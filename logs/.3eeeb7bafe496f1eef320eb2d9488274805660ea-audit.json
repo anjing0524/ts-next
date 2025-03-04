@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/liushuo/code/ts-next-template/logs/.3eeeb7bafe496f1eef320eb2d9488274805660ea-audit.json",
+    "files": [
+        {
+            "date": 1740992327646,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-03.log",
+            "hash": "04d0907058007f9d1d13dd7f2704d06b9d42eea56d15a7441077135bbc268bd3"
+        },
+        {
+            "date": 1741048385263,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-04.log",
+            "hash": "fd788fd52cbb33edaaab5608d5fb93ef943cfb9d2f33a29439107256d5720d3e"
+        }
+    ],
+    "hashType": "sha256"
+}

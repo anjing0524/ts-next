@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/liushuo/code/ts-next-template/logs/.b82e6e7d00629887aa4138cdb3ec335b34440096-audit.json",
+    "files": [
+        {
+            "date": 1741048867599,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-04.log",
+            "hash": "bcf3e46c5d7cd7097ab6610b1e12c68f3a0117328553d2dcb382fad52972d748"
+        }
+    ],
+    "hashType": "sha256"
+}
