@@ -9,7 +9,7 @@
     "lint": "next lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky install",
+    "prepare": "husky",
     "commit": "cz"
   },
   "dependencies": {

@@ -18,7 +18,7 @@ module.exports = {
         'ci', // CI相关变更
       ],
     ],
-    'type-case': [2, 'always', 'lower'],
+    'type-case': [2, 'always', 'lowerCase'], // 修改 'lower' 为 'lowerCase'
     'type-empty': [2, 'never'],
     'subject-empty': [2, 'never'],
     'subject-full-stop': [2, 'never', '.'],
