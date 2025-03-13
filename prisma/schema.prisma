@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model plan_conf {
+  id              Int      @id @default(autoincrement())
+  group_id        Int?
+  plan_id         String   @db.VarChar(100)
+  plan_desc       String?  @db.VarChar(500)
+  time_stage      String?  @db.VarChar(500)
+  plan_deps       String?  @db.VarChar(1000)
+  date_type       Int?
+  cron_str        String   @db.VarChar(100)
+  is_block_skip   String   @db.VarChar(1)
+  is_paused_skip  String   @db.VarChar(1)
+  is_efct         String   @db.VarChar(1)
+  is_his          String   @db.VarChar(45)
+  status          String   @db.VarChar(50)
+  create_time     DateTime @db.DateTime(0)
+  update_time     DateTime @db.DateTime(0)
+  create_user     String?  @db.VarChar(50)
+  update_user     String?  @db.VarChar(50)
+  update_proj_ver String   @db.VarChar(50)
+  lock_ver        Int
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model plan_state {
+  redate      DateTime? @db.Date
+  plan_id     String?   @db.VarChar(100)
+  plan_desc   String?   @db.VarChar(500)
+  exe_id      Int?
+  params      String?   @db.VarChar(500)
+  exec_mode   Int?
+  plan_state  String?   @db.VarChar(1)
+  start_time  DateTime? @db.Timestamp(0)
+  end_time    DateTime? @db.Timestamp(0)
+  cost_time   Decimal?  @db.Decimal(10, 2)
+  total_task  Int?
+  finish_task Int?
+  progress    Decimal?  @db.Decimal(10, 2)
+  exec_desc   String?   @db.VarChar(1000)
+  pid         String?   @db.VarChar(10)
+
+  @@ignore
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model task_conf {
+  id              Int      @id @default(autoincrement())
+  group_id        Int?
+  task_pk         String   @db.VarChar(500)
+  task_id         String?  @db.VarChar(100)
+  task_desc       String?  @db.VarChar(500)
+  plan_id         String?  @db.VarChar(100)
+  task_deps       String?  @db.VarChar(2000)
+  task_type       Int
+  exec_cmd        String   @db.VarChar(1000)
+  tgt_db          String?  @db.VarChar(100)
+  pory            Int?
+  is_retry        String?  @db.VarChar(1)
+  is_his          String   @db.VarChar(45)
+  status          String   @db.VarChar(50)
+  create_time     DateTime @db.DateTime(0)
+  update_time     DateTime @db.DateTime(0)
+  create_user     String   @db.VarChar(50)
+  update_user     String?  @db.VarChar(50)
+  update_proj_ver String   @db.VarChar(50)
+  lock_ver        Int
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model task_state {
+  redate     DateTime? @db.Date
+  task_pk    String    @db.VarChar(500)
+  task_id    String?   @db.VarChar(100)
+  plan_id    String?   @db.VarChar(100)
+  exec_cmd   String?   @db.VarChar(1000)
+  exe_id     Int?
+  task_state String?   @db.VarChar(1)
+  start_time DateTime? @db.Timestamp(0)
+  end_time   DateTime? @db.Timestamp(0)
+  cost_time  Decimal?  @db.Decimal(10, 0)
+  exec_desc  String?   @db.VarChar(1000)
+  ret_value  String?   @db.VarChar(100)
+
+  @@ignore
+}

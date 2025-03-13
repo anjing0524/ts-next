@@ -7,9 +7,11 @@ interface Task {
   delay: number;
   callback: () => void;
   repeat: boolean;
+  maxExecutions?: number; // 最大执行次数
+  executionCount: number; // 已执行次数计数
 }
 
-type TaskOptions = Omit<Task, 'id'>;
+type TaskOptions = Omit<Task, 'id' | 'executionCount'>;
 
 class TimeWheel {
   private slots: Map<string, Task>[];
@@ -34,16 +36,22 @@ class TimeWheel {
    * 添加任务
    * @param options 任务选项
    * @param existingId 可选的现有任务ID
+   * @param executionCount 已执行次数（用于重复任务）
    * @returns 任务ID
    */
-  addTask(options: TaskOptions, existingId?: string): string {
+  addTask(options: TaskOptions, existingId?: string, executionCount: number = 0): string {
     const id = existingId || uuidv4();
-    const task: Task = { ...options, id };
+    const task: Task = { ...options, id, executionCount };
 
     const slotIndex = this.calculateSlotIndex(options.delay);
     this.slots[slotIndex].set(id, task);
+    
+    const maxExecutionsInfo = options.maxExecutions 
+      ? `, 最大执行次数: ${options.maxExecutions}, 当前执行次数: ${executionCount}`
+      : '';
+      
     logger.debug(
-      `添加任务: ${id}, 延迟: ${options.delay}ms, 槽位: ${slotIndex}, 重复: ${options.repeat}`
+      `添加任务: ${id}, 延迟: ${options.delay}ms, 槽位: ${slotIndex}, 重复: ${options.repeat}${maxExecutionsInfo}`
     );
     this.ensureRunning();
     return id;
@@ -120,19 +128,32 @@ class TimeWheel {
   private executeTasks(tasks: Map<string, Task>): void {
     for (const task of tasks.values()) {
       try {
-        logger.debug(`执行任务: ${task.id}`);
+        logger.debug(`执行任务: ${task.id}, 执行次数: ${task.executionCount + 1}`);
         task.callback();
-        if (task.repeat) {
-          logger.debug(`重复任务: ${task.id}, 延迟: ${task.delay}ms`);
-          // 使用相同的ID重新添加任务
+        
+        // 增加执行次数计数
+        const newExecutionCount = task.executionCount + 1;
+        
+        // 检查是否达到最大执行次数
+        if (task.repeat && (!task.maxExecutions || newExecutionCount < task.maxExecutions)) {
+          logger.debug(
+            `重复任务: ${task.id}, 延迟: ${task.delay}ms, 执行次数: ${newExecutionCount}${
+              task.maxExecutions ? `/${task.maxExecutions}` : ''
+            }`
+          );
+          // 使用相同的ID重新添加任务，并传递更新后的执行次数
           this.addTask(
             {
               delay: task.delay,
               callback: task.callback,
               repeat: true,
+              maxExecutions: task.maxExecutions,
             },
-            task.id
+            task.id,
+            newExecutionCount
           );
+        } else if (task.repeat && task.maxExecutions && newExecutionCount >= task.maxExecutions) {
+          logger.info(`任务 ${task.id} 已达到最大执行次数 ${task.maxExecutions}，停止重复执行`);
         }
       } catch (error) {
         logger.error(
@@ -154,6 +175,32 @@ class TimeWheel {
       logger.info('没有剩余任务，停止时间轮');
       this.stop();
     }
+  }
+  
+  /**
+   * 移除任务
+   * @param taskId 任务ID
+   * @returns 是否成功移除
+   */
+  removeTask(taskId: string): boolean {
+    let removed = false;
+    
+    for (const slot of this.slots) {
+      if (slot.has(taskId)) {
+        slot.delete(taskId);
+        removed = true;
+        logger.debug(`移除任务: ${taskId}`);
+        break;
+      }
+    }
+    
+    // 如果没有剩余任务，停止时间轮
+    if (removed && !this.hasRemainingTasks()) {
+      logger.info('移除任务后没有剩余任务，停止时间轮');
+      this.stop();
+    }
+    
+    return removed;
   }
 }
 
