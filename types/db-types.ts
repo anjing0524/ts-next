@@ -1,5 +1,5 @@
 // 自动生成的数据库表结构类型定义
-// 生成时间: 2025-03-11T06:03:32.119Z
+// 生成时间: 2025-03-13T08:32:23.016Z
 
 export interface PlanConf {
   id: number;
@@ -7,6 +7,7 @@ export interface PlanConf {
   plan_id: string; // 计划id
   plan_desc: string | null; // 计划描述
   time_stage: string | null; // 时间阶段
+  project: string | null; // 项目
   plan_deps: string | null; // 前置依赖计划
   date_type: number | null; // 调度日期类型
   cron_str: string; // cron表达式
@@ -24,6 +25,7 @@ export interface PlanConf {
 }
 
 export interface PlanState {
+  id: number;
   redate: Date | null; // 调度日期
   plan_id: string | null; // 计划id
   plan_desc: string | null; // 计划描述
@@ -39,8 +41,6 @@ export interface PlanState {
   progress: number | null; // 执行进度
   exec_desc: string | null; // 执行信息
   pid: string | null; // 进程id
-  // 冗余字段
-  time_stage: string | null; // 时间阶段
 }
 
 export interface TaskConf {
@@ -67,6 +67,7 @@ export interface TaskConf {
 }
 
 export interface TaskState {
+  id: number;
   redate: Date | null; // 调度日期
   task_pk: string; // 任务主键
   task_id: string | null; // 任务id

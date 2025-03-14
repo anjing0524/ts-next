@@ -14,6 +14,7 @@ model plan_conf {
   plan_id         String   @db.VarChar(100)
   plan_desc       String?  @db.VarChar(500)
   time_stage      String?  @db.VarChar(500)
+  project         String?  @db.VarChar(500)
   plan_deps       String?  @db.VarChar(1000)
   date_type       Int?
   cron_str        String   @db.VarChar(100)
@@ -30,9 +31,9 @@ model plan_conf {
   lock_ver        Int
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model plan_state {
+  id          Int       @id @default(autoincrement())
   redate      DateTime? @db.Date
   plan_id     String?   @db.VarChar(100)
   plan_desc   String?   @db.VarChar(500)
@@ -48,8 +49,6 @@ model plan_state {
   progress    Decimal?  @db.Decimal(10, 2)
   exec_desc   String?   @db.VarChar(1000)
   pid         String?   @db.VarChar(10)
-
-  @@ignore
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -76,9 +75,9 @@ model task_conf {
   lock_ver        Int
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model task_state {
+  id         Int       @id @default(autoincrement())
   redate     DateTime? @db.Date
   task_pk    String    @db.VarChar(500)
   task_id    String?   @db.VarChar(100)
@@ -91,6 +90,4 @@ model task_state {
   cost_time  Decimal?  @db.Decimal(10, 0)
   exec_desc  String?   @db.VarChar(1000)
   ret_value  String?   @db.VarChar(100)
-
-  @@ignore
 }

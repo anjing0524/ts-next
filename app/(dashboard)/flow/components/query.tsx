@@ -10,20 +10,28 @@ import { zhCN } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { FlowStage, useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
 
 interface QueryProps {
   options: string[];
-  onSearch?: (date: Date | null, selectedOptions: string[] | null) => Promise<any> | void;
+  onSearch?: (date: Date | null, selectedOptions: string[] | null) => Promise<FlowStage[] | null>;
 }
 
 export function Query({ options, onSearch }: QueryProps) {
   const [date, setDate] = useState<Date>(new Date());
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const { setProjects, setStages } = useFlowStore();
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!onSearch) return;
     // 简化逻辑，直接传递选中的选项
-    onSearch(date, selectedOptions.length > 0 ? selectedOptions : null);
+    const selectdOptions = selectedOptions.length > 0 ? selectedOptions : null;
+    setProjects(selectdOptions || []);
+    const result = await onSearch(date, selectdOptions);
+    console.log(result);
+    if (result) {
+      setStages(result);
+    }
   };
 
   return (
@@ -57,9 +65,9 @@ export function Query({ options, onSearch }: QueryProps) {
       </div>
 
       <MultiSelect
-        label="时间阶段"
+        label="项目平台"
         options={options}
-        placeholder="选择时间阶段"
+        placeholder="选择项目平台"
         onChange={setSelectedOptions}
         className="flex"
       />

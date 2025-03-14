@@ -29,6 +29,11 @@
             "date": 1741833400449,
             "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-13.log",
             "hash": "deab0e4fa3eb0dfb4c7f6553a7362c701d8d7d650fc3aa594a2ca2d74e576214"
+        },
+        {
+            "date": 1741921837048,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-14.log",
+            "hash": "bf618a7f4b180c0730c9e97b92ff0eefc9f7c13e1aa8666b2f46477f4309d95e"
         }
     ],
     "hashType": "sha256"

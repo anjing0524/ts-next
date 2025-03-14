@@ -3,23 +3,27 @@ import { format } from 'date-fns';
 import logger from '@/utils/logger';
 import mysqlPool from '@/lib/instance/mysql-client';
 import { PlanConf, PlanState } from '@/types/db-types';
+import { PlanStateWithTimeStage } from '../(dashboard)/flow/types/type';
+import { FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
+import { Edge } from '@xyflow/react';
 
 // 获取所有有效的服务器配置
 export async function getAllPlanConf() {
   try {
     // 使用 MySQL 连接池执行查询
     const [rows] = await mysqlPool.query(
-      `SELECT plan_id, time_stage, plan_deps, plan_desc
+      `SELECT id, plan_id, time_stage, plan_deps, plan_desc, project
          FROM plan_conf 
          WHERE time_stage IS NOT NULL 
+         and project IS NOT NULL 
          and status <> 'OFF' 
          and is_his = 'N'
          and upper(is_efct) = 'Y'`
     );
     // 过滤掉无效的时间阶段
-    const validRows = (rows as PlanConf[]).filter(
-      (row) => row.time_stage !== null && row.time_stage !== '' && row.time_stage !== '-'
-    );
+    const validRows = (rows as PlanConf[])
+      .filter((row) => row.time_stage !== null && row.time_stage !== '' && row.time_stage !== '-')
+      .filter((row) => row.project !== null && row.project !== '' && row.project !== '-');
     return validRows;
   } catch (error) {
     console.error('获取 plan_conf 失败:', error);
@@ -66,20 +70,32 @@ export async function getPlanState(redate: string, planIds: string[]) {
 /**
  * 处理搜索事件的 Server Action
  */
-export async function handleSearch(date: Date | null, selectedOptions: string[] | null) {
-  if (!date) return { nodes: [], edges: [] };
+export async function handleSearch(
+  date: Date | null,
+  selectedOptions: string[] | null
+): Promise<FlowStage[] | null> {
+  if (!date) return null;
   const dateStr = format(date, 'yyyy/MM/dd');
+  // 创建 Map: project => plan_id[]
+  const projectMap = new Map<string, string[]>();
   // 创建 Map: time_stage -> plan_id[]
   const timeStageMap = new Map<string, string[]>();
   const allPlanConfs = await getAllPlanConf();
   // 遍历结果，将 plan_id 按 time_stage 分组
   allPlanConfs.forEach((row) => {
     const timeStage = row.time_stage as string;
+    const project = row.project as string;
     const planId = row.plan_id;
+    // 填充时间阶段分组
     if (!timeStageMap.has(timeStage)) {
       timeStageMap.set(timeStage, []);
     }
     timeStageMap.get(timeStage)?.push(planId);
+    // 填充项目分组
+    if (!projectMap.has(project)) {
+      projectMap.set(project, []);
+    }
+    projectMap.get(project)?.push(planId);
   });
 
   // 创建MAP: plan_id -> time_stage
@@ -93,19 +109,19 @@ export async function handleSearch(date: Date | null, selectedOptions: string[] 
   // 获取计划ID：如果未选择则获取所有，否则获取选中的
   const allPlanIds =
     !selectedOptions || selectedOptions.length === 0
-      ? Array.from(timeStageMap.values()).flat() // 获取所有计划ID
-      : selectedOptions.flatMap((option) => timeStageMap.get(option) || []); // 获取选中的计划ID
+      ? Array.from(projectMap.values()).flat() // 获取所有计划ID
+      : selectedOptions.flatMap((option) => projectMap.get(option) || []); // 获取选中的计划ID
 
   // 记录搜索条件
   logger.info(
     `搜索条件: 日期=${dateStr}, ` +
-      `时间阶段=${allPlanIds?.length ? allPlanIds.join(', ') : '未选择'}, ` +
+      `计划ID=${allPlanIds?.length ? allPlanIds.join(', ') : '未选择'}, ` +
       `计划ID数量=${allPlanIds.length}`
   );
   const planStates = await getPlanState(dateStr, allPlanIds);
-  //
+
   // 按 time_stage 分组（需要从 planConfs 中获取对应的 time_stage）
-  const groupedByStage = new Map<string, PlanState[]>();
+  const groupedByStage = new Map<string, PlanStateWithTimeStage[]>();
   planStates.forEach((state) => {
     // 查找对应的配置项获取 time_stage
     const stage = planIdToTimeStageMap.get(state.plan_id as string);
@@ -124,35 +140,78 @@ export async function handleSearch(date: Date | null, selectedOptions: string[] 
   groupedByStage.forEach((states, stage) => {
     logger.info(`- ${stage}: ${states.length} 条`);
   });
-  logger.info(`查询到计划状态数据: ${planStates.length}条`);
+  // 根据分组数据计算状态统计
+  const stageStats = new Map<
+    string,
+    {
+      total: number;
+      success: number;
+      failed: number;
+      running: number;
+      waiting: number;
+    }
+  >();
 
-  // 根据分组数据 计算每一行 总数量 成功数量 失败数量 执行中数量 等待数量 使用PlanState status 字段
-
-  // 根据time_stage groupedByStage 数据
-  // 每个分组使用PlanConfs 创建一个Dag 图数组， 判断 plan_deps 为空 则plan_id 为根节点，根据根节点和 plan_deps 生成Dag 图，该图用做边描述
-  // 每个分组使用PlanState 数据 生成节点数据， 节点数据使用PlanState 数据， 节点数据使用PlanState status 字段 生成节点颜色
+  groupedByStage.forEach((states, stage) => {
+    stageStats.set(stage, {
+      total: states.length,
+      success: states.filter((s) => s.plan_state === 'D').length,
+      failed: states.filter((s) => s.plan_state === 'F').length,
+      running: states.filter((s) => s.plan_state === 'R').length,
+      waiting: states.filter((s) => s.plan_state === 'P' || s.plan_state === 'Z').length,
+    });
+  });
   // 生成DAG图数据
   const dagData = Array.from(groupedByStage).map(([stage, states]) => {
     // 生成节点数据（结合状态信息）
-    const nodes = states.map((state) => {
+    const nodes = states.map((state, index) => {
+      // 状态映射为前端友好的格式
+      let status = null;
+      switch (state.plan_state) {
+        case 'D':
+          status = 'success';
+          break;
+        case 'F':
+          status = 'error';
+          break;
+        case 'R':
+          status = 'running';
+          break;
+        case 'P':
+        case 'Z':
+          status = 'waiting';
+          break;
+      }
+
       return {
-        id: state.plan_id,
-        label: `${state.plan_id}\n${state.plan_desc}`,
-        // 需要转化为success error
-        status: state?.plan_state?.toLowerCase() || 'unknown',
-        data: state,
+        id: state.plan_id || `node-${index}`, // 确保id不为null
+        label: `${state.plan_id}\n${state.plan_desc || ''}`,
+        status,
+        // 添加必需的position属性
+        position: { x: 100 + index * 200, y: 100 },
+        // 添加type属性，与flow-store中的设置保持一致
+        type: 'custom',
+        data: {
+          ...state,
+          // 添加格式化的时间和进度信息
+          startTime: state.start_time ? new Date(state.start_time).toLocaleString() : '未开始',
+          endTime: state.end_time ? new Date(state.end_time).toLocaleString() : '未结束',
+          costTime: state.cost_time ? `${state.cost_time}秒` : '-',
+          progress: state.progress ? `${state.progress}%` : '0%',
+        },
       };
     });
 
     // 获取当前阶段的所有计划配置
     const stageConfs = allPlanConfs.filter((conf) => conf.time_stage === stage);
+    const planIdSet = new Set(stageConfs.map((conf) => conf.plan_id));
     // 生成边数据（处理依赖关系）
-    const edges = stageConfs.reduce((acc: any[], conf) => {
+    const edges = stageConfs.reduce((acc: Edge[], conf) => {
       if (conf.plan_deps) {
         const dependencies = conf.plan_deps
           .split(',')
           .map((dep) => dep.trim())
-          .filter((dep) => stageConfs.some((c) => c.plan_id === dep)); // 仅保留本阶段内的依赖
+          .filter((dep) => planIdSet.has(dep)); // 仅保留本阶段内的依赖
 
         dependencies.forEach((depId) => {
           acc.push({
@@ -164,19 +223,30 @@ export async function handleSearch(date: Date | null, selectedOptions: string[] 
       }
       return acc;
     }, []);
-
-    // 记录分组统计（包含状态分布）
-    const statusCounts = states.reduce((acc: Record<string, number>, state) => {
-      const status = state.plan_state || 'UNKNOWN';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
-
-    logger.info(`[${stage}] 状态分布: ${JSON.stringify(statusCounts)}`);
+    logger.info(`${JSON.stringify(edges)}`);
     logger.info(`[${stage}] 节点数: ${nodes.length}, 边数: ${edges.length}`);
-    return { stage, nodes, edges };
-  });
 
-  // 返回第一个分组的DAG数据（示例）
-  return dagData.length > 0 ? dagData[0] : { nodes: [], edges: [] };
+    // 获取当前阶段的统计数据
+    const stats = stageStats.get(stage) || {
+      total: 0,
+      success: 0,
+      failed: 0,
+      running: 0,
+      waiting: 0,
+    };
+
+    return {
+      id: stage,
+      name: stage,
+      nodes,
+      edges,
+      // 添加统计数据，符合 FlowStats 接口
+      stats: {
+        name: stage,
+        ...stats,
+      },
+    };
+  });
+  // 返回所有分组的DAG数据，符合 FlowState 接口
+  return dagData;
 }
