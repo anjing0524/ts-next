@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { FlowStage, useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
@@ -20,22 +20,30 @@ interface QueryProps {
 export function Query({ options, onSearch }: QueryProps) {
   const [date, setDate] = useState<Date>(new Date());
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { setProjects, setStages } = useFlowStore();
 
   const handleSearch = async () => {
     if (!onSearch) return;
-    // 简化逻辑，直接传递选中的选项
-    const selectdOptions = selectedOptions.length > 0 ? selectedOptions : null;
-    setProjects(selectdOptions || []);
-    const result = await onSearch(date, selectdOptions);
-    console.log(result);
-    if (result) {
-      setStages(result);
+
+    setIsLoading(true);
+    try {
+      // 简化逻辑，直接传递选中的选项
+      const selectdOptions = selectedOptions.length > 0 ? selectedOptions : null;
+      setProjects(selectdOptions || []);
+      const result = await onSearch(date, selectdOptions);
+      if (result) {
+        setStages(result);
+      }
+    } catch (error) {
+      console.error('查询出错:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center gap-4 p-3 bg-white rounded-md shadow-sm">
+    <div className="flex items-center gap-4 p-4 mx-4 bg-white rounded-md shadow-sm">
       <div className="flex items-center gap-2">
         <Label className="text-sm whitespace-nowrap">日期:</Label>
         <Popover>
@@ -72,8 +80,15 @@ export function Query({ options, onSearch }: QueryProps) {
         className="flex"
       />
 
-      <Button className="h-9" onClick={handleSearch}>
-        查询
+      <Button className="h-9" onClick={handleSearch} disabled={isLoading}>
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            查询中...
+          </>
+        ) : (
+          '查询'
+        )}
       </Button>
     </div>
   );

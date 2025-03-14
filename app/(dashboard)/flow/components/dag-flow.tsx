@@ -176,8 +176,8 @@ export function DagFlow() {
   // 渲染流程图
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <ScrollArea className="flex-1 mx-4 mb-4">
-        <div className="space-y-8 p-4">
+      <ScrollArea className="flex-1">
+        <div className="space-y-4 mx-4">
           {stagesToShow.map((stage) => (
             <div key={stage.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* 阶段标题和统计信息 */}

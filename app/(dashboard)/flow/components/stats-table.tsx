@@ -15,8 +15,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export function StatsTable() {
-  // 使用 shallow 比较优化状态选择
-  const stages = useFlowStore(useShallow((state) => state.stages));
+  // 使用 shallow 比较优化状态选择，同时获取 currentStage 和 setCurrentStage
+  const { stages, currentStage, setCurrentStage } = useFlowStore(
+    useShallow((state) => ({
+      stages: state.stages,
+      currentStage: state.currentStage,
+      setCurrentStage: state.setCurrentStage,
+    }))
+  );
 
   // 计算所有阶段的统计数据
   const stats = React.useMemo(() => {
@@ -25,6 +31,19 @@ export function StatsTable() {
   }, [stages]);
 
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // 处理双击事件
+  const handleRowDoubleClick = React.useCallback(
+    (stageName: string) => {
+      // 如果当前已选中该阶段，则取消选中；否则选中该阶段
+      if (currentStage === stageName) {
+        setCurrentStage('');
+      } else {
+        setCurrentStage(stageName);
+      }
+    },
+    [currentStage, setCurrentStage]
+  );
 
   // 定义表格列
   const columns: ColumnDef<FlowStats>[] = React.useMemo(
@@ -129,25 +148,9 @@ export function StatsTable() {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  if (stats.length === 0) {
-    return (
-      <div className="rounded-md border p-4 text-center">
-        <p className="text-sm text-gray-500">暂无统计数据</p>
-      </div>
-    );
-  }
-
-  // 使用标准表格渲染而不是虚拟列表，先确认基本功能正常
   return (
-    <div className="rounded-md border main">
-      <div
-        ref={tableContainerRef}
-        className="overflow-auto"
-        style={{
-          position: 'relative',
-          height: Math.min(stats.length * 50 + 40, 400),
-        }}
-      >
+    <div className="rounded-md border mx-4 bg-white">
+      <div className="relative w-full overflow-auto" ref={tableContainerRef}>
         <UITable>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -155,8 +158,9 @@ export function StatsTable() {
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    style={{ width: header.getSize() }}
-                    className="bg-muted/50"
+                    style={{
+                      width: header.getSize(),
+                    }}
                   >
                     {header.isPlaceholder
                       ? null
@@ -167,15 +171,37 @@ export function StatsTable() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className={row.index % 2 ? 'bg-muted/10' : 'bg-background'}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getValue('name') === currentStage ? 'selected' : undefined}
+                  className={
+                    row.getValue('name') === currentStage
+                      ? 'bg-muted/50 hover:bg-muted/70 cursor-pointer'
+                      : 'hover:bg-muted/30 cursor-pointer'
+                  }
+                  onDoubleClick={() => handleRowDoubleClick(row.getValue('name'))}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      style={{
+                        width: cell.column.getSize(),
+                      }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  暂无数据
+                </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </UITable>
       </div>
