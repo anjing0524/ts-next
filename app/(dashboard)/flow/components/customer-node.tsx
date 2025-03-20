@@ -41,13 +41,13 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         }
       });
     }
-  }, [date, projects]);
+  }, [date, projects, setStages]);
 
   // 在需要打开任务详情对话框的地方
   const [loading, setLoading] = useState<string | null>(null);
   // 从data中获取更多信息
   const { plan_id, plan_desc, progress, cost_time, redate, exe_id, status, pid } =
-    data as any as PlanStateWithStatus;
+    data as unknown as PlanStateWithStatus;
 
   // 使用 useCallback 优化函数，依赖项包括 plan_id, plan_desc, redate, exe_id 和 openTaskDetail
   const handleViewDetails = useCallback(() => {
@@ -94,7 +94,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         setLoading(null);
       }
     },
-    [plan_id, redate]
+    [plan_id, redate, refresh]
   );
 
   // 处理重跑失败任务
@@ -132,7 +132,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         setLoading(null);
       }
     },
-    [plan_id, redate, exe_id]
+    [plan_id, redate, exe_id, refresh]
   );
 
   // 处理停止计划
@@ -169,7 +169,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         setLoading(null);
       }
     },
-    [plan_id, redate, pid]
+    [plan_id, redate, pid, refresh]
   );
 
   // 状态配置映射表 - 直接使用 status 字段

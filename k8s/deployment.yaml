@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ts-next-template
+  labels:
+    app: ts-next-template
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ts-next-template
+  template:
+    metadata:
+      labels:
+        app: ts-next-template
+    spec:
+      containers:
+        - name: ts-next-template
+          image: your-registry/ts-next-template:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_HOST
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ts-next-template-secrets
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_DATABASE
+          resources:
+            limits:
+              cpu: '1'
+              memory: '512Mi'
+            requests:
+              cpu: '0.5'
+              memory: '256Mi'

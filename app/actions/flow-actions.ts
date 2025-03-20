@@ -5,11 +5,7 @@ import mysqlPool from '@/lib/instance/mysql-client';
 import { PlanConf, PlanState, TaskState } from '@/types/db-types';
 import { FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
 import { Edge, Node } from '@xyflow/react';
-import {
-  PlanStateWithStatus,
-  TaskConfState,
-  TaskStateDetailType,
-} from '../(dashboard)/flow/types/type';
+import { TaskConfState, TaskStateDetailType } from '../(dashboard)/flow/types/type';
 
 /**
  * 获取所有有效的计划配置
@@ -111,7 +107,7 @@ export async function handleSearch(
 
   // 提前构建每个阶段的计划配置（根据项目过滤）
   const stageConfsMap = new Map<string, PlanConf[]>();
-  for (const [stage, _] of timeStageMap.entries()) {
+  for (const [stage] of timeStageMap.entries()) {
     // 过滤符合条件的计划配置：
     // 1. 时间阶段匹配
     // 2. 计划ID在过滤后的ID列表中
@@ -427,7 +423,7 @@ export async function getTaskDetails(
  */
 async function callSchedulerApi(
   endpoint: string,
-  payload: any
+  payload: { date: string; planId: string; rerunMode: number; param?: string }
 ): Promise<{ success: boolean; message: string; state: number }> {
   try {
     const response = await fetch(`${process.env.SCHEDULER_API_URL}${endpoint}`, {
@@ -598,13 +594,13 @@ export async function stopPlan(
       [planId, redate, pid]
     );
 
-    if (!(runningPlan as any)[0]) {
+    if (!(runningPlan as PlanState[])[0]) {
       logger.warn(`停止计划失败: 计划 ${planId} 在进程 ${pid} 中不存在`);
       return { success: false, message: '指定的计划执行不存在', state: -1 };
     }
 
-    const planState = (runningPlan as any)[0].plan_state;
-    if (!['R', 'P', 'A', 'S'].includes(planState)) {
+    const planState = (runningPlan as PlanState[])[0].plan_state;
+    if (planState && !['R', 'P', 'A', 'S'].includes(planState)) {
       logger.warn(`停止计划失败: 计划 ${planId} 不在运行中，当前状态: ${planState}`);
       return { success: false, message: '只能停止运行中的计划', state: 1 }; // 状态码改为1，表示不在执行状态
     }
@@ -654,108 +650,6 @@ export async function stopPlan(
       state: -1,
     };
   }
-}
-
-/**
- * 并行获取任务详情并补充到节点中
- * @param nodes 节点列表
- * @param dateStr 日期字符串
- */
-async function enrichNodesWithTaskDetails(nodes: Node[], dateStr: string): Promise<void> {
-  // 过滤出有效的节点（有执行ID的节点）
-  const validNodes = nodes.filter((node) => {
-    const state = node.data as any as PlanStateWithStatus;
-    return state && state.exe_id;
-  });
-
-  if (validNodes.length === 0) {
-    logger.info('没有需要获取任务详情的有效节点');
-    return;
-  }
-
-  // 设置最大并发数，不超过10
-  const maxConcurrent = Math.min(10, validNodes.length);
-  logger.info(
-    `开始并行获取任务详情，有效节点数: ${validNodes.length}, 最大并发数: ${maxConcurrent}`
-  );
-
-  // 待处理节点队列
-  const nodeQueue = [...validNodes];
-  // 已完成任务计数
-  let completedCount = 0;
-  const totalCount = validNodes.length;
-
-  // 创建任务处理函数
-  const processNode = async (node: Node): Promise<Node> => {
-    const planId = node.id as string;
-    try {
-      const state = node.data as any as PlanStateWithStatus;
-      const exeId = state.exe_id as number;
-      // 添加超时控制
-      const taskDetailsPromise = getTaskDetails(planId, dateStr, exeId);
-      const timeoutPromise = new Promise<TaskConfState[]>((_, timeoutReject) => {
-        setTimeout(() => timeoutReject(new Error(`获取节点 ${planId} 任务详情超时`)), 3000);
-      });
-      // 使用Promise.race实现超时控制
-      const taskDetails = await Promise.race([taskDetailsPromise, timeoutPromise]);
-      // 将任务详情添加到节点数据中
-      node.data = {
-        ...node.data,
-        taskDetails,
-      };
-      logger.debug(`节点 ${planId} 的任务详情获取成功，任务数: ${taskDetails.length}`);
-    } catch (error) {
-      logger.error(`获取节点 ${planId} 的任务详情失败:`, error);
-      // 即使失败也添加空的任务详情，避免前端处理异常
-      node.data = {
-        ...node.data,
-        taskDetails: [],
-      };
-    }
-    // 更新计数
-    completedCount++;
-
-    // 记录进度
-    if (completedCount % 5 === 0 || completedCount === totalCount) {
-      logger.info(`任务详情获取进度: ${completedCount}/${totalCount}`);
-    }
-
-    return node;
-  };
-
-  // 活跃任务映射
-  const activeTasksMap = new Map<string, Promise<Node>>();
-
-  // 处理队列函数
-  const processQueue = async () => {
-    // 初始填充活跃任务池
-    while (activeTasksMap.size < maxConcurrent && nodeQueue.length > 0) {
-      const node = nodeQueue.shift()!;
-      const promise = processNode(node);
-      activeTasksMap.set(node.id as string, promise);
-    }
-
-    // 持续处理直到所有任务完成
-    while (activeTasksMap.size > 0) {
-      // 使用Promise.race等待任意一个任务完成
-      const promises = Array.from(activeTasksMap.values());
-      const completedNode = await Promise.race(promises);
-
-      // 从映射中移除已完成的任务
-      activeTasksMap.delete(completedNode.id as string);
-
-      // 如果队列中还有任务，添加新任务到活跃任务映射
-      if (nodeQueue.length > 0) {
-        const newNode = nodeQueue.shift()!;
-        const newPromise = processNode(newNode);
-        activeTasksMap.set(newNode.id as string, newPromise);
-      }
-    }
-
-    logger.info(`所有节点的任务详情获取完成，总计: ${totalCount}`);
-  };
-  // 执行队列处理
-  await processQueue();
 }
 
 /**

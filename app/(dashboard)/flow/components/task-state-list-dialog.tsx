@@ -1,30 +1,30 @@
 'use client';
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
+import { TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
+import { getTaskDetails } from '@/app/actions/flow-actions';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
-  useReactTable,
-  SortingState,
   getSortedRowModel,
   Row,
+  SortingState,
+  useReactTable,
 } from '@tanstack/react-table';
-import { Badge } from '@/components/ui/badge';
-import { TaskConfState, TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
-import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
-import { useShallow } from 'zustand/react/shallow';
-import { format } from 'date-fns';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
-import { getTaskDetails } from '@/app/actions/flow-actions';
-import { TaskStateDetail } from './task-state-detail';
+import { format } from 'date-fns';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { TASK_STATE_MAP } from '../cons';
+import { TaskStateDetail } from './task-state-detail';
 
 // 表格行组件接口
 interface TableBodyRowProps {
