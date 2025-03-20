@@ -2,7 +2,7 @@
 
 import { ReactFlow, Background, Controls, MiniMap, Node, MarkerType, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { nodeTypes } from './customer-node';
 import { useFlowStore, FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -75,7 +75,7 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
 
   // 水平间距和垂直间距（可根据节点大小调整）
   const horizontalGap = 250; // 增加水平间距，避免节点重叠
-  const verticalGap = 150; // 增加垂直间距，提高可读性
+  const verticalGap = 200; // 增加垂直间距，提高可读性
 
   // 为每一层的节点分配位置
   layers.forEach((layer, layerIndex) => {
@@ -113,9 +113,6 @@ export function DagFlow() {
     }))
   );
 
-  // 记录每个阶段中选中的节点
-  const [selectedNodes, setSelectedNodes] = useState<Record<string, string | null>>({});
-
   // 根据当前选中的阶段过滤要显示的数据
   const stagesToShow = useMemo(() => {
     if (!currentStage) {
@@ -124,50 +121,37 @@ export function DagFlow() {
     return stages.filter((stage) => stage.name === currentStage);
   }, [stages, currentStage]);
 
-  // 处理节点点击事件
-  const onNodeClick = useCallback(
-    (stageId: string) => (event: React.MouseEvent, node: Node) => {
-      setSelectedNodes((prev) => ({
-        ...prev,
-        [stageId]: node.id, // 记录当前阶段选中的节点
-      }));
-      event.stopPropagation(); // 阻止事件冒泡
-    },
-    []
-  );
+  // 计算节点位置
+  const getNodesWithPosition = useCallback((stage: FlowStage) => {
+    // 计算节点位置
+    const nodesWithPosition = calculateNodePositions(stage.nodes, stage.edges);
 
-  // 处理画布点击事件（取消选中）
-  const onPaneClick = useCallback(
-    (stageId: string) => () => {
-      setSelectedNodes((prev) => ({
-        ...prev,
-        [stageId]: null, // 清除当前阶段的选中状态
-      }));
-    },
-    []
-  );
+    // 添加节点类型，确保使用自定义节点
+    return nodesWithPosition.map((node) => ({
+      ...node,
+      type: 'custom',
+    }));
+  }, []);
 
-  // 计算节点位置并添加选中状态
-  const getNodesWithPositionAndSelection = useCallback(
-    (stage: FlowStage) => {
-      // 先计算节点位置
-      const nodesWithPosition = calculateNodePositions(stage.nodes, stage.edges);
-
-      // 再添加选中状态
-      return nodesWithPosition.map((node) => ({
-        ...node,
-        selected: node.id === selectedNodes[stage.id],
-        // 添加节点类型，确保使用自定义节点
-        type: 'custom',
-      }));
-    },
-    [selectedNodes]
-  );
+  // 计算流程图容器的动态高度
+  const calculateFlowHeight = useCallback((stage: FlowStage) => {
+    // 获取节点位置信息
+    const nodesWithPosition = calculateNodePositions(stage.nodes, stage.edges);
+    // 如果没有节点，返回默认高度
+    if (nodesWithPosition.length === 0) return 600;
+    // 找出最大的y坐标值
+    const maxY = Math.max(...nodesWithPosition.map((node) => node.position.y));
+    // 根据最大y值计算合适的高度，加上额外空间以确保底部节点完全显示
+    // 假设每个节点高度约为100px，底部需要额外200px的空间
+    const calculatedHeight = maxY + 300;
+    // 设置最小高度为600px，确保即使节点很少也有足够的显示空间
+    return Math.max(600, calculatedHeight);
+  }, []);
 
   // 当没有数据时显示提示信息
   if (stagesToShow.length === 0) {
     return (
-      <div className="flex flex-col h-screen bg-gray-50 items-center justify-center">
+      <div className="flex flex-col h-16 bg-gray-50 items-center justify-center">
         <p className="text-lg text-gray-500">暂无数据，请先进行查询</p>
       </div>
     );
@@ -175,9 +159,9 @@ export function DagFlow() {
 
   // 渲染流程图
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <ScrollArea className="flex-1">
-        <div className="space-y-4 mx-4">
+    <div className="flex flex-col h-full bg-gray-50">
+      <ScrollArea className="flex-1 h-full">
+        <div className="space-y-4 mx-4 pb-8">
           {stagesToShow.map((stage) => (
             <div key={stage.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* 阶段标题和统计信息 */}
@@ -190,19 +174,22 @@ export function DagFlow() {
                 </div>
               </div>
 
-              {/* 流程图容器 */}
-              <div style={{ height: '500px' }}>
+              {/* 流程图容器 - 使用动态高度 */}
+              <div style={{ height: `${calculateFlowHeight(stage)}px` }} className="relative">
                 <ReactFlow
-                  nodes={getNodesWithPositionAndSelection(stage)}
+                  nodes={getNodesWithPosition(stage)}
                   edges={stage.edges}
                   nodeTypes={nodeTypes}
                   fitView
-                  onNodeClick={onNodeClick(stage.id)}
-                  onPaneClick={onPaneClick(stage.id)}
+                  fitViewOptions={{
+                    padding: 0.2, // 增加边距，确保所有节点可见
+                    includeHiddenNodes: true,
+                    duration: 800, // 平滑过渡动画
+                  }}
                   defaultEdgeOptions={{
                     type: 'smoothstep',
                     style: {
-                      strokeWidth: 2, // 增加边的粗细
+                      strokeWidth: 2,
                       stroke: '#888', // 设置边的颜色
                       strokeDasharray: '', // 实线
                     },
@@ -216,8 +203,8 @@ export function DagFlow() {
                   }}
                   // 视图设置
                   defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-                  minZoom={0.5}
-                  maxZoom={2}
+                  minZoom={0.6} // 限制最小缩放比例，防止内容过小
+                  maxZoom={1.5} // 限制最大缩放比例，防止内容过大
                   snapToGrid={true}
                   snapGrid={[15, 15]}
                   // 添加全局样式
@@ -227,18 +214,41 @@ export function DagFlow() {
                     account: 'paid-pro',
                   }}
                   // 提高性能的选项
-                  elevateNodesOnSelect={true}
-                  elementsSelectable={true}
-                  zoomOnScroll={true}
-                  panOnScroll={true}
+                  elevateNodesOnSelect={false}
+                  elementsSelectable={false}
+                  zoomOnScroll={false} // 禁用滚轮缩放，避免意外操作
+                  panOnScroll={false} // 禁用滚轮平移，避免意外操作
                   panOnDrag={true}
+                  nodesConnectable={false}
+                  preventScrolling={false} // 允许页面滚动
                 >
                   {/* 背景网格 */}
                   <Background color="#f8f8f8" gap={16} size={1} />
                   {/* 控制面板 */}
-                  <Controls showInteractive={true} />
+                  <Controls
+                    showInteractive={true}
+                    position="bottom-right"
+                    style={{
+                      bottom: 10,
+                      right: 10,
+                      display: 'flex',
+                      flexDirection: 'row',
+                      gap: '5px',
+                    }}
+                  />
                   {/* 小地图 */}
-                  <MiniMap nodeStrokeWidth={3} zoomable pannable />
+                  <MiniMap
+                    nodeStrokeWidth={3}
+                    zoomable
+                    pannable
+                    position="top-right"
+                    style={{
+                      top: 10,
+                      right: 10,
+                      width: 150,
+                      height: 100,
+                    }}
+                  />
                 </ReactFlow>
               </div>
             </div>

@@ -6,16 +6,6 @@
     "auditLog": "/Users/liushuo/code/ts-next-template/logs/.3eeeb7bafe496f1eef320eb2d9488274805660ea-audit.json",
     "files": [
         {
-            "date": 1740992327646,
-            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-03.log",
-            "hash": "04d0907058007f9d1d13dd7f2704d06b9d42eea56d15a7441077135bbc268bd3"
-        },
-        {
-            "date": 1741048385263,
-            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-04.log",
-            "hash": "fd788fd52cbb33edaaab5608d5fb93ef943cfb9d2f33a29439107256d5720d3e"
-        },
-        {
             "date": 1741656534993,
             "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-11.log",
             "hash": "286e32fd6e1ce9fc22dbc493c10880ec669c2aaed4d1ea0d869c9f5b5195b931"
@@ -34,6 +24,26 @@
             "date": 1741921837048,
             "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-14.log",
             "hash": "bf618a7f4b180c0730c9e97b92ff0eefc9f7c13e1aa8666b2f46477f4309d95e"
+        },
+        {
+            "date": 1742173897610,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-17.log",
+            "hash": "3da8953acf8550bcd5fd028a29d9b641bf0df38f1ac6b238b9e974a763f02c03"
+        },
+        {
+            "date": 1742276712427,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-18.log",
+            "hash": "46ba6e2633034618882741f57a0663fb0aa6efa8396ddfe04c1d96c9f5002070"
+        },
+        {
+            "date": 1742345136090,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-19.log",
+            "hash": "5c71ec071d0f690397a407ac216f598094f28d70305a85dacd2c7ee5034c0ec7"
+        },
+        {
+            "date": 1742434872048,
+            "name": "/Users/liushuo/code/ts-next-template/logs/2025-03-20.log",
+            "hash": "a013323ca2f136c199f879f1965b7285e16903cfaca5629ba942e05937307924"
         }
     ],
     "hashType": "sha256"

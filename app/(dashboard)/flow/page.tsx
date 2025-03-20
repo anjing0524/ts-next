@@ -4,6 +4,7 @@ import { Query } from './components/query';
 import { getAllPlanConf, handleSearch } from '@/app/actions/flow-actions';
 import { PlanConf } from '@/types/db-types';
 import { StatsTable } from './components/stats-table';
+import { TaskDetailsDialog } from './components/task-state-list-dialog';
 
 export default async function Flow() {
   const planConfs: PlanConf[] = await getAllPlanConf();
@@ -14,6 +15,7 @@ export default async function Flow() {
       <Query options={options} onSearch={handleSearch} />
       <StatsTable />
       <DagFlow />
+      <TaskDetailsDialog />
     </>
   );
 }
