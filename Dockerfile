@@ -1,19 +1,15 @@
-FROM node:20-alpine AS base
-
-# 设置工作目录
-WORKDIR /app
+# 使用预构建的基础镜像
+FROM ts-next-template-base:latest AS base
 
 # 安装依赖阶段
 FROM base AS deps
-# 安装构建工具和依赖
-RUN apk add --no-cache libc6-compat
 
 # 根据锁文件选择合适的包管理器安装依赖
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+  elif [ -f pnpm-lock.yaml ]; then pnpm i --frozen-lockfile; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
@@ -30,7 +26,7 @@ COPY . .
 RUN \
   if [ -f yarn.lock ]; then yarn run build; \
   elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
+  elif [ -f pnpm-lock.yaml ]; then pnpm run build; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
