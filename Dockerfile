@@ -1,5 +1,5 @@
 # 使用预构建的基础镜像
-FROM liushuodedocker/ts-next-template-base:latest AS base
+FROM liushuodocker/ts-next-template-base:latest AS base
 
 # 安装依赖阶段
 FROM base AS deps
