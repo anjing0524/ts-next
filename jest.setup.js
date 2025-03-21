@@ -26,25 +26,24 @@ jest.mock('next/image', () => ({
 
 // 模拟logger
 jest.mock('@/utils/logger', () => ({
-    info: jest.fn(),
-    debug: jest.fn(),
-    error: jest.fn(),
-  }));
+  info: jest.fn(),
+  debug: jest.fn(),
+  error: jest.fn(),
+}));
 
-  // 模拟 node:timers
+// 模拟 node:timers
 jest.mock('node:timers', () => {
-    const originalModule = jest.requireActual('node:timers');
-    return {
-      ...originalModule,
-      setTimeout: jest.fn((callback, ms) => {
-        return setTimeout(callback, ms);
-      }),
-      clearTimeout: jest.fn((timer) => {
-        clearTimeout(timer);
-      }),
-      setImmediate: jest.fn((callback) => {
-        return setTimeout(callback, 0);
-      }),
-    };
-  });
-  
+  const originalModule = jest.requireActual('node:timers');
+  return {
+    ...originalModule,
+    setTimeout: jest.fn((callback, ms) => {
+      return setTimeout(callback, ms);
+    }),
+    clearTimeout: jest.fn((timer) => {
+      clearTimeout(timer);
+    }),
+    setImmediate: jest.fn((callback) => {
+      return setTimeout(callback, 0);
+    }),
+  };
+});

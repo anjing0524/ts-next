@@ -45,11 +45,9 @@ class TimeWheel {
 
     const slotIndex = this.calculateSlotIndex(options.delay);
     this.slots[slotIndex].set(id, task);
-    
-    const maxExecutionsInfo = options.maxExecutions 
+    const maxExecutionsInfo = options.maxExecutions
       ? `, 最大执行次数: ${options.maxExecutions}, 当前执行次数: ${executionCount}`
       : '';
-      
     logger.debug(
       `添加任务: ${id}, 延迟: ${options.delay}ms, 槽位: ${slotIndex}, 重复: ${options.repeat}${maxExecutionsInfo}`
     );
@@ -130,10 +128,8 @@ class TimeWheel {
       try {
         logger.debug(`执行任务: ${task.id}, 执行次数: ${task.executionCount + 1}`);
         task.callback();
-        
         // 增加执行次数计数
         const newExecutionCount = task.executionCount + 1;
-        
         // 检查是否达到最大执行次数
         if (task.repeat && (!task.maxExecutions || newExecutionCount < task.maxExecutions)) {
           logger.debug(
@@ -176,7 +172,6 @@ class TimeWheel {
       this.stop();
     }
   }
-  
   /**
    * 移除任务
    * @param taskId 任务ID
@@ -184,7 +179,6 @@ class TimeWheel {
    */
   removeTask(taskId: string): boolean {
     let removed = false;
-    
     for (const slot of this.slots) {
       if (slot.has(taskId)) {
         slot.delete(taskId);
@@ -193,13 +187,11 @@ class TimeWheel {
         break;
       }
     }
-    
     // 如果没有剩余任务，停止时间轮
     if (removed && !this.hasRemainingTasks()) {
       logger.info('移除任务后没有剩余任务，停止时间轮');
       this.stop();
     }
-    
     return removed;
   }
 }

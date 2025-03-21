@@ -31,7 +31,7 @@ export interface DataTableHeaderProps<TData> {
   columnOrder: string[];
 }
 
-export interface DataTableCellProps<TData,TValue> {
+export interface DataTableCellProps<TData, TValue> {
   cell: Cell<TData, TValue>;
 }
 
