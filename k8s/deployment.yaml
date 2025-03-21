@@ -17,8 +17,10 @@ spec:
       containers:
         - name: ts-next-template
           image: your-registry/ts-next-template:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
+              name: http
           env:
             - name: MYSQL_HOST
               valueFrom:
@@ -40,6 +42,16 @@ spec:
                 configMapKeyRef:
                   name: ts-next-template-config
                   key: MYSQL_DATABASE
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: NODE_ENV
+            - name: NEXT_TELEMETRY_DISABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: NEXT_TELEMETRY_DISABLED
           resources:
             limits:
               cpu: '1'
@@ -47,3 +59,15 @@ spec:
             requests:
               cpu: '0.5'
               memory: '256Mi'
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
