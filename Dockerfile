@@ -1,5 +1,4 @@
-# 使用带版本的基础镜像
-ARG NODE_VERSION="22.0.0"
+# 使用基础镜像
 FROM liushuodocker/ts-next-template-base:latest AS base
 
 # 设置工作目录
@@ -9,32 +8,29 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 
-# 选择正确的Node版本
-ARG NODE_VERSION="22.0.0"
-RUN . ~/.bashrc && fnm use ${NODE_VERSION}
+# 先复制 .node-version 和 .npmrc 文件
+COPY .node-version .npmrc ./
 
-# 配置npm和pnpm使用国内镜像源
-RUN . ~/.bashrc && npm config set registry https://registry.npmmirror.com && \
-    pnpm config set registry https://registry.npmmirror.com
+# 读取 .node-version 文件内容并切换到对应版本
+RUN NODE_VERSION=$(cat .node-version) && \
+    echo "使用 Node.js 版本: $NODE_VERSION" && \
+    bash -c 'export SHELL=/bin/bash && source ~/.bashrc && fnm use $NODE_VERSION'
 
-# 根据锁文件选择合适的包管理器安装依赖
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
-RUN \
-  . ~/.bashrc && \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+# 复制package.json和锁文件
+COPY package.json pnpm-lock.yaml* ./
+
+# 安装依赖，使用 .npmrc 中的配置
+RUN bash -c 'export SHELL=/bin/bash && source ~/.bashrc && export HUSKY=0 && pnpm install --no-frozen-lockfile'
 
 # 构建阶段
 FROM base AS builder
 WORKDIR /app
 
-# 选择正确的Node版本并验证
-ARG NODE_VERSION="22.0.0"
-RUN . ~/.bashrc && fnm use ${NODE_VERSION} && \
-    node -v | grep -q "v${NODE_VERSION}" || (echo "Node version mismatch" && exit 1)
+# 复制 .node-version 文件并切换到对应版本
+COPY .node-version ./
+RUN NODE_VERSION=$(cat .node-version) && \
+    echo "使用 Node.js 版本: $NODE_VERSION" && \
+    bash -c 'export SHELL=/bin/bash && source ~/.bashrc && fnm use $NODE_VERSION'
 
 # 复制依赖和源代码
 COPY --from=deps /app/node_modules ./node_modules
@@ -43,22 +39,18 @@ COPY . .
 # 禁用 Next.js 遥测
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 根据锁文件选择合适的包管理器构建应用
-RUN \
-  . ~/.bashrc && \
-  if [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f pnpm-lock.yaml ]; then pnpm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+# 构建应用
+RUN bash -c 'export SHELL=/bin/bash && source ~/.bashrc && export HUSKY=0 && pnpm run build'
 
 # 生产阶段
 FROM base AS runner
 WORKDIR /app
 
-# 选择正确的Node版本
-ARG NODE_VERSION="22.0.0"
-RUN . ~/.bashrc && fnm use ${NODE_VERSION}
+# 复制 .node-version 文件并切换到对应版本
+COPY .node-version ./
+RUN NODE_VERSION=$(cat .node-version) && \
+    echo "使用 Node.js 版本: $NODE_VERSION" && \
+    bash -c 'export SHELL=/bin/bash && source ~/.bashrc && fnm use $NODE_VERSION'
 
 # 设置为生产环境
 ENV NODE_ENV=production

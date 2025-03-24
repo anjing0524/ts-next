@@ -20,7 +20,7 @@ ENV FNM_VERSION="v1.37.0"
 RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir /usr/local/bin
 
 # 安装指定Node.js版本（构建时传入参数）
-ARG NODE_VERSION="22.0.0"
+ARG NODE_VERSION="22.14.0"
 RUN fnm install $NODE_VERSION && \
     fnm install 20 && \
     fnm install 18 && \
