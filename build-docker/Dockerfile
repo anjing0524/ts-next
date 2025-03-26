@@ -44,11 +44,17 @@ RUN --mount=type=cache,target=/app/.next/cache \
 FROM node:lts-slim AS runner
 WORKDIR /app
 
-# 设置生产环境变量
+# 设置可被覆盖的生产环境变量
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME="0.0.0.0"
+
+# 声明可注入的环境变量（用于数据库连接）
+ENV MYSQL_HOST=$MYSQL_HOST \
+    MYSQL_USER=$MYSQL_USER \
+    MYSQL_PASSWORD=$MYSQL_PASSWORD \
+    MYSQL_DATABASE=$MYSQL_DATABASE
 
 # 创建非特权用户
 RUN addgroup --system --gid 1001 nodejs && \
