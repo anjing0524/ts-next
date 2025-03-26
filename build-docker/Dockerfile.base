@@ -1,9 +1,9 @@
 # 使用轻量级基础镜像
 FROM debian:bookworm-slim
 
-# 合并基础层配置
-RUN mkdir -p /etc/apt/sources.list.d/
-COPY ./debian.sources /etc/apt/sources.list.d/debian.sources
+# 合并基础层配置 本地可使用 GITHUB上无需使用代理
+# RUN mkdir -p /etc/apt/sources.list.d/
+# COPY ./debian.sources /etc/apt/sources.list.d/debian.sources
 
 # 安装基础依赖（合并apt层）
 RUN apt update \
