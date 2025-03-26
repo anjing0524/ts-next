@@ -40,3 +40,4 @@ RUN bash -c '\
     npm install -g pnpm@latest'
 
 WORKDIR /app
+
