@@ -19,7 +19,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // 确保使用的 Chrome 版本 >= 78
+        // Playwright 默认使用最新版本的 Chrome，所以这里不需要特别指定
+        // 如果需要测试特定版本，可以使用 channel 参数
+        // channel: 'chrome',  // 使用本地安装的 Chrome
+      },
     },
     {
       name: 'firefox',
