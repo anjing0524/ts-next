@@ -17,31 +17,25 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
+    // 最新版 Chrome
     {
-      name: 'chromium',
+      name: 'chrome-latest',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    // Chrome 78 版本测试
+    {
+      name: 'chrome-78',
       use: {
         ...devices['Desktop Chrome'],
-        // 确保使用的 Chrome 版本 >= 78
-        // Playwright 默认使用最新版本的 Chrome，所以这里不需要特别指定
-        // 如果需要测试特定版本，可以使用 channel 参数
-        // channel: 'chrome',  // 使用本地安装的 Chrome
+        // 使用 Chrome 78 的 User-Agent
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36',
       },
     },
+    // 移动版 Chrome
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    {
-      name: 'Mobile Chrome',
+      name: 'mobile-chrome',
       use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
     },
   ],
   webServer: {

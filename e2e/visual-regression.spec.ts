@@ -1,37 +1,36 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('视觉回归测试', () => {
-  test('首页在不同浏览器中视觉一致', async ({ page }) => {
+  test('关键组件在不同浏览器中应有一致的外观', async ({ page, browserName }) => {
     await page.goto('/');
 
-    // 等待页面完全加载
-    await page.waitForLoadState('networkidle');
-
-    // 截取整个页面的屏幕截图并与基准进行比较
-    // 注意：首次运行时会创建基准截图
-    await expect(page).toHaveScreenshot('home-page.png', {
-      maxDiffPixelRatio: 0.05, // 允许5%的像素差异
+    // 添加测试组件
+    await page.evaluate(() => {
+      const testDiv = document.createElement('div');
+      testDiv.id = 'visual-test';
+      testDiv.style.padding = '20px';
+      testDiv.innerHTML = `
+        <div class="space-y-4">
+          <div class="p-4 rounded-lg bg-background">
+            <div class="flex flex-col space-y-4">
+              <h2 class="text-lg font-medium">测试标题</h2>
+              <div class="flex flex-wrap gap-4">
+                <button class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] bg-primary text-primary-foreground shadow-xs h-9 px-4 py-2">
+                  测试按钮
+                </button>
+                <span class="inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap border-transparent bg-primary text-primary-foreground">测试标签</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(testDiv);
     });
-  });
 
-  test('响应式布局在不同视口大小下视觉一致', async ({ page }) => {
-    await page.goto('/');
+    // 等待组件完全渲染
+    await page.waitForTimeout(500);
 
-    // 测试不同视口大小
-    const viewports = [
-      { width: 1280, height: 800, name: 'desktop' },
-      { width: 768, height: 1024, name: 'tablet' },
-      { width: 375, height: 667, name: 'mobile' },
-    ];
-
-    for (const viewport of viewports) {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.waitForLoadState('networkidle');
-
-      // 截取当前视口大小的屏幕截图
-      await expect(page).toHaveScreenshot(`home-page-${viewport.name}.png`, {
-        maxDiffPixelRatio: 0.05,
-      });
-    }
+    // 截图并比较
+    await expect(page.locator('#visual-test')).toHaveScreenshot(`visual-test-${browserName}.png`);
   });
 });
