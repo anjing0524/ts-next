@@ -53,6 +53,7 @@
     "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.5.2",
     "immer": "^10.1.1",
+    "lightweight-charts": "^5.0.4",
     "lucide-react": "^0.477.0",
     "mysql2": "^3.13.0",
     "nanoid": "^5.1.2",

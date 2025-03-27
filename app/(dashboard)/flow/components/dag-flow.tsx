@@ -159,15 +159,15 @@ export function DagFlow() {
 
   // 渲染流程图
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 h-full">
-        <div className="space-y-4 mx-4 pb-8">
+        <div className="space-y-6 pb-8">
           {stagesToShow.map((stage) => (
             <div key={stage.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* 阶段标题和统计信息 */}
-              <div className="p-4 border-b">
+              <div className="p-4 border-b border-border/30">
                 <h2 className="text-xl font-bold">{stage.name}</h2>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="text-sm text-muted-foreground mt-1">
                   总任务: {stage.stats.total} | 成功: {stage.stats.success} | 失败:{' '}
                   {stage.stats.failed} | 运行中: {stage.stats.running} | 等待中:{' '}
                   {stage.stats.waiting}

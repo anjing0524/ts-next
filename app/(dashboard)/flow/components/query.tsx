@@ -43,7 +43,7 @@ export function Query({ options, onSearch }: QueryProps) {
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 mx-4 bg-white rounded-md shadow-sm">
+    <div className="flex items-center gap-4 p-4">
       <div className="flex items-center gap-2">
         <Label className="text-sm whitespace-nowrap">日期:</Label>
         <Popover>
