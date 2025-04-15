@@ -46,3 +46,6 @@ test-results
 
 # log
 /logs
+
+# rust target
+/wasm-cal/target
