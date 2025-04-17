@@ -138,16 +138,12 @@ async function handleDraw(message: DrawMessage) {
     throw new Error('处理器未初始化');
   }
 
-  const { canvas } = message;
+  const { canvas, mainCanvas, overlayCanvas } = message;
 
   try {
     console.time('[Worker] 设置 Canvas');
-    // 创建离屏 Canvas
-    const offscreenMain = new OffscreenCanvas(canvas.width, canvas.height);
-    const offscreenOverlay = new OffscreenCanvas(canvas.width, canvas.height);
-
     // 设置 Canvas 到处理器
-    processorRef.set_canvases(canvas, offscreenMain, offscreenOverlay);
+    processorRef.set_canvases(canvas, mainCanvas, overlayCanvas);
     console.timeEnd('[Worker] 设置 Canvas');
 
     // 绘制 K 线图

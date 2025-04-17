@@ -11,6 +11,7 @@ export default function Main() {
 
   // 定义画布尺寸
   const visibleCanvasHeight = 400; // 可见高度
+  const visibleCanvasWidth = 1500; // 调整为实际需要的大小
 
   // 合并数据获取和Worker初始化到一个useEffect中
   useEffect(() => {
@@ -55,19 +56,23 @@ export default function Main() {
               if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
                 throw new Error('Canvas元素未找到');
               }
-
-              // 设置canvas尺寸
-              canvasRef.current.width = 1500; // 调整为实际需要的大小
-              canvasRef.current.height = 400;
-              canvasRef.current.height = visibleCanvasHeight;
-
               // 第二次传输：OffscreenCanvas (无复制)
               const offscreen = canvasRef.current.transferControlToOffscreen();
               const mainOffscreen = mainCanvasRef.current.transferControlToOffscreen();
               const overlayOffscreen = overlayCanvasRef.current.transferControlToOffscreen();
+
+              [offscreen, mainOffscreen, overlayOffscreen].forEach((canvas) => {
+                canvas.width = visibleCanvasWidth;
+                canvas.height = visibleCanvasHeight;
+              });
               worker.postMessage(
-                { type: 'draw', canvas: offscreen },
-                [offscreen, mainOffscreen, overlayOffscreen] // 关键点2：标记为Transferable
+                {
+                  type: 'draw',
+                  canvas: offscreen,
+                  mainCanvas: mainOffscreen, // 添加 mainCanvas
+                  overlayCanvas: overlayOffscreen, // 添加 overlayCanvas
+                },
+                [offscreen, mainOffscreen, overlayOffscreen] // 标记为Transferable
               );
               break;
 
@@ -108,17 +113,16 @@ export default function Main() {
         </div>
       )}
       {error && <div className="p-4 text-red-600">错误: {error}</div>}
-
       {/* 新增容器并设置固定尺寸 */}
       <div className="relative w-[1500px] h-[400px] cursor-default m-0 border-0 p-0">
         <canvas ref={canvasRef} className="absolute top-0 left-0 m-0 border-0 p-0 z-10" />
         <canvas
           ref={mainCanvasRef}
-          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-20 opacity-100"
+          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-20 "
         />
         <canvas
           ref={overlayCanvasRef}
-          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 opacity-100"
+          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
         />
       </div>
     </div>

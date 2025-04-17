@@ -27,6 +27,9 @@ pub enum WasmError {
     #[error("解析错误: {0}")]
     ParseError(String),
 
+    #[error("缓存数据错误: {0}")]
+    CacheError(String),
+
     /// 其他错误
     #[error("其他错误: {0}")]
     OtherError(String),

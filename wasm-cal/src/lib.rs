@@ -15,8 +15,8 @@ pub use layout::ChartLayout;
 pub use render::ChartRenderer;
 
 // 设置panic钩子
-// #[wasm_bindgen(start)]
-// pub fn start() -> Result<(), JsValue> {
-//     console_error_panic_hook::set_once();
-//     Ok(())
-// }
+#[wasm_bindgen(start)]
+pub fn start() -> Result<(), JsValue> {
+    console_error_panic_hook::set_once();
+    Ok(())
+}

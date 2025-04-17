@@ -17,65 +17,79 @@ impl PriceRenderer {
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
         min_low: f64,
         max_high: f64,
+        visible_start: usize,
+        visible_count: usize,
     ) {
-        // 计算可显示的K线数量
-        let visible_candles = (layout.chart_area_width / layout.total_candle_width) as usize;
-        let start_idx = if items.len() > visible_candles {
-            items.len() - visible_candles
-        } else {
-            0
-        };
+        let visible_end = (visible_start + visible_count).min(items.len());
+        if visible_start >= visible_end {
+            return;
+        }
 
-        // 批量绘制所有蜡烛线的影线，减少路径操作次数
+        // 只清空价格图区域，而不是整个画布
+        ctx.clear_rect(
+            layout.chart_area_x,
+            layout.chart_area_y,
+            layout.chart_area_width,
+            layout.price_chart_height,
+        );
+
+        // 绘制K线影线
         ctx.begin_path();
         ctx.set_stroke_style_str(ChartColors::WICK);
         ctx.set_line_width(1.0);
 
-        for (i, item_idx) in (start_idx..items.len()).enumerate() {
+        // 使用FnvHashMap和整数键来避免浮点数比较问题
+        let mut price_y_cache = std::collections::HashMap::new();
+        let mut map_price = |price: f64| -> f64 {
+            // 将浮点数转换为位模式的u64，作为HashMap的键
+            let price_bits = price.to_bits();
+            *price_y_cache
+                .entry(price_bits)
+                .or_insert_with(|| layout.map_price_to_y(price, min_low, max_high))
+        };
+
+        for (i, item_idx) in (visible_start..visible_end).enumerate() {
             let item = items.get(item_idx);
             let x_center = layout.chart_area_x
                 + (i as f64 * layout.total_candle_width)
                 + layout.candle_width / 2.0;
 
-            let high_y = layout.map_price_to_y(item.high(), min_low, max_high);
-            let low_y = layout.map_price_to_y(item.low(), min_low, max_high);
+            // 使用缓存函数获取Y坐标
+            let high_y = map_price(item.high());
+            let low_y = map_price(item.low());
 
-            // 绘制影线
             ctx.move_to(x_center, high_y);
             ctx.line_to(x_center, low_y);
         }
         ctx.stroke();
 
-        // 批量绘制所有蜡烛线的实体
-        for (i, item_idx) in (start_idx..items.len()).enumerate() {
+        // 绘制K线实体
+        for (i, item_idx) in (visible_start..visible_end).enumerate() {
             let item = items.get(item_idx);
             let x = layout.chart_area_x + (i as f64 * layout.total_candle_width);
 
-            let open_y = layout.map_price_to_y(item.open(), min_low, max_high);
-            let close_y = layout.map_price_to_y(item.close(), min_low, max_high);
+            // 使用缓存函数获取Y坐标
+            let open_y = map_price(item.open());
+            let close_y = map_price(item.close());
 
-            // 判断是上涨还是下跌
             let is_bullish = item.close() >= item.open();
-            let candle_color = if is_bullish {
+            let color = if is_bullish {
                 ChartColors::BULLISH
             } else {
                 ChartColors::BEARISH
             };
 
-            // 计算实体高度
             let (top_y, height) = if is_bullish {
                 (close_y, open_y - close_y)
             } else {
                 (open_y, close_y - open_y)
             };
-
-            // 绘制实体
-            ctx.set_fill_style_str(candle_color);
-            ctx.fill_rect(x, top_y, layout.candle_width, height.max(1.0)); // 确保高度至少为1像素
+            ctx.set_fill_style_str(color);
+            ctx.fill_rect(x, top_y, layout.candle_width, height.max(1.0));
         }
     }
 
-    /// 计算价格范围
+    /// 计算价格范围 (此函数已正确使用 visible_start 和 visible_count)
     pub fn calculate_price_range(
         &self,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
@@ -87,20 +101,34 @@ impl PriceRenderer {
 
         // 计算可见区域的最低价和最高价
         let end_idx = (visible_start + visible_count).min(items.len());
-        for i in visible_start..end_idx {
-            let item = items.get(i);
-            min_low = min_low.min(item.low());
-            max_high = max_high.max(item.high());
+        // 确保起始索引小于结束索引
+        if visible_start < end_idx {
+            for i in visible_start..end_idx {
+                let item = items.get(i);
+                min_low = min_low.min(item.low());
+                max_high = max_high.max(item.high());
+            }
         }
 
         // 如果没有有效数据，返回默认值
         if min_low == f64::MAX || max_high == f64::MIN {
-            return (0.0, 100.0);
+            // 如果只有一个点，或者所有价格相同，给一个默认范围
+            if items.len() > 0 && visible_start < end_idx {
+                let item = items.get(visible_start);
+                return (item.low() - 1.0, item.high() + 1.0); // 基于第一个可见点给个小范围
+            } else {
+                return (0.0, 100.0); // 完全没数据时的默认值
+            }
         }
 
         // 添加一定的边距，使图表不会贴边
         let price_range = max_high - min_low;
-        let padding = price_range * 0.05; // 5%的边距
+        // 如果价格范围为0（例如只有一个点或所有价格相同），添加固定边距
+        let padding = if price_range > 0.0 {
+            price_range * 0.05 // 5%的边距
+        } else {
+            1.0 // 固定边距
+        };
 
         (min_low - padding, max_high + padding)
     }

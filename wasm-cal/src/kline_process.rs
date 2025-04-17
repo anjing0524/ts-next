@@ -3,6 +3,7 @@ use crate::ChartRenderer;
 use crate::kline_generated::kline::{KlineData, root_as_kline_data_with_opts};
 use crate::layout::ChartLayout;
 use crate::utils::WasmError;
+
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::OffscreenCanvas;
@@ -22,14 +23,10 @@ extern "C" {
 #[wasm_bindgen]
 pub struct KlineProcess {
     // 数据相关
-    data: Vec<u8>, // 原始FlatBuffer数据
+    data: Vec<u8>,                           // 原始FlatBuffer数据
+    parsed_data: Option<KlineData<'static>>, // 解析后的数据，用于缓存 (移除了Rc)
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
-    // 缓存的计算结果
-    min_low: f64,    // 最低价
-    max_high: f64,   // 最高价
-    min_volume: f64, // 最小成交量
-    max_volume: f64, // 最大成交量
 }
 
 #[wasm_bindgen]
@@ -50,21 +47,23 @@ impl KlineProcess {
         let data = Self::read_from_memory(memory_val, ptr_offset, data_length)?;
 
         // 2. 验证数据
-        Self::verify_kline_data_slice(&data)?; // 现在可以直接使用 ? 操作符
+        Self::verify_kline_data_slice(&data)?;
 
         // 5. 解析数据并计算范围（初始）
+        time("KlineProcess::new - Parsing and calculating ranges");
         let parsed_data = Self::parse_kline_data_from_slice(&data)?;
-        let (min_low, max_high, max_volume) = Self::calculate_data_ranges(&parsed_data)?;
+        // 初始化到常量里面
+        // let (min_low, max_high, max_volume) = Self::calculate_data_ranges(&parsed_data)?;
+        // 移除Rc，直接使用transmute
+        let parsed_data = unsafe { std::mem::transmute(parsed_data) };
+        time_end("KlineProcess::new - Parsing and calculating ranges");
 
         log("KlineProcess initialized successfully.");
 
         Ok(KlineProcess {
             data,
+            parsed_data: Some(parsed_data),
             chart_renderer: None,
-            min_low,
-            max_high,
-            min_volume: 0.0,
-            max_volume,
         })
     }
 
@@ -76,16 +75,30 @@ impl KlineProcess {
         main_canvas: OffscreenCanvas,
         overlay_canvas: OffscreenCanvas,
     ) -> Result<(), JsValue> {
-        // 获取Canvas尺寸
-        let width = base_canvas.width() as f64;
-        let height = base_canvas.height() as f64;
+        // 获取最大尺寸，确保三层canvas一致
+        let width = base_canvas
+            .width()
+            .max(main_canvas.width())
+            .max(overlay_canvas.width());
+        let height = base_canvas
+            .height()
+            .max(main_canvas.height())
+            .max(overlay_canvas.height());
+
+        // 强制三层canvas尺寸一致
+        base_canvas.set_width(width);
+        main_canvas.set_width(width);
+        overlay_canvas.set_width(width);
+        base_canvas.set_height(height);
+        main_canvas.set_height(height);
+        overlay_canvas.set_height(height);
+
         // 创建布局
-        let layout = ChartLayout::new(width, height);
+        let layout = ChartLayout::new(width as f64, height as f64);
         // 创建渲染器
         let chart_renderer =
             ChartRenderer::new(&base_canvas, &main_canvas, &overlay_canvas, layout)?;
         self.chart_renderer = Some(chart_renderer);
-
         Ok(())
     }
 
@@ -93,13 +106,19 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn draw_all(&self) -> Result<(), JsValue> {
         time("KlineProcess::draw_all");
-        // 解析数据 ON THE FLY for drawing
-        let parsed_data = self.parse_kline_data()?;
 
-        // 获取K线数据项
-        let items = parsed_data
-            .items()
-            .ok_or_else(|| WasmError::ParseError("无K线数据项".into()))?;
+        // 获取K线数据项 - 直接使用引用
+        let items = if let Some(parsed_data) = &self.parsed_data {
+            parsed_data
+                .items()
+                .ok_or_else(|| WasmError::ParseError("无K线数据项".into()))?
+        } else {
+            // 只有在没有缓存数据时才解析
+            let parsed_data = self.parse_kline_data()?;
+            parsed_data
+                .items()
+                .ok_or_else(|| WasmError::ParseError("无K线数据项".into()))?
+        };
 
         // 使用ChartRenderer绘制所有图表
         match &self.chart_renderer {
@@ -130,8 +149,8 @@ impl KlineProcess {
         let buffer = memory.buffer();
         let memory_view = js_sys::Uint8Array::new_with_byte_offset_and_length(
             &buffer,
-            ptr_offset as u32,  // Cast offset to u32
-            data_length as u32, // Cast length to u32
+            ptr_offset as u32,
+            data_length as u32,
         );
 
         let data = memory_view.to_vec();
@@ -160,9 +179,15 @@ impl KlineProcess {
         Ok(())
     }
 
-    /// 解析K线数据
+    /// 解析K线数据 - 返回引用或克隆
     fn parse_kline_data(&self) -> Result<KlineData, WasmError> {
-        let bytes: &Vec<u8> = &self.data;
+        // 如果已有解析好的数据，直接克隆
+        if let Some(parsed_data) = &self.parsed_data {
+            // 直接克隆数据，不需要Rc
+            return Ok(parsed_data.clone());
+        }
+        // 只有在没有缓存时才进行解析
+        let bytes = &self.data;
         Self::verify_kline_data_slice(bytes)?;
         let mut opts = flatbuffers::VerifierOptions::default();
         opts.max_tables = 1_000_000_000;

@@ -73,34 +73,23 @@ impl ChartRenderer {
             Some(dr) => dr,
             None => return,
         };
-        // 暂时注释掉 overlay_renderer 的获取
-        // let overlay_renderer = match &self.overlay_renderer {
-        //     Some(or) => or,
-        //     None => return,
-        // };
-
         // 清除所有画布
         canvas_manager.clear_all();
-
         // 如果数据为空，直接返回
         if items.len() == 0 {
             return;
         }
+        // 获取布局信息 (只借用一次)
+        let layout_ref = canvas_manager.layout.borrow();
+        let visible_start = layout_ref.navigator_visible_start;
+        let visible_count = layout_ref.navigator_visible_count;
+        let visible_end = (visible_start + visible_count).min(items.len()); // 计算可见范围的结束索引
 
-        // 计算价格范围
-        let (min_low, max_high) = price_renderer.calculate_price_range(
-            items,
-            canvas_manager.layout.borrow().navigator_visible_start,
-            canvas_manager.layout.borrow().navigator_visible_count,
-        );
-
-        // 计算最大成交量
-        let max_volume = volume_renderer.calculate_max_volume(
-            items,
-            canvas_manager.layout.borrow().navigator_visible_start,
-            canvas_manager.layout.borrow().navigator_visible_start
-                + canvas_manager.layout.borrow().navigator_visible_count,
-        );
+        // 计算可见区域的价格范围
+        let (min_low, max_high) =
+            price_renderer.calculate_price_range(items, visible_start, visible_count);
+        // 计算可见区域的最大成交量
+        let max_volume = volume_renderer.calculate_max_volume(items, visible_start, visible_end); // 使用 visible_end
 
         // 绘制底层静态元素（坐标轴、网格线等）
         axis_renderer.draw(canvas_manager, items, min_low, max_high, max_volume);
@@ -111,17 +100,26 @@ impl ChartRenderer {
         // 获取主Canvas上下文
         let main_ctx = canvas_manager.get_context(CanvasLayerType::Main);
 
-        // 绘制K线图
+        // 绘制K线图 - 传入可见范围
         price_renderer.draw(
             main_ctx,
-            &canvas_manager.layout.borrow(),
+            &layout_ref, // 使用借用的布局
             items,
             min_low,
             max_high,
+            visible_start, // 传递可见起始索引
+            visible_count, // 传递可见数量
         );
 
-        // 绘制成交量图
-        volume_renderer.draw(main_ctx, &canvas_manager.layout.borrow(), items);
+        // 绘制成交量图 - 传入可见范围和最大成交量
+        volume_renderer.draw(
+            main_ctx,
+            &layout_ref, // 使用借用的布局
+            items,
+            max_volume,    // 传递计算好的最大成交量
+            visible_start, // 传递可见起始索引
+            visible_count, // 传递可见数量
+        );
 
         // 暂时注释掉交互元素的绘制（十字光标、提示框等）
         // overlay_renderer.draw(canvas_manager, items, min_low, max_high, max_volume);

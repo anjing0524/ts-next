@@ -2,10 +2,8 @@
 
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartColors;
 use flatbuffers;
-use web_sys::OffscreenCanvasRenderingContext2d;
-
 /// DataZoom导航器绘制器
 pub struct DataZoomRenderer;
 
@@ -17,7 +15,7 @@ impl DataZoomRenderer {
         canvas_manager: &CanvasManager,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
     ) {
-        let ctx = canvas_manager.get_context(CanvasLayerType::Base);
+        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow(); // 不可变借用
 
         // 计算导航器位置

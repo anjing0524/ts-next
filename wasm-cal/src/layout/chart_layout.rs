@@ -20,7 +20,6 @@ pub struct ChartLayout {
     pub chart_area_height: f64, // 图表区域总高度(包括K线和成交量) 等于 canvas_height-header_height-navigator_height
 
     // 子图表区域
-    pub main_chart_height: f64,   // 主图表区域高度(K线图+成交量图)
     pub price_chart_height: f64,  // 价格图(K线)高度
     pub volume_chart_height: f64, // 成交量图高度
     pub volume_chart_y: f64,      // 成交量图Y坐标起点(位于K线图下方)
@@ -68,7 +67,16 @@ pub struct ChartLayout {
 }
 
 impl ChartLayout {
-    // 创建新的图表布局实例，根据画布尺寸计算所有布局参数
+    /// 创建新的图表布局实例
+    ///
+    /// # Arguments
+    ///
+    /// * `canvas_width` - 画布总宽度
+    /// * `canvas_height` - 画布总高度
+    ///
+    /// # Returns
+    ///
+    /// * `ChartLayout` - 新的布局实例
     pub fn new(canvas_width: f64, canvas_height: f64) -> Self {
         // 基础布局参数
         let header_height = 25.0; // 顶部标题区域高度
@@ -77,12 +85,17 @@ impl ChartLayout {
         let padding = 8.0; // 通用内边距
         let price_margin = 8.0; // 价格图表上下边距
         let volume_margin = 2.0; // 成交量图表上下边距
+
         let tooltip_width = 140.0; // 提示框宽度
         let tooltip_height = 100.0; // 提示框高度
         let tooltip_padding = 6.0; // 提示框内边距
+        // Define tooltip_fade_duration here
+        let tooltip_fade_duration = 200.0; // Default fade duration in ms
+
         let crosshair_width = 1.0; // 十字光标线宽度
         let grid_line_count = 5; // 网格线数量
-        let time_axis_height = 20.0; // 时间轴高度
+        // 修正：增加时间轴高度以容纳两行标签
+        let time_axis_height = 30.0; // 时间轴高度 (原为 20.0)
         let navigator_handle_width = 4.0; // 导航器滑块宽度(减小宽度使其更精细)
 
         // K线图参数
@@ -94,15 +107,15 @@ impl ChartLayout {
         let chart_area_x = y_axis_width; // 图表区域X起点(从Y轴右侧开始)
         let chart_area_y = header_height; // 图表区域Y起点(从标题下方开始)
         let chart_area_width = canvas_width - y_axis_width; // 图表区域宽度
-        let main_chart_height = canvas_height - header_height - navigator_height - time_axis_height; // 主图区域高度
-        let chart_area_height = main_chart_height; // 图表区域总高度
+        // chart_area_height 会自动根据新的 time_axis_height 调整
+        let chart_area_height = canvas_height - header_height - navigator_height - time_axis_height; // 主图区域高度
 
         // 调整成交量图和价格图的高度比例
-        let volume_chart_height = main_chart_height * 0.15; // 成交量图占主图区域的15%
-        let price_chart_height = main_chart_height - volume_chart_height; // 价格图占剩余空间
+        let volume_chart_height = chart_area_height * 0.15; // 成交量图占主图区域的15%
+        let price_chart_height = chart_area_height - volume_chart_height; // 价格图占剩余空间
         let volume_chart_y = chart_area_y + price_chart_height; // 成交量图的Y坐标起点
 
-        // 导航器位置
+        // 导航器位置 (计算方式不变)
         let navigator_y = canvas_height - navigator_height;
 
         // 导航器中每个K线的宽度 - 这个值应该根据实际数据量动态计算
@@ -112,20 +125,25 @@ impl ChartLayout {
         // 计算初始可见K线数量 (根据画布宽度和K线宽度计算)
         let initial_visible_count = (chart_area_width / total_candle_width).floor() as usize;
 
+        // 初始导航器状态
+        let navigator_total_count = 0; // 初始时未知，将在数据加载后更新
+        let navigator_visible_start = 0; // 初始时从头开始
+        let navigator_visible_count = initial_visible_count; // 初始可见数量
+
         Self {
             canvas_width,
             canvas_height,
             header_height,
             y_axis_width,
             navigator_height,
+            time_axis_height, // 使用更新后的值
             chart_area_x,
             chart_area_y,
             chart_area_width,
-            chart_area_height,
-            main_chart_height,
-            volume_chart_height,
-            volume_chart_y,
-            price_chart_height,
+            chart_area_height,   // 使用更新后的值
+            price_chart_height,  // 使用更新后的值
+            volume_chart_height, // 使用更新后的值
+            volume_chart_y,      // 使用更新后的值
             candle_width,
             candle_spacing,
             total_candle_width,
@@ -135,23 +153,24 @@ impl ChartLayout {
             tooltip_width,
             tooltip_height,
             tooltip_padding,
+            tooltip_fade_duration, // Initialize tooltip_fade_duration
             crosshair_width,
             grid_line_count,
-            time_axis_height,
-            navigator_y,
-            navigator_handle_width,
+            navigator_y, // 使用更新后的值
             navigator_candle_width,
-            navigator_visible_start: 0,
-            navigator_visible_count: initial_visible_count,
+            navigator_handle_width,
+            navigator_visible_start,
+            navigator_visible_count,
+            // --- Add missing fields with default values ---
+            navigator_drag_active: false,
+            navigator_drag_start_x: 0.0,
             dragging_handle: None,
             drag_start_x: 0.0,
             drag_start_visible_start: 0,
             hover_candle_index: None,
             hover_position: None,
             show_tooltip: false,
-            tooltip_fade_duration: 200.0, // 200ms fade
-            navigator_drag_active: false,
-            navigator_drag_start_x: 0.0,
+            // --- End of added fields ---
         }
     }
 

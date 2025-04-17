@@ -1,5 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
+export function start(): void;
 /**
  * KlineProcess - 持有K线数据和渲染器，提供统一的绘制函数
  */
@@ -27,9 +28,11 @@ export interface InitOutput {
   readonly klineprocess_new: (a: any, b: number, c: number) => [number, number, number];
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
   readonly klineprocess_draw_all: (a: number) => [number, number];
+  readonly start: () => void;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_2: WebAssembly.Table;
+  readonly __wbindgen_export_3: WebAssembly.Table;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __externref_table_dealloc: (a: number) => void;
