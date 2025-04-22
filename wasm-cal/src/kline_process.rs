@@ -204,49 +204,6 @@ impl KlineProcess {
             .map_err(|e| WasmError::ParseError(format!("Flatbuffer 解析失败: {}", e)))
     }
 
-    /// 计算价格和成交量范围 (static method, operates on parsed data)
-    fn calculate_data_ranges(parsed_data: &KlineData<'_>) -> Result<(f64, f64, f64), WasmError> {
-        let items = parsed_data
-            .items()
-            .ok_or_else(|| WasmError::ParseError("无法获取 K 线数据项".into()))?;
-
-        if items.is_empty() {
-            return Ok((0.0, 0.0, 0.0)); // Return default values for empty data
-        }
-
-        let mut min_low = f64::MAX;
-        let mut max_high = f64::MIN;
-        // 修复 max_volume.max(volume) 类型歧义问题
-
-        // 改为:
-        let mut max_volume: f64 = 0.0;
-
-        for item in items.iter() {
-            min_low = min_low.min(item.low());
-            max_high = max_high.max(item.high());
-            let volume = item.b_vol() + item.s_vol();
-            max_volume = max_volume.max(volume);
-        }
-
-        // Add buffer for better visualization
-        let price_range = max_high - min_low;
-        // Handle potential case where min_low == max_high
-        if price_range > 0.0 {
-            min_low -= price_range * 0.05; // 5% buffer below
-            max_high += price_range * 0.05; // 5% buffer above
-        } else {
-            // Add a small fixed buffer if range is zero
-            min_low -= 1.0;
-            max_high += 1.0;
-        }
-        // Ensure max_volume has a minimum value if all volumes are 0
-        if max_volume == 0.0 {
-            max_volume = 1.0;
-        }
-
-        Ok((min_low, max_high, max_volume))
-    }
-
     #[wasm_bindgen]
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
         if let Some(chart_renderer) = &self.chart_renderer {
@@ -274,23 +231,15 @@ impl KlineProcess {
 
             // 调用渲染器的鼠标离开处理方法
             chart_renderer.handle_mouse_leave();
-
-            // 清除覆盖层
-            if let Some(parsed_data) = &self.parsed_data {
-                if let Some(items) = parsed_data.items() {
-                    chart_renderer.clear_overlay(items);
-                }
-            }
+            chart_renderer.clear_overlay();
         }
     }
 
     #[wasm_bindgen]
     pub fn handle_wheel(&self, delta: f64, x: f64, y: f64) {
-        if let Some(chart_renderer) = &self.chart_renderer {
-            log(&format!(
-                "KlineProcess::handle_wheel - delta={}, x={}, y={}",
-                delta, x, y
-            ));
-        }
+        log(&format!(
+            "KlineProcess::handle_wheel - delta={}, x={}, y={}",
+            delta, x, y
+        ));
     }
 }

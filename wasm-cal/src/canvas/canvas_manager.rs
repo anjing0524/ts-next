@@ -1,8 +1,8 @@
 //! Canvas管理器 - 管理多层Canvas
 
 use super::{get_canvas_context, layer::CanvasLayerType};
+use crate::layout::ChartLayout;
 use crate::utils::WasmError;
-use crate::{layout::ChartLayout, render::DataZoomRenderer};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::{OffscreenCanvas, OffscreenCanvasRenderingContext2d};

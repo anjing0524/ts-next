@@ -184,22 +184,13 @@ impl ChartRenderer {
         };
 
         // 先清除覆盖层
-        overlay_renderer
-            .borrow_mut()
-            .clear_overlay(canvas_manager, items);
+        overlay_renderer.borrow_mut().clear_overlay(canvas_manager);
         // 然后绘制覆盖层
         overlay_renderer.borrow().draw(canvas_manager, items);
-        // 最后确保 DataZoom 被绘制
-        overlay_renderer
-            .borrow()
-            .render_datazoom(canvas_manager, items);
     }
 
     // 清除覆盖层
-    pub fn clear_overlay(
-        &self,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-    ) {
+    pub fn clear_overlay(&self) {
         // 获取覆盖层渲染器
         let overlay_renderer = match &self.overlay_renderer {
             Some(or) => or,
@@ -210,8 +201,6 @@ impl ChartRenderer {
             None => return,
         };
         // 清除覆盖层
-        overlay_renderer
-            .borrow_mut()
-            .clear_overlay(canvas_manager, items);
+        overlay_renderer.borrow_mut().clear_overlay(canvas_manager);
     }
 }

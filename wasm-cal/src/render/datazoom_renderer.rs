@@ -39,7 +39,7 @@ impl DataZoomRenderer {
         }
 
         // 绘制成交量曲线作为背景
-        self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_width, nav_height);
+        self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height);
         // 绘制当前可见区域指示器
         self.draw_visible_range_indicator(ctx, &layout, items, nav_x, nav_y, nav_width, nav_height);
     }
@@ -52,7 +52,6 @@ impl DataZoomRenderer {
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
         nav_x: f64,
         nav_y: f64,
-        nav_width: f64,
         nav_height: f64,
     ) {
         let items_len = items.len();
@@ -60,8 +59,8 @@ impl DataZoomRenderer {
             return;
         }
 
-        // 计算导航器中每个K线的宽度 (根据总数据量和导航器宽度)
-        let nav_candle_width = nav_width / items_len as f64;
+        // 使用ChartLayout中的方法计算导航器中每个K线的宽度
+        let nav_candle_width = layout.calculate_navigator_candle_width(items_len);
 
         // 找出最大成交量，用于缩放
         let mut max_volume: f64 = 0.0;
@@ -155,20 +154,9 @@ impl DataZoomRenderer {
             return;
         }
 
-        // 计算可见区域在导航器中的位置
-        let visible_start = layout.navigator_visible_start;
-        let visible_count = layout.navigator_visible_count;
-
-        // 确保可见区域不超出数据范围
-        let visible_start = visible_start.min(items_len);
-        let visible_count = visible_count.min(items_len - visible_start);
-
-        // 计算比例
-        let visible_start_ratio = visible_start as f64 / items_len as f64;
-        let visible_end_ratio = (visible_start + visible_count) as f64 / items_len as f64;
-
-        let visible_start_x = nav_x + visible_start_ratio * nav_width;
-        let visible_end_x = nav_x + visible_end_ratio.min(1.0) * nav_width;
+        // 使用ChartLayout中的方法计算可见区域坐标
+        let (visible_start_x, visible_end_x) =
+            layout.calculate_visible_range_coordinates(items_len);
 
         // 绘制半透明遮罩 (左侧不可见区域)
         ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);
@@ -190,16 +178,12 @@ impl DataZoomRenderer {
         // 左侧边框
         ctx.move_to(visible_start_x, nav_y);
         ctx.line_to(visible_start_x, nav_y + nav_height);
-
         // 右侧边框
         ctx.move_to(visible_end_x, nav_y);
         ctx.line_to(visible_end_x, nav_y + nav_height);
-
         ctx.stroke();
-
         // 绘制可拖动手柄
         ctx.set_fill_style_str(ChartColors::NAVIGATOR_HANDLE);
-
         // 左侧手柄
         ctx.fill_rect(
             visible_start_x - layout.navigator_handle_width / 2.0,

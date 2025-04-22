@@ -147,7 +147,7 @@ impl ChartLayout {
             tooltip_width,
             tooltip_height,
             tooltip_padding,
-            tooltip_fade_duration, // Initialize tooltip_fade_duration
+            tooltip_fade_duration,
             crosshair_width,
             grid_line_count,
             navigator_y, // 使用更新后的值
@@ -155,7 +155,6 @@ impl ChartLayout {
             navigator_handle_width,
             navigator_visible_start,
             navigator_visible_count,
-            // --- Add missing fields with default values ---
             navigator_drag_active: false,
             navigator_drag_start_x: 0.0,
             dragging_handle: None,
@@ -164,24 +163,7 @@ impl ChartLayout {
             hover_candle_index: None,
             hover_position: None,
             show_tooltip: false,
-            // --- End of added fields ---
         }
-    }
-
-    // 添加一个方法来更新导航器中每个K线的宽度
-    pub fn update_navigator_candle_width(&mut self, total_items: usize) {
-        if total_items > 0 {
-            self.navigator_candle_width = self.chart_area_width / total_items as f64;
-        }
-    }
-
-    // 计算导航器可见区域的位置和宽度
-    // 在 ChartLayout 实现中添加以下方法
-
-    // 设置可见区域
-    pub fn set_visible_area(&mut self, start: usize, count: usize) {
-        self.navigator_visible_start = start;
-        self.navigator_visible_count = count;
     }
 
     // 获取可用的价格图表高度（减去边距）
@@ -239,109 +221,66 @@ impl ChartLayout {
         volume_ratio * max_volume
     }
 
-    // 获取K线的X坐标位置
-    pub fn get_candle_x_position(&self, index: usize, visible_start_index: usize) -> f64 {
-        let relative_index = index - visible_start_index;
-        self.chart_area_x + (relative_index as f64) * self.total_candle_width
-    }
-
-    // 计算提示框位置
-    pub fn calculate_tooltip_position(&self, mouse_x: f64, mouse_y: f64) -> (f64, f64) {
-        // 默认将提示框放在鼠标右侧
-        let mut tooltip_x = mouse_x + 10.0;
-        let mut tooltip_y = mouse_y - self.tooltip_height / 2.0;
-
-        // 如果提示框超出右边界，则放在鼠标左侧
-        if tooltip_x + self.tooltip_width > self.canvas_width {
-            tooltip_x = mouse_x - 10.0 - self.tooltip_width;
-        }
-
-        // 确保提示框不超出上下边界
-        if tooltip_y < 0.0 {
-            tooltip_y = 0.0;
-        } else if tooltip_y + self.tooltip_height > self.canvas_height {
-            tooltip_y = self.canvas_height - self.tooltip_height;
-        }
-
-        (tooltip_x, tooltip_y)
-    }
-
-    // 格式化日期用于坐标轴显示
-    pub fn format_date_for_axis(&self, timestamp: i64) -> String {
-        if let Some(dt) = DateTime::from_timestamp(timestamp, 0) {
-            dt.format("%Y-%m-%d %H:%M").to_string()
+    /// 格式化成交量显示，根据数值大小自动添加K或M后缀
+    /// * `volume` - 需要格式化的成交量
+    /// * `precision` - 小数点后保留的位数
+    /// * 返回格式化后的字符串
+    pub fn format_volume(&self, volume: f64, precision: usize) -> String {
+        if volume >= 1_000_000.0 {
+            format!(
+                "{:.precision$}M",
+                volume / 1_000_000.0,
+                precision = precision
+            )
+        } else if volume >= 1_000.0 {
+            format!("{:.precision$}K", volume / 1_000.0, precision = precision)
         } else {
-            "Invalid Date".to_string()
+            format!("{:.precision$}", volume, precision = precision)
         }
     }
 
-    // 开始导航器拖动
-    pub fn start_navigator_drag(&mut self, mouse_x: f64) {
-        self.navigator_drag_active = true;
-        self.navigator_drag_start_x = mouse_x;
+    /// 格式化时间戳为可读的日期时间格式
+    /// * `timestamp_secs` - Unix时间戳（秒）
+    /// * `format_str` - 格式化字符串，例如"%Y/%m/%d %H:%M"
+    /// * 返回格式化后的时间字符串
+    pub fn format_timestamp(&self, timestamp_secs: i64, format_str: &str) -> String {
+        let dt = DateTime::from_timestamp(timestamp_secs, 0)
+            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap());
+        dt.format(format_str).to_string()
     }
 
-    // 处理导航器拖动
-    pub fn handle_navigator_drag(&mut self, mouse_x: f64, total_candles: usize) -> (usize, usize) {
-        if !self.navigator_drag_active {
-            return (self.navigator_visible_start, self.navigator_visible_count);
+    /// 计算导航器中每个K线的宽度
+    /// * `items_len` - 数据项总数
+    /// * 返回导航器中每个K线的宽度
+    pub fn calculate_navigator_candle_width(&self, items_len: usize) -> f64 {
+        if items_len == 0 {
+            return 1.0; // 默认值
+        }
+        self.chart_area_width / items_len as f64
+    }
+
+    /// 计算导航器中可见区域的起始和结束X坐标
+    /// * `items_len` - 数据项总数
+    /// * 返回 (visible_start_x, visible_end_x)
+    pub fn calculate_visible_range_coordinates(&self, items_len: usize) -> (f64, f64) {
+        let nav_x = self.chart_area_x;
+        let nav_width = self.chart_area_width;
+
+        if items_len == 0 {
+            return (nav_x, nav_x + nav_width);
         }
 
-        let drag_distance = mouse_x - self.navigator_drag_start_x;
-        let candles_per_pixel = total_candles as f64 / self.chart_area_width;
-        let candle_shift = (drag_distance * candles_per_pixel).round() as isize;
+        // 确保可见区域不超出数据范围
+        let visible_start = self.navigator_visible_start.min(items_len);
+        let visible_count = self.navigator_visible_count.min(items_len - visible_start);
 
-        // 更新拖动起始位置
-        self.navigator_drag_start_x = mouse_x;
+        // 计算比例
+        let visible_start_ratio = visible_start as f64 / items_len as f64;
+        let visible_end_ratio = (visible_start + visible_count) as f64 / items_len as f64;
 
-        // 计算新的可见区域起始索引
-        let new_start = self.navigator_visible_start as isize - candle_shift;
-        let new_start = new_start
-            .max(0)
-            .min((total_candles - self.navigator_visible_count) as isize)
-            as usize;
+        let visible_start_x = nav_x + visible_start_ratio * nav_width;
+        let visible_end_x = nav_x + visible_end_ratio.min(1.0) * nav_width;
 
-        self.navigator_visible_start = new_start;
-
-        (new_start, self.navigator_visible_count)
-    }
-
-    // 结束导航器拖动
-    pub fn end_navigator_drag(&mut self) {
-        self.navigator_drag_active = false;
-    }
-
-    // 根据X坐标获取K线索引
-    pub fn get_candle_index_from_x(
-        &self,
-        x: f64,
-        visible_start: usize,
-        total_items: usize,
-    ) -> Option<usize> {
-        if x < self.chart_area_x || x > self.chart_area_x + self.chart_area_width {
-            return None;
-        }
-
-        let relative_x = x - self.chart_area_x;
-        let candle_idx = (relative_x / self.total_candle_width).floor() as usize;
-
-        let absolute_idx = visible_start + candle_idx;
-        if absolute_idx < total_items {
-            Some(absolute_idx)
-        } else {
-            None
-        }
-    }
-
-    // 确保 calculate_navigator_visible_area 方法可以在可变引用上调用
-    pub fn calculate_navigator_visible_area(&mut self, total_items: usize) -> (f64, f64, f64) {
-        let start_x =
-            self.chart_area_x + self.navigator_visible_start as f64 * self.navigator_candle_width;
-        let end_x = self.chart_area_x
-            + (self.navigator_visible_start + self.navigator_visible_count) as f64
-                * self.navigator_candle_width;
-        let width = self.navigator_visible_count as f64 * self.navigator_candle_width;
-
-        (start_x, end_x, width)
+        (visible_start_x, visible_end_x)
     }
 }

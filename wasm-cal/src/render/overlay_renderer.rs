@@ -66,9 +66,7 @@ impl OverlayRenderer {
         if self.mouse_in_chart && items.len() > 0 {
             let relative_x = x - layout.chart_area_x;
             let candle_idx = (relative_x / layout.total_candle_width).floor() as usize;
-
             let data_idx = layout.navigator_visible_start + candle_idx;
-
             if data_idx < items.len() {
                 layout.hover_candle_index = Some(data_idx);
             } else {
@@ -84,10 +82,8 @@ impl OverlayRenderer {
         {
             // 释放layout的可变借用，以便后续操作
             drop(layout);
-
             // 清除覆盖层
-            self.clear_overlay(canvas_manager, items);
-
+            self.clear_overlay(canvas_manager);
             // 如果鼠标在图表区域内，重新绘制交互元素
             if self.mouse_in_chart {
                 // 直接使用传入的价格范围和最大成交量，避免重复计算
@@ -228,12 +224,8 @@ impl OverlayRenderer {
             let volume = layout.map_y_to_volume(mouse_y, max_volume);
             self.draw_volume_label(ctx, layout, volume, max_volume); // 传递最大成交量
         }
-
         // 2. 绘制X轴时间标签
         self.draw_time_label(ctx, layout, mouse_x, item);
-
-        // 3. 绘制当前K线高亮
-        self.highlight_current_candle(ctx, layout, mouse_x, item);
     }
 
     /// 绘制价格标签
@@ -306,13 +298,8 @@ impl OverlayRenderer {
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
         ctx.set_text_align("right"); // 改为右对齐
 
-        let volume_text = if volume >= 1_000_000.0 {
-            format!("{:.2}M", volume / 1_000_000.0)
-        } else if volume >= 1_000.0 {
-            format!("{:.2}K", volume / 1_000.0)
-        } else {
-            format!("{:.2}", volume)
-        };
+        // 使用ChartLayout的方法格式化成交量
+        let volume_text = layout.format_volume(volume, 2);
 
         // 文本位置调整为标签右侧边缘减去内边距
         let text_x = label_x + label_width - 5.0; // 右侧边缘减去5像素内边距
@@ -347,50 +334,11 @@ impl OverlayRenderer {
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
         ctx.set_text_align("center");
 
-        // 将时间戳转换为可读格式 - 使用 chrono 替代 js_sys::Date
+        // 使用ChartLayout的方法格式化时间戳
         let timestamp_secs = item.timestamp() as i64;
-        let dt = DateTime::from_timestamp(timestamp_secs, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap());
-
-        // 格式化时间字符串
-        let time_str = dt.format("%y/%m/%d %H:%M").to_string();
+        let time_str = layout.format_timestamp(timestamp_secs, "%y/%m/%d %H:%M");
 
         let _ = ctx.fill_text(&time_str, mouse_x, label_y + label_height / 2.0);
-    }
-
-    /// 高亮当前K线
-    fn highlight_current_candle(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mouse_x: f64,
-        item: KlineItem,
-    ) {
-        // 计算当前K线的位置
-        let candle_idx = layout.hover_candle_index.unwrap();
-        let candle_x = layout.chart_area_x
-            + (candle_idx - layout.navigator_visible_start) as f64 * layout.total_candle_width;
-
-        // 设置高亮样式
-        ctx.set_fill_style_str("rgba(255, 255, 255, 0.2)");
-        ctx.set_stroke_style_str(ChartColors::CROSSHAIR);
-        ctx.set_line_width(1.0);
-
-        // 绘制高亮背景
-        ctx.fill_rect(
-            candle_x,
-            layout.chart_area_y,
-            layout.candle_width,
-            layout.chart_area_height,
-        );
-
-        // 绘制高亮边框
-        ctx.stroke_rect(
-            candle_x,
-            layout.chart_area_y,
-            layout.candle_width,
-            layout.chart_area_height,
-        );
     }
 
     /// 绘制详细数据提示框
@@ -417,18 +365,24 @@ impl OverlayRenderer {
         let mut tooltip_y = mouse_y - 10.0; // 默认在鼠标上方
 
         // 如果提示框会超出右边界，则放在鼠标左侧
-        if tooltip_x + tooltip_width > layout.canvas_width {
+        if tooltip_x + tooltip_width > layout.chart_area_x + layout.chart_area_width {
             tooltip_x = mouse_x - tooltip_width - 15.0;
         }
 
-        // 如果提示框会超出上边界，则放在鼠标下方
-        if tooltip_y < 0.0 {
-            tooltip_y = mouse_y + 10.0;
+        // 确保提示框不超出图表区域左边界
+        if tooltip_x < layout.chart_area_x {
+            tooltip_x = layout.chart_area_x + 5.0;
         }
 
-        // 如果提示框会超出下边界，则向上调整
-        if tooltip_y + tooltip_height > layout.canvas_height {
-            tooltip_y = layout.canvas_height - tooltip_height - 10.0;
+        // 如果提示框会超出上边界，则放在鼠标下方
+        if tooltip_y < layout.chart_area_y {
+            tooltip_y = layout.chart_area_y + 5.0;
+        }
+
+        // 如果提示框会超出下边界，则向上调整，确保不与datazoom重叠
+        // 使用 volume_chart_y + volume_chart_height 作为下边界，而不是 canvas_height
+        if tooltip_y + tooltip_height > layout.volume_chart_y + layout.volume_chart_height {
+            tooltip_y = layout.volume_chart_y + layout.volume_chart_height - tooltip_height - 5.0;
         }
 
         // 绘制提示框背景
@@ -443,11 +397,9 @@ impl OverlayRenderer {
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
 
-        // 将时间戳转换为可读格式
+        // 使用ChartLayout的方法格式化时间戳
         let timestamp_secs = item.timestamp() as i64;
-        let dt = DateTime::from_timestamp(timestamp_secs, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap());
-        let time_str = dt.format("%Y/%m/%d %H:%M").to_string();
+        let time_str = layout.format_timestamp(timestamp_secs, "%Y/%m/%d %H:%M");
 
         // 绘制时间
         let _ = ctx.fill_text(
@@ -480,13 +432,8 @@ impl OverlayRenderer {
 
         // 绘制成交量
         let volume = item.b_vol() + item.s_vol();
-        let volume_text = if volume >= 1_000_000.0 {
-            format!("成交量: {:.2}M", volume / 1_000_000.0)
-        } else if volume >= 1_000.0 {
-            format!("成交量: {:.2}K", volume / 1_000.0)
-        } else {
-            format!("成交量: {:.2}", volume)
-        };
+        // 使用ChartLayout的方法格式化成交量
+        let volume_text = format!("成交量: {}", layout.format_volume(volume, 2));
         let _ = ctx.fill_text(
             &volume_text,
             tooltip_x + padding,
@@ -495,19 +442,17 @@ impl OverlayRenderer {
     }
 
     // 清除覆盖层
-    pub fn clear_overlay(
-        &mut self,
-        canvas_manager: &CanvasManager,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-    ) {
+    pub fn clear_overlay(&mut self, canvas_manager: &CanvasManager) {
         // 获取覆盖层上下文
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
-
         // 只清除图表区域，保留datazoom区域
-        ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.canvas_height); // 释放布局借用
-        drop(layout);
-        self.render_datazoom(canvas_manager, items);
+        ctx.clear_rect(
+            0.0,
+            0.0,
+            layout.canvas_width,
+            layout.canvas_height - layout.navigator_height,
+        );
     }
 
     /// 渲染 DataZoom 导航器

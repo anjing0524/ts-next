@@ -3,7 +3,6 @@
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
-use chrono::DateTime; // 调整导入，移除 NaiveDateTime 和 TimeZone (如果不再需要)
 use flatbuffers;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
@@ -76,7 +75,7 @@ impl AxisRenderer {
         // --- 绘制Y轴刻度和标签 ---
         // (标签绘制逻辑不变)
         let num_y_labels = 5;
-        ctx.set_fill_style_str(ChartColors::TEXT); // 使用更深的文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
         ctx.set_font("10px Arial");
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
@@ -123,7 +122,7 @@ impl AxisRenderer {
 
         // --- 绘制Y轴刻度和标签 ---
         let num_y_labels = 2; // 成交量图只需要少量标签
-        ctx.set_fill_style_str(ChartColors::TEXT); // 使用更深的文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
         ctx.set_font("10px Arial");
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
@@ -146,14 +145,8 @@ impl AxisRenderer {
                 y += 5.0; // 向下移动半个字体高度
             }
 
-            // 格式化成交量显示
-            let volume_text = if volume >= 1_000_000.0 {
-                format!("{:.1}M", volume / 1_000_000.0)
-            } else if volume >= 1_000.0 {
-                format!("{:.1}K", volume / 1_000.0)
-            } else {
-                format!("{:.0}", volume) // 0 值显示为 "0"
-            };
+            // 使用ChartLayout的方法格式化成交量
+            let volume_text = layout.format_volume(volume, 1);
 
             // 绘制标签
             let _ = ctx.fill_text(&volume_text, layout.y_axis_width - 5.0, y);
@@ -212,7 +205,7 @@ impl AxisRenderer {
             .ceil()
             .max(1.0) as usize; // 每隔多少根K线显示一个标签
 
-        ctx.set_fill_style_str(ChartColors::TEXT); // 使用更深的文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
         ctx.set_font("10px Arial");
         ctx.set_text_align("center");
         ctx.set_text_baseline("top");
@@ -234,15 +227,9 @@ impl AxisRenderer {
                 let item = items.get(data_idx);
                 let timestamp_secs = item.timestamp() as i64; // 获取 Unix 时间戳 (秒)
 
-                // --- 使用 chrono::DateTime::from_timestamp 转换和格式化时间戳 ---
-                // 直接将 Unix 时间戳（秒）转换为 DateTime<Utc>
-                let dt = DateTime::from_timestamp(timestamp_secs, 0)
-                    .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap()); // 处理可能的转换失败，提供默认值（纪元开始）
-
-                // 格式化时间字符串
-                let time_str = dt.format("%H:%M").to_string(); // 时:分
-                let date_str = dt.format("%y/%m/%d").to_string(); // 月/日
-                // --- 结束 chrono 处理 ---
+                // 使用ChartLayout的方法格式化时间戳
+                let time_str = layout.format_timestamp(timestamp_secs, "%H:%M"); // 时:分
+                let date_str = layout.format_timestamp(timestamp_secs, "%y/%m/%d"); // 月/日
 
                 // 绘制时间标签（两行）
                 let _ = ctx.fill_text(&date_str, x, time_label_y_start);
@@ -257,7 +244,7 @@ impl AxisRenderer {
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
         // 绘制标题
-        ctx.set_fill_style_str(ChartColors::TEXT);
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         ctx.set_font("bold 14px Arial");
         ctx.set_text_align("left");
         ctx.set_text_baseline("middle");
@@ -268,14 +255,14 @@ impl AxisRenderer {
         // 绿色上涨
         ctx.set_fill_style_str(ChartColors::BULLISH);
         ctx.fill_rect(legend_x, legend_y - 5.0, 10.0, 10.0);
-        ctx.set_fill_style_str(ChartColors::TEXT);
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         ctx.set_font("12px Arial");
         ctx.set_text_align("left");
         let _ = ctx.fill_text("上涨", legend_x + 15.0, legend_y);
         // 红色下跌
         ctx.set_fill_style_str(ChartColors::BEARISH);
         ctx.fill_rect(legend_x + 60.0, legend_y - 5.0, 10.0, 10.0);
-        ctx.set_fill_style_str(ChartColors::TEXT);
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         let _ = ctx.fill_text("下跌", legend_x + 75.0, legend_y);
     }
 }
