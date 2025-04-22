@@ -1,5 +1,11 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  MouseEvent as ReactMouseEvent,
+  WheelEvent as ReactWheelEvent,
+} from 'react';
 
 export default function Main() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,6 +109,39 @@ export default function Main() {
     };
   }, []);
 
+  // 直接在React事件处理函数中发送消息给Worker
+  const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    if (!workerRef.current || !overlayCanvasRef.current) return;
+
+    const rect = overlayCanvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    workerRef.current.postMessage({
+      type: 'mousemove',
+      x,
+      y,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    if (!workerRef.current) return;
+
+    workerRef.current.postMessage({
+      type: 'mouseleave',
+    });
+  };
+
+  const handleWheel = (e: ReactWheelEvent<HTMLCanvasElement>) => {
+    if (!workerRef.current) return;
+    workerRef.current.postMessage({
+      type: 'wheel',
+      deltaY: e.deltaY,
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY,
+    });
+  };
+
   return (
     <div className="p-4">
       <h2 className="text-xl font-semibold mb-4">K 线图 (Web Worker + OffscreenCanvas)</h2>
@@ -121,6 +160,9 @@ export default function Main() {
           className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-20 "
         />
         <canvas
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onWheel={handleWheel}
           ref={overlayCanvasRef}
           className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
         />

@@ -1,5 +1,5 @@
 // 图表布局配置 - 定义整个K线图的布局参数
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::DateTime;
 
 #[derive(Clone)]
 pub struct ChartLayout {
@@ -68,14 +68,8 @@ pub struct ChartLayout {
 
 impl ChartLayout {
     /// 创建新的图表布局实例
-    ///
-    /// # Arguments
-    ///
     /// * `canvas_width` - 画布总宽度
     /// * `canvas_height` - 画布总高度
-    ///
-    /// # Returns
-    ///
     /// * `ChartLayout` - 新的布局实例
     pub fn new(canvas_width: f64, canvas_height: f64) -> Self {
         // 基础布局参数
@@ -210,12 +204,16 @@ impl ChartLayout {
 
     // 将Y坐标映射到价格
     pub fn map_y_to_price(&self, y: f64, min_low: f64, max_high: f64) -> f64 {
-        let usable_height = self.price_chart_height - 2.0 * self.price_margin;
-        if usable_height <= 0.0 {
-            return min_low; // 避免除以零
+        let price_range = max_high - min_low;
+        if price_range <= 0.0 {
+            return 0.0;
         }
-        let price_ratio = 1.0 - (y - self.chart_area_y - self.price_margin) / usable_height;
-        min_low + price_ratio * (max_high - min_low)
+
+        let chart_height = self.price_chart_height - 2.0 * self.price_margin;
+        let relative_y = y - (self.chart_area_y + self.price_margin);
+        let price_ratio = relative_y / chart_height;
+
+        max_high - price_ratio * price_range
     }
 
     // 将成交量映射到Y坐标
@@ -270,9 +268,8 @@ impl ChartLayout {
 
     // 格式化日期用于坐标轴显示
     pub fn format_date_for_axis(&self, timestamp: i64) -> String {
-        if let Some(dt) = NaiveDateTime::from_timestamp_opt(timestamp, 0) {
-            let datetime: DateTime<Utc> = Utc.from_utc_datetime(&dt);
-            datetime.format("%Y-%m-%d %H:%M").to_string()
+        if let Some(dt) = DateTime::from_timestamp(timestamp, 0) {
+            dt.format("%Y-%m-%d %H:%M").to_string()
         } else {
             "Invalid Date".to_string()
         }

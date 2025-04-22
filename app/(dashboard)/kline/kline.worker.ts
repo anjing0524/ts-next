@@ -26,7 +26,19 @@ interface MouseLeaveMessage {
   type: 'mouseleave';
 }
 
-type WorkerMessage = InitMessage | DrawMessage | MouseMoveMessage | MouseLeaveMessage;
+interface WheelMessage {
+  type: 'wheel';
+  deltaY: number;
+  x: number;
+  y: number;
+}
+
+type WorkerMessage =
+  | InitMessage
+  | DrawMessage
+  | MouseMoveMessage
+  | MouseLeaveMessage
+  | WheelMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -50,6 +62,18 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           return;
         }
         await handleDraw(data);
+        break;
+      case 'mousemove':
+        if (!processorRef) return;
+        processorRef.handle_mouse_move(data.x, data.y);
+        break;
+      case 'mouseleave':
+        if (!processorRef) return;
+        processorRef.handle_mouse_leave();
+        break;
+      case 'wheel':
+        if (!processorRef) return;
+        processorRef.handle_wheel(data.deltaY, data.x, data.y);
         break;
       default:
         console.error('Worker 收到未知类型的消息');

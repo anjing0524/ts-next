@@ -29,7 +29,12 @@ impl ChartColors {
     pub const NAVIGATOR_BG: &'static str = "#f8f9fa"; // 导航器背景 (非常浅的灰)
     pub const NAVIGATOR_BORDER: &'static str = "#e0e3eb"; // 导航器边框
     pub const NAVIGATOR_HANDLE: &'static str = "#b0b8c9"; // 导航器滑块
-    pub const NAVIGATOR_WINDOW: &'static str = "rgba(176, 184, 201, 0.2)"; // 导航器选中区域
+    pub const NAVIGATOR_WINDOW: &'static str = "rgba(176, 184, 201, 0.2)"; // 导航器选中区域   
+    pub const NAVIGATOR_MASK: &'static str = "rgba(180, 180, 180, 0.3)"; // 导航器不可见区域遮罩
+
+    // 成交量相关颜色
+    pub const VOLUME_LINE: &'static str = "#6C8CD5"; // 成交量曲线颜色
+    pub const VOLUME_AREA: &'static str = "rgba(108, 140, 213, 0.2)"; // 成交量区域填充颜色
 
     // --- 交互元素 ---
     pub const CROSSHAIR: &'static str = "rgba(100, 100, 100, 0.5)"; // 十字线 (半透明灰)

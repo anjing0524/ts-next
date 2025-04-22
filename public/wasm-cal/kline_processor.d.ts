@@ -18,6 +18,9 @@ export class KlineProcess {
    * 绘制所有图表
    */
   draw_all(): void;
+  handle_mouse_move(x: number, y: number): void;
+  handle_mouse_leave(): void;
+  handle_wheel(delta: number, x: number, y: number): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -28,6 +31,9 @@ export interface InitOutput {
   readonly klineprocess_new: (a: any, b: number, c: number) => [number, number, number];
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
   readonly klineprocess_draw_all: (a: number) => [number, number];
+  readonly klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
+  readonly klineprocess_handle_mouse_leave: (a: number) => void;
+  readonly klineprocess_handle_wheel: (a: number, b: number, c: number, d: number) => void;
   readonly start: () => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;

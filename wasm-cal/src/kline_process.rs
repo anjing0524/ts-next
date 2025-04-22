@@ -246,4 +246,51 @@ impl KlineProcess {
 
         Ok((min_low, max_high, max_volume))
     }
+
+    #[wasm_bindgen]
+    pub fn handle_mouse_move(&self, x: f64, y: f64) {
+        if let Some(chart_renderer) = &self.chart_renderer {
+            log(&format!(
+                "KlineProcess::handle_mouse_move - x={}, y={}",
+                x, y
+            ));
+
+            // 获取K线数据项
+            if let Some(parsed_data) = &self.parsed_data {
+                if let Some(items) = parsed_data.items() {
+                    // 调用渲染器的鼠标移动处理方法
+                    chart_renderer.handle_mouse_move(x, y, items);
+                    // 重新绘制覆盖层
+                    chart_renderer.render_overlay(items);
+                }
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn handle_mouse_leave(&self) {
+        if let Some(chart_renderer) = &self.chart_renderer {
+            log("KlineProcess::handle_mouse_leave");
+
+            // 调用渲染器的鼠标离开处理方法
+            chart_renderer.handle_mouse_leave();
+
+            // 清除覆盖层
+            if let Some(parsed_data) = &self.parsed_data {
+                if let Some(items) = parsed_data.items() {
+                    chart_renderer.clear_overlay(items);
+                }
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn handle_wheel(&self, delta: f64, x: f64, y: f64) {
+        if let Some(chart_renderer) = &self.chart_renderer {
+            log(&format!(
+                "KlineProcess::handle_wheel - delta={}, x={}, y={}",
+                delta, x, y
+            ));
+        }
+    }
 }
