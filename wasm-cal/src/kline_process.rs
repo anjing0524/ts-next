@@ -206,6 +206,7 @@ impl KlineProcess {
 
     #[wasm_bindgen]
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
+        time("KlineProcess::handle_mouse_move");
         if let Some(chart_renderer) = &self.chart_renderer {
             log(&format!(
                 "KlineProcess::handle_mouse_move - x={}, y={}",
@@ -222,6 +223,7 @@ impl KlineProcess {
                 }
             }
         }
+        time_end("KlineProcess::handle_mouse_move");
     }
 
     #[wasm_bindgen]
