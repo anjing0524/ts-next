@@ -1,7 +1,10 @@
 // 图表布局配置 - 定义整个K线图的布局参数
 use chrono::DateTime;
-
-#[derive(Clone)]
+// enum HandleType {
+//     Left,
+//     Right,
+//     Middle,
+// }
 pub struct ChartLayout {
     // 基础尺寸
     pub canvas_width: f64,  // 画布总宽度
@@ -10,8 +13,8 @@ pub struct ChartLayout {
     // 区域划分
     pub header_height: f64,    // 顶部标题和图例区域高度
     pub y_axis_width: f64,     // 左侧Y轴宽度
-    pub navigator_height: f64, // 底部导航器高度
     pub time_axis_height: f64, // 时间轴高度
+    pub navigator_height: f64, // 底部导航器高度
 
     // 计算得出的区域坐标
     pub chart_area_x: f64,      // 图表区域起始X坐标(一般等于y_axis_width)
@@ -51,14 +54,8 @@ pub struct ChartLayout {
     pub navigator_drag_active: bool, // 导航器是否处于拖动状态
     pub navigator_drag_start_x: f64, // 导航器拖动起始X坐标
 
-    // 导航器状态
-    pub navigator_visible_start: usize, // 导航器中可见区域的起始索引
-    pub navigator_visible_count: usize, // 导航器中可见区域的K线数量
-
     // 拖动状态
-    pub dragging_handle: Option<&'static str>, // 当前拖动的手柄类型: "left", "right", "middle"
-    pub drag_start_x: f64,                     // 拖动开始时的X坐标
-    pub drag_start_visible_start: usize,       // 拖动开始时的可见区域起始索引
+    pub drag_start_x: f64, // 拖动开始时的X坐标
 
     // 悬浮状态
     pub hover_candle_index: Option<usize>,  // 当前悬浮的K线索引
@@ -92,10 +89,10 @@ impl ChartLayout {
         let time_axis_height = 30.0; // 时间轴高度 (原为 20.0)
         let navigator_handle_width = 4.0; // 导航器滑块宽度(减小宽度使其更精细)
 
-        // K线图参数
-        let candle_width = 6.0; // K线宽度
-        let candle_spacing = 2.0; // 间距
-        let total_candle_width = candle_width + candle_spacing; // 单个K线总占用宽度
+        // K线图参数 - 设置固定的蜡烛宽度和间距，确保与图片中的样式匹配
+        let candle_spacing = 1.0; // 蜡烛间的间距，较小以符合图片样式
+        let candle_width = 10.0; // 固定蜡烛宽度为10像素
+        let total_candle_width = candle_width + candle_spacing; // 单个K线总宽度
 
         // 计算主图表区域
         let chart_area_x = y_axis_width; // 图表区域X起点(从Y轴右侧开始)
@@ -105,7 +102,7 @@ impl ChartLayout {
         let chart_area_height = canvas_height - header_height - navigator_height - time_axis_height; // 主图区域高度
 
         // 调整成交量图和价格图的高度比例
-        let volume_chart_height = chart_area_height * 0.15; // 成交量图占主图区域的15%
+        let volume_chart_height = chart_area_height * 0.2; // 成交量图占主图区域的20%
         let price_chart_height = chart_area_height - volume_chart_height; // 价格图占剩余空间
         let volume_chart_y = chart_area_y + price_chart_height; // 成交量图的Y坐标起点
 
@@ -115,14 +112,6 @@ impl ChartLayout {
         // 导航器中每个K线的宽度 - 这个值应该根据实际数据量动态计算
         // 这里先设置一个默认值，后续会在绘制时根据实际数据量重新计算
         let navigator_candle_width = 1.0;
-
-        // 计算初始可见K线数量 (根据画布宽度和K线宽度计算)
-        let initial_visible_count = (chart_area_width / total_candle_width).floor() as usize;
-
-        // 初始导航器状态
-        let navigator_total_count = 0; // 初始时未知，将在数据加载后更新
-        let navigator_visible_start = 0; // 初始时从头开始
-        let navigator_visible_count = initial_visible_count; // 初始可见数量
 
         Self {
             canvas_width,
@@ -153,13 +142,9 @@ impl ChartLayout {
             navigator_y, // 使用更新后的值
             navigator_candle_width,
             navigator_handle_width,
-            navigator_visible_start,
-            navigator_visible_count,
             navigator_drag_active: false,
             navigator_drag_start_x: 0.0,
-            dragging_handle: None,
             drag_start_x: 0.0,
-            drag_start_visible_start: 0,
             hover_candle_index: None,
             hover_position: None,
             show_tooltip: false,
@@ -261,8 +246,15 @@ impl ChartLayout {
 
     /// 计算导航器中可见区域的起始和结束X坐标
     /// * `items_len` - 数据项总数
+    /// * `visible_start` - 可见区域起始索引
+    /// * `visible_count` - 可见区域K线数量
     /// * 返回 (visible_start_x, visible_end_x)
-    pub fn calculate_visible_range_coordinates(&self, items_len: usize) -> (f64, f64) {
+    pub fn calculate_visible_range_coordinates(
+        &self,
+        items_len: usize,
+        visible_start: usize,
+        visible_count: usize,
+    ) -> (f64, f64) {
         let nav_x = self.chart_area_x;
         let nav_width = self.chart_area_width;
 
@@ -271,8 +263,8 @@ impl ChartLayout {
         }
 
         // 确保可见区域不超出数据范围
-        let visible_start = self.navigator_visible_start.min(items_len);
-        let visible_count = self.navigator_visible_count.min(items_len - visible_start);
+        let visible_start = visible_start.min(items_len);
+        let visible_count = visible_count.min(items_len - visible_start);
 
         // 计算比例
         let visible_start_ratio = visible_start as f64 / items_len as f64;
@@ -282,5 +274,51 @@ impl ChartLayout {
         let visible_end_x = nav_x + visible_end_ratio.min(1.0) * nav_width;
 
         (visible_start_x, visible_end_x)
+    }
+
+    /// 判断点是否在导航器区域内
+    /// * `x` - X坐标
+    /// * `y` - Y坐标
+    /// * 返回是否在导航器区域内
+    pub fn is_point_in_navigator(&self, x: f64, y: f64) -> bool {
+        x >= self.chart_area_x
+            && x <= self.chart_area_x + self.chart_area_width
+            && y >= self.navigator_y
+            && y <= self.navigator_y + self.navigator_height
+    }
+
+    /// 判断点是否在图表主区域内
+    /// * `x` - X坐标
+    /// * `y` - Y坐标
+    /// * 返回是否在图表主区域内
+    pub fn is_point_in_chart_area(&self, x: f64, y: f64) -> bool {
+        x >= self.chart_area_x
+            && x <= self.chart_area_x + self.chart_area_width
+            && y >= self.chart_area_y
+            && y <= self.chart_area_y + self.chart_area_height
+    }
+
+    /// 根据可见K线数量计算蜡烛图宽度
+    pub fn calculate_candle_width(&self, visible_count: usize) -> f64 {
+        if visible_count == 0 {
+            return 8.0; // 默认宽度
+        }
+        // 计算每根K线的总宽度（包括间距）
+        let total_width_per_candle = self.chart_area_width / visible_count as f64;
+        // 蜡烛图实体宽度 = 总宽度 - 间距
+        let candle_width = (total_width_per_candle * 0.8).max(1.0);
+
+        candle_width
+    }
+
+    /// 更新布局参数以适应当前可见K线数量
+    pub fn update_for_visible_count(&mut self, visible_count: usize) {
+        if visible_count > 0 {
+            // 计算新的蜡烛图宽度
+            self.candle_width = self.calculate_candle_width(visible_count);
+
+            // 更新K线总宽度（包括间距）
+            self.total_candle_width = self.chart_area_width / visible_count as f64;
+        }
     }
 }

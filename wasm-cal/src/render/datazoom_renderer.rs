@@ -1,9 +1,12 @@
 //! DataZoom导航器模块 - 负责绘制和处理数据缩放导航器
 
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
 use flatbuffers;
+use std::cell::RefCell;
+use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// DataZoom导航器绘制器
@@ -11,12 +14,8 @@ pub struct DataZoomRenderer;
 
 impl DataZoomRenderer {
     /// 绘制DataZoom导航器
-    pub fn draw(
-        &self,
-        canvas_manager: &CanvasManager,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-    ) {
-        // 获取上下文和布局
+    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+        // 获取 BASE 上下文和布局
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
 
@@ -26,12 +25,15 @@ impl DataZoomRenderer {
         let nav_width = layout.chart_area_width;
         let nav_height = layout.navigator_height;
 
-        // 清除导航器区域
-        ctx.clear_rect(nav_x, nav_y, nav_width, nav_height);
-
         // 绘制导航器背景
         ctx.set_fill_style_str(ChartColors::NAVIGATOR_BG);
         ctx.fill_rect(nav_x, nav_y, nav_width, nav_height);
+
+        let items_opt = data_manager.borrow().get_items();
+        let items = match items_opt {
+            Some(items) => items,
+            None => return,
+        };
 
         // 如果数据为空，直接返回
         if items.len() == 0 {
@@ -41,7 +43,16 @@ impl DataZoomRenderer {
         // 绘制成交量曲线作为背景
         self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height);
         // 绘制当前可见区域指示器
-        self.draw_visible_range_indicator(ctx, &layout, items, nav_x, nav_y, nav_width, nav_height);
+        self.draw_visible_range_indicator(
+            ctx,
+            &layout,
+            items,
+            nav_x,
+            nav_y,
+            nav_width,
+            nav_height,
+            data_manager,
+        );
     }
 
     /// 在导航器上绘制成交量区域图
@@ -148,15 +159,21 @@ impl DataZoomRenderer {
         nav_y: f64,
         nav_width: f64,
         nav_height: f64,
+        data_manager: &Rc<RefCell<DataManager>>,
     ) {
         let items_len = items.len();
         if items_len == 0 {
             return;
         }
 
+        // 从DataManager获取可见区域的起始索引和数量
+        let data_manager_ref = data_manager.borrow();
+        // 获取可见范围
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+
         // 使用ChartLayout中的方法计算可见区域坐标
         let (visible_start_x, visible_end_x) =
-            layout.calculate_visible_range_coordinates(items_len);
+            layout.calculate_visible_range_coordinates(items_len, visible_start, visible_count);
 
         // 绘制半透明遮罩 (左侧不可见区域)
         ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);

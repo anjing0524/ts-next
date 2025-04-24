@@ -40,25 +40,6 @@ impl CanvasManager {
         })
     }
 
-    /// 清除指定层的Canvas
-    pub fn clear_layer(&self, layer_type: CanvasLayerType) {
-        let ctx = self.get_context(layer_type);
-
-        ctx.clear_rect(
-            0.0,
-            0.0,
-            self.layout.borrow().canvas_width,
-            self.layout.borrow().canvas_height,
-        );
-    }
-
-    /// 清除所有层的Canvas
-    pub fn clear_all(&self) {
-        self.clear_layer(CanvasLayerType::Base);
-        self.clear_layer(CanvasLayerType::Main);
-        self.clear_layer(CanvasLayerType::Overlay);
-    }
-
     /// 获取指定层的Canvas上下文
     pub fn get_context(&self, layer_type: CanvasLayerType) -> &OffscreenCanvasRenderingContext2d {
         match layer_type {

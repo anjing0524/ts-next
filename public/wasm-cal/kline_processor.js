@@ -380,6 +380,9 @@ function __wbg_get_imports() {
         const ret = Array.of(arg0, arg1);
         return ret;
     };
+    imports.wbg.__wbg_quadraticCurveTo_d0e2225e49394b7a = function(arg0, arg1, arg2, arg3, arg4) {
+        arg0.quadraticCurveTo(arg1, arg2, arg3, arg4);
+    };
     imports.wbg.__wbg_rect_00c560f0cc92818c = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.rect(arg1, arg2, arg3, arg4);
     };
@@ -401,6 +404,18 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setlineWidth_3c8b7156949a9f4b = function(arg0, arg1) {
         arg0.lineWidth = arg1;
     };
+    imports.wbg.__wbg_setshadowBlur_55636e14cc608483 = function(arg0, arg1) {
+        arg0.shadowBlur = arg1;
+    };
+    imports.wbg.__wbg_setshadowColor_6e6d8ffdd901b1b4 = function(arg0, arg1, arg2) {
+        arg0.shadowColor = getStringFromWasm0(arg1, arg2);
+    };
+    imports.wbg.__wbg_setshadowOffsetX_a2bf8df2ff417742 = function(arg0, arg1) {
+        arg0.shadowOffsetX = arg1;
+    };
+    imports.wbg.__wbg_setshadowOffsetY_3a6168755a1f2781 = function(arg0, arg1) {
+        arg0.shadowOffsetY = arg1;
+    };
     imports.wbg.__wbg_setstrokeStyle_070920f27992b9a6 = function(arg0, arg1, arg2) {
         arg0.strokeStyle = getStringFromWasm0(arg1, arg2);
     };
@@ -419,6 +434,9 @@ function __wbg_get_imports() {
         const len1 = WASM_VECTOR_LEN;
         getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
         getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+    };
+    imports.wbg.__wbg_strokeRect_758dd38f99a9581f = function(arg0, arg1, arg2, arg3, arg4) {
+        arg0.strokeRect(arg1, arg2, arg3, arg4);
     };
     imports.wbg.__wbg_stroke_44080cc2554b4436 = function(arg0) {
         arg0.stroke();

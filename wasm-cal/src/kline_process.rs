@@ -24,7 +24,7 @@ extern "C" {
 pub struct KlineProcess {
     // 数据相关
     data: Vec<u8>,                           // 原始FlatBuffer数据
-    parsed_data: Option<KlineData<'static>>, // 解析后的数据，用于缓存 (移除了Rc)
+    parsed_data: Option<KlineData<'static>>, // 解析后的数据
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
 }
@@ -45,21 +45,15 @@ impl KlineProcess {
 
         // 1. 从WASM内存中读取数据
         let data = Self::read_from_memory(memory_val, ptr_offset, data_length)?;
-
         // 2. 验证数据
         Self::verify_kline_data_slice(&data)?;
-
-        // 5. 解析数据并计算范围（初始）
-        time("KlineProcess::new - Parsing and calculating ranges");
+        // 3. 解析数据并设置到数据管理器
+        time("KlineProcess::new - Parsing data");
         let parsed_data = Self::parse_kline_data_from_slice(&data)?;
-        // 初始化到常量里面
-        // let (min_low, max_high, max_volume) = Self::calculate_data_ranges(&parsed_data)?;
-        // 移除Rc，直接使用transmute
-        let parsed_data = unsafe { std::mem::transmute(parsed_data) };
-        time_end("KlineProcess::new - Parsing and calculating ranges");
-
+        // 持久化解析后的数据生命周期
+        let parsed_data: KlineData<'static> = unsafe { std::mem::transmute(parsed_data) };
+        time_end("KlineProcess::new - Parsing data");
         log("KlineProcess initialized successfully.");
-
         Ok(KlineProcess {
             data,
             parsed_data: Some(parsed_data),
@@ -95,9 +89,16 @@ impl KlineProcess {
 
         // 创建布局
         let layout = ChartLayout::new(width as f64, height as f64);
-        // 创建渲染器
-        let chart_renderer =
-            ChartRenderer::new(&base_canvas, &main_canvas, &overlay_canvas, layout)?;
+
+        // 创建渲染器，并传入数据管理器引用
+        let chart_renderer = ChartRenderer::new(
+            &base_canvas,
+            &main_canvas,
+            &overlay_canvas,
+            layout,
+            self.parsed_data,
+        )?;
+
         self.chart_renderer = Some(chart_renderer);
         Ok(())
     }
@@ -107,23 +108,10 @@ impl KlineProcess {
     pub fn draw_all(&self) -> Result<(), JsValue> {
         time("KlineProcess::draw_all");
 
-        // 获取K线数据项 - 直接使用引用
-        let items = if let Some(parsed_data) = &self.parsed_data {
-            parsed_data
-                .items()
-                .ok_or_else(|| WasmError::ParseError("无K线数据项".into()))?
-        } else {
-            // 只有在没有缓存数据时才解析
-            let parsed_data = self.parse_kline_data()?;
-            parsed_data
-                .items()
-                .ok_or_else(|| WasmError::ParseError("无K线数据项".into()))?
-        };
-
         // 使用ChartRenderer绘制所有图表
         match &self.chart_renderer {
             Some(chart_renderer) => {
-                chart_renderer.render(items);
+                chart_renderer.render();
             }
             None => {
                 return Err(WasmError::RenderError("未设置Canvas".into()).into());
@@ -179,23 +167,7 @@ impl KlineProcess {
         Ok(())
     }
 
-    /// 解析K线数据 - 返回引用或克隆
-    fn parse_kline_data(&self) -> Result<KlineData, WasmError> {
-        // 如果已有解析好的数据，直接克隆
-        if let Some(parsed_data) = &self.parsed_data {
-            // 直接克隆数据，不需要Rc
-            return Ok(parsed_data.clone());
-        }
-        // 只有在没有缓存时才进行解析
-        let bytes = &self.data;
-        Self::verify_kline_data_slice(bytes)?;
-        let mut opts = flatbuffers::VerifierOptions::default();
-        opts.max_tables = 1_000_000_000;
-        root_as_kline_data_with_opts(&opts, bytes)
-            .map_err(|e| WasmError::ParseError(format!("Flatbuffer 解析失败: {}", e)))
-    }
-
-    // Helper function to parse from a slice, avoiding borrow issues
+    // Helper function to parse from a slice
     fn parse_kline_data_from_slice(data: &[u8]) -> Result<KlineData, WasmError> {
         Self::verify_kline_data_slice(data)?;
         let mut opts = flatbuffers::VerifierOptions::default();
@@ -207,22 +179,21 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
         time("KlineProcess::handle_mouse_move");
-        if let Some(chart_renderer) = &self.chart_renderer {
-            log(&format!(
-                "KlineProcess::handle_mouse_move - x={}, y={}",
-                x, y
-            ));
-
-            // 获取K线数据项
-            if let Some(parsed_data) = &self.parsed_data {
-                if let Some(items) = parsed_data.items() {
-                    // 调用渲染器的鼠标移动处理方法
-                    chart_renderer.handle_mouse_move(x, y, items);
-                    // 重新绘制覆盖层
-                    chart_renderer.render_overlay(items);
-                }
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                time_end("KlineProcess::handle_mouse_move");
+                return;
             }
-        }
+        };
+
+        log(&format!(
+            "KlineProcess::handle_mouse_move - x={}, y={}",
+            x, y
+        ));
+
+        chart_renderer.handle_mouse_move(x, y);
+
         time_end("KlineProcess::handle_mouse_move");
     }
 
@@ -230,15 +201,18 @@ impl KlineProcess {
     pub fn handle_mouse_leave(&self) {
         if let Some(chart_renderer) = &self.chart_renderer {
             log("KlineProcess::handle_mouse_leave");
-
-            // 调用渲染器的鼠标离开处理方法
             chart_renderer.handle_mouse_leave();
-            chart_renderer.clear_overlay();
         }
     }
 
     #[wasm_bindgen]
     pub fn handle_wheel(&self, delta: f64, x: f64, y: f64) {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => return,
+        };
+
+        chart_renderer.handle_wheel(delta, x, y);
         log(&format!(
             "KlineProcess::handle_wheel - delta={}, x={}, y={}",
             delta, x, y

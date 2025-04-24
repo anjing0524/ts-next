@@ -8,4 +8,3 @@ mod price_renderer;
 mod volume_renderer;
 
 pub use chart_renderer::ChartRenderer;
-pub use datazoom_renderer::DataZoomRenderer;

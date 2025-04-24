@@ -1,9 +1,12 @@
 //! 坐标轴模块 - 负责绘制X轴和Y轴
 
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
 use flatbuffers;
+use std::cell::RefCell;
+use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 坐标轴绘制器
@@ -11,24 +14,74 @@ pub struct AxisRenderer;
 
 impl AxisRenderer {
     /// 绘制所有坐标轴
-    pub fn draw(
-        &self,
-        canvas_manager: &CanvasManager,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        min_low: f64,
-        max_high: f64,
-        max_volume: f64,
-    ) {
+    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Base);
         let layout_ref = canvas_manager.layout.borrow(); // 使用 borrow 获取引用
+        let data_manager_ref = data_manager.borrow(); // 使用 borrow 获取引用
+        let items = match data_manager_ref.get_items() {
+            Some(items) => items,
+            None => return,
+        };
+        let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
+        // 绘制交替背景色
+        self.draw_alternating_background(&ctx, &layout_ref);
         // 绘制价格Y轴
-        self.draw_price_y_axis(ctx, &layout_ref, min_low, max_high);
+        self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high);
         // 绘制成交量Y轴
-        self.draw_volume_y_axis(ctx, &layout_ref, max_volume);
+        self.draw_volume_y_axis(&ctx, &layout_ref, max_volume);
         // 绘制X轴
-        self.draw_x_axis(ctx, &layout_ref, items);
+        self.draw_x_axis(&ctx, &layout_ref, items, data_manager);
         // 绘制标题和图例
-        self.draw_header(ctx, &layout_ref);
+        self.draw_header(&ctx, &layout_ref);
+    }
+
+    /// 绘制交替背景色
+    fn draw_alternating_background(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+    ) {
+        // 绘制主要价格图区域的交替背景色
+        let num_y_bands = 5; // 与标签数量一致
+        let band_height = layout.price_chart_height / num_y_bands as f64;
+
+        for i in 0..num_y_bands {
+            let band_y = layout.header_height + i as f64 * band_height;
+            let color = if i % 2 == 0 {
+                ChartColors::BACKGROUND // 主要背景色
+            } else {
+                ChartColors::GRID // 交替背景色 (浅灰色)
+            };
+
+            ctx.set_fill_style_str(color);
+            ctx.fill_rect(
+                layout.chart_area_x, // 从图表区域左边界开始
+                band_y,
+                layout.chart_area_width, // 宽度限制在图表区域
+                band_height,
+            );
+        }
+
+        // 绘制成交量图区域的交替背景色
+        let vol_num_y_bands = 2; // 成交量区域通常只需要2个区域
+        let vol_band_height = layout.volume_chart_height / vol_num_y_bands as f64;
+
+        for i in 0..vol_num_y_bands {
+            let band_y = layout.volume_chart_y + i as f64 * vol_band_height;
+            let color = if i % 2 == 0 {
+                ChartColors::BACKGROUND // 主要背景色
+            } else {
+                ChartColors::GRID // 交替背景色 (浅灰色)
+            };
+
+            ctx.set_fill_style_str(color);
+            ctx.fill_rect(
+                layout.chart_area_x, // 从图表区域左边界开始
+                band_y,
+                layout.chart_area_width, // 宽度限制在图表区域
+                vol_band_height,
+            );
+        }
     }
 
     /// 绘制价格Y轴
@@ -42,7 +95,6 @@ impl AxisRenderer {
         let effective_price_range = max_high - min_low;
 
         // --- 绘制Y轴背景 (Y轴标签区域) ---
-        // 确保只绘制在 Y 轴区域
         ctx.set_fill_style_str(ChartColors::HEADER_BG); // 通常是白色或浅色
         ctx.fill_rect(
             0.0, // 从画布最左侧开始
@@ -51,31 +103,20 @@ impl AxisRenderer {
             layout.price_chart_height, // 高度为价格图高度
         );
 
-        // --- 绘制价格区域的交替背景色 ---
-        // 修正：确保背景色只绘制在 chart_area 内
-        let num_y_bands = 5; // 与标签数量一致
-        let band_height = layout.price_chart_height / num_y_bands as f64;
-        for i in 0..num_y_bands {
-            let band_y = layout.header_height + i as f64 * band_height;
-            let color = if i % 2 == 0 {
-                ChartColors::BACKGROUND // 例如 "#ffffff"
-            } else {
-                ChartColors::GRID // 例如 "#f0f3fa" (浅蓝灰)
-            };
-            ctx.set_fill_style_str(color);
-            // 修正：X坐标从 chart_area_x 开始，宽度为 chart_area_width
-            ctx.fill_rect(
-                layout.chart_area_x, // 从图表区域左边界开始
-                band_y,
-                layout.chart_area_width, // 宽度限制在图表区域
-                band_height,
-            );
-        }
+        // --- 绘制Y轴右侧边界线 ---
+        ctx.set_stroke_style_str(ChartColors::BORDER);
+        ctx.set_line_width(1.0);
+        ctx.begin_path();
+        ctx.move_to(layout.y_axis_width, layout.header_height);
+        ctx.line_to(
+            layout.y_axis_width,
+            layout.header_height + layout.price_chart_height,
+        );
+        ctx.stroke();
 
-        // --- 绘制Y轴刻度和标签 ---
-        // (标签绘制逻辑不变)
+        // --- 绘制Y轴价格刻度和标签 ---
         let num_y_labels = 5;
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用文本颜色
         ctx.set_font("10px Arial");
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
@@ -87,19 +128,17 @@ impl AxisRenderer {
             if !price.is_finite() {
                 continue;
             }
-            let mut y = layout.map_price_to_y(price, min_low, max_high);
+            let y = layout.map_price_to_y(price, min_low, max_high);
 
-            // 调整最低标签的 Y 坐标，防止被截断 (基于 10px 字体大小)
-            if i == num_y_labels {
-                y -= 5.0; // 向上移动半个字体高度
-            }
-            // 调整最高标签的 Y 坐标，防止被截断
-            if i == 0 {
-                y += 5.0; // 向下移动半个字体高度
-            }
-
-            // 绘制标签 (位置不变，仍在 Y 轴区域内)
+            // 绘制标签
             let _ = ctx.fill_text(&format!("{:.2}", price), layout.y_axis_width - 5.0, y);
+
+            // 绘制小刻度线
+            ctx.set_stroke_style_str(ChartColors::BORDER);
+            ctx.begin_path();
+            ctx.move_to(layout.y_axis_width - 3.0, y);
+            ctx.line_to(layout.y_axis_width, y);
+            ctx.stroke();
         }
     }
 
@@ -111,7 +150,6 @@ impl AxisRenderer {
         max_volume: f64,
     ) {
         // --- 绘制Y轴背景 (Y轴标签区域) ---
-        // 位置和高度不变，因为 layout.volume_chart_y 已包含间距
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(
             0.0,
@@ -120,9 +158,20 @@ impl AxisRenderer {
             layout.volume_chart_height,
         );
 
+        // --- 绘制Y轴右侧边界线 ---
+        ctx.set_stroke_style_str(ChartColors::BORDER);
+        ctx.set_line_width(1.0);
+        ctx.begin_path();
+        ctx.move_to(layout.y_axis_width, layout.volume_chart_y);
+        ctx.line_to(
+            layout.y_axis_width,
+            layout.volume_chart_y + layout.volume_chart_height,
+        );
+        ctx.stroke();
+
         // --- 绘制Y轴刻度和标签 ---
         let num_y_labels = 2; // 成交量图只需要少量标签
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         ctx.set_font("10px Arial");
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
@@ -134,15 +183,13 @@ impl AxisRenderer {
             if !volume.is_finite() {
                 continue;
             }
+
+            // Map volume to Y coordinate
             let mut y = layout.map_volume_to_y(volume, max_volume);
 
-            // 调整最低标签 (0) 的 Y 坐标，防止被截断 (基于 10px 字体大小)
+            // If this is the zero line (i == 0), shift it up slightly to prevent overlap with the bottom border
             if i == 0 {
-                y -= 5.0; // 向上移动半个字体高度
-            }
-            // 调整最高标签的 Y 坐标，防止被截断
-            if i == num_y_labels {
-                y += 5.0; // 向下移动半个字体高度
+                y -= 2.0; // Shift up by 1 pixel
             }
 
             // 使用ChartLayout的方法格式化成交量
@@ -150,6 +197,13 @@ impl AxisRenderer {
 
             // 绘制标签
             let _ = ctx.fill_text(&volume_text, layout.y_axis_width - 5.0, y);
+
+            // 绘制小刻度线
+            ctx.set_stroke_style_str(ChartColors::BORDER);
+            ctx.begin_path();
+            ctx.move_to(layout.y_axis_width - 3.0, y);
+            ctx.line_to(layout.y_axis_width, y);
+            ctx.stroke();
         }
     }
 
@@ -159,7 +213,16 @@ impl AxisRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        data_manager: &Rc<RefCell<DataManager>>,
     ) {
+        let data_manager_ref = data_manager.borrow();
+        // 获取可见范围
+        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
+
+        if visible_start >= visible_end {
+            return;
+        }
+
         // X轴位置 (图表区域底部)
         let x_axis_y = layout.header_height + layout.chart_area_height;
         // 时间轴标签绘制的Y坐标起点 (X轴下方)
@@ -181,17 +244,6 @@ impl AxisRenderer {
         ctx.move_to(layout.chart_area_x, x_axis_y); // 从图表区域左边界开始
         ctx.line_to(layout.chart_area_x + layout.chart_area_width, x_axis_y); // 到图表区域右边界结束
         ctx.stroke();
-
-        // --- X轴标签和垂直网格线绘制逻辑 ---
-        // 获取可见区域的起始索引和数量
-        let visible_start = layout.navigator_visible_start;
-        let visible_count = layout.navigator_visible_count;
-        let visible_end = (visible_start + visible_count).min(items.len());
-
-        // 如果没有可见数据，则不绘制标签和网格线
-        if visible_start >= visible_end {
-            return;
-        }
 
         // 优化：计算第一个和最后一个可见标签的X坐标
         let first_visible_x = layout.chart_area_x;
@@ -243,26 +295,38 @@ impl AxisRenderer {
         // 绘制标题区域背景
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
+
+        // 绘制标题区域底部边界
+        ctx.set_stroke_style_str(ChartColors::BORDER);
+        ctx.set_line_width(1.0);
+        ctx.begin_path();
+        ctx.move_to(0.0, layout.header_height);
+        ctx.line_to(layout.canvas_width, layout.header_height);
+        ctx.stroke();
+
         // 绘制标题
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
+        ctx.set_fill_style_str(ChartColors::TEXT);
         ctx.set_font("bold 14px Arial");
         ctx.set_text_align("left");
         ctx.set_text_baseline("middle");
-        let _ = ctx.fill_text("K线图", layout.padding, layout.header_height / 2.0);
+        let _ = ctx.fill_text("BTC/USDT", layout.padding, layout.header_height / 2.0);
+
         // 绘制图例
         let legend_x = layout.canvas_width - 120.0;
         let legend_y = layout.header_height / 2.0;
+
         // 绿色上涨
         ctx.set_fill_style_str(ChartColors::BULLISH);
         ctx.fill_rect(legend_x, legend_y - 5.0, 10.0, 10.0);
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
+        ctx.set_fill_style_str(ChartColors::TEXT);
         ctx.set_font("12px Arial");
         ctx.set_text_align("left");
         let _ = ctx.fill_text("上涨", legend_x + 15.0, legend_y);
+
         // 红色下跌
         ctx.set_fill_style_str(ChartColors::BEARISH);
         ctx.fill_rect(legend_x + 60.0, legend_y - 5.0, 10.0, 10.0);
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
+        ctx.set_fill_style_str(ChartColors::TEXT);
         let _ = ctx.fill_text("下跌", legend_x + 75.0, legend_y);
     }
 }

@@ -1,25 +1,24 @@
 //! 交互层渲染器 - 负责绘制十字光标、提示框等交互元素
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
-use chrono::DateTime;
-use flatbuffers;
-use wasm_bindgen::JsValue;
+use js_sys;
+use std::cell::RefCell;
+use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
-
-use super::DataZoomRenderer;
 
 /// 交互层渲染器
 #[derive(Default)]
 pub struct OverlayRenderer {
     // 鼠标是否在图表区域内
     mouse_in_chart: bool,
-    // 缓存最近一次计算的价格范围
-    cached_price_range: Option<(f64, f64)>,
-    // 缓存最近一次计算的最大成交量
-    cached_max_volume: Option<f64>,
-    // DataZoom渲染器引用
-    datazoom_renderer: Option<DataZoomRenderer>,
+    // 当前鼠标X坐标
+    mouse_x: f64,
+    // 当前鼠标Y坐标
+    mouse_y: f64,
+    // 缓存当前悬停的K线索引
+    hover_candle_index: Option<usize>,
 }
 
 impl OverlayRenderer {
@@ -27,426 +26,112 @@ impl OverlayRenderer {
     pub fn new() -> Self {
         Self {
             mouse_in_chart: false,
-            cached_price_range: None,
-            cached_max_volume: None,
-            datazoom_renderer: Some(DataZoomRenderer {}),
+            mouse_x: 0.0,
+            mouse_y: 0.0,
+            hover_candle_index: None,
         }
-    }
-
-    pub fn set_cached(&mut self, min_low: f64, max_high: f64, max_volume: f64) {
-        self.cached_price_range = Some((min_low, max_high));
-        self.cached_max_volume = Some(max_volume);
     }
 
     /// 处理鼠标移动事件
     pub fn handle_mouse_move(
         &mut self,
-        canvas_manager: &CanvasManager,
         x: f64,
         y: f64,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
     ) {
-        // 更新缓存
-        let mut layout = canvas_manager.layout.borrow_mut();
+        let layout = canvas_manager.layout.borrow();
 
-        // 获取之前的悬停位置，用于判断是否需要重绘
-        let prev_hover_position = layout.hover_position;
-        let prev_hover_index = layout.hover_candle_index;
-
-        // 更新鼠标位置
-        layout.hover_position = Some((x, y));
+        // 更新鼠标坐标
+        self.mouse_x = x;
+        self.mouse_y = y;
 
         // 判断鼠标是否在图表区域内
-        self.mouse_in_chart = x >= layout.chart_area_x
-            && x <= layout.chart_area_x + layout.chart_area_width
-            && y >= layout.chart_area_y
-            && y <= layout.chart_area_y + layout.chart_area_height;
+        self.mouse_in_chart = layout.is_point_in_chart_area(x, y);
 
-        // 更新悬停的K线索引
-        if self.mouse_in_chart && items.len() > 0 {
+        let data_manager_ref = data_manager.borrow();
+        // 获取可见范围
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+
+        // 如果鼠标在图表区域内，计算当前悬停的K线索引
+        if self.mouse_in_chart {
+            // 计算鼠标X坐标对应的K线索引
             let relative_x = x - layout.chart_area_x;
             let candle_idx = (relative_x / layout.total_candle_width).floor() as usize;
-            let data_idx = layout.navigator_visible_start + candle_idx;
-            if data_idx < items.len() {
-                layout.hover_candle_index = Some(data_idx);
+
+            // 判断索引是否在可见范围内
+            if candle_idx < visible_count {
+                self.hover_candle_index = Some(visible_start + candle_idx);
             } else {
-                layout.hover_candle_index = None;
+                self.hover_candle_index = None;
             }
         } else {
-            layout.hover_candle_index = None;
+            self.hover_candle_index = None;
         }
 
-        // 仅当位置或索引发生变化时才清除和重绘
-        if prev_hover_position != layout.hover_position
-            || prev_hover_index != layout.hover_candle_index
-        {
-            // 释放layout的可变借用，以便后续操作
-            drop(layout);
-            // 清除覆盖层
-            self.clear_overlay(canvas_manager);
-            // 如果鼠标在图表区域内，重新绘制交互元素
-            if self.mouse_in_chart {
-                // 直接使用传入的价格范围和最大成交量，避免重复计算
-                self.draw(canvas_manager, items);
-            }
-        }
+        // 绘制交互层
+        self.draw(canvas_manager, data_manager);
     }
 
     /// 处理鼠标离开事件
     pub fn handle_mouse_leave(&mut self, canvas_manager: &CanvasManager) {
-        let mut layout = canvas_manager.layout.borrow_mut();
-        layout.hover_position = None;
-        layout.hover_candle_index = None;
         self.mouse_in_chart = false;
+        self.hover_candle_index = None;
 
-        // 清除画布
-        let ctx: &OffscreenCanvasRenderingContext2d =
-            canvas_manager.get_context(CanvasLayerType::Overlay);
-        ctx.clear_rect(0.0, 0.0, layout.chart_area_width, layout.chart_area_height);
+        // 清除交互层
+        self.clear(canvas_manager);
     }
 
-    /// 绘制交互层元素
-    pub fn draw(
-        &self,
-        canvas_manager: &CanvasManager,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-    ) {
+    /// 绘制交互层
+    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+        // 获取交互层上下文
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
 
-        // 如果没有悬停位置，不绘制十字光标
-        if layout.hover_position.is_none() {
-            return;
-        }
+        // 清除交互层
+        self.clear(canvas_manager);
+        let data_manager_ref = data_manager.borrow(); // 使用 borrow 获取引用
+        // 提前获取所有需要的数据，避免多次借用
+        // 获取价格范围和最大成交量 (使用可变借用)
+        let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
+        // 获取数据集
+        let items_opt = data_manager_ref.get_items();
+        let items = match items_opt {
+            Some(items) => items,
+            None => return,
+        };
 
-        // 获取悬停位置
-        let (mouse_x, mouse_y) = layout.hover_position.unwrap();
-
-        // 判断鼠标是否在图表区域内
-        if mouse_x < layout.chart_area_x
-            || mouse_x > layout.chart_area_x + layout.chart_area_width
-            || mouse_y < layout.chart_area_y
-            || mouse_y > layout.chart_area_y + layout.chart_area_height
-        {
+        // 如果鼠标不在图表区域内，则不绘制光标和提示
+        if !self.mouse_in_chart {
             return;
         }
 
         // 绘制十字光标
-        self.draw_crosshair(ctx, &layout, mouse_x, mouse_y);
+        self.draw_crosshair(&ctx, &layout);
 
-        // 如果有悬停的K线索引，绘制对应的数据标签
-        if let Some(hover_idx) = layout.hover_candle_index {
+        // 绘制坐标轴标签 - 传递已获取的数据，避免再次借用data_manager
+        self.draw_axis_labels(
+            &ctx,
+            &layout,
+            min_low,
+            max_high,
+            max_volume,
+            items,
+            self.hover_candle_index,
+        );
+
+        // 绘制提示框
+        if let Some(hover_idx) = self.hover_candle_index {
             if hover_idx < items.len() {
-                let item = items.get(hover_idx);
-                if let Some((min_low, max_high)) = self.cached_price_range {
-                    self.draw_axis_labels(
-                        ctx,
-                        &layout,
-                        mouse_x,
-                        mouse_y,
-                        item,
-                        min_low,
-                        max_high,
-                        // 直接使用缓存的最大成交量
-                        self.cached_max_volume.unwrap(),
-                    );
-                    // 绘制详细数据提示框
-                    self.draw_data_tooltip(ctx, &layout, mouse_x, mouse_y, item);
-                }
+                self.draw_tooltip(&ctx, &layout, items.get(hover_idx));
             }
         }
     }
 
-    /// 绘制十字光标
-    fn draw_crosshair(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mouse_x: f64,
-        mouse_y: f64,
-    ) {
-        // 设置十字光标样式
-        ctx.set_stroke_style_str(ChartColors::CROSSHAIR);
-        ctx.set_line_width(layout.crosshair_width);
-
-        // 绘制垂直线 (虚线)
-        ctx.set_line_dash(&js_sys::Array::of2(
-            &JsValue::from_f64(4.0),
-            &JsValue::from_f64(4.0),
-        ))
-        .unwrap_or_default(); // 虚线样式
-
-        ctx.begin_path();
-        ctx.move_to(mouse_x, layout.chart_area_y);
-        ctx.line_to(mouse_x, layout.chart_area_y + layout.chart_area_height);
-        ctx.stroke();
-
-        // 绘制水平线 (实线) - 重置虚线样式
-        ctx.set_line_dash(&js_sys::Array::new()).unwrap_or_default();
-
-        ctx.begin_path();
-        if mouse_y <= layout.volume_chart_y {
-            // 在价格区域
-            ctx.move_to(layout.chart_area_x, mouse_y);
-            ctx.line_to(layout.chart_area_x + layout.chart_area_width, mouse_y);
-        } else {
-            // 在成交量区域
-            ctx.move_to(layout.chart_area_x, mouse_y);
-            ctx.line_to(layout.chart_area_x + layout.chart_area_width, mouse_y);
-        }
-        ctx.stroke();
-    }
-
-    /// 绘制坐标轴标签
-    fn draw_axis_labels(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mouse_x: f64,
-        mouse_y: f64,
-        item: KlineItem,
-        min_low: f64,
-        max_high: f64,
-        max_volume: f64,
-    ) {
-        // 设置标签样式
-        ctx.set_font("12px Arial");
-        ctx.set_text_align("center");
-        ctx.set_text_baseline("middle");
-
-        // 1. 绘制Y轴价格标签
-        if mouse_y <= layout.volume_chart_y {
-            // 在价格区域
-            let price = layout.map_y_to_price(mouse_y, min_low, max_high);
-            self.draw_price_label(ctx, layout, price, min_low, max_high); // 传递价格范围
-        } else {
-            // 在成交量区域
-            let volume = layout.map_y_to_volume(mouse_y, max_volume);
-            self.draw_volume_label(ctx, layout, volume, max_volume); // 传递最大成交量
-        }
-        // 2. 绘制X轴时间标签
-        self.draw_time_label(ctx, layout, mouse_x, item);
-    }
-
-    /// 绘制价格标签
-    fn draw_price_label(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        price: f64,
-        min_low: f64,
-        max_high: f64,
-    ) {
-        // 绘制价格标签背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
-        ctx.set_line_width(1.0);
-
-        let label_width = 60.0;
-        let label_height = 20.0;
-
-        // 修正标签位置 - 将标签放在Y轴左侧，与Y轴对齐
-        let label_x = layout.chart_area_x - label_width - 5.0; // 左侧偏移5像素
-
-        // 使用正确的价格范围计算Y坐标
-        let label_y = layout.map_price_to_y(price, min_low, max_high) - label_height / 2.0;
-
-        // 绘制标签背景
-        ctx.begin_path();
-        ctx.rect(label_x, label_y, label_width, label_height);
-        ctx.fill();
-        ctx.stroke();
-
-        // 绘制价格文本 - 修改文本对齐方式为右对齐
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_text_align("right"); // 改为右对齐
-        let price_text = format!("{:.2}", price);
-
-        // 文本位置调整为标签右侧边缘减去内边距
-        let text_x = label_x + label_width - 5.0; // 右侧边缘减去5像素内边距
-        let _ = ctx.fill_text(&price_text, text_x, label_y + label_height / 2.0);
-    }
-
-    fn draw_volume_label(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        volume: f64,
-        max_volume: f64,
-    ) {
-        // 绘制成交量标签背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
-        ctx.set_line_width(1.0);
-
-        let label_width = 80.0;
-        let label_height = 20.0;
-
-        // 修正标签位置 - 将标签放在Y轴左侧，与Y轴对齐
-        let label_x = layout.chart_area_x - label_width - 5.0; // 左侧偏移5像素
-
-        // 使用正确的最大成交量计算Y坐标
-        let label_y = layout.map_volume_to_y(volume, max_volume) - label_height / 2.0;
-
-        // 绘制标签背景
-        ctx.begin_path();
-        ctx.rect(label_x, label_y, label_width, label_height);
-        ctx.fill();
-        ctx.stroke();
-
-        // 绘制成交量文本 (格式化大数字) - 修改文本对齐方式为右对齐
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_text_align("right"); // 改为右对齐
-
-        // 使用ChartLayout的方法格式化成交量
-        let volume_text = layout.format_volume(volume, 2);
-
-        // 文本位置调整为标签右侧边缘减去内边距
-        let text_x = label_x + label_width - 5.0; // 右侧边缘减去5像素内边距
-        let _ = ctx.fill_text(&volume_text, text_x, label_y + label_height / 2.0);
-    }
-
-    /// 绘制时间标签
-    fn draw_time_label(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mouse_x: f64,
-        item: KlineItem,
-    ) {
-        // 绘制时间标签背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
-        ctx.set_line_width(1.0);
-
-        let label_width = 100.0;
-        let label_height = 20.0;
-        let label_x = mouse_x - label_width / 2.0;
-        let label_y = layout.chart_area_y + layout.chart_area_height;
-
-        // 绘制标签背景
-        ctx.begin_path();
-        ctx.rect(label_x, label_y, label_width, label_height);
-        ctx.fill();
-        ctx.stroke();
-
-        // 绘制时间文本
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_text_align("center");
-
-        // 使用ChartLayout的方法格式化时间戳
-        let timestamp_secs = item.timestamp() as i64;
-        let time_str = layout.format_timestamp(timestamp_secs, "%y/%m/%d %H:%M");
-
-        let _ = ctx.fill_text(&time_str, mouse_x, label_y + label_height / 2.0);
-    }
-
-    /// 绘制详细数据提示框
-    fn draw_data_tooltip(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mouse_x: f64,
-        mouse_y: f64,
-        item: KlineItem,
-    ) {
-        // 设置提示框样式
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
-        ctx.set_line_width(1.0);
-
-        // 提示框尺寸和位置
-        let tooltip_width = 160.0;
-        let tooltip_height = 120.0;
-        let padding = 8.0;
-
-        // 根据鼠标位置调整提示框位置，避免超出画布边界
-        let mut tooltip_x = mouse_x + 15.0; // 默认在鼠标右侧
-        let mut tooltip_y = mouse_y - 10.0; // 默认在鼠标上方
-
-        // 如果提示框会超出右边界，则放在鼠标左侧
-        if tooltip_x + tooltip_width > layout.chart_area_x + layout.chart_area_width {
-            tooltip_x = mouse_x - tooltip_width - 15.0;
-        }
-
-        // 确保提示框不超出图表区域左边界
-        if tooltip_x < layout.chart_area_x {
-            tooltip_x = layout.chart_area_x + 5.0;
-        }
-
-        // 如果提示框会超出上边界，则放在鼠标下方
-        if tooltip_y < layout.chart_area_y {
-            tooltip_y = layout.chart_area_y + 5.0;
-        }
-
-        // 如果提示框会超出下边界，则向上调整，确保不与datazoom重叠
-        // 使用 volume_chart_y + volume_chart_height 作为下边界，而不是 canvas_height
-        if tooltip_y + tooltip_height > layout.volume_chart_y + layout.volume_chart_height {
-            tooltip_y = layout.volume_chart_y + layout.volume_chart_height - tooltip_height - 5.0;
-        }
-
-        // 绘制提示框背景
-        ctx.begin_path();
-        ctx.rect(tooltip_x, tooltip_y, tooltip_width, tooltip_height);
-        ctx.fill();
-        ctx.stroke();
-
-        // 设置文本样式
-        ctx.set_font("12px Arial");
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_text_align("left");
-        ctx.set_text_baseline("top");
-
-        // 使用ChartLayout的方法格式化时间戳
-        let timestamp_secs = item.timestamp() as i64;
-        let time_str = layout.format_timestamp(timestamp_secs, "%Y/%m/%d %H:%M");
-
-        // 绘制时间
-        let _ = ctx.fill_text(
-            &format!("时间: {}", time_str),
-            tooltip_x + padding,
-            tooltip_y + padding,
-        );
-
-        // 绘制价格信息
-        let _ = ctx.fill_text(
-            &format!("开盘: {:.2}", item.open()),
-            tooltip_x + padding,
-            tooltip_y + padding + 20.0,
-        );
-        let _ = ctx.fill_text(
-            &format!("最高: {:.2}", item.high()),
-            tooltip_x + padding,
-            tooltip_y + padding + 40.0,
-        );
-        let _ = ctx.fill_text(
-            &format!("最低: {:.2}", item.low()),
-            tooltip_x + padding,
-            tooltip_y + padding + 60.0,
-        );
-        let _ = ctx.fill_text(
-            &format!("收盘: {:.2}", item.close()),
-            tooltip_x + padding,
-            tooltip_y + padding + 80.0,
-        );
-
-        // 绘制成交量
-        let volume = item.b_vol() + item.s_vol();
-        // 使用ChartLayout的方法格式化成交量
-        let volume_text = format!("成交量: {}", layout.format_volume(volume, 2));
-        let _ = ctx.fill_text(
-            &volume_text,
-            tooltip_x + padding,
-            tooltip_y + padding + 100.0,
-        );
-    }
-
-    // 清除覆盖层
-    pub fn clear_overlay(&mut self, canvas_manager: &CanvasManager) {
-        // 获取覆盖层上下文
+    /// 清除交互层
+    fn clear(&self, canvas_manager: &CanvasManager) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
-        // 只清除图表区域，保留datazoom区域
         ctx.clear_rect(
             0.0,
             0.0,
@@ -455,14 +140,303 @@ impl OverlayRenderer {
         );
     }
 
-    /// 渲染 DataZoom 导航器
-    pub fn render_datazoom(
+    /// 绘制十字光标
+    fn draw_crosshair(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
+        // 设置十字光标样式
+        ctx.set_stroke_style_str(ChartColors::CROSSHAIR);
+        ctx.set_line_width(layout.crosshair_width);
+
+        // 设置虚线样式 - 使用set_line_dash替代set_dash_array
+        let dash_array = js_sys::Array::of2(&4.0.into(), &4.0.into());
+        let _ = ctx.set_line_dash(&dash_array);
+
+        // 绘制水平线 - 横跨整个图表区域
+        let mouse_y_constrained = self
+            .mouse_y
+            .max(layout.header_height)
+            .min(layout.header_height + layout.chart_area_height);
+        ctx.begin_path();
+        ctx.move_to(layout.chart_area_x, mouse_y_constrained);
+        ctx.line_to(
+            layout.chart_area_x + layout.chart_area_width,
+            mouse_y_constrained,
+        );
+        ctx.stroke();
+
+        // 绘制垂直线 - 横跨整个图表区域
+        let mouse_x_constrained = self
+            .mouse_x
+            .max(layout.chart_area_x)
+            .min(layout.chart_area_x + layout.chart_area_width);
+        ctx.begin_path();
+        ctx.move_to(mouse_x_constrained, layout.header_height);
+        ctx.line_to(
+            mouse_x_constrained,
+            layout.header_height + layout.chart_area_height,
+        );
+        ctx.stroke();
+
+        // 重置虚线设置
+        let empty_array = js_sys::Array::new();
+        let _ = ctx.set_line_dash(&empty_array);
+    }
+
+    /// 绘制坐标轴标签 - 重构后不再需要data_manager参数
+    fn draw_axis_labels(
         &self,
-        canvas_manager: &CanvasManager,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        min_low: f64,
+        max_high: f64,
+        max_volume: f64,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        hover_candle_index: Option<usize>,
     ) {
-        if let Some(datazoom_renderer) = &self.datazoom_renderer {
-            datazoom_renderer.draw(canvas_manager, items);
+        // --- Y轴标签 (价格/成交量) ---
+        let mouse_y_constrained = self
+            .mouse_y
+            .max(layout.header_height)
+            .min(layout.header_height + layout.chart_area_height);
+        let y_label_width = layout.y_axis_width - layout.padding; // Adjust width to fit axis area
+        let y_label_height = 20.0;
+        let y_label_x = layout.padding / 2.0; // Position within the Y axis area
+        let y_label_y = mouse_y_constrained - y_label_height / 2.0;
+
+        // 确保标签不超出画布垂直范围
+        let adjusted_y_label_y = y_label_y
+            .max(layout.header_height)
+            .min(layout.header_height + layout.chart_area_height - y_label_height);
+
+        // 绘制Y轴标签背景
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.fill_rect(y_label_x, adjusted_y_label_y, y_label_width, y_label_height);
+
+        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
+        ctx.set_line_width(1.0);
+        ctx.stroke_rect(y_label_x, adjusted_y_label_y, y_label_width, y_label_height);
+
+        // 绘制Y轴标签文本
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
+        ctx.set_font("10px Arial"); // Match axis font
+        ctx.set_text_align("right"); // Align to the right within the axis area
+        ctx.set_text_baseline("middle");
+
+        // 根据鼠标位置判断是显示价格还是成交量
+        let y_value: f64;
+        let y_label_text: String;
+        if self.mouse_y >= layout.header_height
+            && self.mouse_y <= layout.header_height + layout.price_chart_height
+        {
+            // 在价格图区域内
+            y_value = layout.map_y_to_price(mouse_y_constrained, min_low, max_high);
+            if y_value.abs() < 0.001 {
+                y_label_text = "0".to_string();
+            } else {
+                y_label_text = format!("{:.2}", y_value);
+            }
+        } else if self.mouse_y >= layout.volume_chart_y
+            && self.mouse_y <= layout.volume_chart_y + layout.volume_chart_height
+        {
+            // 在成交量区域内
+            y_value = layout.map_y_to_volume(mouse_y_constrained, max_volume);
+            y_label_text = layout.format_volume(y_value, 1);
+        } else {
+            return; // Outside relevant chart areas
         }
+
+        let _ = ctx.fill_text(
+            &y_label_text,
+            y_label_x + y_label_width - 5.0,
+            adjusted_y_label_y + y_label_height / 2.0,
+        );
+
+        // --- X轴标签 (时间) ---
+        let x_label_width = 80.0;
+        let x_label_height = 20.0;
+        // Position below the chart area, within the time axis height
+        let x_axis_y = layout.header_height + layout.chart_area_height;
+        let x_label_y = x_axis_y + (layout.time_axis_height - x_label_height) / 2.0; // Center vertically in time axis area
+        let mouse_x_constrained = self
+            .mouse_x
+            .max(layout.chart_area_x)
+            .min(layout.chart_area_x + layout.chart_area_width);
+        let x_label_x = mouse_x_constrained - x_label_width / 2.0;
+
+        // 确保标签不超出画布水平范围
+        let adjusted_x_label_x = x_label_x
+            .max(layout.chart_area_x)
+            .min(layout.chart_area_x + layout.chart_area_width - x_label_width);
+
+        // 绘制X轴标签背景
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.fill_rect(adjusted_x_label_x, x_label_y, x_label_width, x_label_height);
+
+        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
+        ctx.set_line_width(1.0);
+        ctx.stroke_rect(adjusted_x_label_x, x_label_y, x_label_width, x_label_height);
+
+        // 绘制X轴标签文本（如果有悬停的K线，显示其时间）
+        if let Some(hover_idx) = hover_candle_index {
+            if hover_idx < items.len() {
+                let item = items.get(hover_idx);
+                let timestamp = item.timestamp() as i64;
+                // Use layout's formatting for consistency
+                let date_str = layout.format_timestamp(timestamp, "%y/%m/%d");
+                let time_str = layout.format_timestamp(timestamp, "%H:%M:%S");
+
+                ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
+                ctx.set_font("10px Arial"); // Match axis font
+                ctx.set_text_align("center");
+                ctx.set_text_baseline("middle"); // Center text vertically
+                let _ = ctx.fill_text(
+                    &format!("{} {}", date_str, time_str),
+                    adjusted_x_label_x + x_label_width / 2.0,
+                    x_label_y + x_label_height / 2.0,
+                );
+            }
+        }
+    }
+
+    /// 绘制提示框
+    fn draw_tooltip(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        item: KlineItem,
+    ) {
+        // 获取K线时间戳
+        let timestamp = item.timestamp() as i64;
+        // 使用 layout 的格式化方法
+        let datetime_str = layout.format_timestamp(timestamp, "%Y-%m-%d %H:%M");
+
+        // 获取K线价格数据
+        let open_price = item.open();
+        let high_price = item.high();
+        let low_price = item.low();
+        let close_price = item.close();
+        let volume = item.b_vol() + item.s_vol();
+
+        // 定义提示框尺寸和内容行高
+        let tooltip_width = 150.0;
+        let line_height = 20.0;
+        let padding = 10.0;
+        let num_lines = 6; // Datetime, Open, High, Low, Close, Volume
+        let tooltip_height = (num_lines as f64 * line_height) + padding * 2.0; // Calculate height based on content
+        let mouse_offset = 15.0; // Distance from mouse cursor
+
+        // --- 计算提示框位置 ---
+        // Initial position (prefer top-right of cursor)
+        let mut tooltip_x = self.mouse_x + mouse_offset;
+        let mut tooltip_y = self.mouse_y - mouse_offset - tooltip_height; // Place above cursor initially
+
+        // --- Boundary Checks ---
+        // Chart area boundaries
+        let chart_right_edge = layout.chart_area_x + layout.chart_area_width;
+        let chart_bottom_edge = layout.header_height + layout.chart_area_height; // Bottom of price+volume area
+
+        // Adjust X if goes off right edge
+        if tooltip_x + tooltip_width > chart_right_edge {
+            tooltip_x = self.mouse_x - mouse_offset - tooltip_width; // Move to left of cursor
+        }
+        // Adjust X if goes off left edge (after potentially moving left)
+        if tooltip_x < layout.chart_area_x {
+            tooltip_x = layout.chart_area_x; // Clamp to left edge
+        }
+
+        // Adjust Y if goes off top edge
+        if tooltip_y < layout.header_height {
+            tooltip_y = self.mouse_y + mouse_offset; // Move below cursor
+        }
+        // Adjust Y if goes off bottom edge (after potentially moving below)
+        if tooltip_y + tooltip_height > chart_bottom_edge {
+            tooltip_y = chart_bottom_edge - tooltip_height; // Clamp to bottom edge
+        }
+        // Ensure Y doesn't go below header if clamped low
+        tooltip_y = tooltip_y.max(layout.header_height);
+
+        // 绘制提示框背景 - 添加圆角和阴影
+        let corner_radius = 4.0; // 圆角半径
+
+        // 设置阴影
+        ctx.set_shadow_color("rgba(0, 0, 0, 0.5)");
+        ctx.set_shadow_blur(10.0);
+        ctx.set_shadow_offset_x(3.0);
+        ctx.set_shadow_offset_y(3.0);
+
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.begin_path();
+
+        // 绘制圆角矩形
+        ctx.move_to(tooltip_x + corner_radius, tooltip_y);
+        ctx.line_to(tooltip_x + tooltip_width - corner_radius, tooltip_y);
+        ctx.quadratic_curve_to(
+            tooltip_x + tooltip_width,
+            tooltip_y,
+            tooltip_x + tooltip_width,
+            tooltip_y + corner_radius,
+        );
+        ctx.line_to(
+            tooltip_x + tooltip_width,
+            tooltip_y + tooltip_height - corner_radius,
+        );
+        ctx.quadratic_curve_to(
+            tooltip_x + tooltip_width,
+            tooltip_y + tooltip_height,
+            tooltip_x + tooltip_width - corner_radius,
+            tooltip_y + tooltip_height,
+        );
+        ctx.line_to(tooltip_x + corner_radius, tooltip_y + tooltip_height);
+        ctx.quadratic_curve_to(
+            tooltip_x,
+            tooltip_y + tooltip_height,
+            tooltip_x,
+            tooltip_y + tooltip_height - corner_radius,
+        );
+        ctx.line_to(tooltip_x, tooltip_y + corner_radius);
+        ctx.quadratic_curve_to(tooltip_x, tooltip_y, tooltip_x + corner_radius, tooltip_y);
+        ctx.close_path();
+
+        ctx.fill();
+
+        // 重置阴影，避免影响文本
+        ctx.set_shadow_color("transparent");
+        ctx.set_shadow_blur(0.0);
+        ctx.set_shadow_offset_x(0.0);
+        ctx.set_shadow_offset_y(0.0);
+
+        // 绘制提示框内容
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
+        ctx.set_font("12px Arial");
+        ctx.set_text_align("left");
+        ctx.set_text_baseline("top"); // Align text from the top
+
+        let text_x = tooltip_x + padding;
+        let label_x = tooltip_x + 60.0; // X position for values
+        let mut current_y = tooltip_y + padding;
+
+        // 绘制日期和时间 (one line)
+        let _ = ctx.fill_text(&datetime_str, text_x, current_y);
+        current_y += line_height;
+
+        // Helper function to draw a line item (label + value)
+        let draw_line =
+            |ctx: &OffscreenCanvasRenderingContext2d, label: &str, value: &str, y: f64| {
+                let _ = ctx.fill_text(label, text_x, y);
+                let _ = ctx.fill_text(value, label_x, y);
+            };
+
+        // 绘制价格和成交量信息
+        draw_line(ctx, "开盘:", &format!("{:.2}", open_price), current_y);
+        current_y += line_height;
+        draw_line(ctx, "最高:", &format!("{:.2}", high_price), current_y);
+        current_y += line_height;
+        draw_line(ctx, "最低:", &format!("{:.2}", low_price), current_y);
+        current_y += line_height;
+        draw_line(ctx, "收盘:", &format!("{:.2}", close_price), current_y);
+        current_y += line_height;
+
+        // Format volume using layout's method
+        let formatted_volume = layout.format_volume(volume, 2);
+        draw_line(ctx, "成交量:", &formatted_volume, current_y);
     }
 }
