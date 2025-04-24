@@ -239,6 +239,24 @@ export class KlineProcess {
     handle_mouse_move(x, y) {
         wasm.klineprocess_handle_mouse_move(this.__wbg_ptr, x, y);
     }
+    /**
+     * 获取当前鼠标位置的光标样式
+     * @param {number} x
+     * @param {number} y
+     * @returns {string}
+     */
+    get_cursor_style(x, y) {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.klineprocess_get_cursor_style(this.__wbg_ptr, x, y);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
     handle_mouse_leave() {
         wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
     }

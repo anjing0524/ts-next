@@ -29,7 +29,7 @@ pub struct ChartRenderer {
     /// 数据管理器
     data_manager: Rc<RefCell<DataManager>>,
     /// DataZoom渲染器
-    datazoom_renderer: DataZoomRenderer,
+    datazoom_renderer: Rc<RefCell<DataZoomRenderer>>,
 }
 
 impl ChartRenderer {
@@ -62,7 +62,7 @@ impl ChartRenderer {
         let price_renderer = PriceRenderer {};
         let volume_renderer = VolumeRenderer {};
         let overlay_renderer = Rc::new(RefCell::new(OverlayRenderer::new()));
-        let datazoom_renderer = DataZoomRenderer {};
+        let datazoom_renderer = Rc::new(RefCell::new(DataZoomRenderer::new()));
 
         Ok(Self {
             canvas_manager,
@@ -105,18 +105,87 @@ impl ChartRenderer {
             .draw(&self.canvas_manager, &self.data_manager);
 
         self.datazoom_renderer
+            .borrow()
             .draw(&self.canvas_manager, &self.data_manager);
+    }
+
+    /// 获取当前鼠标位置的光标样式
+    pub fn get_cursor_style(&self, x: f64, y: f64) -> &'static str {
+        // 先检查是否在DataZoom上，并获取对应的光标样式
+        let datazoom_cursor = self.datazoom_renderer.borrow().get_cursor_style(
+            x,
+            y,
+            &self.canvas_manager,
+            &self.data_manager,
+        );
+
+        // 如果DataZoom返回了非默认样式，则使用该样式
+        if datazoom_cursor != "default" {
+            return datazoom_cursor;
+        }
+
+        // 未来可以添加其他区域的光标样式判断
+        // 例如在K线图上可以显示十字光标等
+
+        // 默认光标样式
+        "default"
     }
 
     // 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
+        let is_on_datazoom = {
+            // 先检查是否在DataZoom上
+            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
+            datazoom_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager)
+        };
+        // 如果DataZoom处理了鼠标移动并需要重绘，则重绘图表
+        if is_on_datazoom {
+            // 重绘图表
+            self.render();
+            return;
+        }
+
+        // 如果不在DataZoom上，则交给OverlayRenderer处理
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-        // 处理鼠标移动
         overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager);
+    }
+
+    // 处理鼠标按下事件
+    pub fn handle_mouse_down(&self, x: f64, y: f64) -> bool {
+        let is_on_datazoom = {
+            // 检查是否在DataZoom上
+            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
+            datazoom_renderer.handle_mouse_down(x, y, &self.canvas_manager, &self.data_manager)
+        };
+        // 如果在DataZoom上按下，返回true表示已处理
+        if is_on_datazoom {
+            return true;
+        }
+        // 未来可以添加其他区域的鼠标按下处理
+        false
+    }
+
+    // 处理鼠标释放事件
+    pub fn handle_mouse_up(&self, x: f64, y: f64) -> bool {
+        let was_dragging = {
+            // 检查DataZoom是否处于拖动状态
+            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
+            datazoom_renderer.handle_mouse_up()
+        };
+
+        // 如果之前在拖动，重绘图表并返回true表示已处理
+        if was_dragging {
+            self.render();
+            return true;
+        }
+
+        // 未来可以添加其他区域的鼠标释放处理
+        false
     }
 
     // 处理鼠标离开事件 - 清除所有交互元素
     pub fn handle_mouse_leave(&self) {
+        // 处理交互层的鼠标离开
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
         overlay_renderer.handle_mouse_leave(&self.canvas_manager);
     }

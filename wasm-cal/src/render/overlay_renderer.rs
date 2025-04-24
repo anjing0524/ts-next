@@ -19,16 +19,22 @@ pub struct OverlayRenderer {
     mouse_y: f64,
     // 缓存当前悬停的K线索引
     hover_candle_index: Option<usize>,
+    dash_array: Option<js_sys::Array>,
+    empty_array: Option<js_sys::Array>,
 }
 
 impl OverlayRenderer {
     /// 创建新的交互层渲染器
     pub fn new() -> Self {
+        let dash_array = js_sys::Array::of2(&4.0.into(), &4.0.into());
+        let empty_array = js_sys::Array::new();
         Self {
             mouse_in_chart: false,
             mouse_x: 0.0,
             mouse_y: 0.0,
             hover_candle_index: None,
+            dash_array: Some(dash_array),
+            empty_array: Some(empty_array),
         }
     }
 
@@ -40,13 +46,21 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
     ) {
-        let layout = canvas_manager.layout.borrow();
+        let prev_x = self.mouse_x;
+        let prev_y = self.mouse_y;
 
         // 更新鼠标坐标
         self.mouse_x = x;
         self.mouse_y = y;
 
+        // 计算移动距离
+        let distance = ((x - prev_x).powi(2) + (y - prev_y).powi(2)).sqrt();
+        if distance < 1.0 {
+            return;
+        }
+
         // 判断鼠标是否在图表区域内
+        let layout = canvas_manager.layout.borrow();
         self.mouse_in_chart = layout.is_point_in_chart_area(x, y);
 
         let data_manager_ref = data_manager.borrow();
@@ -147,8 +161,9 @@ impl OverlayRenderer {
         ctx.set_line_width(layout.crosshair_width);
 
         // 设置虚线样式 - 使用set_line_dash替代set_dash_array
-        let dash_array = js_sys::Array::of2(&4.0.into(), &4.0.into());
-        let _ = ctx.set_line_dash(&dash_array);
+        if let Some(dash_array) = &self.dash_array {
+            let _ = ctx.set_line_dash(dash_array);
+        }
 
         // 绘制水平线 - 横跨整个图表区域
         let mouse_y_constrained = self
@@ -177,8 +192,9 @@ impl OverlayRenderer {
         ctx.stroke();
 
         // 重置虚线设置
-        let empty_array = js_sys::Array::new();
-        let _ = ctx.set_line_dash(&empty_array);
+        if let Some(empty_array) = &self.empty_array {
+            let _ = ctx.set_line_dash(empty_array);
+        }
     }
 
     /// 绘制坐标轴标签 - 重构后不再需要data_manager参数

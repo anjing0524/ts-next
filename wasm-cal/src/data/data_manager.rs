@@ -108,16 +108,6 @@ impl DataManager {
         )
     }
 
-    /// 获取可见范围起始索引
-    fn get_visible_start(&self) -> usize {
-        self.visible_start
-    }
-
-    /// 获取可见范围K线数量
-    fn get_visible_count(&self) -> usize {
-        self.visible_count
-    }
-
     /// 无效化缓存的范围计算
     pub fn invalidate_cache(&mut self) {
         self.cached_min_low = None;

@@ -6,6 +6,7 @@ export const klineprocess_new: (a: any, b: number, c: number) => [number, number
 export const klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
 export const klineprocess_draw_all: (a: number) => [number, number];
 export const klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
+export const klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
 export const klineprocess_handle_mouse_leave: (a: number) => void;
 export const klineprocess_handle_wheel: (a: number, b: number, c: number, d: number) => void;
 export const start: () => void;

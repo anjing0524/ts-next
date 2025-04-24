@@ -19,6 +19,10 @@ export class KlineProcess {
    */
   draw_all(): void;
   handle_mouse_move(x: number, y: number): void;
+  /**
+   * 获取当前鼠标位置的光标样式
+   */
+  get_cursor_style(x: number, y: number): string;
   handle_mouse_leave(): void;
   handle_wheel(delta: number, x: number, y: number): void;
 }
@@ -32,6 +36,7 @@ export interface InitOutput {
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
   readonly klineprocess_draw_all: (a: number) => [number, number];
   readonly klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
+  readonly klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_leave: (a: number) => void;
   readonly klineprocess_handle_wheel: (a: number, b: number, c: number, d: number) => void;
   readonly start: () => void;

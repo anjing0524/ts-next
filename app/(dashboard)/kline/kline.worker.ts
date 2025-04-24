@@ -22,6 +22,12 @@ interface MouseMoveMessage {
   y: number;
 }
 
+interface GetCursorStyleMessage {
+  type: 'getCursorStyle';
+  x: number;
+  y: number;
+}
+
 interface MouseLeaveMessage {
   type: 'mouseleave';
 }
@@ -38,7 +44,8 @@ type WorkerMessage =
   | DrawMessage
   | MouseMoveMessage
   | MouseLeaveMessage
-  | WheelMessage;
+  | WheelMessage
+  | GetCursorStyleMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -74,6 +81,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       case 'wheel':
         if (!processorRef) return;
         processorRef.handle_wheel(data.deltaY, data.x, data.y);
+        break;
+      case 'getCursorStyle':
+        if (!processorRef) return;
+        const cursorStyle = processorRef.get_cursor_style(data.x, data.y);
+        self.postMessage({
+          type: 'cursorStyle',
+          style: cursorStyle,
+        });
         break;
       default:
         console.error('Worker 收到未知类型的消息');

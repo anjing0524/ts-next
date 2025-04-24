@@ -197,6 +197,18 @@ impl KlineProcess {
         time_end("KlineProcess::handle_mouse_move");
     }
 
+    /// 获取当前鼠标位置的光标样式
+    #[wasm_bindgen]
+    pub fn get_cursor_style(&self, x: f64, y: f64) -> String {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => return "default".to_string(),
+        };
+
+        // 获取鼠标样式并转换为String返回给JavaScript
+        chart_renderer.get_cursor_style(x, y).to_string()
+    }
+
     #[wasm_bindgen]
     pub fn handle_mouse_leave(&self) {
         if let Some(chart_renderer) = &self.chart_renderer {

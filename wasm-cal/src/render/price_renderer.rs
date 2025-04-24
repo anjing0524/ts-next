@@ -48,7 +48,7 @@ impl PriceRenderer {
         ctx.set_stroke_style_str(ChartColors::WICK);
         ctx.set_line_width(1.0);
 
-        // 使用FnvHashMap和整数键来避免浮点数比较问题
+        // 使用HashMap和整数键来避免浮点数比较问题
         let mut price_y_cache = std::collections::HashMap::new();
         let mut map_price = |price: f64| -> f64 {
             // 将浮点数转换为位模式的u64，作为HashMap的键
@@ -58,18 +58,23 @@ impl PriceRenderer {
                 .or_insert_with(|| layout.map_price_to_y(price, min_low, max_high))
         };
 
+        let mut path_points = Vec::with_capacity((visible_end - visible_start) * 2);
         for (i, item_idx) in (visible_start..visible_end).enumerate() {
             let item = items.get(item_idx);
             let x_center = layout.chart_area_x
                 + (i as f64 * layout.total_candle_width)
                 + layout.candle_width / 2.0;
 
-            // 使用缓存函数获取Y坐标
             let high_y = map_price(item.high());
             let low_y = map_price(item.low());
 
-            ctx.move_to(x_center, high_y);
-            ctx.line_to(x_center, low_y);
+            path_points.push((x_center, high_y, x_center, low_y));
+        }
+        // 一次性绘制所有线段
+        ctx.begin_path();
+        for (x1, y1, x2, y2) in path_points {
+            ctx.move_to(x1, y1);
+            ctx.line_to(x2, y2);
         }
         ctx.stroke();
 

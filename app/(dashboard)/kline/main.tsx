@@ -5,6 +5,7 @@ import {
   useState,
   MouseEvent as ReactMouseEvent,
   WheelEvent as ReactWheelEvent,
+  CSSProperties,
 } from 'react';
 
 export default function Main() {
@@ -14,6 +15,7 @@ export default function Main() {
   const workerRef = useRef<Worker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cursorStyle, setCursorStyle] = useState<string>('default');
 
   // 定义画布尺寸
   const visibleCanvasHeight = 400; // 可见高度
@@ -90,6 +92,10 @@ export default function Main() {
               setError(e.data.error);
               setIsLoading(false);
               break;
+
+            case 'cursorStyle':
+              setCursorStyle(e.data.style);
+              break;
           }
         };
       } catch (err) {
@@ -117,8 +123,16 @@ export default function Main() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // 发送鼠标移动消息
     workerRef.current.postMessage({
       type: 'mousemove',
+      x,
+      y,
+    });
+
+    // 获取鼠标样式
+    workerRef.current.postMessage({
+      type: 'getCursorStyle',
       x,
       y,
     });
@@ -153,7 +167,10 @@ export default function Main() {
       )}
       {error && <div className="p-4 text-red-600">错误: {error}</div>}
       {/* 新增容器并设置固定尺寸 */}
-      <div className="relative w-[1500px] h-[400px] cursor-default m-0 border-0 p-0">
+      <div
+        className="relative w-[1500px] h-[400px] m-0 border-0 p-0"
+        style={{ cursor: cursorStyle }}
+      >
         <canvas ref={canvasRef} className="absolute top-0 left-0 m-0 border-0 p-0 z-10" />
         <canvas
           ref={mainCanvasRef}
