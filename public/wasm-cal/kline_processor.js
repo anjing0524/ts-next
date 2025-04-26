@@ -346,6 +346,9 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_clearRect_4790e3611b42f068 = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.clearRect(arg1, arg2, arg3, arg4);
     };
+    imports.wbg.__wbg_clip_005815dea515e201 = function(arg0) {
+        arg0.clip();
+    };
     imports.wbg.__wbg_closePath_cf0e7130243e1083 = function(arg0) {
         arg0.closePath();
     };
@@ -435,6 +438,12 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_rect_00c560f0cc92818c = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.rect(arg1, arg2, arg3, arg4);
+    };
+    imports.wbg.__wbg_restore_1ef50af0835a4649 = function(arg0) {
+        arg0.restore();
+    };
+    imports.wbg.__wbg_save_5f563096e64939da = function(arg0) {
+        arg0.save();
     };
     imports.wbg.__wbg_setLineDash_0e3f3e194352a774 = function() { return handleError(function (arg0, arg1) {
         arg0.setLineDash(arg1);

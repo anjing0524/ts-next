@@ -21,16 +21,14 @@ impl ChartColors {
     pub const BEARISH: &'static str = "#ef5350"; // 下跌 (红色)
     pub const WICK: &'static str = "#888888"; // 影线 (中灰)
 
-    // --- 成交量颜色 ---
-    pub const VOLUME_BULLISH: &'static str = "rgba(38, 166, 154, 0.5)"; // 上涨成交量 (半透明绿)
-    pub const VOLUME_BEARISH: &'static str = "rgba(239, 83, 80, 0.5)"; // 下跌成交量 (半透明红)
-
     // --- 导航器颜色 ---
     pub const NAVIGATOR_BG: &'static str = "#f8f9fa"; // 导航器背景 (非常浅的灰)
     pub const NAVIGATOR_HANDLE: &'static str = "#b0b8c9"; // 导航器滑块
     pub const NAVIGATOR_ACTIVE_HANDLE: &'static str = "#5c7cfa"; // 活动状态手柄颜色（更醒目的蓝色）
     pub const NAVIGATOR_MASK: &'static str = "rgba(180, 180, 180, 0.3)"; // 导航器不可见区域遮罩
     pub const NAVIGATOR_BORDER: &'static str = "#dee2e6"; // 导航器边框颜色
+    pub const NAVIGATOR_ACTIVE_HANDLE_SHADOW: &'static str = "rgba(92, 124, 250, 0.6)"; // 活动状态手柄阴影颜色
+    pub const TRANSPARENT: &'static str = "transparent"; // 透明颜色
 
     // 成交量相关颜色
     pub const VOLUME_LINE: &'static str = "#6C8CD5"; // 成交量曲线颜色
