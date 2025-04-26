@@ -4,6 +4,7 @@ use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
+use crate::utils::time;
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,16 +24,21 @@ impl AxisRenderer {
             None => return,
         };
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
+        
+        // 优先绘制标题和图例以确保头部区域被正确清空和绘制
+        self.draw_header(&ctx, &layout_ref);
+        
         // 绘制交替背景色
         self.draw_alternating_background(&ctx, &layout_ref);
+        
         // 绘制价格Y轴
         self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high);
+        
         // 绘制成交量Y轴
         self.draw_volume_y_axis(&ctx, &layout_ref, max_volume);
+        
         // 绘制X轴
         self.draw_x_axis(&ctx, &layout_ref, items, data_manager);
-        // 绘制标题和图例
-        self.draw_header(&ctx, &layout_ref);
     }
 
     /// 绘制交替背景色
@@ -192,8 +198,8 @@ impl AxisRenderer {
                 y -= 2.0; // Shift up by 1 pixel
             }
 
-            // 使用ChartLayout的方法格式化成交量
-            let volume_text = layout.format_volume(volume, 1);
+            // 使用ChartLayout的方法格式化成交量 - 改为使用 render::utils::format_volume
+            let volume_text = time::format_volume(volume, 1);
 
             // 绘制标签
             let _ = ctx.fill_text(&volume_text, layout.y_axis_width - 5.0, y);
@@ -204,89 +210,6 @@ impl AxisRenderer {
             ctx.move_to(layout.y_axis_width - 3.0, y);
             ctx.line_to(layout.y_axis_width, y);
             ctx.stroke();
-        }
-    }
-
-    /// 绘制X轴
-    fn draw_x_axis(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-    ) {
-        let data_manager_ref = data_manager.borrow();
-        // 获取可见范围
-        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
-
-        if visible_start >= visible_end {
-            return;
-        }
-
-        // X轴位置 (图表区域底部)
-        let x_axis_y = layout.header_height + layout.chart_area_height;
-        // 时间轴标签绘制的Y坐标起点 (X轴下方)
-        let time_label_y_start = x_axis_y + 5.0; // 在X轴下方留出一点空隙
-
-        // 绘制X轴背景 (时间轴区域)
-        ctx.set_fill_style_str(ChartColors::HEADER_BG); // 使用与Y轴背景一致的颜色
-        ctx.fill_rect(
-            0.0, // 从画布左边缘开始
-            x_axis_y,
-            layout.canvas_width, // 宽度覆盖整个画布
-            layout.time_axis_height,
-        );
-
-        // 绘制X轴上边界 (图表区域底部的分隔线)
-        ctx.set_stroke_style_str(ChartColors::BORDER); // 使用标准边框颜色
-        ctx.set_line_width(1.0);
-        ctx.begin_path();
-        ctx.move_to(layout.chart_area_x, x_axis_y); // 从图表区域左边界开始
-        ctx.line_to(layout.chart_area_x + layout.chart_area_width, x_axis_y); // 到图表区域右边界结束
-        ctx.stroke();
-
-        // 优化：计算第一个和最后一个可见标签的X坐标
-        let first_visible_x = layout.chart_area_x;
-        let last_visible_x = layout.chart_area_x + layout.chart_area_width;
-
-        // 动态计算标签间距，避免过于密集或稀疏
-        let min_label_spacing = 70.0; // 最小标签间距（像素）
-        let max_labels = (layout.chart_area_width / min_label_spacing).floor() as usize;
-        let total_visible_candles = visible_count;
-        let candle_interval = (total_visible_candles as f64 / max_labels as f64)
-            .ceil()
-            .max(1.0) as usize; // 每隔多少根K线显示一个标签
-
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
-        ctx.set_font("10px Arial");
-        ctx.set_text_align("center");
-        ctx.set_text_baseline("top");
-
-        // 绘制垂直网格线和时间标签
-        for i in (0..visible_count).step_by(candle_interval) {
-            let data_idx = visible_start + i;
-            if data_idx >= items.len() {
-                break; // 超出数据范围
-            }
-
-            // 计算当前K线中心点的X坐标 (相对于画布)
-            let x = layout.chart_area_x
-                + (i as f64 * layout.total_candle_width)
-                + layout.candle_width / 2.0;
-
-            // 仅在可见区域内绘制
-            if x >= first_visible_x && x <= last_visible_x {
-                let item = items.get(data_idx);
-                let timestamp_secs = item.timestamp() as i64; // 获取 Unix 时间戳 (秒)
-
-                // 使用ChartLayout的方法格式化时间戳
-                let time_str = layout.format_timestamp(timestamp_secs, "%H:%M"); // 时:分
-                let date_str = layout.format_timestamp(timestamp_secs, "%y/%m/%d"); // 月/日
-
-                // 绘制时间标签（两行）
-                let _ = ctx.fill_text(&date_str, x, time_label_y_start);
-                let _ = ctx.fill_text(&time_str, x, time_label_y_start + 12.0); // 第二行标签位置
-            }
         }
     }
 
@@ -328,5 +251,80 @@ impl AxisRenderer {
         ctx.fill_rect(legend_x + 60.0, legend_y - 5.0, 10.0, 10.0);
         ctx.set_fill_style_str(ChartColors::TEXT);
         let _ = ctx.fill_text("下跌", legend_x + 75.0, legend_y);
+    }
+
+    /// 绘制X轴 (时间轴)
+    fn draw_x_axis(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        data_manager: &Rc<RefCell<DataManager>>,
+    ) {
+        let data_manager_ref = data_manager.borrow();
+        // 获取可见范围
+        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
+
+        if visible_start >= visible_end {
+            return;
+        }
+
+        // X轴位置 (图表区域底部)
+        let x_axis_y = layout.header_height + layout.chart_area_height;
+        // 时间轴标签绘制的Y坐标起点 (X轴下方)
+        let time_label_y_start = x_axis_y + 5.0; // 在X轴下方留出一点空隙
+
+        // 绘制X轴背景 (时间轴区域)
+        ctx.set_fill_style_str(ChartColors::HEADER_BG); // 使用与Y轴背景一致的颜色
+        ctx.fill_rect(
+            0.0, // 从画布左边缘开始
+            x_axis_y,
+            layout.canvas_width, // 宽度覆盖整个画布
+            layout.time_axis_height,
+        );
+
+        // 绘制X轴上边界 (图表区域底部的分隔线)
+        ctx.set_stroke_style_str(ChartColors::BORDER); // 使用标准边框颜色
+        ctx.set_line_width(1.0);
+        ctx.begin_path();
+        ctx.move_to(layout.chart_area_x, x_axis_y); // 从图表区域左边界开始
+        ctx.line_to(layout.chart_area_x + layout.chart_area_width, x_axis_y); // 到图表区域右边界结束
+        ctx.stroke();
+
+        // 动态计算标签间距，避免过于密集或稀疏
+        let min_label_spacing = 70.0; // 最小标签间距（像素）
+        let max_labels = (layout.chart_area_width / min_label_spacing).floor() as usize;
+        let candle_interval = (visible_count as f64 / max_labels as f64)
+            .ceil()
+            .max(1.0) as usize; // 每隔多少根K线显示一个标签
+
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
+        ctx.set_font("10px Arial");
+        ctx.set_text_align("center");
+        ctx.set_text_baseline("top");
+
+        // 绘制垂直网格线和时间标签
+        for i in (0..visible_count).step_by(candle_interval) {
+            let data_idx = visible_start + i;
+            if data_idx >= items.len() {
+                break; // 超出数据范围
+            }
+
+            // 计算当前K线中心点的X坐标 (相对于画布)
+            let x = layout.chart_area_x
+                + (i as f64 * layout.total_candle_width)
+                + layout.candle_width / 2.0;
+
+            let item = items.get(data_idx);
+            let timestamp_secs = item.timestamp() as i64; // 获取 Unix 时间戳 (秒)
+
+            // 使用ChartLayout的方法格式化时间戳 - 改为使用 render::utils::format_timestamp
+            let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
+            let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
+
+            // 绘制时间标签（两行）
+            let _ = ctx.fill_text(&date_str, x, time_label_y_start);
+            let _ = ctx.fill_text(&time_str, x, time_label_y_start + 12.0); // 第二行标签位置
+        }
     }
 }

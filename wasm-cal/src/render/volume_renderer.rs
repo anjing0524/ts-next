@@ -25,69 +25,75 @@ impl VolumeRenderer {
         };
 
         // 获取可见范围
-        let data_manager_ref = data_manager.borrow();
-        let (visible_start, _, visible_end) = data_manager_ref.get_visible();
+        let visible_range = data_manager_ref.get_visible_range();
+        let (visible_start, visible_count, visible_end) = visible_range.get_range();
 
-        // 获取最大成交量
-        let (_, _, max_volume) = data_manager_ref.get_cached_cal();
-
-        // 如果可见区域为空，或最大成交量无效，则不绘制
-        if visible_start >= visible_end || max_volume <= 0.0 {
+        if visible_start >= visible_end {
             return;
         }
 
-        // 只清空成交量图区域，而不是整个画布
-        ctx.clear_rect(
-            layout.chart_area_x,
-            layout.volume_chart_y,
-            layout.chart_area_width,
-            layout.volume_chart_height,
-        );
+        // 获取成交量范围
+        let (_, _, max_volume) = data_manager_ref.get_cached_cal();
+        
+        // 预先计算所有可见K线的X坐标
+        let x_coordinates = visible_range.precompute_x_coordinates(layout);
+        
+        // 优化：使用临时数组收集所有绘制操作，减少绘制调用次数
+        let mut bullish_rects = Vec::with_capacity(visible_count);
+        let mut bearish_rects = Vec::with_capacity(visible_count);
 
-        // 预先设置绘图样式，减少状态切换
-        ctx.set_line_width(0.0); // 成交量柱状图不需要边框
-
-        // 使用缓存机制减少重复计算
-        let mut volume_y_cache = std::collections::HashMap::new();
-        let mut map_volume = |volume: f64| -> f64 {
-            // 将浮点数转换为位模式的u64，作为HashMap的键
-            let volume_bits = volume.to_bits();
-            *volume_y_cache
-                .entry(volume_bits)
-                .or_insert_with(|| layout.map_volume_to_y(volume, max_volume))
-        };
-
-        // 计算底部Y坐标（只计算一次）
-        let bottom_y = layout.volume_chart_y + layout.volume_chart_height - layout.volume_margin;
-
-        // 绘制成交量柱状图
-        for (i, item_idx) in (visible_start..visible_end).enumerate() {
-            let item = items.get(item_idx);
-            // 使用 i (相对索引) 计算 X 坐标
-            let x = layout.chart_area_x + (i as f64 * layout.total_candle_width);
-            // 判断是上涨还是下跌
-            let is_bullish = item.close() >= item.open();
-            // 计算总成交量
-            let total_volume = item.b_vol() + item.s_vol();
-
-            // 使用缓存函数获取Y坐标
-            let y = map_volume(total_volume);
-
-            // 计算柱子高度，确保从底部开始绘制
-            let height = bottom_y - y;
-
-            // 确保成交量柱状图的宽度与K线宽度协调，稍微窄一些
-            let volume_width = layout.candle_width.max(1.5);
-
-            // 设置颜色 - 与K线颜色匹配，但使用半透明效果
-            ctx.set_fill_style_str(if is_bullish {
-                ChartColors::VOLUME_BULLISH
+        // 遍历所有可见的K线数据
+        for (rel_idx, global_idx) in (visible_start..visible_end).enumerate() {
+            if global_idx >= items.len() {
+                break;
+            }
+            
+            let item = items.get(global_idx);
+            let x_center = x_coordinates[rel_idx];
+            
+            // 计算成交量矩形的参数
+            let candle_x = x_center - (layout.candle_width / 2.0);
+            let candle_width = layout.candle_width.max(1.0);
+            
+            // 计算成交量对应的高度
+            let volume = item.b_vol() + item.s_vol();
+            let height = if max_volume > 0.0 {
+                (volume / max_volume) * layout.volume_chart_height
             } else {
-                ChartColors::VOLUME_BEARISH
-            });
-
-            // 确保高度至少为1像素，避免绘制负高度
-            ctx.fill_rect(x, y, volume_width, height.max(1.0));
+                0.0
+            };
+            
+            // Y坐标需要从底部开始计算
+            let volume_y = layout.volume_chart_y + layout.volume_chart_height - height;
+            
+            // 根据价格变化收集矩形信息
+            if item.close() >= item.open() {
+                // 上涨K线
+                bullish_rects.push((candle_x, volume_y, candle_width, height));
+            } else {
+                // 下跌K线
+                bearish_rects.push((candle_x, volume_y, candle_width, height));
+            }
+        }
+        
+        // 批量绘制所有上涨成交量矩形
+        if !bullish_rects.is_empty() {
+            ctx.set_fill_style_str(ChartColors::BULLISH);
+            ctx.begin_path();
+            for (x, y, width, height) in bullish_rects {
+                ctx.rect(x, y, width, height);
+            }
+            ctx.fill();
+        }
+        
+        // 批量绘制所有下跌成交量矩形
+        if !bearish_rects.is_empty() {
+            ctx.set_fill_style_str(ChartColors::BEARISH);
+            ctx.begin_path();
+            for (x, y, width, height) in bearish_rects {
+                ctx.rect(x, y, width, height);
+            }
+            ctx.fill();
         }
     }
 }

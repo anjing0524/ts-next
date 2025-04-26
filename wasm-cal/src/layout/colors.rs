@@ -28,7 +28,9 @@ impl ChartColors {
     // --- 导航器颜色 ---
     pub const NAVIGATOR_BG: &'static str = "#f8f9fa"; // 导航器背景 (非常浅的灰)
     pub const NAVIGATOR_HANDLE: &'static str = "#b0b8c9"; // 导航器滑块
+    pub const NAVIGATOR_ACTIVE_HANDLE: &'static str = "#5c7cfa"; // 活动状态手柄颜色（更醒目的蓝色）
     pub const NAVIGATOR_MASK: &'static str = "rgba(180, 180, 180, 0.3)"; // 导航器不可见区域遮罩
+    pub const NAVIGATOR_BORDER: &'static str = "#dee2e6"; // 导航器边框颜色
 
     // 成交量相关颜色
     pub const VOLUME_LINE: &'static str = "#6C8CD5"; // 成交量曲线颜色

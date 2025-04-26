@@ -1,10 +1,5 @@
 // 图表布局配置 - 定义整个K线图的布局参数
 use chrono::DateTime;
-// enum HandleType {
-//     Left,
-//     Right,
-//     Middle,
-// }
 pub struct ChartLayout {
     // 基础尺寸
     pub canvas_width: f64,  // 画布总宽度
@@ -182,6 +177,56 @@ impl ChartLayout {
         }
         let volume_ratio = 1.0 - (y - self.volume_chart_y - self.volume_margin) / usable_height;
         volume_ratio * max_volume
+    }
+
+    // 将数据索引映射到X坐标
+    // 
+    // # 参数
+    // * `index` - 在可见区域内的索引，从0开始
+    // * `visible_start` - 当前可见区域的起始索引
+    // * `visible_count` - 当前可见区域的数据数量
+    // 
+    // # 返回值
+    // X坐标（画布坐标系）
+    pub fn map_index_to_x(&self, index: usize, visible_start: usize) -> f64 {
+        let relative_index = if index >= visible_start {
+            index - visible_start
+        } else {
+            0
+        };
+        
+        self.chart_area_x + (relative_index as f64 * self.total_candle_width) + (self.candle_width / 2.0)
+    }
+
+    // 将X坐标映射到数据索引
+    // 
+    // # 参数
+    // * `x` - X坐标（画布坐标系）
+    // * `visible_start` - 当前可见区域的起始索引
+    // * `visible_count` - 当前可见区域的数据数量
+    // * `items_len` - 数据总长度
+    // 
+    // # 返回值
+    // 数据索引，如果X坐标超出范围则返回None
+    pub fn map_x_to_index(&self, x: f64, visible_start: usize, visible_count: usize, items_len: usize) -> Option<usize> {
+        // 如果X坐标超出图表区域，返回None
+        if x < self.chart_area_x || x > self.chart_area_x + self.chart_area_width {
+            return None;
+        }
+        
+        // 计算相对X坐标
+        let relative_x = x - self.chart_area_x;
+        
+        // 计算相对索引
+        let relative_index = (relative_x / self.total_candle_width).floor() as usize;
+        
+        // 计算绝对索引并确保不超出数据范围
+        let absolute_index = visible_start + relative_index;
+        if absolute_index < items_len {
+            Some(absolute_index)
+        } else {
+            None
+        }
     }
 
     /// 格式化成交量显示，根据数值大小自动添加K或M后缀

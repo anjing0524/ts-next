@@ -25,8 +25,8 @@ impl PriceRenderer {
         };
 
         // 获取可见范围
-        let data_manager_ref = data_manager.borrow();
-        let (visible_start, _, visible_end) = data_manager_ref.get_visible();
+        let visible_range = data_manager_ref.get_visible_range();
+        let (visible_start, visible_count, visible_end) = visible_range.get_range();
 
         if visible_start >= visible_end {
             return;
@@ -35,86 +35,76 @@ impl PriceRenderer {
         // 获取价格范围
         let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
 
-        // 只清空价格图区域，而不是整个画布
-        ctx.clear_rect(
-            layout.chart_area_x,
-            layout.chart_area_y,
-            layout.chart_area_width,
-            layout.price_chart_height,
-        );
+        // 预先计算所有可见K线的X坐标
+        let x_coordinates = visible_range.precompute_x_coordinates(layout);
 
-        // 绘制K线影线 - 使用路径批处理
+        // 优化：使用临时数组收集所有绘制操作，减少绘制调用次数
+        let mut high_low_lines = Vec::with_capacity(visible_count);
+        let mut bullish_rects = Vec::with_capacity(visible_count);
+        let mut bearish_rects = Vec::with_capacity(visible_count);
+
+        // 遍历所有可见的K线数据
+        for (rel_idx, global_idx) in (visible_start..visible_end).enumerate() {
+            if global_idx >= items.len() {
+                break;
+            }
+            
+            let item = items.get(global_idx);
+            let x_center = x_coordinates[rel_idx];
+            
+            // 计算价格对应的Y坐标
+            let high_y = layout.map_price_to_y(item.high(), min_low, max_high);
+            let low_y = layout.map_price_to_y(item.low(), min_low, max_high);
+            let open_y = layout.map_price_to_y(item.open(), min_low, max_high);
+            let close_y = layout.map_price_to_y(item.close(), min_low, max_high);
+            
+            // 收集影线绘制信息
+            high_low_lines.push((x_center, high_y, x_center, low_y));
+            
+            // 收集实体绘制信息
+            let candle_x = x_center - (layout.candle_width / 2.0);
+            let candle_width = layout.candle_width.max(1.0);
+            
+            if item.close() >= item.open() {
+                // 上涨K线
+                let height = (open_y - close_y).max(1.0);
+                bullish_rects.push((candle_x, close_y, candle_width, height));
+            } else {
+                // 下跌K线
+                let height = (close_y - open_y).max(1.0);
+                bearish_rects.push((candle_x, open_y, candle_width, height));
+            }
+        }
+        
+        // 批量绘制所有K线影线
         ctx.begin_path();
         ctx.set_stroke_style_str(ChartColors::WICK);
         ctx.set_line_width(1.0);
-
-        // 使用HashMap和整数键来避免浮点数比较问题
-        let mut price_y_cache = std::collections::HashMap::new();
-        let mut map_price = |price: f64| -> f64 {
-            // 将浮点数转换为位模式的u64，作为HashMap的键
-            let price_bits = price.to_bits();
-            *price_y_cache
-                .entry(price_bits)
-                .or_insert_with(|| layout.map_price_to_y(price, min_low, max_high))
-        };
-
-        let mut path_points = Vec::with_capacity((visible_end - visible_start) * 2);
-        for (i, item_idx) in (visible_start..visible_end).enumerate() {
-            let item = items.get(item_idx);
-            let x_center = layout.chart_area_x
-                + (i as f64 * layout.total_candle_width)
-                + layout.candle_width / 2.0;
-
-            let high_y = map_price(item.high());
-            let low_y = map_price(item.low());
-
-            path_points.push((x_center, high_y, x_center, low_y));
-        }
-        // 一次性绘制所有线段
-        ctx.begin_path();
-        for (x1, y1, x2, y2) in path_points {
+        
+        for (x1, y1, x2, y2) in high_low_lines {
             ctx.move_to(x1, y1);
             ctx.line_to(x2, y2);
         }
         ctx.stroke();
-
-        // 预先准备好颜色
-        let bullish_color = ChartColors::BULLISH;
-        let bearish_color = ChartColors::BEARISH;
-
-        // 分组绘制实体，减少颜色切换
-        // 先绘制所有上涨K线
-        ctx.set_fill_style_str(bullish_color);
-        ctx.begin_path();
-        for (i, item_idx) in (visible_start..visible_end).enumerate() {
-            let item = items.get(item_idx);
-            if item.close() >= item.open() {
-                // 绘制上涨K线
-                let x = layout.chart_area_x + (i as f64 * layout.total_candle_width);
-                let open_y = map_price(item.open());
-                let close_y = map_price(item.close());
-                let candle_width = layout.candle_width.max(2.0);
-                let height = (open_y - close_y).max(1.0);
-                ctx.rect(x, close_y, candle_width, height);
+        
+        // 批量绘制所有上涨K线实体
+        if !bullish_rects.is_empty() {
+            ctx.set_fill_style_str(ChartColors::BULLISH);
+            ctx.begin_path();
+            for (x, y, width, height) in bullish_rects {
+                ctx.rect(x, y, width, height);
             }
+            ctx.fill();
         }
-        ctx.fill();
-
-        // 再绘制所有下跌K线
-        ctx.set_fill_style_str(bearish_color);
-        ctx.begin_path();
-        for (i, item_idx) in (visible_start..visible_end).enumerate() {
-            let item = items.get(item_idx);
-            if item.close() < item.open() {
-                // 绘制下跌K线
-                let x = layout.chart_area_x + (i as f64 * layout.total_candle_width);
-                let open_y = map_price(item.open());
-                let close_y = map_price(item.close());
-                let candle_width = layout.candle_width.max(2.0);
-                let height = (close_y - open_y).max(1.0);
-                ctx.rect(x, open_y, candle_width, height);
+        
+        // 批量绘制所有下跌K线实体
+        if !bearish_rects.is_empty() {
+            ctx.set_fill_style_str(ChartColors::BEARISH);
+            ctx.begin_path();
+            for (x, y, width, height) in bearish_rects {
+                ctx.rect(x, y, width, height);
             }
+            ctx.fill();
         }
-        ctx.fill();
     }
 }

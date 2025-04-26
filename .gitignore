@@ -49,3 +49,13 @@ test-results
 
 # rust target
 /wasm-cal/target
+
+
+# rust target
+/wasm-cal/install.sh
+# rust target
+/wasm-cal/pkg
+
+/.cusror/
+
+/public/
