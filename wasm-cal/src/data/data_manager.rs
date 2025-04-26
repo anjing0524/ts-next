@@ -212,7 +212,7 @@ impl DataManager {
     pub fn handle_wheel(
         &mut self,
         mouse_x: f64,
-        mouse_y: f64,
+        _mouse_y: f64,
         delta: f64,
         chart_area_x: f64,
         chart_area_width: f64,

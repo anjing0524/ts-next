@@ -50,17 +50,6 @@ pub struct ChartLayout {
     // 导航器参数
     pub navigator_y: f64,            // 导航器Y坐标起点
     pub navigator_handle_width: f64, // 导航器滑块宽度
-    pub navigator_candle_width: f64, // 导航器中每个K线的宽度
-    pub navigator_drag_active: bool, // 导航器是否处于拖动状态
-    pub navigator_drag_start_x: f64, // 导航器拖动起始X坐标
-
-    // 拖动状态
-    pub drag_start_x: f64, // 拖动开始时的X坐标
-
-    // 悬浮状态
-    pub hover_candle_index: Option<usize>,  // 当前悬浮的K线索引
-    pub hover_position: Option<(f64, f64)>, // 当前悬浮位置(x, y)
-    pub show_tooltip: bool,                 // 是否显示提示框
 }
 
 impl ChartLayout {
@@ -109,10 +98,6 @@ impl ChartLayout {
         // 导航器位置 (计算方式不变)
         let navigator_y = canvas_height - navigator_height;
 
-        // 导航器中每个K线的宽度 - 这个值应该根据实际数据量动态计算
-        // 这里先设置一个默认值，后续会在绘制时根据实际数据量重新计算
-        let navigator_candle_width = 1.0;
-
         Self {
             canvas_width,
             canvas_height,
@@ -140,14 +125,7 @@ impl ChartLayout {
             crosshair_width,
             grid_line_count,
             navigator_y, // 使用更新后的值
-            navigator_candle_width,
             navigator_handle_width,
-            navigator_drag_active: false,
-            navigator_drag_start_x: 0.0,
-            drag_start_x: 0.0,
-            hover_candle_index: None,
-            hover_position: None,
-            show_tooltip: false,
         }
     }
 

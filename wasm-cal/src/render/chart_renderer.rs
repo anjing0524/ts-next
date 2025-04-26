@@ -123,29 +123,13 @@ impl ChartRenderer {
         if datazoom_cursor != "default" {
             return datazoom_cursor;
         }
-
-        // 未来可以添加其他区域的光标样式判断
-        // 例如在K线图上可以显示十字光标等
-
         // 默认光标样式
         "default"
     }
 
     // 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
-        let is_on_datazoom = {
-            // 先检查是否在DataZoom上
-            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
-            datazoom_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager)
-        };
-        // 如果DataZoom处理了鼠标移动并需要重绘，则重绘图表
-        if is_on_datazoom {
-            // 重绘图表
-            self.render();
-            return;
-        }
-
-        // 如果不在DataZoom上，则交给OverlayRenderer处理
+        // 直接交给OverlayRenderer处理鼠标移动
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
         overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager);
     }
@@ -183,11 +167,41 @@ impl ChartRenderer {
         false
     }
 
-    // 处理鼠标离开事件 - 清除所有交互元素
-    pub fn handle_mouse_leave(&self) {
+    // 处理鼠标拖动事件
+    pub fn handle_mouse_drag(&self, x: f64, y: f64) -> bool {
+        // 检查DataZoom是否处于拖动状态
+        let need_redraw = {
+            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
+            datazoom_renderer.handle_mouse_drag(x, y, &self.canvas_manager, &self.data_manager)
+        };
+
+        // 如果需要重绘，重新绘制所有图表
+        if need_redraw {
+            self.render();
+        }
+
+        need_redraw
+    }
+
+    // 处理鼠标离开事件 - 清除所有交互元素并重置拖动状态
+    pub fn handle_mouse_leave(&self) -> bool {
         // 处理交互层的鼠标离开
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
         overlay_renderer.handle_mouse_leave(&self.canvas_manager);
+
+        // 检查DataZoom是否处于拖动状态，如果是则重置并返回需要重绘
+        let was_dragging = {
+            let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
+            datazoom_renderer.handle_mouse_up()
+        };
+
+        // 如果之前在拖动，重绘图表并返回true表示已处理
+        if was_dragging {
+            self.render();
+            return true;
+        }
+
+        false
     }
 
     // 处理鼠标滚轮事件

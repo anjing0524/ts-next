@@ -178,23 +178,13 @@ impl KlineProcess {
 
     #[wasm_bindgen]
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
-        time("KlineProcess::handle_mouse_move");
         let chart_renderer = match &self.chart_renderer {
             Some(renderer) => renderer,
             None => {
-                time_end("KlineProcess::handle_mouse_move");
                 return;
             }
         };
-
-        log(&format!(
-            "KlineProcess::handle_mouse_move - x={}, y={}",
-            x, y
-        ));
-
         chart_renderer.handle_mouse_move(x, y);
-
-        time_end("KlineProcess::handle_mouse_move");
     }
 
     /// 获取当前鼠标位置的光标样式
@@ -204,17 +194,20 @@ impl KlineProcess {
             Some(renderer) => renderer,
             None => return "default".to_string(),
         };
-
         // 获取鼠标样式并转换为String返回给JavaScript
         chart_renderer.get_cursor_style(x, y).to_string()
     }
 
     #[wasm_bindgen]
-    pub fn handle_mouse_leave(&self) {
-        if let Some(chart_renderer) = &self.chart_renderer {
-            log("KlineProcess::handle_mouse_leave");
-            chart_renderer.handle_mouse_leave();
-        }
+    pub fn handle_mouse_leave(&self) -> bool {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                return false;
+            }
+        };
+        // 调用chart_renderer的鼠标离开处理函数，并返回是否需要重绘
+        chart_renderer.handle_mouse_leave()
     }
 
     #[wasm_bindgen]
@@ -223,11 +216,46 @@ impl KlineProcess {
             Some(renderer) => renderer,
             None => return,
         };
-
+        // 即使在拖动状态下也处理滚轮事件
         chart_renderer.handle_wheel(delta, x, y);
-        log(&format!(
-            "KlineProcess::handle_wheel - delta={}, x={}, y={}",
-            delta, x, y
-        ));
+    }
+
+    /// 处理鼠标按下事件
+    #[wasm_bindgen]
+    pub fn handle_mouse_down(&self, x: f64, y: f64) -> bool {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                return false;
+            }
+        };
+        let result = chart_renderer.handle_mouse_down(x, y);
+        result
+    }
+
+    /// 处理鼠标释放事件
+    #[wasm_bindgen]
+    pub fn handle_mouse_up(&self, x: f64, y: f64) -> bool {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                return false;
+            }
+        };
+        let result = chart_renderer.handle_mouse_up(x, y);
+        result
+    }
+
+    /// 处理鼠标拖动事件
+    #[wasm_bindgen]
+    pub fn handle_mouse_drag(&self, x: f64, y: f64) {
+        let chart_renderer = match &self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                return;
+            }
+        };
+        // 调用chart_renderer的鼠标拖动处理函数
+        chart_renderer.handle_mouse_drag(x, y);
     }
 }

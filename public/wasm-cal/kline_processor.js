@@ -257,8 +257,12 @@ export class KlineProcess {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
+    /**
+     * @returns {boolean}
+     */
     handle_mouse_leave() {
-        wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
+        const ret = wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
+        return ret !== 0;
     }
     /**
      * @param {number} delta
@@ -267,6 +271,34 @@ export class KlineProcess {
      */
     handle_wheel(delta, x, y) {
         wasm.klineprocess_handle_wheel(this.__wbg_ptr, delta, x, y);
+    }
+    /**
+     * 处理鼠标按下事件
+     * @param {number} x
+     * @param {number} y
+     * @returns {boolean}
+     */
+    handle_mouse_down(x, y) {
+        const ret = wasm.klineprocess_handle_mouse_down(this.__wbg_ptr, x, y);
+        return ret !== 0;
+    }
+    /**
+     * 处理鼠标释放事件
+     * @param {number} x
+     * @param {number} y
+     * @returns {boolean}
+     */
+    handle_mouse_up(x, y) {
+        const ret = wasm.klineprocess_handle_mouse_up(this.__wbg_ptr, x, y);
+        return ret !== 0;
+    }
+    /**
+     * 处理鼠标拖动事件
+     * @param {number} x
+     * @param {number} y
+     */
+    handle_mouse_drag(x, y) {
+        wasm.klineprocess_handle_mouse_drag(this.__wbg_ptr, x, y);
     }
 }
 

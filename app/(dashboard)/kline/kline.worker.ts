@@ -22,6 +22,24 @@ interface MouseMoveMessage {
   y: number;
 }
 
+interface MouseDownMessage {
+  type: 'mousedown';
+  x: number;
+  y: number;
+}
+
+interface MouseUpMessage {
+  type: 'mouseup';
+  x: number;
+  y: number;
+}
+
+interface MouseDragMessage {
+  type: 'mousedrag';
+  x: number;
+  y: number;
+}
+
 interface GetCursorStyleMessage {
   type: 'getCursorStyle';
   x: number;
@@ -37,12 +55,16 @@ interface WheelMessage {
   deltaY: number;
   x: number;
   y: number;
+  isDragging?: boolean; // 添加可选的拖动状态标志
 }
 
 type WorkerMessage =
   | InitMessage
   | DrawMessage
   | MouseMoveMessage
+  | MouseDownMessage
+  | MouseUpMessage
+  | MouseDragMessage
   | MouseLeaveMessage
   | WheelMessage
   | GetCursorStyleMessage;
@@ -74,12 +96,38 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         if (!processorRef) return;
         processorRef.handle_mouse_move(data.x, data.y);
         break;
+      case 'mousedown':
+        if (!processorRef) return;
+        // 调用WASM中的鼠标按下处理函数
+        const isHandled = processorRef.handle_mouse_down(data.x, data.y);
+        // 通知主线程鼠标按下事件是否被处理
+        self.postMessage({
+          type: 'mousedownHandled',
+          handled: isHandled,
+        });
+        break;
+      case 'mouseup':
+        if (!processorRef) return;
+        // 调用WASM中的鼠标释放处理函数
+        const isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
+        // 通知主线程鼠标释放事件处理结果
+        self.postMessage({
+          type: 'mouseupHandled',
+          isDragEnd: isDragEnd,
+        });
+        break;
+      case 'mousedrag':
+        if (!processorRef) return;
+        // 调用WASM中的鼠标拖动处理函数
+        processorRef.handle_mouse_drag(data.x, data.y);
+        break;
       case 'mouseleave':
         if (!processorRef) return;
         processorRef.handle_mouse_leave();
         break;
       case 'wheel':
         if (!processorRef) return;
+        // 传递滚轮事件到WASM，包括拖动状态
         processorRef.handle_wheel(data.deltaY, data.x, data.y);
         break;
       case 'getCursorStyle':

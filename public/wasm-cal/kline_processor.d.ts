@@ -23,8 +23,20 @@ export class KlineProcess {
    * 获取当前鼠标位置的光标样式
    */
   get_cursor_style(x: number, y: number): string;
-  handle_mouse_leave(): void;
+  handle_mouse_leave(): boolean;
   handle_wheel(delta: number, x: number, y: number): void;
+  /**
+   * 处理鼠标按下事件
+   */
+  handle_mouse_down(x: number, y: number): boolean;
+  /**
+   * 处理鼠标释放事件
+   */
+  handle_mouse_up(x: number, y: number): boolean;
+  /**
+   * 处理鼠标拖动事件
+   */
+  handle_mouse_drag(x: number, y: number): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -37,8 +49,11 @@ export interface InitOutput {
   readonly klineprocess_draw_all: (a: number) => [number, number];
   readonly klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
   readonly klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
-  readonly klineprocess_handle_mouse_leave: (a: number) => void;
+  readonly klineprocess_handle_mouse_leave: (a: number) => number;
   readonly klineprocess_handle_wheel: (a: number, b: number, c: number, d: number) => void;
+  readonly klineprocess_handle_mouse_down: (a: number, b: number, c: number) => number;
+  readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
+  readonly klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
   readonly start: () => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;

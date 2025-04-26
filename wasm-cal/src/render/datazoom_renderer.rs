@@ -158,27 +158,39 @@ impl DataZoomRenderer {
         }
     }
 
-    /// 处理鼠标移动事件
-    pub fn handle_mouse_move(
+    /// 处理鼠标释放事件
+    /// 当用户释放鼠标按钮时调用此函数，结束拖动操作
+    /// 返回一个布尔值，表示之前是否处于拖动状态
+    pub fn handle_mouse_up(&mut self) -> bool {
+        let was_dragging = self.is_dragging;
+        if was_dragging {
+            // 记录拖动结束状态，用于可能的动画或过渡效果
+            // 这里我们简单地重置状态，但可以添加更复杂的逻辑
+            // 例如记录最后的拖动速度，实现惯性滚动等
+        }
+        // 重置拖动状态
+        self.is_dragging = false;
+        self.drag_handle_type = DragHandleType::None;
+        // 返回之前是否在拖动，调用者可以据此决定是否需要重绘
+        was_dragging
+    }
+
+    /// 处理鼠标拖动事件
+    /// 当用户拖动鼠标时调用此函数，更新导航器的位置
+    /// 与handle_mouse_move类似，但专门用于拖动状态
+    pub fn handle_mouse_drag(
         &mut self,
         x: f64,
-        y: f64,
+        _y: f64,
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> bool {
-        // 如果没有在拖动，检查是否需要改变鼠标样式
+        // 如果没有在拖动，不处理
         if !self.is_dragging {
-            let handle_type = self.get_handle_at_position(x, y, canvas_manager, data_manager);
-            // 返回是否在导航器上
-            return handle_type != DragHandleType::None;
+            return false;
         }
-
-        // 如果正在拖动，计算拖动距离
+        // 计算拖动距离
         let drag_distance = x - self.drag_start_x;
-        if drag_distance.abs() < 1.0 {
-            return true; // 拖动距离太小，不处理
-        }
-
         // 获取布局和数据
         let layout = canvas_manager.layout.borrow();
         let mut data_manager_ref = data_manager.borrow_mut();
@@ -200,8 +212,8 @@ impl DataZoomRenderer {
             0
         };
 
-        // 根据拖动手柄类型处理不同的拖动逻辑
-        match self.drag_handle_type {
+        // 计算新的可见区域参数
+        let (new_start, new_count) = match self.drag_handle_type {
             DragHandleType::Left => {
                 // 拖动左侧手柄，改变可见区域起始位置和数量
                 let new_start = (self.drag_start_visible_start as isize + index_change)
@@ -212,8 +224,7 @@ impl DataZoomRenderer {
                     .drag_start_visible_count
                     .saturating_add(self.drag_start_visible_start.saturating_sub(new_start));
 
-                // 更新可见区域
-                data_manager_ref.update_visible_range(new_start, new_count);
+                (new_start, new_count)
             }
             DragHandleType::Right => {
                 // 拖动右侧手柄，只改变可见区域数量
@@ -221,8 +232,7 @@ impl DataZoomRenderer {
                     .max(1) // 至少显示1根K线
                     .min(items_len - self.drag_start_visible_start); // 不能超出数据范围
 
-                // 更新可见区域
-                data_manager_ref.update_visible_range(self.drag_start_visible_start, new_count);
+                (self.drag_start_visible_start, new_count)
             }
             DragHandleType::Middle => {
                 // 拖动中间区域，平移整个可见区域
@@ -231,29 +241,27 @@ impl DataZoomRenderer {
                     .min((items_len - self.drag_start_visible_count) as isize)
                     as usize;
 
-                // 更新可见区域
-                data_manager_ref.update_visible_range(new_start, self.drag_start_visible_count);
+                (new_start, self.drag_start_visible_count)
             }
             DragHandleType::None => {
                 return false;
             }
-        }
+        };
 
+        // 更新可见区域
+        data_manager_ref.update_visible_range(new_start, new_count);
         // 重新计算数据范围
         data_manager_ref.calculate_data_ranges();
 
+        // 更新拖动起始位置为当前位置，以便下次拖动计算
+        self.drag_start_x = x;
+
+        // 记录拖动开始时的可见区域（更新为当前值）
+        self.drag_start_visible_start = new_start;
+        self.drag_start_visible_count = new_count;
+
+        // 返回true表示需要重绘
         true
-    }
-
-    /// 处理鼠标释放事件
-    pub fn handle_mouse_up(&mut self) -> bool {
-        let was_dragging = self.is_dragging;
-
-        // 重置拖动状态
-        self.is_dragging = false;
-        self.drag_handle_type = DragHandleType::None;
-
-        was_dragging
     }
 
     /// 绘制DataZoom导航器
@@ -418,6 +426,15 @@ impl DataZoomRenderer {
         } else {
             layout.navigator_handle_width
         };
+
+        // 设置拖动时的阴影效果
+        let shadow_blur = if self.is_dragging { 4.0 } else { 0.0 };
+        let shadow_color = if self.is_dragging {
+            "rgba(74, 144, 226, 0.6)"
+        } else {
+            "transparent"
+        };
+
         let items_len = items.len();
         if items_len == 0 {
             return;
@@ -444,6 +461,21 @@ impl DataZoomRenderer {
             nav_height,
         );
 
+        // 绘制可见区域背景，添加轻微的高亮效果
+        if self.is_dragging {
+            ctx.set_fill_style_str("rgba(255, 255, 255, 0.05)");
+            ctx.fill_rect(
+                visible_start_x,
+                nav_y,
+                visible_end_x - visible_start_x,
+                nav_height,
+            );
+        }
+
+        // 设置阴影效果
+        ctx.set_shadow_blur(shadow_blur);
+        ctx.set_shadow_color(shadow_color);
+
         // 绘制可见区域边框
         ctx.set_stroke_style_str(handle_color);
         ctx.set_line_width(handle_width);
@@ -456,8 +488,10 @@ impl DataZoomRenderer {
         ctx.move_to(visible_end_x, nav_y);
         ctx.line_to(visible_end_x, nav_y + nav_height);
         ctx.stroke();
+
         // 绘制可拖动手柄
         ctx.set_fill_style_str(handle_color);
+
         // 左侧手柄
         ctx.fill_rect(
             visible_start_x - handle_width / 2.0,
@@ -474,27 +508,22 @@ impl DataZoomRenderer {
             nav_height,
         );
 
-        // 如果正在拖动，绘制当前拖动的手柄类型提示
+        // 重置阴影效果
+        ctx.set_shadow_blur(0.0);
+        ctx.set_shadow_color("transparent");
+
+        // 如果正在拖动，绘制一个细线连接左右手柄，增强视觉效果
         if self.is_dragging {
-            // 设置文本样式
-            ctx.set_font("12px Arial");
-            ctx.set_fill_style_str("#ffffff");
-            ctx.set_text_align("center");
+            ctx.begin_path();
+            ctx.set_stroke_style_str("rgba(74, 144, 226, 0.4)");
+            ctx.set_line_width(1.0);
 
-            // 根据拖动的手柄类型显示不同的提示文本
-            let tip_text = match self.drag_handle_type {
-                DragHandleType::Left => "调整起始位置",
-                DragHandleType::Right => "调整结束位置",
-                DragHandleType::Middle => "平移可见区域",
-                _ => "",
-            };
-
-            // 在导航器上方绘制提示文本
-            if !tip_text.is_empty() {
-                let text_y = nav_y - 5.0;
-                let text_x = (visible_start_x + visible_end_x) / 2.0;
-                ctx.fill_text(tip_text, text_x, text_y).unwrap_or_default();
-            }
+            // 在顶部和底部绘制连接线
+            ctx.move_to(visible_start_x, nav_y);
+            ctx.line_to(visible_end_x, nav_y);
+            ctx.move_to(visible_start_x, nav_y + nav_height);
+            ctx.line_to(visible_end_x, nav_y + nav_height);
+            ctx.stroke();
         }
     }
 }
