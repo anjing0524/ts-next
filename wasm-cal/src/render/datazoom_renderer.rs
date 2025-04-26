@@ -212,6 +212,9 @@ impl DataZoomRenderer {
             0
         };
 
+        // 获取当前可见范围，用于后续计算
+        let (current_visible_start, current_visible_count, _) = data_manager_ref.get_visible();
+
         // 计算新的可见区域参数
         let mut update_result = match self.drag_handle_type {
             DragHandleType::Left => {
@@ -247,27 +250,25 @@ impl DataZoomRenderer {
             DragHandleType::Right => {
                 let original_start = self.drag_start_visible_start;
                 
-                // 计算新的可见数量
-                let mut new_count = ((self.drag_start_visible_count as isize + index_change) as usize)
-                    .max(1)  // 确保至少显示1根K线
-                    .min(items_len - original_start);  // 不超过数据范围
+                // 右侧手柄的当前坐标
+                let right_x = x;
                 
                 // 左侧手柄坐标对应的点在画布上的x坐标
-                let left_handle_x = layout.map_index_to_x(original_start, original_start);
+                let left_x = layout.map_index_to_x(original_start, original_start);
                 
                 // 如果右手柄拖到了左手柄左侧，交换操作类型
-                if x < left_handle_x {
+                if right_x <= left_x {
                     // 交换手柄类型
                     self.drag_handle_type = DragHandleType::Left;
                     
                     // 计算新的起始点位置（鼠标当前位置对应的数据索引）
                     let mouse_index = 
-                        if let Some(idx) = layout.map_x_to_index(x, original_start, self.drag_start_visible_count, items_len) {
+                        if let Some(idx) = layout.map_x_to_index(right_x, current_visible_start, current_visible_count, items_len) {
                             idx
                         } else {
                             // 如果无法准确映射，估算一个位置
                             let ratio = if layout.chart_area_width > 0.0 {
-                                (x - layout.chart_area_x) / layout.chart_area_width
+                                (right_x - layout.chart_area_x) / layout.chart_area_width
                             } else {
                                 0.0
                             };
@@ -275,7 +276,11 @@ impl DataZoomRenderer {
                         };
 
                     let new_start = mouse_index.max(0).min(items_len - 1);
-                    let new_count = 1;  // 当交换时，设置为最小可能值
+                    let new_count = if original_start > new_start { 
+                        original_start - new_start 
+                    } else { 
+                        1 // 最小可见数量
+                    };
                     
                     // 更新拖动起始状态
                     self.drag_start_x = x;
@@ -285,6 +290,11 @@ impl DataZoomRenderer {
                     // 返回交换后的新值
                     (new_start, new_count)
                 } else {
+                    // 计算新的可见数量
+                    let mut new_count = ((self.drag_start_visible_count as isize + index_change) as usize)
+                        .max(1)  // 确保至少显示1根K线
+                        .min(items_len - original_start);  // 不超过数据范围
+                    
                     // 正常情况，不需要交换
                     (original_start, new_count)
                 }
@@ -499,49 +509,90 @@ impl DataZoomRenderer {
         
         // 使用VisibleRange的get_screen_coordinates方法获取可见区域的坐标
         let (visible_start_x, visible_end_x) = visible_range.get_screen_coordinates(layout);
+        
+        // 确保手柄位置在datazoom区域内
+        let clamped_start_x = visible_start_x.max(nav_x).min(nav_x + nav_width);
+        let clamped_end_x = visible_end_x.max(nav_x).min(nav_x + nav_width);
+        
+        // 获取当前可见范围
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        
+        // 检查是否显示全部数据（缩放到最大）
+        let is_showing_all = visible_start == 0 && visible_count >= items_len;
+        
+        // 如果显示全部数据，则不渲染左侧手柄
+        let should_render_left_handle = !is_showing_all && 
+                                        clamped_start_x >= nav_x && 
+                                        clamped_start_x <= nav_x + nav_width;
+        
+        // 如果显示全部数据，则不渲染右侧手柄
+        let should_render_right_handle = !is_showing_all && 
+                                         clamped_end_x >= nav_x && 
+                                         clamped_end_x <= nav_x + nav_width;
 
-        // 绘制半透明遮罩 (左侧不可见区域)
-        ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);
-        ctx.fill_rect(nav_x, nav_y, visible_start_x - nav_x, nav_height);
+        // 绘制半透明遮罩 (左侧不可见区域) - 只在非全屏模式下绘制
+        if !is_showing_all {
+            ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);
+            ctx.fill_rect(nav_x, nav_y, clamped_start_x - nav_x, nav_height);
 
-        // 绘制半透明遮罩 (右侧不可见区域)
-        ctx.fill_rect(
-            visible_end_x,
-            nav_y,
-            nav_x + nav_width - visible_end_x,
-            nav_height,
-        );
+            // 绘制半透明遮罩 (右侧不可见区域)
+            ctx.fill_rect(
+                clamped_end_x,
+                nav_y,
+                nav_x + nav_width - clamped_end_x,
+                nav_height,
+            );
+        }
 
-        // 绘制左侧手柄
-        ctx.set_fill_style_str(handle_color);
-        ctx.set_shadow_blur(shadow_blur);
-        ctx.set_shadow_color(shadow_color);
-        ctx.begin_path();
-        // 绘制圆角矩形作为左侧手柄
-        ctx.fill_rect(
-            visible_start_x - handle_width / 2.0,
-            nav_y + nav_height / 4.0,
-            handle_width,
-            nav_height / 2.0,
-        );
-
-        // 绘制右侧手柄
-        ctx.begin_path();
-        // 绘制圆角矩形作为右侧手柄
-        ctx.fill_rect(
-            visible_end_x - handle_width / 2.0,
-            nav_y + nav_height / 4.0,
-            handle_width,
-            nav_height / 2.0,
-        );
-
-        // 重置阴影
+        // 重置阴影效果，确保只有手柄使用阴影
         ctx.set_shadow_blur(0.0);
         ctx.set_shadow_color("transparent");
 
+        // 绘制左侧手柄 - 只有当手柄在区域内且不是显示全部数据时才渲染
+        if should_render_left_handle {
+            ctx.set_fill_style_str(handle_color);
+            ctx.set_shadow_blur(shadow_blur);
+            ctx.set_shadow_color(shadow_color);
+            ctx.begin_path();
+            // 绘制圆角矩形作为左侧手柄
+            ctx.fill_rect(
+                clamped_start_x - handle_width / 2.0,
+                nav_y + nav_height / 4.0,
+                handle_width,
+                nav_height / 2.0,
+            );
+            // 重置阴影，避免影响其他元素
+            ctx.set_shadow_blur(0.0);
+            ctx.set_shadow_color("transparent");
+        }
+
+        // 绘制右侧手柄 - 只有当手柄在区域内且不是显示全部数据时才渲染
+        if should_render_right_handle {
+            ctx.set_fill_style_str(handle_color);
+            ctx.set_shadow_blur(shadow_blur);
+            ctx.set_shadow_color(shadow_color);
+            ctx.begin_path();
+            // 绘制圆角矩形作为右侧手柄
+            ctx.fill_rect(
+                clamped_end_x - handle_width / 2.0,
+                nav_y + nav_height / 4.0,
+                handle_width,
+                nav_height / 2.0,
+            );
+            // 重置阴影，避免影响其他元素
+            ctx.set_shadow_blur(0.0);
+            ctx.set_shadow_color("transparent");
+        }
+
         // 绘制可见区域边框 (高亮显示当前可见区域)
-        ctx.set_stroke_style_str(ChartColors::NAVIGATOR_BORDER);
-        ctx.set_line_width(1.0);
-        ctx.stroke_rect(visible_start_x, nav_y, visible_end_x - visible_start_x, nav_height);
+        // 确保边框在DataZoom范围内且不是显示全部数据
+        let border_left = clamped_start_x;
+        let border_width = clamped_end_x - clamped_start_x;
+        
+        if border_width > 0.0 && !is_showing_all {
+            ctx.set_stroke_style_str(ChartColors::NAVIGATOR_BORDER);
+            ctx.set_line_width(1.0);
+            ctx.stroke_rect(border_left, nav_y, border_width, nav_height);
+        }
     }
 }
