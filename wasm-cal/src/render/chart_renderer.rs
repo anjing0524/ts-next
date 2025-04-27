@@ -14,6 +14,11 @@ use std::cell::{RefCell, Cell};
 use std::rc::Rc;
 use web_sys::OffscreenCanvas;
 
+// 定义每次重绘的间隔计数
+thread_local! {
+    static DRAG_THROTTLE_COUNTER: Cell<u8> = Cell::new(0);
+}
+
 /// 图表渲染器 - 整合所有模块，提供统一的渲染接口
 pub struct ChartRenderer {
     /// Canvas管理器
@@ -162,12 +167,12 @@ impl ChartRenderer {
         false
     }
 
-    // 处理鼠标释放事件
+    /// 处理鼠标抬起事件
     pub fn handle_mouse_up(&self, _x: f64, _y: f64) -> bool {
         let was_dragging = {
             // 检查DataZoom是否处于拖动状态
             let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
-            datazoom_renderer.handle_mouse_up()
+            datazoom_renderer.handle_mouse_up(&self.data_manager)
         };
 
         // 如果之前在拖动，重绘图表并返回true表示已处理
@@ -195,11 +200,7 @@ impl ChartRenderer {
 
         // 性能优化：使用线程局部变量进行节流
         // 实际应用中应该使用时间戳，这里简化实现为每隔几次渲染
-        thread_local! {
-            static THROTTLE_COUNTER: std::cell::Cell<u8> = std::cell::Cell::new(0);
-        }
-        
-        let should_render = THROTTLE_COUNTER.with(|counter| {
+        let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
             let current = counter.get();
             let next = (current + 1) % 3; // 每3次拖动事件渲染一次
             counter.set(next);
@@ -224,7 +225,7 @@ impl ChartRenderer {
         // 检查DataZoom是否处于拖动状态，如果是则重置并返回需要重绘
         let was_dragging = {
             let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
-            datazoom_renderer.handle_mouse_up()
+            datazoom_renderer.handle_mouse_up(&self.data_manager)
         };
 
         // 如果之前在拖动，重绘图表并返回true表示已处理
@@ -260,5 +261,11 @@ impl ChartRenderer {
         if need_redraw {
             self.render();
         }
+    }
+
+    /// 处理鼠标点击事件 (特别用于切换图表模式)
+    pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
+        
+        false
     }
 }

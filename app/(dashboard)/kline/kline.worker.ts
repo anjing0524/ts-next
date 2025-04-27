@@ -58,6 +58,12 @@ interface WheelMessage {
   isDragging?: boolean; // 添加可选的拖动状态标志
 }
 
+interface ClickMessage {
+  type: 'click';
+  x: number;
+  y: number;
+}
+
 type WorkerMessage =
   | InitMessage
   | DrawMessage
@@ -67,7 +73,8 @@ type WorkerMessage =
   | MouseDragMessage
   | MouseLeaveMessage
   | WheelMessage
-  | GetCursorStyleMessage;
+  | GetCursorStyleMessage
+  | ClickMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -136,6 +143,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         self.postMessage({
           type: 'cursorStyle',
           style: cursorStyle,
+        });
+        break;
+      case 'click':
+        if (!processorRef) return;
+        // 调用WASM中的点击处理函数
+        const wasModeChanged = processorRef.handle_click(data.x, data.y);
+        // 通知主线程点击事件是否被处理（导致了模式切换）
+        self.postMessage({
+          type: 'clickHandled',
+          modeChanged: wasModeChanged,
         });
         break;
       default:

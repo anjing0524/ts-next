@@ -1,8 +1,8 @@
 //! 数据管理器 - 负责管理K线数据和可见范围
 
-use crate::data::visible_range::{DataRange, VisibleRange};
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
+use crate::data::visible_range::{DataRange, VisibleRange};
 use flatbuffers;
 
 /// 数据管理器 - 负责管理K线数据和可见范围

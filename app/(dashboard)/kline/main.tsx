@@ -119,6 +119,12 @@ export default function Main() {
             setIsDragging(false);
           }
         },
+        clickHandled: (data) => {
+          // 点击事件导致了模式切换，可以在这里执行任何额外操作
+          if (data.modeChanged) {
+            console.log('图表模式已切换');
+          }
+        },
         performanceMetrics: (data) => {
           // 可以添加从Worker接收性能指标的处理
           if (data.renderTime) {
@@ -328,6 +334,21 @@ export default function Main() {
     [getMouseCoordinates, sendMessageToWorker]
   );
 
+  // 处理点击事件
+  const handleClick = useCallback(
+    (e: ReactMouseEvent<HTMLCanvasElement>) => {
+      const coords = getMouseCoordinates(e);
+      if (!coords) return;
+
+      sendMessageToWorker({
+        type: 'click',
+        x: coords.x,
+        y: coords.y,
+      });
+    },
+    [getMouseCoordinates, sendMessageToWorker]
+  );
+
   // 添加错误边界处理函数
   const handleError = useCallback((err: Error) => {
     console.error('K线图渲染错误:', err);
@@ -379,6 +400,7 @@ export default function Main() {
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
+          onClick={handleClick}
           ref={overlayCanvasRef}
           className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
         />

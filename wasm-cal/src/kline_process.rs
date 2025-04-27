@@ -258,4 +258,17 @@ impl KlineProcess {
         // 调用chart_renderer的鼠标拖动处理函数
         chart_renderer.handle_mouse_drag(x, y);
     }
+
+    /// 处理鼠标点击事件（用于切换K线图/线图模式）
+    #[wasm_bindgen]
+    pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
+        let chart_renderer = match &mut self.chart_renderer {
+            Some(renderer) => renderer,
+            None => {
+                return false;
+            }
+        };
+        // 调用chart_renderer的处理点击事件方法
+        chart_renderer.handle_click(x, y)
+    }
 }

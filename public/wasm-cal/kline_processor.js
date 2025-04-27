@@ -300,6 +300,16 @@ export class KlineProcess {
     handle_mouse_drag(x, y) {
         wasm.klineprocess_handle_mouse_drag(this.__wbg_ptr, x, y);
     }
+    /**
+     * 处理鼠标点击事件（用于切换K线图/线图模式）
+     * @param {number} x
+     * @param {number} y
+     * @returns {boolean}
+     */
+    handle_click(x, y) {
+        const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, x, y);
+        return ret !== 0;
+    }
 }
 
 async function __wbg_load(module, imports) {

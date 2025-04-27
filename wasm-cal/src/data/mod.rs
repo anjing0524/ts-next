@@ -4,3 +4,4 @@ mod data_manager;
 mod visible_range;
 
 pub use data_manager::DataManager;
+pub use visible_range::VisibleRange;

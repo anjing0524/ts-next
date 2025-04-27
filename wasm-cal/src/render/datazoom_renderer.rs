@@ -30,10 +30,6 @@ pub struct DataZoomRenderer {
     drag_start_x: f64,
     /// 当前拖动的手柄类型
     drag_handle_type: DragHandleType,
-    /// 拖动开始时的可见区域起始索引
-    drag_start_visible_start: usize,
-    /// 拖动开始时的可见区域数量
-    drag_start_visible_count: usize,
 }
 
 impl DataZoomRenderer {
@@ -43,8 +39,6 @@ impl DataZoomRenderer {
             is_dragging: false,
             drag_start_x: 0.0,
             drag_handle_type: DragHandleType::None,
-            drag_start_visible_start: 0,
-            drag_start_visible_count: 0,
         }
     }
 
@@ -123,12 +117,6 @@ impl DataZoomRenderer {
         self.drag_start_x = x;
         self.drag_handle_type = handle_type;
 
-        // 记录拖动开始时的可见区域 - 从VisibleRange获取
-        let data_manager_ref = data_manager.borrow();
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
-        self.drag_start_visible_start = visible_start;
-        self.drag_start_visible_count = visible_count;
-
         true
     }
 
@@ -161,16 +149,13 @@ impl DataZoomRenderer {
     /// 处理鼠标释放事件
     /// 当用户释放鼠标按钮时调用此函数，结束拖动操作
     /// 返回一个布尔值，表示之前是否处于拖动状态
-    pub fn handle_mouse_up(&mut self) -> bool {
+    pub fn handle_mouse_up(&mut self, _data_manager: &Rc<RefCell<DataManager>>) -> bool {
         let was_dragging = self.is_dragging;
-        if was_dragging {
-            // 记录拖动结束状态，用于可能的动画或过渡效果
-            // 这里我们简单地重置状态，但可以添加更复杂的逻辑
-            // 例如记录最后的拖动速度，实现惯性滚动等
-        }
+        
         // 重置拖动状态
         self.is_dragging = false;
         self.drag_handle_type = DragHandleType::None;
+        
         // 返回之前是否在拖动，调用者可以据此决定是否需要重绘
         was_dragging
     }
@@ -178,6 +163,10 @@ impl DataZoomRenderer {
     /// 处理鼠标拖动事件
     /// 当用户拖动鼠标时调用此函数，更新导航器的位置
     /// 与handle_mouse_move类似，但专门用于拖动状态
+    /// 允许左侧拖动手柄向右拖动以及交换手柄
+    /// 允许右侧拖动手柄向左拖动以及交换手柄
+    /// 两侧的手柄均支持 左右两个方向拖动
+    /// 拖动中间区域实现平移
     pub fn handle_mouse_drag(
         &mut self,
         x: f64,
@@ -189,8 +178,10 @@ impl DataZoomRenderer {
         if !self.is_dragging {
             return false;
         }
+        
         // 计算拖动距离
         let drag_distance = x - self.drag_start_x;
+        
         // 获取布局和数据
         let layout = canvas_manager.layout.borrow();
         let mut data_manager_ref = data_manager.borrow_mut();
@@ -212,35 +203,30 @@ impl DataZoomRenderer {
             0
         };
 
-        // 获取当前可见范围，用于后续计算
-        let (current_visible_start, current_visible_count, _) = data_manager_ref.get_visible();
+        // 如果没有明显变化，不需要处理
+        if index_change == 0 {
+            return false;
+        }
 
-        // 计算新的可见区域参数
-        let  update_result = match self.drag_handle_type {
+        // 获取当前可见范围
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+
+        // 根据拖动手柄类型计算新的可见范围
+        let (new_start, new_count) = match self.drag_handle_type {
             DragHandleType::Left => {
                 // 拖动左侧手柄，改变可见区域起始位置和数量
-                let mut new_start = (self.drag_start_visible_start as isize + index_change)
+                let mut new_start = (visible_start as isize + index_change)
                     .max(0)
                     .min((items_len - 1) as isize) as usize;
 
-                let original_end = self.drag_start_visible_start + self.drag_start_visible_count;
-                
+                let original_end = visible_start + visible_count;
+
                 // 如果左手柄超过了右手柄位置，交换操作类型
                 if new_start >= original_end - 1 {
                     // 交换手柄类型
                     self.drag_handle_type = DragHandleType::Right;
-                    
-                    // 新的起始点是原结束点-可见数量
-                    let new_count = 1;  // 当交换时，设置为最小可能值
-                    new_start = original_end - new_count;
-                    
-                    // 更新拖动起始状态
-                    self.drag_start_x = x;
-                    self.drag_start_visible_start = new_start;
-                    self.drag_start_visible_count = new_count;
-                    
-                    // 返回交换后的新值
-                    (new_start, new_count)
+                    new_start = original_end - 1;
+                    (new_start, 1)
                 } else {
                     // 正常计算新可见区域
                     let new_count = (original_end - new_start).max(1);
@@ -248,91 +234,56 @@ impl DataZoomRenderer {
                 }
             }
             DragHandleType::Right => {
-                let original_start = self.drag_start_visible_start;
-                
-                // 右侧手柄的当前坐标
-                let right_x = x;
-                
-                // 左侧手柄坐标对应的点在画布上的x坐标
-                let left_x = layout.map_index_to_x(original_start, original_start);
-                
-                // 如果右手柄拖到了左手柄左侧，交换操作类型
-                if right_x <= left_x {
-                    // 交换手柄类型
-                    self.drag_handle_type = DragHandleType::Left;
-                    
-                    // 计算新的起始点位置（鼠标当前位置对应的数据索引）
-                    let mouse_index = 
-                        if let Some(idx) = layout.map_x_to_index(right_x, current_visible_start, current_visible_count, items_len) {
-                            idx
-                        } else {
-                            // 如果无法准确映射，估算一个位置
-                            let ratio = if layout.chart_area_width > 0.0 {
-                                (right_x - layout.chart_area_x) / layout.chart_area_width
-                            } else {
-                                0.0
-                            };
-                            (ratio * items_len as f64).floor() as usize
-                        };
+                // 计算新的可见数量
+                let new_count = ((visible_count as isize + index_change)
+                    as usize)
+                    .max(1) // 确保至少显示1根K线
+                    .min(items_len - visible_start); // 不超过数据范围
 
-                    let new_start = mouse_index.max(0).min(items_len - 1);
-                    let new_count = if original_start > new_start { 
-                        original_start - new_start 
-                    } else { 
-                        1 // 最小可见数量
-                    };
-                    
-                    // 更新拖动起始状态
-                    self.drag_start_x = x;
-                    self.drag_start_visible_start = new_start;
-                    self.drag_start_visible_count = new_count;
-                    
-                    // 返回交换后的新值
-                    (new_start, new_count)
-                } else {
-                    // 计算新的可见数量
-                    let  new_count = ((self.drag_start_visible_count as isize + index_change) as usize)
-                        .max(1)  // 确保至少显示1根K线
-                        .min(items_len - original_start);  // 不超过数据范围
-                    
-                    // 正常情况，不需要交换
-                    (original_start, new_count)
-                }
+                // 正常情况，不需要交换
+                (visible_start, new_count)
             }
             DragHandleType::Middle => {
                 // 拖动中间区域，平移整个可见区域
-                let new_start = (self.drag_start_visible_start as isize + index_change)
+                let new_start = (visible_start as isize + index_change)
                     .max(0)
-                    .min((items_len - self.drag_start_visible_count) as isize)
+                    .min((items_len - visible_count) as isize)
                     as usize;
 
-                (new_start, self.drag_start_visible_count)
+                (new_start, visible_count)
             }
             DragHandleType::None => {
                 return false;
             }
         };
 
-        // 更新可见区域 - 使用VisibleRange的update方法
-        data_manager_ref.update_visible_range(update_result.0, update_result.1);
+        // 检查是否有显著变化
+        let start_diff = if visible_start > new_start { visible_start - new_start } else { new_start - visible_start };
+        let count_diff = if visible_count > new_count { visible_count - new_count } else { new_count - visible_count };
         
-        // 重新计算数据范围
-        data_manager_ref.calculate_data_ranges();
+        let has_significant_change = start_diff > 0 || count_diff > 0;
 
-        // 如果操作类型没有改变，则更新拖动起始位置
-        if self.drag_handle_type == DragHandleType::Left || self.drag_handle_type == DragHandleType::Right {
-            // 如果是拖动左右手柄，只有在没有交换类型时更新
-            self.drag_start_visible_start = update_result.0;
-            self.drag_start_visible_count = update_result.1;
-            self.drag_start_x = x;
-        } else if self.drag_handle_type == DragHandleType::Middle {
-            // 拖动中间区域，总是更新
-            self.drag_start_visible_start = update_result.0;
-            self.drag_start_x = x;
+        // 如果有显著变化，无效化缓存并更新可见范围
+        if has_significant_change {
+            // 无效化缓存
+            data_manager_ref.invalidate_cache();
+            
+            // 更新可见范围
+            data_manager_ref.update_visible_range(new_start, new_count);
+            
+            // 如果拖动距离较大，更新起始拖动位置以提供更好的用户体验
+            if start_diff > 10 || count_diff > 10 {
+                self.drag_start_x = x;
+            }
+            
+            // 重新计算数据范围
+            data_manager_ref.calculate_data_ranges();
+            
+            // 返回true表示需要重绘
+            return true;
         }
-
-        // 返回true表示需要重绘
-        true
+        
+        false
     }
 
     /// 绘制DataZoom导航器
@@ -350,10 +301,10 @@ impl DataZoomRenderer {
         // 绘制前清除整个DataZoom区域及周围
         let padding = 10.0; // 额外清除周围区域以防阴影溢出
         ctx.clear_rect(
-            nav_x - padding, 
-            nav_y - padding, 
-            nav_width + padding * 2.0, 
-            nav_height + padding * 2.0
+            nav_x - padding,
+            nav_y - padding,
+            nav_width + padding * 2.0,
+            nav_height + padding * 2.0,
         );
 
         // 绘制导航器背景
@@ -373,7 +324,7 @@ impl DataZoomRenderer {
 
         // 绘制成交量曲线作为背景
         self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height);
-        
+
         // 绘制当前可见区域指示器
         self.draw_visible_range_indicator(
             ctx,
@@ -401,33 +352,33 @@ impl DataZoomRenderer {
         if items_len == 0 {
             return;
         }
-        
+
         // 使用ChartLayout中的方法计算导航器中每个K线的宽度
         let nav_candle_width = layout.calculate_navigator_candle_width(items_len);
-        
+
         // 找出最大成交量，用于缩放
         let mut max_volume: f64 = 0.0;
         // 使用步进采样来减少计算量，对于大数据集特别有效
         let step = (items_len / 100).max(1); // 至少每100个点采样一次
-        
+
         // 对于大数据集，使用稀疏采样提高性能
         for i in (0..items_len).step_by(step) {
             let item = items.get(i);
             let volume = item.b_vol() + item.s_vol();
             max_volume = max_volume.max(volume);
         }
-        
+
         // 如果采样没有找到有效值，使用默认值
         if max_volume <= 0.0 {
             max_volume = 1.0;
         }
-        
+
         // 绘制成交量曲线
         ctx.begin_path();
         ctx.set_stroke_style_str(ChartColors::VOLUME_LINE);
         ctx.set_line_width(1.0);
         ctx.set_fill_style_str(ChartColors::VOLUME_AREA);
-        
+
         // 对于大数据集，使用自适应采样提高性能
         // 最大采样200个点，确保不会有性能问题
         let draw_step = if items_len > 200 {
@@ -435,13 +386,13 @@ impl DataZoomRenderer {
         } else {
             1
         };
-        
+
         // 移动到第一个点
         let first_item = items.get(0);
         let first_volume = first_item.b_vol() + first_item.s_vol();
         let first_y = nav_y + nav_height - (first_volume / max_volume) * nav_height * 0.8;
         ctx.move_to(nav_x, first_y);
-        
+
         // 减少绘制的点数量
         for i in (0..items_len).step_by(draw_step) {
             let item = items.get(i);
@@ -450,7 +401,7 @@ impl DataZoomRenderer {
             let y = nav_y + nav_height - (volume / max_volume) * nav_height * 0.8;
             ctx.line_to(x, y);
         }
-        
+
         // 确保绘制最后一个点
         if items_len > 1 && draw_step > 1 {
             let last_idx = items_len - 1;
@@ -460,13 +411,13 @@ impl DataZoomRenderer {
             let last_y = nav_y + nav_height - (last_volume / max_volume) * nav_height * 0.8;
             ctx.line_to(last_x, last_y);
         }
-        
+
         // 完成路径，回到底部形成闭合区域
         let last_x = nav_x + (items_len - 1) as f64 * nav_candle_width;
         ctx.line_to(last_x, nav_y + nav_height);
         ctx.line_to(nav_x, nav_y + nav_height);
         ctx.close_path();
-        
+
         // 填充区域
         ctx.fill();
         // 描边曲线 - 省略描边可进一步提高性能
@@ -493,28 +444,28 @@ impl DataZoomRenderer {
         // 获取可见范围对象
         let data_manager_ref = data_manager.borrow();
         let visible_range = data_manager_ref.get_visible_range();
-        
+
         // 获取当前可见范围
         let (visible_start, visible_count, _) = data_manager_ref.get_visible();
-        
+
         // 检查是否显示全部数据（缩放到最大）
         let is_showing_all = visible_start == 0 && visible_count >= items_len;
-        
+
         // 如果是显示全部数据，就不需要绘制任何可见区域指示器
         if is_showing_all {
             return;
         }
-        
+
         // 使用VisibleRange的get_screen_coordinates方法获取可见区域的坐标
         let (visible_start_x, visible_end_x) = visible_range.get_screen_coordinates(layout);
-        
+
         // 确保手柄位置在datazoom区域内
         let clamped_start_x = visible_start_x.max(nav_x).min(nav_x + nav_width);
         let clamped_end_x = visible_end_x.max(nav_x).min(nav_x + nav_width);
 
         // 保存当前渲染状态
         ctx.save();
-        
+
         // 设置裁剪区域为导航器区域，防止任何绘制超出此区域
         ctx.begin_path();
         ctx.rect(nav_x, nav_y, nav_width, nav_height);
@@ -531,11 +482,11 @@ impl DataZoomRenderer {
             nav_x + nav_width - clamped_end_x,
             nav_height,
         );
-        
+
         // 绘制可见区域边框
         let border_left = clamped_start_x;
         let border_width = clamped_end_x - clamped_start_x;
-        
+
         if border_width > 0.0 {
             ctx.set_stroke_style_str(ChartColors::NAVIGATOR_BORDER);
             ctx.set_line_width(1.0);
@@ -558,29 +509,29 @@ impl DataZoomRenderer {
         };
 
         // 设置拖动时的阴影效果
-        let shadow_blur = if self.is_dragging { 
+        let shadow_blur = if self.is_dragging {
             // 根据手柄位置调整阴影模糊半径
             // 当手柄靠近边缘时，降低阴影模糊半径
             let left_edge_distance = clamped_start_x - nav_x;
             let right_edge_distance = nav_x + nav_width - clamped_end_x;
             let min_distance = left_edge_distance.min(right_edge_distance);
-            
+
             // 如果接近边缘，逐渐减小阴影
             if min_distance < 10.0 {
                 4.0 * (min_distance / 10.0)
             } else {
                 4.0
             }
-        } else { 
-            0.0 
+        } else {
+            0.0
         };
-        
+
         let shadow_color = if self.is_dragging {
             ChartColors::NAVIGATOR_ACTIVE_HANDLE_SHADOW
         } else {
             ChartColors::TRANSPARENT
         };
-        
+
         // 绘制左侧手柄
         if clamped_start_x >= nav_x && clamped_start_x <= nav_x + nav_width {
             ctx.set_fill_style_str(handle_color);
@@ -610,7 +561,7 @@ impl DataZoomRenderer {
                 nav_height / 2.0,
             );
         }
-        
+
         // 恢复渲染状态，取消裁剪区域
         ctx.restore();
     }

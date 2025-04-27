@@ -12,6 +12,7 @@ export const klineprocess_handle_wheel: (a: number, b: number, c: number, d: num
 export const klineprocess_handle_mouse_down: (a: number, b: number, c: number) => number;
 export const klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
 export const klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
+export const klineprocess_handle_click: (a: number, b: number, c: number) => number;
 export const start: () => void;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_exn_store: (a: number) => void;

@@ -37,6 +37,10 @@ export class KlineProcess {
    * 处理鼠标拖动事件
    */
   handle_mouse_drag(x: number, y: number): void;
+  /**
+   * 处理鼠标点击事件（用于切换K线图/线图模式）
+   */
+  handle_click(x: number, y: number): boolean;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -54,6 +58,7 @@ export interface InitOutput {
   readonly klineprocess_handle_mouse_down: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
+  readonly klineprocess_handle_click: (a: number, b: number, c: number) => number;
   readonly start: () => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
