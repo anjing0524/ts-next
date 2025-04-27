@@ -151,11 +151,11 @@ impl DataZoomRenderer {
     /// 返回一个布尔值，表示之前是否处于拖动状态
     pub fn handle_mouse_up(&mut self, _data_manager: &Rc<RefCell<DataManager>>) -> bool {
         let was_dragging = self.is_dragging;
-        
+
         // 重置拖动状态
         self.is_dragging = false;
         self.drag_handle_type = DragHandleType::None;
-        
+
         // 返回之前是否在拖动，调用者可以据此决定是否需要重绘
         was_dragging
     }
@@ -178,10 +178,10 @@ impl DataZoomRenderer {
         if !self.is_dragging {
             return false;
         }
-        
+
         // 计算拖动距离
         let drag_distance = x - self.drag_start_x;
-        
+
         // 获取布局和数据
         let layout = canvas_manager.layout.borrow();
         let mut data_manager_ref = data_manager.borrow_mut();
@@ -209,39 +209,40 @@ impl DataZoomRenderer {
         }
 
         // 获取当前可见范围
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
 
         // 根据拖动手柄类型计算新的可见范围
-        let (new_start, new_count) = match self.drag_handle_type {
+        let (new_start, new_end) = match self.drag_handle_type {
             DragHandleType::Left => {
                 // 拖动左侧手柄，改变可见区域起始位置和数量
-                let mut new_start = (visible_start as isize + index_change)
+                let  new_start = (visible_start as isize + index_change)
                     .max(0)
                     .min((items_len - 1) as isize) as usize;
 
-                let original_end = visible_start + visible_count;
-
                 // 如果左手柄超过了右手柄位置，交换操作类型
-                if new_start >= original_end - 1 {
+                if new_start >= visible_end {
                     // 交换手柄类型
                     self.drag_handle_type = DragHandleType::Right;
-                    new_start = original_end - 1;
-                    (new_start, 1)
+                    (visible_end, visible_end)
                 } else {
                     // 正常计算新可见区域
-                    let new_count = (original_end - new_start).max(1);
-                    (new_start, new_count)
+                    (new_start, visible_end)
                 }
             }
             DragHandleType::Right => {
                 // 计算新的可见数量
-                let new_count = ((visible_count as isize + index_change)
-                    as usize)
+                let  new_end = ((visible_end as isize + index_change) as usize)
                     .max(1) // 确保至少显示1根K线
-                    .min(items_len - visible_start); // 不超过数据范围
-
-                // 正常情况，不需要交换
-                (visible_start, new_count)
+                    .min(items_len - 1); // 不超过数据范围
+                if new_end <= visible_start {
+                    // 交换
+                    self.drag_handle_type = DragHandleType::Left;
+                    (visible_start,visible_start)
+                } else {
+                    // 正常情况，不需要交换
+                    (visible_start, new_end)
+                }
+             
             }
             DragHandleType::Middle => {
                 // 拖动中间区域，平移整个可见区域
@@ -250,7 +251,7 @@ impl DataZoomRenderer {
                     .min((items_len - visible_count) as isize)
                     as usize;
 
-                (new_start, visible_count)
+                (new_start, new_start + visible_count)
             }
             DragHandleType::None => {
                 return false;
@@ -258,31 +259,31 @@ impl DataZoomRenderer {
         };
 
         // 检查是否有显著变化
-        let start_diff = if visible_start > new_start { visible_start - new_start } else { new_start - visible_start };
-        let count_diff = if visible_count > new_count { visible_count - new_count } else { new_count - visible_count };
-        
-        let has_significant_change = start_diff > 0 || count_diff > 0;
+        let start_diff = (visible_start as isize - new_start as isize).abs();
+        let end_diff  = (visible_end as isize - new_end as isize).abs();
+
+        let has_significant_change = start_diff > 0 || end_diff > 0;
 
         // 如果有显著变化，无效化缓存并更新可见范围
         if has_significant_change {
             // 无效化缓存
             data_manager_ref.invalidate_cache();
-            
+
             // 更新可见范围
-            data_manager_ref.update_visible_range(new_start, new_count);
-            
+            data_manager_ref.update_visible_range(new_start, new_end-new_start);
+
             // 如果拖动距离较大，更新起始拖动位置以提供更好的用户体验
-            if start_diff > 10 || count_diff > 10 {
+            if start_diff > 10 || end_diff > 10 {
                 self.drag_start_x = x;
             }
-            
+
             // 重新计算数据范围
             data_manager_ref.calculate_data_ranges();
-            
+
             // 返回true表示需要重绘
             return true;
         }
-        
+
         false
     }
 
