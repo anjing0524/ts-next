@@ -20,6 +20,7 @@ impl ChartColors {
     pub const BULLISH: &'static str = "#26a69a"; // 上涨 (绿色)
     pub const BEARISH: &'static str = "#ef5350"; // 下跌 (红色)
     pub const WICK: &'static str = "#888888"; // 影线 (中灰)
+    
 
     // --- 导航器颜色 ---
     pub const NAVIGATOR_BG: &'static str = "#f8f9fa"; // 导航器背景 (非常浅的灰)

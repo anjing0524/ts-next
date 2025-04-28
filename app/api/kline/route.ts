@@ -141,6 +141,7 @@ function serializeKlineData(data: KlineItem[]): Uint8Array {
   // 创建KlineData根对象
   Kline.KlineData.startKlineData(builder);
   Kline.KlineData.addItems(builder, itemsVector);
+  Kline.KlineData.addTick(builder,10);
   const klineDataOffset = Kline.KlineData.endKlineData(builder);
 
   // 完成构建并设置文件标识符

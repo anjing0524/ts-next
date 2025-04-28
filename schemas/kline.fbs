@@ -18,6 +18,7 @@ table KlineItem {
 
 table KlineData {
     items: [KlineItem];
+    tick: double; // 最小变动价位
 }
 
 root_type KlineData;

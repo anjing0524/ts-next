@@ -2,21 +2,29 @@
 
 use super::axis_renderer::AxisRenderer;
 use super::datazoom_renderer::DataZoomRenderer;
+use super::heat_renderer::HeatRenderer;
 use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
-use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::canvas::{self, CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
 use crate::utils::WasmError;
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use web_sys::OffscreenCanvas;
 
 // 定义每次重绘的间隔计数
 thread_local! {
     static DRAG_THROTTLE_COUNTER: Cell<u8> = Cell::new(0);
+}
+
+// 定义渲染图形引擎
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum RenderMode {
+    KMAP,    // K线图和成交量图
+    HEATMAP, // 热图和成交量图
 }
 
 /// 图表渲染器 - 整合所有模块，提供统一的渲染接口
@@ -29,12 +37,17 @@ pub struct ChartRenderer {
     price_renderer: PriceRenderer,
     /// 成交量图渲染器
     volume_renderer: VolumeRenderer,
+    /// 热图渲染器
+    heat_renderer: HeatRenderer,
     /// 交互元素渲染器
     overlay_renderer: Rc<RefCell<OverlayRenderer>>,
     /// 数据管理器
     data_manager: Rc<RefCell<DataManager>>,
     /// DataZoom渲染器
     datazoom_renderer: Rc<RefCell<DataZoomRenderer>>,
+
+    // 采用哪种渲染引擎
+    mode: RenderMode,
 }
 
 impl ChartRenderer {
@@ -52,8 +65,9 @@ impl ChartRenderer {
         match parsed_data {
             Some(data) => {
                 let items = data.items().expect("Data must contain items");
+                let tick = data.tick();
                 let mut data_manager_ref = data_manager.borrow_mut();
-                data_manager_ref.set_items(items);
+                data_manager_ref.set_items(items,tick);
                 let layout = &canvas_manager.layout.borrow();
                 data_manager_ref.initialize_visible_range(layout);
                 data_manager_ref.calculate_data_ranges();
@@ -66,6 +80,7 @@ impl ChartRenderer {
         let axis_renderer = AxisRenderer {};
         let price_renderer = PriceRenderer {};
         let volume_renderer = VolumeRenderer {};
+        let heat_renderer = HeatRenderer::default();
         let overlay_renderer = Rc::new(RefCell::new(OverlayRenderer::new()));
         let datazoom_renderer = Rc::new(RefCell::new(DataZoomRenderer::new()));
 
@@ -74,57 +89,102 @@ impl ChartRenderer {
             axis_renderer,
             price_renderer,
             volume_renderer,
+            heat_renderer,
             overlay_renderer,
             data_manager,
             datazoom_renderer,
+            mode: RenderMode::KMAP,
         })
+    }
+
+    /// 获取当前渲染模式
+    pub fn get_mode(&self) -> RenderMode {
+        self.mode
+    }
+
+    /// 设置渲染模式
+    pub fn set_mode(&mut self, mode: RenderMode) {
+        self.mode = mode;
     }
 
     /// 渲染图表 (不包括交互层)
     pub fn render(&self) {
         // 获取可见范围
         let (_, visible_count, _) = self.data_manager.borrow().get_visible();
-        
-        // 更新布局以适应当前可见K线数量
+
+        // 更新布局以适应当前可见K线数量和渲染模式
         {
             let mut layout = self.canvas_manager.layout.borrow_mut();
+            // 先更新基本布局
             layout.update_for_visible_count(visible_count);
+            
+            // 根据当前模式应用相应的布局
+            match self.mode {
+                RenderMode::KMAP => layout.apply_kline_layout(),
+                RenderMode::HEATMAP => layout.apply_heatmap_layout(),
+            }
         }
 
         // 在渲染前先计算数据范围，确保所有渲染器使用相同的比例
         self.data_manager.borrow_mut().calculate_data_ranges();
-        
+
         // 先清除所有画布
         let base_ctx = self.canvas_manager.get_context(CanvasLayerType::Base);
         let main_ctx = self.canvas_manager.get_context(CanvasLayerType::Main);
+        let overlay_ctx = self.canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = &self.canvas_manager.layout.borrow();
-        
+
+        // 清除所有画布内容
         base_ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.canvas_height);
         main_ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.canvas_height);
-        
+        // 只清除非导航器区域，以避免清除DataZoom
+        overlay_ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.navigator_y);
+
         // 首先通过AxisRenderer渲染背景和坐标轴
         // 这会先绘制Header, Y轴背景等
         self.axis_renderer
-            .draw(&self.canvas_manager, &self.data_manager);
-            
-        // 渲染K线图
-        self.price_renderer.draw(
-            &self.canvas_manager.get_context(CanvasLayerType::Main),
-            layout,
-            &self.data_manager,
-        );
+            .draw(&self.canvas_manager, &self.data_manager, self.mode);
 
-        // 渲染成交量图
-        self.volume_renderer.draw(
-            &self.canvas_manager.get_context(CanvasLayerType::Main),
-            layout,
-            &self.data_manager,
-        );
+        match self.mode {
+            RenderMode::KMAP => {
+                // 渲染K线图
+                self.price_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                );
+                
+                // 渲染成交量图 
+                self.volume_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                );
+            }
+            RenderMode::HEATMAP => {
+                // 热图模式下，热图占据整个区域
+                self.heat_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                ); 
+                // 渲染成交量图 
+                self.volume_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                );
+            }
+        }
 
-        // 渲染DataZoom
+        // 渲染DataZoom - 确保它在任何情况下都被渲染
         self.datazoom_renderer
             .borrow()
             .draw(&self.canvas_manager, &self.data_manager);
+        
+        // 最后渲染交互层的静态元素（如模式切换按钮）
+        let overlay_renderer = self.overlay_renderer.borrow();
+        overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
     }
 
     /// 获取当前鼠标位置的光标样式
@@ -147,9 +207,17 @@ impl ChartRenderer {
 
     // 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
+        // 如果是热图模式，不需要显示十字光标和提示框
+        if self.mode == RenderMode::HEATMAP {
+            return;
+        }
+        
         // 直接交给OverlayRenderer处理鼠标移动
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
         overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager);
+        
+        // 无论如何都要绘制覆盖层 (包括切换按钮)
+        overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
     }
 
     // 处理鼠标按下事件
@@ -212,15 +280,20 @@ impl ChartRenderer {
             self.render();
             return true;
         }
-        
+
         need_redraw
     }
 
     // 处理鼠标离开事件 - 清除所有交互元素并重置拖动状态
     pub fn handle_mouse_leave(&self) -> bool {
         // 处理交互层的鼠标离开
-        let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-        overlay_renderer.handle_mouse_leave(&self.canvas_manager);
+        {
+            let mut overlay_renderer = self.overlay_renderer.borrow_mut();
+            overlay_renderer.handle_mouse_leave(&self.canvas_manager);
+            
+            // 重新绘制覆盖层 (只显示切换按钮)
+            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
+        } // 在这里释放 overlay_renderer 的可变借用
 
         // 检查DataZoom是否处于拖动状态，如果是则重置并返回需要重绘
         let was_dragging = {
@@ -265,6 +338,30 @@ impl ChartRenderer {
 
     /// 处理鼠标点击事件 (特别用于切换图表模式)
     pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
+        // 检查是否点击了切换按钮
+        let is_switch_click = {
+            let layout = self.canvas_manager.layout.borrow();
+            let overlay_renderer = self.overlay_renderer.borrow();
+            overlay_renderer.check_switch_button_click(x, y, &layout)
+        };
+
+        if let Some(is_kmap) = is_switch_click {
+            // 根据点击的按钮设置渲染模式
+            if is_kmap {
+                self.mode = RenderMode::KMAP;
+            } else {
+                self.mode = RenderMode::HEATMAP;
+            }
+            
+            // 重新渲染图表
+            self.render();
+            
+            // 重新绘制交互元素
+            let overlay_renderer = self.overlay_renderer.borrow();
+            overlay_renderer.clear(&self.canvas_manager);
+            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
+            return true;
+        }
         
         false
     }

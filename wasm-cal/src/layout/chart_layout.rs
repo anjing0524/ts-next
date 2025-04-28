@@ -45,6 +45,10 @@ pub struct ChartLayout {
     // 导航器参数
     pub navigator_y: f64,            // 导航器Y坐标起点
     pub navigator_handle_width: f64, // 导航器滑块宽度
+
+    //  切换按钮
+    pub switch_btn_width: f64,
+    pub switch_btn_height: f64
 }
 
 impl ChartLayout {
@@ -93,6 +97,9 @@ impl ChartLayout {
         // 导航器位置 (计算方式不变)
         let navigator_y = canvas_height - navigator_height;
 
+        let switch_btn_height = 16.0;
+        let switch_btn_width = 60.0;
+
         Self {
             canvas_width,
             canvas_height,
@@ -121,6 +128,8 @@ impl ChartLayout {
             grid_line_count,
             navigator_y, // 使用更新后的值
             navigator_handle_width,
+            switch_btn_height,
+            switch_btn_width
         }
     }
 
@@ -343,5 +352,26 @@ impl ChartLayout {
             // 更新K线总宽度（包括间距）
             self.total_candle_width = self.chart_area_width / visible_count as f64;
         }
+    }
+
+    /// 对布局应用热图模式设置
+    pub fn apply_heatmap_layout(&mut self) {
+        // 在热图模式下，热图占据大部分区域，成交量图在底部
+        self.volume_chart_height = self.chart_area_height * 0.1;  // 成交量图占10%
+        self.price_chart_height = self.chart_area_height - self.volume_chart_height;  // 热图占剩余空间
+        self.volume_chart_y = self.chart_area_y + self.price_chart_height;  // 成交量图在热图下方
+    }
+
+    /// 恢复到标准K线模式布局
+    pub fn apply_kline_layout(&mut self) {
+        // 恢复K线模式下的标准比例
+        self.volume_chart_height = self.chart_area_height * 0.2;
+        self.price_chart_height = self.chart_area_height - self.volume_chart_height;
+        self.volume_chart_y = self.chart_area_y + self.price_chart_height;
+    }
+
+    /// 检查当前布局是否为热图模式
+    pub fn is_heatmap_mode(&self) -> bool {
+        self.volume_chart_height == 0.0
     }
 }

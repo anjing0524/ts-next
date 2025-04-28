@@ -9,6 +9,8 @@ use flatbuffers;
 pub struct DataManager {
     /// K线数据
     items: Option<flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>>,
+    /// 最小变动价位
+    tick: f64,
     /// 可见数据范围
     visible_range: VisibleRange,
     /// 缓存的数据范围
@@ -22,6 +24,7 @@ impl DataManager {
     pub fn new() -> Self {
         Self {
             items: None,
+            tick: 1.0,
             visible_range: VisibleRange::new(0, 0, 0),
             cached_data_range: None,
             cached_range_valid: false,
@@ -32,6 +35,7 @@ impl DataManager {
     pub fn set_items(
         &mut self,
         items: flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>,
+        tick: f64
     ) {
         // 清除缓存的范围计算
         self.invalidate_cache();
@@ -39,7 +43,7 @@ impl DataManager {
         // 设置数据
         let items_len = items.len();
         self.items = Some(items);
-
+        self.tick = if tick > 0.0 { tick } else { 0.01 }; // 确保 tick 为正数
         // 更新可见范围的总长度
         self.visible_range.update_total_len(items_len);
     }
@@ -162,5 +166,10 @@ impl DataManager {
         
         // 如果发生了更新，或者Delta很大（表示快速缩放），则返回需要重绘
         range_updated || delta.abs() > 5.0
+    }
+
+    /// 获取 tick 值的方法
+    pub fn get_tick(&self) -> f64 {
+        self.tick
     }
 }

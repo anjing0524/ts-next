@@ -5,6 +5,7 @@ use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
 use crate::utils::time;
+use crate::render::chart_renderer::RenderMode;
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,7 +16,7 @@ pub struct AxisRenderer;
 
 impl AxisRenderer {
     /// 绘制所有坐标轴
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Base);
         let layout_ref = canvas_manager.layout.borrow(); // 使用 borrow 获取引用
         let data_manager_ref = data_manager.borrow(); // 使用 borrow 获取引用
@@ -26,10 +27,15 @@ impl AxisRenderer {
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
         
         // 优先绘制标题和图例以确保头部区域被正确清空和绘制
-        self.draw_header(&ctx, &layout_ref);
+        self.draw_header(&ctx, &layout_ref, mode);
         
-        // 绘制交替背景色
-        self.draw_alternating_background(&ctx, &layout_ref);
+        // 只在K线图模式下绘制交替背景色
+        if mode == RenderMode::KMAP {
+            self.draw_alternating_background(&ctx, &layout_ref);
+        } else {
+            // 热图模式下，使用热图配色方案中最深的颜色作为背景
+            self.draw_heatmap_background(&ctx, &layout_ref);
+        }
         
         // 绘制价格Y轴
         self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high);
@@ -90,6 +96,33 @@ impl AxisRenderer {
         }
     }
 
+    /// 绘制热图背景 - 使用热图配色方案中最深的颜色
+    fn draw_heatmap_background(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+    ) {
+        // 使用热图配色方案中最深的颜色 (#000033)
+        ctx.set_fill_style_str("#FFF");
+        
+        // 绘制价格图区域背景
+        ctx.fill_rect(
+            layout.chart_area_x, // 从图表区域左边界开始
+            layout.header_height,
+            layout.chart_area_width, // 宽度限制在图表区域
+            layout.price_chart_height,
+        );
+        
+        // 绘制成交量图区域背景 - 使用稍浅的颜色
+        ctx.set_fill_style_str("#FFF");
+        ctx.fill_rect(
+            layout.chart_area_x, // 从图表区域左边界开始
+            layout.volume_chart_y,
+            layout.chart_area_width, // 宽度限制在图表区域
+            layout.volume_chart_height,
+        );
+    }
+
     /// 绘制价格Y轴
     fn draw_price_y_axis(
         &self,
@@ -98,53 +131,46 @@ impl AxisRenderer {
         min_low: f64,
         max_high: f64,
     ) {
-        let effective_price_range = max_high - min_low;
-
-        // --- 绘制Y轴背景 (Y轴标签区域) ---
-        ctx.set_fill_style_str(ChartColors::HEADER_BG); // 通常是白色或浅色
-        ctx.fill_rect(
-            0.0, // 从画布最左侧开始
-            layout.header_height,
-            layout.y_axis_width,       // 宽度为 Y 轴宽度
-            layout.price_chart_height, // 高度为价格图高度
-        );
-
-        // --- 绘制Y轴右侧边界线 ---
-        ctx.set_stroke_style_str(ChartColors::BORDER);
+        // 设置轴线和标签样式
+        ctx.set_stroke_style_str(ChartColors::BORDER);  // 使用 BORDER 颜色替代 AXIS
         ctx.set_line_width(1.0);
-        ctx.begin_path();
-        ctx.move_to(layout.y_axis_width, layout.header_height);
-        ctx.line_to(
-            layout.y_axis_width,
-            layout.header_height + layout.price_chart_height,
-        );
-        ctx.stroke();
-
-        // --- 绘制Y轴价格刻度和标签 ---
-        let num_y_labels = 5;
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用文本颜色
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         ctx.set_font("10px Arial");
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
-
-        // 从高到低绘制Y轴标签
-        for i in 0..=num_y_labels {
-            let price = max_high - (effective_price_range * i as f64 / num_y_labels as f64);
-            // 确保价格不为负无穷或正无穷
-            if !price.is_finite() {
-                continue;
-            }
+        
+        // 绘制Y轴
+        ctx.begin_path();
+        ctx.move_to(layout.chart_area_x, layout.chart_area_y);
+        ctx.line_to(layout.chart_area_x, layout.chart_area_y + layout.chart_area_height);
+        ctx.stroke();
+        
+        // 计算价格区间，创建等距网格线
+        let price_range = max_high - min_low;
+        if price_range <= 0.0 {
+            return;
+        }
+        
+        // 决定网格线数量 - 使用图表布局中的值
+        let grid_count = layout.grid_line_count;
+        let step = price_range / grid_count as f64;
+        
+        // 绘制价格标签
+        for i in 0..=grid_count {
+            let price = min_low + step * i as f64;
             let y = layout.map_price_to_y(price, min_low, max_high);
-
-            // 绘制标签
-            let _ = ctx.fill_text(&format!("{:.2}", price), layout.y_axis_width - 5.0, y);
-
-            // 绘制小刻度线
-            ctx.set_stroke_style_str(ChartColors::BORDER);
-            ctx.begin_path();
-            ctx.move_to(layout.y_axis_width - 3.0, y);
-            ctx.line_to(layout.y_axis_width, y);
-            ctx.stroke();
+            
+            let price_text = if price_range > 100.0 {
+                format!("{:.0}", price)
+            } else {
+                format!("{:.2}", price)
+            };
+            
+            ctx.fill_text(
+                &price_text,
+                layout.chart_area_x - 5.0,
+                y,
+            ).unwrap_or_default();
         }
     }
 
@@ -214,18 +240,20 @@ impl AxisRenderer {
     }
 
     /// 绘制标题和图例
-    fn draw_header(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
+    fn draw_header(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout, mode: RenderMode) {
         // 绘制标题区域背景
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
 
-        // 绘制标题区域底部边界
-        ctx.set_stroke_style_str(ChartColors::BORDER);
-        ctx.set_line_width(1.0);
-        ctx.begin_path();
-        ctx.move_to(0.0, layout.header_height);
-        ctx.line_to(layout.canvas_width, layout.header_height);
-        ctx.stroke();
+        // 只在KMAP模式下绘制标题区域底部边界
+        if mode == RenderMode::KMAP {
+            ctx.set_stroke_style_str(ChartColors::BORDER);
+            ctx.set_line_width(1.0);
+            ctx.begin_path();
+            ctx.move_to(0.0, layout.header_height);
+            ctx.line_to(layout.canvas_width, layout.header_height);
+            ctx.stroke();
+        }
 
         // 绘制标题
         ctx.set_fill_style_str(ChartColors::TEXT);

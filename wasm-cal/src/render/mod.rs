@@ -3,6 +3,7 @@
 mod axis_renderer;
 mod chart_renderer;
 mod datazoom_renderer;
+mod heat_renderer;
 mod overlay_renderer;
 mod price_renderer;
 mod volume_renderer; // 添加 utils 模块

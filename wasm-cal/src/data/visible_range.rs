@@ -162,54 +162,6 @@ impl VisibleRange {
         (self.start, self.count, self.end)
     }
 
-    /// 检查索引是否在可见范围内
-    pub fn contains(&self, index: usize) -> bool {
-        index >= self.start && index < self.end
-    }
-
-    /// 获取指定全局索引在可见范围内的相对索引
-    /// 
-    /// # 参数
-    /// * `global_index` - 全局数据索引
-    /// 
-    /// # 返回值
-    /// 相对于可见范围起始位置的索引，如果索引不在可见范围内则返回None
-    pub fn get_relative_index(&self, global_index: usize) -> Option<usize> {
-        if self.contains(global_index) {
-            Some(global_index - self.start)
-        } else {
-            None
-        }
-    }
-
-    /// 将指数据点映射到X坐标
-    /// 
-    /// # 参数
-    /// * `global_index` - 全局数据索引
-    /// * `layout` - 图表布局
-    /// 
-    /// # 返回值
-    /// X坐标（画布坐标系），如果索引不在可见范围内则返回None
-    pub fn map_index_to_x(&self, global_index: usize, layout: &ChartLayout) -> Option<f64> {
-        if self.contains(global_index) {
-            Some(layout.map_index_to_x(global_index, self.start))
-        } else {
-            None
-        }
-    }
-
-    /// 将X坐标映射到数据索引
-    /// 
-    /// # 参数
-    /// * `x` - X坐标（画布坐标系）
-    /// * `layout` - 图表布局
-    /// 
-    /// # 返回值
-    /// 全局数据索引，如果X坐标超出范围则返回None
-    pub fn map_x_to_index(&self, x: f64, layout: &ChartLayout) -> Option<usize> {
-        layout.map_x_to_index(x, self.start, self.count, self.total_len)
-    }
-
     /// 计算可见范围的屏幕坐标
     /// 
     /// # 参数

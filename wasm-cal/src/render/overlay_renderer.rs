@@ -7,6 +7,7 @@ use js_sys;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
+use crate::render::chart_renderer::RenderMode;
 
 /// 交互层渲染器
 #[derive(Default)]
@@ -83,8 +84,8 @@ impl OverlayRenderer {
             self.hover_candle_index = None;
         }
 
-        // 绘制交互层
-        self.draw(canvas_manager, data_manager);
+        // 绘制交互层 - 默认使用KMAP模式
+        self.draw(canvas_manager, data_manager, RenderMode::KMAP);
     }
 
     /// 处理鼠标离开事件
@@ -97,10 +98,10 @@ impl OverlayRenderer {
     }
 
     /// 绘制交互层
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
         // 获取交互层上下文
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager.layout.borrow();
+        let layout: std::cell::Ref<'_, ChartLayout> = canvas_manager.layout.borrow();
 
         // 清除交互层
         self.clear(canvas_manager);
@@ -114,6 +115,14 @@ impl OverlayRenderer {
             Some(items) => items,
             None => return,
         };
+        
+        // 绘制切换按钮
+        self.draw_switch_button(&ctx, &layout, mode);
+        
+        // 如果是热图模式，不显示十字光标等交互元素
+        if mode == RenderMode::HEATMAP {
+            return;
+        }
 
         // 如果鼠标不在图表区域内，则不绘制光标和提示
         if !self.mouse_in_chart {
@@ -143,14 +152,16 @@ impl OverlayRenderer {
     }
 
     /// 清除交互层
-    fn clear(&self, canvas_manager: &CanvasManager) {
+    pub fn clear(&self, canvas_manager: &CanvasManager) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
+        
+        // 只清除非导航器区域，保留DataZoom部分
         ctx.clear_rect(
             0.0,
             0.0,
             layout.canvas_width,
-            layout.canvas_height - layout.navigator_height,
+            layout.navigator_y
         );
     }
 
@@ -454,5 +465,93 @@ impl OverlayRenderer {
         // Format volume using layout's method
         let formatted_volume = layout.format_volume(volume, 2);
         draw_line(ctx, "成交量:", &formatted_volume, current_y);
+    }
+
+    /// 绘制模式切换按钮 (K线/热图)
+    fn draw_switch_button(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout, mode: RenderMode) {
+        // 计算切换按钮的位置 - 在标题区域中间顶部
+        let button_width = layout.switch_btn_width * 2.0; // 总宽度 (两个选项)
+        let button_height = layout.switch_btn_height;
+        let button_x = (layout.canvas_width - button_width) / 2.0;
+        let button_y = layout.padding;
+
+        // 绘制边框
+        ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
+        ctx.set_line_width(1.0);
+        ctx.stroke_rect(button_x, button_y, button_width, button_height);
+
+        // 根据当前模式确定哪个选项是激活的
+        let is_kmap_active = mode == RenderMode::KMAP;
+
+        // 绘制K线选项
+        let kline_button_x = button_x;
+        self.draw_switch_option(ctx, "K线", kline_button_x, button_y, layout.switch_btn_width, button_height, is_kmap_active);
+
+        // 绘制热图选项
+        let heatmap_button_x = button_x + layout.switch_btn_width;
+        self.draw_switch_option(ctx, "热图", heatmap_button_x, button_y, layout.switch_btn_width, button_height, !is_kmap_active);
+    }
+
+    /// 绘制单个切换选项
+    fn draw_switch_option(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        text: &str,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        is_active: bool,
+    ) {
+        // 设置选项样式
+        if is_active {
+            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
+        } else {
+            ctx.set_fill_style_str(ChartColors::SWITCH_BG);
+        }
+
+        // 绘制选项背景
+        ctx.fill_rect(x, y, width, height);
+
+        // 设置文本样式
+        if is_active {
+            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
+        } else {
+            ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
+        }
+        ctx.set_text_align("center");
+        ctx.set_text_baseline("middle");
+        ctx.set_font("12px Arial");
+
+        // 绘制文本
+        let text_x = x + width / 2.0;
+        let text_y = y + height / 2.0;
+        ctx.fill_text(text, text_x, text_y).unwrap();
+    }
+    
+    /// 检查点击是否在切换按钮区域内，如果是，返回选中的模式
+    pub fn check_switch_button_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<bool> {
+        // 计算切换按钮的位置
+        let button_width = layout.switch_btn_width * 2.0;
+        let button_height = layout.switch_btn_height;
+        let button_x = (layout.canvas_width - button_width) / 2.0;
+        let button_y = layout.padding;
+        
+        // 检查点击是否在按钮区域内
+        if x >= button_x && x <= button_x + button_width && y >= button_y && y <= button_y + button_height {
+            // 确定点击的是哪个选项
+            let kline_button_x = button_x;
+            let heatmap_button_x = button_x + layout.switch_btn_width;
+            
+            if x >= kline_button_x && x < heatmap_button_x {
+                // 点击了K线选项
+                return Some(true);
+            } else {
+                // 点击了热图选项
+                return Some(false);
+            }
+        }
+        
+        None
     }
 }
