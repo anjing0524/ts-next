@@ -207,10 +207,6 @@ impl ChartRenderer {
 
     // 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
-        // 如果是热图模式，不需要显示十字光标和提示框
-        if self.mode == RenderMode::HEATMAP {
-            return;
-        }
         
         // 直接交给OverlayRenderer处理鼠标移动
         let mut overlay_renderer = self.overlay_renderer.borrow_mut();
