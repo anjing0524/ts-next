@@ -51,18 +51,19 @@ function generateKlineData(count: number): KlineItem[] {
     const s_vol = parseFloat((totalVolume * (1 - buyRatio)).toFixed(2));
 
     // 生成价格订单量数据
-    const volumes: Array<{ price: number; volume: number }> = [];
-    // 在价格范围内生成10-20个价格点
-    const pricePoints = Math.floor(Math.random() * 11) + 10; // 10-20个价格点
-    const fullPriceRange = boundedHigh - boundedLow;
-
-    for (let j = 0; j < pricePoints; j++) {
-      // 在价格范围内均匀分布价格点
-      const price = parseFloat((boundedLow + (fullPriceRange * j) / (pricePoints - 1)).toFixed(2));
-      // 生成该价格点的订单量，越接近收盘价订单量越大
-      const distanceRatio = 1 - Math.abs(price - boundedClose) / fullPriceRange;
-      const volume = parseFloat((Math.random() * 2000 * distanceRatio + 100).toFixed(2));
-      volumes.push({ price, volume });
+    const tick = 10; // 档位间隔
+    const priceLevels: Array<{ price: number; volume: number }> = [];
+    for (
+      let p = Math.floor(boundedLow / tick) * tick;
+      p <= Math.ceil(boundedHigh / tick) * tick;
+      p += tick
+    ) {
+      // 以收盘价为中心，挂单量呈高斯分布
+      const center = boundedClose;
+      const sigma = (boundedHigh - boundedLow) / 6 || 1; // 防止除0
+      const base = Math.exp(-Math.pow(p - center, 2) / (2 * sigma * sigma));
+      const volume = Math.round(base * (Math.random() * 2000 + 500));
+      priceLevels.push({ price: parseFloat(p.toFixed(2)), volume });
     }
 
     data.push({
@@ -73,7 +74,7 @@ function generateKlineData(count: number): KlineItem[] {
       close: boundedClose,
       b_vol,
       s_vol,
-      volumes,
+      volumes: priceLevels,
     });
 
     // 为下一个周期设置开盘价

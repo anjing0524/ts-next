@@ -467,6 +467,9 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setfont_4c3584ef2f5c9f7e = function(arg0, arg1, arg2) {
         arg0.font = getStringFromWasm0(arg1, arg2);
     };
+    imports.wbg.__wbg_setglobalAlpha_3018cc44e3ab2d57 = function(arg0, arg1) {
+        arg0.globalAlpha = arg1;
+    };
     imports.wbg.__wbg_setheight_433680330c9420c3 = function(arg0, arg1) {
         arg0.height = arg1 >>> 0;
     };

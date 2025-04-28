@@ -315,9 +315,8 @@ impl OverlayRenderer {
             if hover_idx < items.len() {
                 let item = items.get(hover_idx);
                 let timestamp = item.timestamp() as i64;
-                // Use layout's formatting for consistency
-                let date_str = layout.format_timestamp(timestamp, "%y/%m/%d");
-                let time_str = layout.format_timestamp(timestamp, "%H:%M:%S");
+                let date_str = time::format_timestamp(timestamp, "%y/%m/%d");
+                let time_str = time::format_timestamp(timestamp, "%H:%M:%S");
 
                 ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
                 ctx.set_font("10px Arial"); // Match axis font

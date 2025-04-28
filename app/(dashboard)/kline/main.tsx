@@ -47,8 +47,8 @@ export default function Main() {
   const [fps, setFps] = useState(0); // 添加FPS状态
 
   // 定义画布尺寸常量
-  const CANVAS_HEIGHT = 400; // 可见高度
-  const CANVAS_WIDTH = 1500; // 可见宽度
+  const CANVAS_HEIGHT = 800; // 可见高度
+  const CANVAS_WIDTH = 1800; // 可见宽度
 
   // 创建一个通用的获取鼠标坐标的函数
   const getMouseCoordinates = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {

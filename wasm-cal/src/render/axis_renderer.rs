@@ -34,7 +34,7 @@ impl AxisRenderer {
             self.draw_alternating_background(&ctx, &layout_ref);
         } else {
             // 热图模式下，使用热图配色方案中最深的颜色作为背景
-            self.draw_heatmap_background(&ctx, &layout_ref);
+            // self.draw_heatmap_background(&ctx, &layout_ref);
         }
         
         // 绘制价格Y轴

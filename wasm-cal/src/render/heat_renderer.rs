@@ -129,10 +129,22 @@ impl HeatRenderer {
                     continue; // 跳过极小热度
                 }
                 
-                // 使用缓存获取颜色
                 let color = self.get_cached_color(norm);
+
+                // 只用透明度渐变
+                let alpha = 0.15 + 0.85 * norm.powf(1.5);
+
+                ctx.set_global_alpha(alpha);
                 ctx.set_fill_style_str(&color);
-                ctx.fill_rect(x_left, rect_y, x_width, rect_height);
+                ctx.fill_rect(x_left, rect_y, x_width - 1.0, rect_height - 1.0);
+
+                // 极端热度描边（可选）
+                // if norm > 0.95 {
+                //     ctx.set_global_alpha(1.0);
+                //     ctx.set_stroke_style_str("#b71c1c");
+                //     ctx.stroke_rect(x_left, rect_y, x_width - 1.0, rect_height - 1.0);
+                // }
+                ctx.set_global_alpha(1.0); // 恢复
             }
         }
     }
@@ -154,15 +166,16 @@ impl HeatRenderer {
         let norm = norm.clamp(0.0, 1.0);
         // 更平滑的色带节点，参考Bookmap
         let color_stops = [
-            (0.0,   "#181c25"), // 深黑蓝
-            (0.15,  "#003366"), // 深蓝
-            (0.30,  "#0066cc"), // 蓝
-            (0.45,  "#00bfff"), // 青蓝
-            (0.60,  "#33ffff"), // 浅蓝
-            (0.70,  "#ffffff"), // 白
-            (0.80,  "#ffe600"), // 黄
-            (0.90,  "#ff9900"), // 橙
-            (1.0,   "#ff0000"), // 红
+            (0.0,   "#f0f9e8"), // 极淡绿
+            (0.15,  "#ccebc5"), // 淡绿
+            (0.35,  "#a8ddb5"), // 浅绿
+            (0.55,  "#7bccc4"), // 青绿
+            (0.75,  "#43a2ca"), // 蓝绿
+            (0.90,  "#0868ac"), // 深蓝
+            (0.94,  "#fff600"), // 明亮黄
+            (0.97,  "#ff9900"), // 鲜橙
+            (0.99,  "#ff6a00"), // 深橙
+            (1.0,   "#ff0000"), // 鲜红
         ];
         // 找到norm所在的区间
         for i in 0..color_stops.len() - 1 {
