@@ -11,6 +11,7 @@ import {
 // 防抖函数已移除，使用直接调用以提高响应速度
 
 // 节流函数工具
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number
@@ -62,7 +63,7 @@ export default function Main() {
   }, []);
 
   // 创建一个通用的发送消息给Worker的函数
-  const sendMessageToWorker = useCallback((message: any) => {
+  const sendMessageToWorker = useCallback((message: unknown) => {
     if (!workerRef.current) return;
     workerRef.current.postMessage(message);
   }, []);
@@ -73,8 +74,9 @@ export default function Main() {
   const setupWorkerMessageHandler = useCallback(
     (worker: Worker) => {
       // 使用消息类型映射优化消息处理
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messageHandlers: Record<string, (data: any) => void> = {
-        initialized: (data) => {
+        initialized: () => {
           if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
             setError('Canvas元素未找到');
             setIsLoading(false);
@@ -173,10 +175,7 @@ export default function Main() {
   // 合并数据获取和Worker初始化到一个useEffect中
   useEffect(() => {
     const controller = new AbortController();
-    let animationFrameId: number;
-
-    // 启动性能监控
-    animationFrameId = requestAnimationFrame(updatePerformanceMetrics);
+    const animationFrameId = requestAnimationFrame(updatePerformanceMetrics);
 
     const fetchAndDraw = async () => {
       try {
@@ -275,6 +274,7 @@ export default function Main() {
   }, [sendMessageToWorker]);
 
   // 处理滚轮事件 - 使用节流优化
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleWheel = useCallback(
     throttle((e: ReactWheelEvent<HTMLCanvasElement>) => {
       // 无论是否在拖动状态，都发送滚轮事件到Worker
