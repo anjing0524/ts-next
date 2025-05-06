@@ -28,7 +28,7 @@ COPY . .
 # 优化构建过程
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=cache,target=/app/.next/cache \
-    pnpm run build
+    DISABLE_ESLINT_PLUGIN=true pnpm run build
 
 # 生产阶段 - 使用更轻量的基础镜像
 FROM node:lts-slim AS runner
