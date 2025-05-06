@@ -67,6 +67,16 @@ spec:
                 configMapKeyRef:
                   name: ts-next-template-config
                   key: HOSTNAME
+            - name: SCHEDULER_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: SCHEDULER_API_URL
+            - name: SCHEDULER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scheduler-secret
+                  key: api-key
           resources:
             limits:
               cpu: '1'

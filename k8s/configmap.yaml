@@ -13,3 +13,5 @@ data:
   NEXT_TELEMETRY_DISABLED: '1'
   PORT: '3000'
   HOSTNAME: '0.0.0.0'
+  # Scheduler API 配置
+  SCHEDULER_API_URL: 'http://scheduler-service:8080'
