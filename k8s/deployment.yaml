@@ -27,6 +27,11 @@ spec:
                 configMapKeyRef:
                   name: ts-next-template-config
                   key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_PORT
             - name: MYSQL_USER
               valueFrom:
                 configMapKeyRef:

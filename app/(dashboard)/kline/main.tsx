@@ -8,8 +8,6 @@ import {
   useCallback,
 } from 'react';
 
-// 防抖函数已移除，使用直接调用以提高响应速度
-
 // 节流函数工具
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function throttle<T extends (...args: any[]) => any>(
