@@ -6,11 +6,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-app:
+  build-wasm:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WebAssembly module
+        run: |
+          cd wasm-cal
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload WebAssembly build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: wasm-build
+          path: wasm-cal/pkg
+
+  build-app:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download WebAssembly build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: wasm-build
+          path: wasm-cal/pkg
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
