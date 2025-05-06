@@ -10,7 +10,7 @@ FROM base AS deps
 WORKDIR /app
 
 # 复制版本和配置文件
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* .npmrc ./
 
 # 安装依赖（优化缓存策略）
 RUN --mount=type=cache,target=/root/.pnpm-store \
