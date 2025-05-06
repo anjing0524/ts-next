@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ts-next-template
-          image: your-registry/ts-next-template:latest
+          image: liushuodocker/ts-next:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -25,13 +25,13 @@ spec:
             - name: MYSQL_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: app-config
-                  key: mysql.host
+                  name: ts-next-template-config
+                  key: MYSQL_HOST
             - name: MYSQL_USER
               valueFrom:
                 configMapKeyRef:
-                  name: app-config
-                  key: mysql.user
+                  name: ts-next-template-config
+                  key: MYSQL_USER
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -40,8 +40,8 @@ spec:
             - name: MYSQL_DATABASE
               valueFrom:
                 configMapKeyRef:
-                  name: app-config
-                  key: mysql.database
+                  name: ts-next-template-config
+                  key: MYSQL_DATABASE
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:
@@ -52,6 +52,16 @@ spec:
                 configMapKeyRef:
                   name: ts-next-template-config
                   key: NEXT_TELEMETRY_DISABLED
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: PORT
+            - name: HOSTNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: HOSTNAME
           resources:
             limits:
               cpu: '1'

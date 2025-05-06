@@ -10,3 +10,5 @@ data:
   # 添加其他应用配置
   NODE_ENV: 'production'
   NEXT_TELEMETRY_DISABLED: '1'
+  PORT: '3000'
+  HOSTNAME: '0.0.0.0'
