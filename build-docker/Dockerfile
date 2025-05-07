@@ -21,22 +21,39 @@ RUN --mount=type=cache,target=/root/.pnpm-store \
 FROM base AS builder
 WORKDIR /app
 
-# 复制依赖和源代码
+# 复制依赖
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+
+# 复制必要的源代码文件和配置文件
+COPY next.config.ts ./
+COPY tsconfig.json ./
+COPY package.json ./
+COPY postcss.config.mjs ./
+COPY prettier.config.mjs ./
+COPY components.json ./
+COPY next-env.d.ts ./
+COPY .node-version ./
+
+# 复制源代码目录
+COPY app ./app
+COPY components ./components
+COPY lib ./lib
+COPY public ./public
+COPY types ./types
+COPY utils ./utils
+COPY generated ./generated
+COPY schemas ./schemas
 
 # 优化构建过程
 ENV NEXT_TELEMETRY_DISABLED=1
-# 确保 WASM 文件被正确构建
+
+# 构建应用
 RUN --mount=type=cache,target=/app/.next/cache \
     DISABLE_ESLINT_PLUGIN=true pnpm run build
 
 # 生产阶段 - 使用更轻量的基础镜像
 FROM node:lts-slim AS runner
 WORKDIR /app
-
-# 安装 pnpm
-RUN npm install -g pnpm
 
 # 设置可被覆盖的生产环境变量
 ENV NODE_ENV=production \
@@ -55,7 +72,7 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # 复制构建产物（优化复制命令）
-# 确保 public 目录中的 WASM 文件被正确复制
+# 复制 public 目录（包含 WASM 文件）
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public/
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static/
