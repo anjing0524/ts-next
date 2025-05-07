@@ -27,6 +27,7 @@ COPY . .
 
 # 优化构建过程
 ENV NEXT_TELEMETRY_DISABLED=1
+# 确保 WASM 文件被正确构建
 RUN --mount=type=cache,target=/app/.next/cache \
     DISABLE_ESLINT_PLUGIN=true pnpm run build
 
@@ -54,12 +55,14 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # 复制构建产物（优化复制命令）
+# 确保 public 目录中的 WASM 文件被正确复制
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public/
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static/
 
-# 确保非特权用户可以访问所需文件
-RUN chown -R nextjs:nodejs /app
+# 确保非特权用户可以访问所需文件，特别是 WASM 文件
+RUN chown -R nextjs:nodejs /app && \
+    chmod -R 755 /app/public
 
 USER nextjs
 EXPOSE 3000

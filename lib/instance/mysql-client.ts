@@ -21,11 +21,20 @@ export const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  multipleStatements: true,
+  debug: process.env.NODE_ENV !== 'production',
 };
 
 // 创建连接池
 const createPool = () => {
-  logger.info('MySQL 连接池已初始化');
+  logger.info('正在初始化 MySQL 连接池...', {
+    host: dbConfig.host,
+    port: dbConfig.port,
+    user: dbConfig.user,
+    database: dbConfig.database,
+  });
   return mysql.createPool(dbConfig);
 };
 
@@ -98,11 +107,61 @@ export async function query<T = unknown>(
   params?: Array<string | number | boolean | null>
 ): Promise<T[]> {
   try {
-    const [rows] = await mysqlPool.execute(sql, params);
-    return rows as T[];
+    // 记录查询开始
+    const startTime = Date.now();
+    logger.debug('执行 SQL 查询', { sql, params });
+
+    // 获取连接并执行查询
+    const connection = await mysqlPool.getConnection();
+    try {
+      const [rows] = await connection.execute(sql, params);
+
+      // 记录查询完成
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      logger.debug('SQL 查询完成', {
+        sql,
+        params,
+        duration: `${duration}ms`,
+        rowCount: Array.isArray(rows) ? rows.length : 0,
+      });
+
+      return rows as T[];
+    } catch (error) {
+      // 记录查询错误
+      logger.error('SQL 查询失败', {
+        sql,
+        params,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error; // 重新抛出错误，让调用者处理
+    } finally {
+      connection.release(); // 确保连接被释放
+    }
   } catch (error) {
-    logger.error('数据库查询失败', { sql, error });
-    return [];
+    // 记录连接错误
+    logger.error('获取数据库连接失败', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error; // 重新抛出错误，让调用者处理
+  }
+}
+
+// 添加连接池健康检查函数
+export async function checkPoolHealth(): Promise<boolean> {
+  try {
+    const connection = await mysqlPool.getConnection();
+    try {
+      await connection.query('SELECT 1');
+      return true;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    logger.error('数据库连接池健康检查失败', error);
+    return false;
   }
 }
 
