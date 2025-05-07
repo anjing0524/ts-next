@@ -31,7 +31,7 @@ COPY package.json ./
 COPY postcss.config.mjs ./
 COPY prettier.config.mjs ./
 COPY components.json ./
-COPY next-env.d.ts ./
+# COPY next-env.d.ts ./
 COPY .node-version ./
 
 # 复制源代码目录
@@ -59,7 +59,14 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME="0.0.0.0"
+    HOSTNAME="0.0.0.0" \
+    # 添加RSC相关环境变量
+    NEXT_RUNTIME="nodejs" \
+    NEXT_SHARP_PATH="/app/node_modules/sharp" \
+    # 添加网络相关环境变量
+    NODE_OPTIONS="--max-old-space-size=4096 --max-http-header-size=16384" \
+    # 添加调试环境变量
+    DEBUG="next:*"
 
 # 声明可注入的环境变量（用于数据库连接）
 ENV MYSQL_HOST=$MYSQL_HOST \
@@ -74,13 +81,26 @@ RUN addgroup --system --gid 1001 nodejs && \
 # 复制构建产物（优化复制命令）
 # 复制 public 目录（包含 WASM 文件）
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public/
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static/
+
+# 对于Next.js 15，确保正确复制所有必要的构建文件
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next/
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # 确保非特权用户可以访问所需文件，特别是 WASM 文件
 RUN chown -R nextjs:nodejs /app && \
-    chmod -R 755 /app/public
+    chmod -R 755 /app/public && \
+    chmod -R 755 /app/.next
+
+# 创建健康检查脚本
+RUN echo '#!/bin/sh\ncurl -f http://localhost:3000/api/health || exit 1' > /app/healthcheck.sh && \
+    chmod +x /app/healthcheck.sh
 
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+
+# 使用健康检查
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD /app/healthcheck.sh
+
+# 使用更可靠的启动命令
+CMD ["node", ".next/standalone/server.js"]

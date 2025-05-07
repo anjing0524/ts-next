@@ -9,8 +9,3 @@ resources:
   - service.yaml
   - hpa.yaml
   - pdb.yaml
-
-commonLabels:
-  app.kubernetes.io/name: ts-next-template
-  app.kubernetes.io/part-of: ts-next-template
-  app.kubernetes.io/managed-by: kustomize 
