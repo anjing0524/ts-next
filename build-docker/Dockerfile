@@ -78,15 +78,12 @@ ENV MYSQL_HOST=$MYSQL_HOST \
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# 复制构建产物（优化复制命令）
-# 复制 public 目录（包含 WASM 文件）
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public/
+# 复制 standalone 输出和必要的静态文件
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# 对于Next.js 15，确保正确复制所有必要的构建文件
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next/
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-
-# 确保非特权用户可以访问所需文件，特别是 WASM 文件
+# 确保非特权用户可以访问所需文件
 RUN chown -R nextjs:nodejs /app && \
     chmod -R 755 /app/public && \
     chmod -R 755 /app/.next
@@ -103,4 +100,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD /app/healthcheck.sh
 
 # 使用更可靠的启动命令
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", "server.js"]

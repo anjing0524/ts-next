@@ -1,0 +1,75 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Database and Data Access Guide
+
+This project uses MySQL for data storage and access.
+
+## Database Configuration
+
+Database connection is configured through environment variables:
+
+- `MYSQL_HOST`: MySQL server hostname
+- `MYSQL_USER`: MySQL username
+- `MYSQL_PASSWORD`: MySQL password
+- `MYSQL_DATABASE`: MySQL database name
+
+## Database Types
+
+Database types are defined in [types/db-types.ts](mdc:types/db-types.ts) and can be generated using:
+
+```bash
+pnpm run generate-db-types
+```
+
+## Data Access Patterns
+
+### Server-Side Data Access
+
+For server components and server actions, data can be accessed directly:
+
+```tsx
+// Example server component with database access
+async function ServerComponent() {
+  const data = await db.query('SELECT * FROM table');
+  return <div>{data}</div>;
+}
+```
+
+### Client-Side Data Access
+
+For client components, data should be accessed through API routes or React Query:
+
+```tsx
+'use client';
+
+// Client component with React Query
+function ClientComponent() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['data'],
+    queryFn: () => fetch('/api/data').then(res => res.json())
+  });
+  
+  if (isLoading) return <div>Loading...</div>;
+  return <div>{data}</div>;
+}
+```
+
+## API Routes
+
+API routes are defined in the [app/api/](mdc:app/api/) directory and provide a way to access data from client components.
+
+## Common Issues and Solutions
+
+- **Connection errors**: Check database credentials and network connectivity
+- **Query errors**: Verify SQL syntax and table structure
+- **Performance issues**: Use proper indexing and query optimization
+
+## Best Practices
+
+1. Use parameterized queries to prevent SQL injection
+2. Implement proper error handling for database operations
+3. Use transactions for operations that require atomicity
+4. Implement connection pooling for better performance

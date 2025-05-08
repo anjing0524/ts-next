@@ -1,0 +1,110 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Development Workflow Guide
+
+This project uses a set of tools and scripts to streamline the development process.
+
+## Available Scripts
+
+The project includes several npm scripts defined in [package.json](mdc:package.json):
+
+- `pnpm dev`: Start the development server with Turbopack
+- `pnpm build`: Build the application for production
+- `pnpm start`: Start the production server
+- `pnpm lint`: Run ESLint to check for code issues
+- `pnpm format`: Format code with Prettier
+- `pnpm test`: Run Jest tests
+- `pnpm e2e`: Run Playwright end-to-end tests
+- `pnpm generate-db-types`: Generate TypeScript types from database schema
+- `pnpm flatc:generate`: Generate TypeScript and Rust code from FlatBuffers schemas
+
+## Development Tools
+
+### Code Quality
+
+- **ESLint**: For code linting, configured in [eslint.config.mjs](mdc:eslint.config.mjs)
+- **Prettier**: For code formatting, configured in [prettier.config.mjs](mdc:prettier.config.mjs)
+- **Husky**: For Git hooks, configured in [.husky/](mdc:.husky/)
+- **lint-staged**: For running linters on staged files, configured in [.lintstagedrc.js](mdc:.lintstagedrc.js)
+
+### Testing
+
+- **Jest**: For unit and integration tests, configured in [jest.config.js](mdc:jest.config.js)
+- **Playwright**: For end-to-end tests, configured in [playwright.config.ts](mdc:playwright.config.ts)
+
+### TypeScript
+
+TypeScript is configured in [tsconfig.json](mdc:tsconfig.json) with strict type checking enabled.
+
+### Rust and WASM
+
+- **wasm-pack**: For building Rust WASM modules
+- **FlatBuffers**: For efficient data serialization
+
+## Git Workflow
+
+The project uses a conventional commit format enforced by commitlint:
+
+```bash
+# Format: type(scope): description
+git commit -m "feat(auth): add login functionality"
+```
+
+Common commit types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes
+- `refactor`: Code refactoring
+- `test`: Adding or modifying tests
+- `chore`: Maintenance tasks
+
+## Docker Development
+
+For local development with Docker:
+
+```bash
+# Build the Docker image
+docker build -f build-docker/Dockerfile -t my-app .
+
+# Run the container
+docker run -p 3000:3000 my-app
+```
+
+## Kubernetes Development
+
+For local Kubernetes development:
+
+```bash
+# Apply the Kubernetes configuration
+kubectl apply -f k8s/
+
+# Verify the deployment
+./k8s/verify.sh
+```
+
+## WASM Development
+
+For developing the Rust WASM module:
+
+```bash
+# Build the WASM module
+cd wasm-cal
+wasm-pack build --target web
+
+# Generate code from FlatBuffers schemas
+pnpm run flatc:generate
+```
+
+## Best Practices
+
+1. Write tests for new features
+2. Follow the established code style
+3. Use conventional commits
+4. Keep dependencies up to date
+5. Document code changes
+6. Test WASM modules in isolation
+7. Use FlatBuffers for efficient data serialization

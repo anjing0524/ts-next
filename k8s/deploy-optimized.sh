@@ -13,16 +13,10 @@ show_help() {
   echo -e ""
   echo -e "${YELLOW}选项:${NC}"
   echo -e "  -h, --help     显示帮助信息"
-  echo -e "  -b, --build    构建 Docker 镜像"
   echo -e "  -d, --deploy   部署应用到 Kubernetes"
-  echo -e "  -a, --all      构建镜像并部署应用"
-  echo -e "  -e, --env      指定环境 (dev, prod, 默认: dev)"
   echo -e ""
   echo -e "${YELLOW}示例:${NC}"
-  echo -e "  $0 --build     # 仅构建镜像"
-  echo -e "  $0 --deploy    # 仅部署应用"
-  echo -e "  $0 --all       # 构建镜像并部署应用"
-  echo -e "  $0 --deploy --env prod  # 部署到生产环境"
+  echo -e "  $0 --deploy    # 部署应用"
 }
 
 # 检查 kubectl 是否可用
@@ -41,28 +35,6 @@ check_kustomize() {
   fi
 }
 
-# 构建 Docker 镜像
-build_image() {
-  echo -e "${YELLOW}构建 Docker 镜像...${NC}"
-  
-  # 检查 Dockerfile 是否存在
-  if [ ! -f "Dockerfile" ]; then
-    echo -e "${RED}错误: Dockerfile 不存在${NC}"
-    exit 1
-  fi
-  
-  # 构建镜像
-  docker build -t ts-next-template:latest .
-  
-  # 检查构建结果
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}镜像构建成功${NC}"
-  else
-    echo -e "${RED}镜像构建失败${NC}"
-    exit 1
-  fi
-}
-
 # 部署应用到 Kubernetes
 deploy_app() {
   echo -e "${YELLOW}部署应用到 Kubernetes...${NC}"
@@ -71,18 +43,9 @@ deploy_app() {
   check_kubectl
   check_kustomize
   
-  # 确定环境
-  ENV=${ENV:-dev}
-  OVERLAY_DIR="k8s/overlays/$ENV"
-  
-  if [ ! -d "$OVERLAY_DIR" ]; then
-    echo -e "${RED}错误: 环境 $ENV 不存在${NC}"
-    exit 1
-  fi
-  
   # 使用 kustomize 部署
-  echo -e "${YELLOW}部署到 $ENV 环境...${NC}"
-  kubectl apply -k $OVERLAY_DIR
+  echo -e "${YELLOW}部署应用...${NC}"
+  kubectl apply -k k8s/
   
   # 检查部署结果
   if [ $? -eq 0 ]; then
@@ -90,11 +53,15 @@ deploy_app() {
     
     # 等待部署完成
     echo -e "${YELLOW}等待部署完成...${NC}"
-    kubectl rollout status deployment/ts-next-template -n $ENV
+    kubectl rollout status deployment/ts-next-template
     
     # 显示 Pod 状态
     echo -e "${YELLOW}Pod 状态:${NC}"
-    kubectl get pods -n $ENV -l app=ts-next-template
+    kubectl get pods -l app=ts-next-template
+    
+    # 显示服务状态
+    echo -e "${YELLOW}服务状态:${NC}"
+    kubectl get svc -l app=ts-next-template
   else
     echo -e "${RED}应用部署失败${NC}"
     exit 1
@@ -116,19 +83,8 @@ main() {
         show_help
         exit 0
         ;;
-      -b|--build)
-        build_image
-        ;;
       -d|--deploy)
         deploy_app
-        ;;
-      -a|--all)
-        build_image
-        deploy_app
-        ;;
-      -e|--env)
-        ENV="$2"
-        shift
         ;;
       *)
         echo -e "${RED}错误: 未知选项 $1${NC}"

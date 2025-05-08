@@ -1,0 +1,107 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# UI Components and Styling Guide
+
+This project uses shadcn/ui components with Tailwind CSS for styling.
+
+## Component Structure
+
+UI components are organized in the [components/](mdc:components) directory:
+
+- `ui/`: Basic UI components (buttons, inputs, etc.)
+- `flow/`: Flow-related components
+- `data-table/`: Data table components
+    
+## Component Library
+
+The project uses [shadcn/ui](mdc:https:/ui.shadcn.com) for accessible, customizable UI components:
+
+- `@radix-ui/react-dialog`: Modal dialogs
+- `@radix-ui/react-dropdown-menu`: Dropdown menus
+- `@radix-ui/react-tabs`: Tabbed interfaces
+- And many more...
+
+## shadcn/ui Components
+
+shadcn/ui components are configured in [components.json](mdc:components.json) and are located in the `components/ui/` directory.
+
+### Adding New Components
+
+To add a new shadcn/ui component:
+
+```bash
+pnpm dlx shadcn-ui@latest add button
+```
+
+This will create a new component in `components/ui/button.tsx`.
+
+## Tailwind CSS
+
+The project uses Tailwind CSS for styling, configured in:
+
+- [postcss.config.mjs](mdc:postcss.config.mjs): PostCSS configuration
+- [tailwind.config.js](mdc:tailwind.config.js): Tailwind configuration
+
+### Tailwind Configuration
+
+Tailwind is configured with:
+
+- Custom color palette
+- Typography settings
+- Animation utilities
+- Custom plugins
+
+## Component Patterns
+
+### shadcn/ui Components
+
+shadcn/ui components follow a consistent pattern:
+
+```tsx
+// Example shadcn/ui component
+import { cn } from "@/lib/utils";
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "default" | "outline" | "ghost";
+  size?: "sm" | "md" | "lg";
+}
+
+export function Button({
+  className,
+  variant = "default",
+  size = "md",
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      className={cn(
+        "rounded-md font-medium",
+        variant === "default" && "bg-primary text-primary-foreground",
+        variant === "outline" && "border border-input bg-background",
+        variant === "ghost" && "hover:bg-accent hover:text-accent-foreground",
+        size === "sm" && "h-9 px-3 text-sm",
+        size === "md" && "h-10 px-4 py-2",
+        size === "lg" && "h-11 px-8",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+```
+
+### Custom Components
+
+Custom components should follow the same pattern as shadcn/ui components, using the `cn` utility for class name merging.
+
+## Best Practices
+
+1. Use shadcn/ui components for consistency
+2. Follow the established styling patterns
+3. Use Tailwind CSS utility classes for styling
+4. Ensure components are accessible
+5. Use responsive design principles
+6. Implement proper error states and loading indicators

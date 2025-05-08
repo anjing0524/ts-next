@@ -2,10 +2,23 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - configmap.yaml
-  - db-secret.yaml
-  - scheduler-secret.yaml
-  - deployment.yaml
-  - service.yaml
-  - hpa.yaml
-  - pdb.yaml
+  - app/deployment.yaml
+  - app/service.yaml
+  - app/ingress.yaml
+  - mysql/deployment.yaml
+  - mysql/service.yaml
+  - mysql/pvc.yaml
+  - mysql/secret.yaml
+
+commonLabels:
+  app: ts-next-template
+
+configMapGenerator:
+  - name: ts-next-template-config
+    literals:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NODE_ENV=production
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=dataalchemist
+      - MYSQL_USER=root
