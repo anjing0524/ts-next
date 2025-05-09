@@ -58,11 +58,11 @@ spec:
                   key: PORT
           resources:
             requests:
-              cpu: '0.3'
-              memory: '200Mi'
-            limits:
-              cpu: '1'
+              cpu: '0.8'
               memory: '512Mi'
+            limits:
+              cpu: '2'
+              memory: '1Gi'
           readinessProbe:
             httpGet:
               path: /datamgr_flow/api/health

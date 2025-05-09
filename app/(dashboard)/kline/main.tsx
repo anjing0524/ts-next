@@ -25,6 +25,8 @@ function throttle<T extends (...args: any[]) => any>(
 }
 
 export default function Main() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow'; // 使用环境变量
+  
   // Canvas引用
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -178,7 +180,7 @@ export default function Main() {
     const fetchAndDraw = async () => {
       try {
         // 获取数据
-        const response = await fetch('/api/kline', {
+        const response = await fetch(`${basePath}/api/kline`, {
           method: 'POST',
           signal: controller.signal,
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -205,7 +207,7 @@ export default function Main() {
           {
             type: 'init',
             buffer: arrayBuffer,
-            wasmPath: `${window.location.origin}/wasm-cal/kline_processor_bg.wasm`,
+            wasmPath: `${window.location.origin}${basePath}/wasm-cal/kline_processor_bg.wasm`,
           },
           [arrayBuffer] // 关键点1：标记为Transferable
         );

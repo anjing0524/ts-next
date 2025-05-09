@@ -1,7 +1,7 @@
 const nextConfig = {
   output: 'standalone',
-  basePath: '/datamgr_flow',
-  assetPrefix: '/datamgr_flow',
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow',
+  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow',
 };
 
 export default nextConfig;
