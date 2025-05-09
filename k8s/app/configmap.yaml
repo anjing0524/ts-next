@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ts-next-template-config
+data:
+  HOSTNAME: "0.0.0.0"
+  MYSQL_DATABASE: "dataalchemist"
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_USER: "root"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NODE_ENV: "production"
+  PORT: "3000"
+  SCHEDULER_API_URL: "http://scheduler-service:8080"

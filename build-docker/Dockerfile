@@ -31,7 +31,6 @@ COPY package.json ./
 COPY postcss.config.mjs ./
 COPY prettier.config.mjs ./
 COPY components.json ./
-# COPY next-env.d.ts ./
 COPY .node-version ./
 
 # 复制源代码目录
@@ -42,7 +41,6 @@ COPY public ./public
 COPY types ./types
 COPY utils ./utils
 COPY generated ./generated
-COPY schemas ./schemas
 
 # 优化构建过程
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -69,10 +67,11 @@ ENV NODE_ENV=production \
     DEBUG="next:*"
 
 # 声明可注入的环境变量（用于数据库连接）
-ENV MYSQL_HOST=$MYSQL_HOST \
-    MYSQL_USER=$MYSQL_USER \
-    MYSQL_PASSWORD=$MYSQL_PASSWORD \
-    MYSQL_DATABASE=$MYSQL_DATABASE
+ENV MYSQL_HOST="" \
+    MYSQL_USER="" \
+    MYSQL_PASSWORD="" \
+    MYSQL_DATABASE="" \
+    MYSQL_PORT=3306
 
 # 创建非特权用户
 RUN addgroup --system --gid 1001 nodejs && \
@@ -82,6 +81,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/generated ./generated
 
 # 确保非特权用户可以访问所需文件
 RUN chown -R nextjs:nodejs /app && \

@@ -151,18 +151,37 @@ export async function query<T = unknown>(
 
 // 添加连接池健康检查函数
 export async function checkPoolHealth(): Promise<boolean> {
-  try {
-    const connection = await mysqlPool.getConnection();
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1 second
+  let retryCount = 0;
+
+  while (retryCount < maxRetries) {
     try {
-      await connection.query('SELECT 1');
-      return true;
-    } finally {
-      connection.release();
+      logger.info(`Attempting database health check (attempt ${retryCount + 1}/${maxRetries})`);
+      const connection = await mysqlPool.getConnection();
+      try {
+        await connection.query('SELECT 1');
+        logger.info('Database health check successful');
+        return true;
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      retryCount++;
+      logger.error(`Database health check failed (attempt ${retryCount}/${maxRetries})`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      if (retryCount < maxRetries) {
+        logger.info(`Retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
     }
-  } catch (error) {
-    logger.error('数据库连接池健康检查失败', error);
-    return false;
   }
+
+  logger.error(`Database health check failed after ${maxRetries} attempts`);
+  return false;
 }
 
 export default mysqlPool;

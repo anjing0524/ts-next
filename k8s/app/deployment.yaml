@@ -15,60 +15,85 @@ spec:
         app: ts-next-template
     spec:
       containers:
-      - name: ts-next-template
-        image: ts-next-template:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3000
-        env:
-        - name: MYSQL_HOST
-          value: mysql
-        - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: MYSQL_USER
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: MYSQL_PASSWORD
-        - name: MYSQL_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: MYSQL_DATABASE
-        resources:
-          requests:
-            cpu: "0.3"
-            memory: "200Mi"
-          limits:
-            cpu: "1"
-            memory: "512Mi"
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        volumeMounts:
-        - name: tmp-volume
-          mountPath: /tmp
-        - name: logs-volume
-          mountPath: /app/logs
+        - name: ts-next-template
+          image: liushuodocker/ts-next:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: MYSQL_PORT
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_DATABASE
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: PORT
+          resources:
+            requests:
+              cpu: '0.3'
+              memory: '200Mi'
+            limits:
+              cpu: '1'
+              memory: '512Mi'
+          readinessProbe:
+            httpGet:
+              path: /datamgr_flow/api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /datamgr_flow/api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+            - name: logs-volume
+              mountPath: /app/logs
       volumes:
-      - name: tmp-volume
-        emptyDir: {}
-      - name: logs-volume
-        emptyDir: {}
+        - name: tmp-volume
+          emptyDir: {}
+        - name: logs-volume
+          persistentVolumeClaim:
+            claimName: app-logs-pvc
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
-        fsGroup: 1001 
+        fsGroup: 1001

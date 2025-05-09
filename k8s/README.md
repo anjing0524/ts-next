@@ -1,144 +1,171 @@
-# Kubernetes 配置
+# Kubernetes 部署指南
 
-本项目使用 Kubernetes 和 Kustomize 来管理应用和 MySQL 数据库的部署。
+本目录包含用于在 Kubernetes 集群上部署 TS Next Template 应用的配置文件。
 
 ## 目录结构
 
 ```
 k8s/
-├── base/                  # 基础配置
-│   ├── app/               # 应用配置
-│   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   └── kustomization.yaml
-│   ├── mysql/             # MySQL 配置
-│   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   ├── pvc.yaml
-│   │   ├── secret.yaml
-│   │   └── kustomization.yaml
-│   └── kustomization.yaml # 主 kustomization 文件
-├── overlays/              # 环境特定配置
-│   └── dev/               # 开发环境
-│       ├── kustomization.yaml
-│       └── replicas-patch.yaml
-└── deploy.sh              # 部署脚本
+├── app/                  # 应用相关配置
+│   ├── deployment.yaml   # 应用部署配置
+│   ├── ingress.yaml      # Ingress 配置
+│   ├── pvc.yaml          # 持久卷声明配置
+│   └── service.yaml      # 服务配置
+├── mysql/                # MySQL 相关配置
+│   ├── deployment.yaml   # MySQL 部署配置
+│   ├── pvc.yaml          # MySQL 持久卷声明配置
+│   ├── secret.yaml       # MySQL 密钥配置
+│   └── service.yaml      # MySQL 服务配置
+├── deploy.sh             # 部署脚本
+├── verify.sh             # 验证脚本
+└── kustomization.yaml    # Kustomize 配置
 ```
 
-## 部署
+## 快速开始
 
-使用 `deploy.sh` 脚本来构建和部署应用：
+### 部署应用
+
+使用提供的部署脚本一键部署应用和 MySQL：
 
 ```bash
-# 显示帮助信息
-./k8s/deploy.sh --help
-
-# 构建 Docker 镜像
-./k8s/deploy.sh --build
-
-# 部署应用到开发环境
+# 使用默认镜像部署
 ./k8s/deploy.sh --deploy
 
-# 构建镜像并部署到开发环境
-./k8s/deploy.sh --all
+# 使用指定镜像部署
+./k8s/deploy.sh --deploy --image myapp:v1
 
-# 部署到特定环境
-./k8s/deploy.sh --deploy --env dev
+# 在指定命名空间中部署
+./k8s/deploy.sh --deploy --namespace myapp
 ```
 
-## 应用与 MySQL 的连接
+### 验证部署
 
-应用通过 Kubernetes 服务名称 `mysql` 连接到 MySQL 数据库。MySQL 服务在集群内部暴露为 `mysql:3306`。
-
-应用的环境变量配置如下：
-
-```yaml
-env:
-  - name: MYSQL_HOST
-    value: mysql
-  - name: MYSQL_USER
-    valueFrom:
-      secretKeyRef:
-        name: mysql-secret
-        key: MYSQL_USER
-  - name: MYSQL_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: mysql-secret
-        key: MYSQL_PASSWORD
-  - name: MYSQL_DATABASE
-    valueFrom:
-      secretKeyRef:
-        name: mysql-secret
-        key: MYSQL_DATABASE
-```
-
-## 添加新环境
-
-要添加新环境（如生产环境），请按照以下步骤操作：
-
-1. 在 `overlays` 目录下创建新环境目录（如 `prod`）
-2. 创建 `kustomization.yaml` 文件，指定命名空间和资源
-3. 添加环境特定的补丁文件（如 `replicas-patch.yaml`）
-
-示例：
+使用验证脚本检查部署状态和连接：
 
 ```bash
-mkdir -p k8s/overlays/prod
-```
+# 检查部署状态
+./k8s/verify.sh --check
 
-然后创建 `k8s/overlays/prod/kustomization.yaml`：
+# 测试应用和 MySQL 的连接
+./k8s/verify.sh --test
 
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+# 尝试修复部署问题
+./k8s/verify.sh --fix
 
-namespace: prod
+# 执行所有验证
+./k8s/verify.sh --all
 
-resources:
-  - ../../base
-
-patches:
-  - path: replicas-patch.yaml
-    target:
-      kind: Deployment
-      name: ts-next-template
-```
-
-创建 `k8s/overlays/prod/replicas-patch.yaml`：
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ts-next-template
-spec:
-  replicas: 3
+# 在指定命名空间中验证
+./k8s/verify.sh --check --namespace myapp
 ```
 
 ## 配置说明
 
-### 应用部署
+### 应用配置
 
-- 使用 `ts-next-template:latest` 镜像
-- 资源请求: CPU 0.3, 内存 200Mi
-- 资源限制: CPU 1, 内存 512Mi
-- 健康检查: 通过 `/api/health` 端点
+应用部署配置位于 `app/deployment.yaml`，主要包含以下内容：
 
-### MySQL 部署
+- 容器镜像和资源限制
+- 环境变量配置（MySQL 连接信息等）
+- 健康检查配置
+- 卷挂载配置（日志和临时文件）
 
-- 使用 `mysql:8.0` 镜像
-- 资源请求: CPU 0.2, 内存 256Mi
-- 资源限制: CPU 0.5, 内存 512Mi
-- 使用 PersistentVolumeClaim 存储数据
+### MySQL 配置
 
-### 服务
+MySQL 部署配置位于 `mysql/deployment.yaml`，主要包含以下内容：
 
-- 应用服务: 将端口 80 映射到容器的 3000 端口
-- MySQL 服务: 将端口 3306 映射到容器的 3306 端口
+- MySQL 镜像和资源限制
+- 环境变量配置
+- 持久卷挂载配置
 
-## 注意事项
+### Ingress 配置
 
-1. 确保 Docker 已安装并运行
-2. 确保 kubectl 已安装并配置
-3. 确保 Kubernetes 集群已启动
+Ingress 配置位于 `app/ingress.yaml`，主要包含以下内容：
+
+- 路径重写规则
+- 安全头配置
+- 主机名配置
+
+### 持久卷配置
+
+应用和 MySQL 的持久卷配置分别位于 `app/pvc.yaml` 和 `mysql/pvc.yaml`，用于持久化存储日志和数据库数据。
+
+## 环境变量
+
+应用使用以下环境变量：
+
+- `MYSQL_HOST`: MySQL 主机名
+- `MYSQL_PORT`: MySQL 端口
+- `MYSQL_USER`: MySQL 用户名
+- `MYSQL_PASSWORD`: MySQL 密码
+- `MYSQL_DATABASE`: MySQL 数据库名
+- `NODE_ENV`: 环境（production/development）
+- `PORT`: 应用端口
+- `BASE_PATH`: 应用基础路径
+
+## 镜像配置
+
+应用使用以下镜像：
+
+- 默认镜像: `liushuodocker/ts-next:latest`
+
+## 访问应用
+
+应用部署后，可以通过以下方式访问：
+
+- 本地访问: `http://ts-next-template.local/datamgr_flow`
+- 集群内部访问: `http://ts-next-template-service/datamgr_flow`
+
+## 故障排除
+
+如果遇到部署问题，可以使用以下命令进行故障排除：
+
+```bash
+# 查看应用 Pod 日志
+kubectl logs -l app=ts-next-template
+
+# 查看 MySQL Pod 日志
+kubectl logs -l app=mysql
+
+# 查看 Pod 状态
+kubectl get pods -l app=ts-next-template
+kubectl get pods -l app=mysql
+
+# 查看部署状态
+kubectl get deployments -l app=ts-next-template
+kubectl get deployments -l app=mysql
+
+# 查看服务状态
+kubectl get svc -l app=ts-next-template
+kubectl get svc -l app=mysql
+
+# 查看 Ingress 状态
+kubectl get ingress
+```
+
+## 常见问题
+
+### ImagePullBackOff 错误
+
+如果遇到 ImagePullBackOff 错误，可能是因为镜像不存在或无法访问。可以使用以下方法解决：
+
+1. 确保镜像已正确构建并推送到可访问的镜像仓库
+2. 检查 Kubernetes 集群的镜像拉取凭证配置
+3. 使用 `--fix` 选项尝试修复
+
+### CrashLoopBackOff 错误
+
+如果遇到 CrashLoopBackOff 错误，可能是因为应用启动失败。可以使用以下方法解决：
+
+1. 查看 Pod 日志，了解具体错误原因
+2. 检查环境变量配置是否正确
+3. 检查应用代码是否有错误
+4. 使用 `--fix` 选项尝试修复
+
+### 连接问题
+
+如果应用无法连接到 MySQL，请检查：
+
+1. MySQL Pod 是否正常运行
+2. MySQL 服务是否可访问
+3. 环境变量配置是否正确 

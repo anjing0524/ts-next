@@ -5,10 +5,11 @@ metadata:
   labels:
     app: ts-next-template
 spec:
-  selector:
-    app: ts-next-template
+  type: ClusterIP
+
   ports:
-    - port: 80
+    - port: 3000
       targetPort: 3000
       protocol: TCP
-  type: ClusterIP 
+  selector:
+    app: ts-next-template
