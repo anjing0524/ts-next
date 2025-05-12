@@ -4,12 +4,6 @@ metadata:
   name: ts-next-template-ingress
   annotations:
     nginx.ingress.kubernetes.io/use-regex: 'true'
-    nginx.ingress.kubernetes.io/ssl-redirect: 'false'
-    nginx.ingress.kubernetes.io/force-ssl-redirect: 'false'
-    nginx.ingress.kubernetes.io/proxy-body-size: '8m'
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: '30'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '30'
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '30'
 spec:
   ingressClassName: nginx
   rules:

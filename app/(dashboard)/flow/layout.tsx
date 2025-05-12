@@ -4,7 +4,15 @@ import { Metadata } from 'next';
 export const metadata: Metadata = {
   title: '数据建模系统 | 调度系统',
   description: '查看和管理调度任务状态、监控执行进度',
-  keywords: '任务调度',
+  keywords: '任务调度, 数据建模, 调度系统',
+  icons: {
+    icon: [
+      {
+        url: '/favicon.ico',
+        sizes: 'any',
+      },
+    ],
+  },
 };
 
 export default function FlowLayout({ children }: { children: React.ReactNode }) {

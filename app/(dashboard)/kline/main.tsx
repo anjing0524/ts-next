@@ -26,7 +26,7 @@ function throttle<T extends (...args: any[]) => any>(
 
 export default function Main() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow'; // 使用环境变量
-  
+
   // Canvas引用
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -176,6 +176,12 @@ export default function Main() {
   useEffect(() => {
     const controller = new AbortController();
     const animationFrameId = requestAnimationFrame(updatePerformanceMetrics);
+    let wasmPath = '';
+
+    // 在客户端设置 wasmPath
+    if (typeof window !== 'undefined') {
+      wasmPath = `${window.location.origin}${basePath}/wasm-cal/kline_processor_bg.wasm`;
+    }
 
     const fetchAndDraw = async () => {
       try {
@@ -207,7 +213,7 @@ export default function Main() {
           {
             type: 'init',
             buffer: arrayBuffer,
-            wasmPath: `${window.location.origin}${basePath}/wasm-cal/kline_processor_bg.wasm`,
+            wasmPath,
           },
           [arrayBuffer] // 关键点1：标记为Transferable
         );
@@ -358,6 +364,8 @@ export default function Main() {
 
   // 使用useEffect添加全局错误处理
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleGlobalError = (event: ErrorEvent) => {
       if (event.message.includes('Worker') || event.message.includes('Canvas')) {
         handleError(new Error(`全局错误: ${event.message}`));

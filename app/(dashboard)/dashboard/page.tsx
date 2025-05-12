@@ -18,22 +18,31 @@ interface User {
 
 // 生成模拟数据
 const generateMockData = (count: number): User[] => {
+  'use client';
+
   const roles = ['管理员', '编辑', '用户', '访客', '审核员'];
   const statuses = ['活跃', '离线', '已禁用', '待验证'];
 
-  return Array.from({ length: count }).map((_, i) => ({
-    id: uuidv4(),
-    name: `用户${i + 1}`,
-    email: `user${i + 1}@example.com`,
-    role: roles[Math.floor(Math.random() * roles.length)],
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    lastLogin: new Date(
-      Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-    ).toISOString(),
-    createdAt: new Date(
-      Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000
-    ).toISOString(),
-  }));
+  // 使用固定的基准时间来避免服务端和客户端的差异
+  const baseTime = new Date('2024-01-01').getTime();
+
+  return Array.from({ length: count }).map((_, i) => {
+    // 使用确定性的时间偏移，基于索引而不是随机数
+    const dayOffset = i % 30; // 0-29天的偏移
+    const monthOffset = Math.floor(i / 30) % 12; // 0-11月的偏移
+
+    return {
+      id: uuidv4(),
+      name: `用户${i + 1}`,
+      email: `user${i + 1}@example.com`,
+      role: roles[i % roles.length],
+      status: statuses[i % statuses.length],
+      lastLogin: new Date(baseTime - dayOffset * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(
+        baseTime - (dayOffset + monthOffset * 30) * 24 * 60 * 60 * 1000
+      ).toISOString(),
+    };
+  });
 };
 
 const columns: ColumnDef<User>[] = [
