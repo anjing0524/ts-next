@@ -24,6 +24,7 @@ export const dbConfig = {
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
   multipleStatements: true,
+  charset: 'utf8mb4',
   debug: process.env.NODE_ENV !== 'production',
 };
 
@@ -101,81 +102,34 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-// 创建一个简单的查询辅助函数
-export async function query<T = unknown>(
-  sql: string,
-  params?: Array<string | number | boolean | null>
-): Promise<T[]> {
-  try {
-    // 记录查询开始
-    const startTime = Date.now();
-    logger.debug('执行 SQL 查询', { sql, params });
-
-    // 获取连接并执行查询
-    const connection = await mysqlPool.getConnection();
-    try {
-      const [rows] = await connection.execute(sql, params);
-
-      // 记录查询完成
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      logger.debug('SQL 查询完成', {
-        sql,
-        params,
-        duration: `${duration}ms`,
-        rowCount: Array.isArray(rows) ? rows.length : 0,
-      });
-
-      return rows as T[];
-    } catch (error) {
-      // 记录查询错误
-      logger.error('SQL 查询失败', {
-        sql,
-        params,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      throw error; // 重新抛出错误，让调用者处理
-    } finally {
-      connection.release(); // 确保连接被释放
-    }
-  } catch (error) {
-    // 记录连接错误
-    logger.error('获取数据库连接失败', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    throw error; // 重新抛出错误，让调用者处理
-  }
-}
-
 // 添加连接池健康检查函数
 export async function checkPoolHealth(): Promise<boolean> {
   const maxRetries = 3;
   const retryDelay = 1000; // 1 second
   let retryCount = 0;
 
+  // 确保连接池已初始化
+  if (!mysqlPool) {
+    logger.error('MySQL connection pool is not initialized');
+    return false;
+  }
+
   while (retryCount < maxRetries) {
     try {
       logger.info(`Attempting database health check (attempt ${retryCount + 1}/${maxRetries})`);
-      const connection = await mysqlPool.getConnection();
-      try {
-        await connection.query('SELECT 1');
-        logger.info('Database health check successful');
-        return true;
-      } finally {
-        connection.release();
-      }
+      await mysqlPool.query('SELECT 1');
+      logger.info('Database health check successful');
+      return true;
     } catch (error) {
       retryCount++;
       logger.error(`Database health check failed (attempt ${retryCount}/${maxRetries})`, {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      
+
       if (retryCount < maxRetries) {
         logger.info(`Retrying in ${retryDelay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
     }
   }

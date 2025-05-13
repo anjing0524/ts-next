@@ -7,7 +7,6 @@ resources:
   - app/ingress.yaml
   - app/pvc.yaml
   - app/configmap.yaml
-  - mysql/deployment.yaml
-  - mysql/service.yaml
-  - mysql/pvc.yaml
-  - mysql/secret.yaml
+
+components:
+  - mysql

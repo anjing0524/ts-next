@@ -21,7 +21,8 @@ export async function getAllPlanConf(): Promise<PlanConf[]> {
          and project IS NOT NULL 
          and status <> 'OFF' 
          and is_his = 'N'
-         and upper(is_efct) = 'Y'`
+         and upper(is_efct) = 'Y'
+         ORDER BY plan_id ASC`
     );
     // 过滤掉无效的时间阶段
     const validRows = (rows as PlanConf[])

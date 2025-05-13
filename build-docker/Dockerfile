@@ -71,7 +71,8 @@ ENV MYSQL_HOST="" \
     MYSQL_USER="" \
     MYSQL_PASSWORD="" \
     MYSQL_DATABASE="" \
-    MYSQL_PORT=3306
+    MYSQL_PORT=3306 \
+    SCHEDULER_API_URL=""
 
 # 创建非特权用户
 RUN addgroup --system --gid 1001 nodejs && \
