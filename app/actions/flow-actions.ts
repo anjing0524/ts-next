@@ -658,14 +658,17 @@ export async function stopPlan(
  * @param taskPk 任务主键
  * @returns 任务详情
  */
-export async function getTaskInfo(taskPk: string | number): Promise<TaskStateDetailType | null> {
+export async function getTaskInfo(
+  taskPk: string | number,
+  redate: string
+): Promise<TaskStateDetailType | null> {
   try {
     const [rows] = await mysqlPool.query(
       `SELECT 
         ts.*
       FROM task_state ts
-      WHERE ts.task_pk = ?`,
-      [taskPk]
+      WHERE ts.task_pk = ? and ts.redate = ?`,
+      [taskPk, redate]
     );
     if (Array.isArray(rows) && rows.length > 0) {
       const taskInfo = rows[0] as TaskState;

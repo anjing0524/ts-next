@@ -242,7 +242,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              重跑
+              重跑计划
             </Button>
           </div>
         );
@@ -271,7 +271,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              重跑
+              重跑计划
             </Button>
             <Button
               variant="outline"
@@ -285,7 +285,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               ) : (
                 <AlertCircle className="h-3 w-3" />
               )}
-              重跑失败
+              重跑失败任务
             </Button>
           </div>
         );
@@ -388,7 +388,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
                 ></div>
               </div>
               <div className="flex justify-between text-xs mt-1 text-gray-600">
-                <span>{progress}%</span>
+                <span>{progress}</span>
                 {cost_time && <span>{cost_time}秒</span>}
               </div>
             </div>

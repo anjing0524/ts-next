@@ -19,17 +19,18 @@ interface TaskDetailProps {
   isOpen: boolean;
   onClose: () => void;
   taskPk: string | number | null;
+  redate: string | null;
 }
 
-export function TaskStateDetail({ isOpen, onClose, taskPk }: TaskDetailProps) {
+export function TaskStateDetail({ isOpen, onClose, taskPk, redate }: TaskDetailProps) {
   const [taskDetail, setTaskDetail] = useState<TaskStateDetailType | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     async function fetchTaskDetail() {
-      if (!taskPk) return;
+      if (!taskPk || !redate) return;
       try {
         setLoading(true);
-        const detail = await getTaskInfo(taskPk);
+        const detail = await getTaskInfo(taskPk, redate);
         setTaskDetail(detail);
       } catch (error) {
         console.error('获取任务详情失败:', error);
@@ -41,12 +42,12 @@ export function TaskStateDetail({ isOpen, onClose, taskPk }: TaskDetailProps) {
     if (isOpen && taskPk) {
       fetchTaskDetail();
     }
-  }, [isOpen, taskPk]);
+  }, [isOpen, taskPk, redate]);
 
   // 定义详情项
   const detailItems = taskDetail
     ? [
-        { label: '任务ID', value: taskDetail.task_id },
+        { label: '任务ID', value: taskDetail.task_id, className: 'col-span-2 break-all' },
         { label: '计划ID', value: taskDetail.plan_id },
         { label: '执行ID', value: taskDetail.exe_id },
         {

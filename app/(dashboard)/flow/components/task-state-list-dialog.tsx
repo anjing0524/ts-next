@@ -21,10 +21,18 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { format } from 'date-fns';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { TASK_STATE_MAP } from '../cons';
 import { TaskStateDetail } from './task-state-detail';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import React from 'react';
 
 // 表格行组件接口
 interface TableBodyRowProps {
@@ -34,10 +42,21 @@ interface TableBodyRowProps {
   handleRowClick: (taskPk: string) => void;
 }
 
-// 表格行组件
-function TableBodyRow({ row, virtualRow, rowVirtualizer, handleRowClick }: TableBodyRowProps) {
+// 使用 memo 优化表格行组件，避免不必要的重渲染
+const TableBodyRow = React.memo(function TableBodyRow({
+  row,
+  virtualRow,
+  rowVirtualizer,
+  handleRowClick,
+}: TableBodyRowProps) {
   // 获取当前行的task_pk
   const taskPk = row.original.task_pk;
+
+  // 使用 useCallback 优化点击处理函数
+  const onClick = useCallback(() => {
+    if (taskPk) handleRowClick(taskPk);
+  }, [taskPk, handleRowClick]);
+
   return (
     <tr
       data-index={virtualRow.index}
@@ -51,7 +70,7 @@ function TableBodyRow({ row, virtualRow, rowVirtualizer, handleRowClick }: Table
         height: '32px', // 降低行高
       }}
       className="hover:bg-muted/50"
-      onClick={() => taskPk && handleRowClick(taskPk)}
+      onClick={onClick}
     >
       {row.getVisibleCells().map((cell) => (
         <td
@@ -68,6 +87,27 @@ function TableBodyRow({ row, virtualRow, rowVirtualizer, handleRowClick }: Table
         </td>
       ))}
     </tr>
+  );
+});
+
+// 添加防抖函数
+function useDebounce<T extends (...args: unknown[]) => unknown>(
+  callback: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  return useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    },
+    [callback, delay]
   );
 }
 
@@ -88,6 +128,8 @@ export function TaskDetailsDialog() {
   const [loading, setLoading] = useState(false);
   // 移除tableHeight状态，改为使用shouldScroll状态
   const [shouldScroll, setShouldScroll] = useState(false);
+  // 添加任务状态过滤状态
+  const [taskStateFilter, setTaskStateFilter] = useState<string | null>(null);
 
   // 创建表格容器引用
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -95,11 +137,45 @@ export function TaskDetailsDialog() {
   // 添加状态管理选中的任务PK和详情弹窗状态
   const [selectedTaskPk, setSelectedTaskPk] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  // 处理行点击事件
-  const handleRowClick = (taskPk: string) => {
+
+  // 使用 useCallback 优化行点击处理函数
+  const handleRowClickCallback = useCallback((taskPk: string) => {
     setSelectedTaskPk(taskPk);
     setIsDetailOpen(true);
+  }, []);
+
+  // 处理任务状态过滤变化
+  const handleTaskStateFilterChange = (value: string) => {
+    setTaskStateFilter(value === 'all' ? null : value);
   };
+
+  // 根据任务状态过滤任务列表
+  const filteredTasks = useMemo(() => {
+    if (!taskStateFilter) return tasks;
+
+    // 根据选择的状态过滤任务
+    return tasks.filter((task) => {
+      const state = task.task_state;
+
+      // 根据状态分类过滤
+      switch (taskStateFilter) {
+        case 'success':
+          // 成功状态：D, K
+          return state === 'D' || state === 'K';
+        case 'failed':
+          // 失败状态：F, Z, C, T
+          return state === 'F' || state === 'Z' || state === 'C' || state === 'T';
+        case 'running':
+          // 运行中状态：R, W
+          return state === 'R' || state === 'W';
+        case 'not_run':
+          // 未运行状态：N, P
+          return state === 'N' || state === 'P';
+        default:
+          return true;
+      }
+    });
+  }, [tasks, taskStateFilter]);
 
   useEffect(() => {
     async function fetchData() {
@@ -109,9 +185,7 @@ export function TaskDetailsDialog() {
 
       try {
         setLoading(true);
-        console.log('Fetching task details:', planId, format(redate, 'yyyy-MM-dd'), exeId);
         const ret = await getTaskDetails(planId, format(redate, 'yyyy-MM-dd'), exeId);
-        console.log('Task details received:', ret);
 
         if (ret && Array.isArray(ret)) {
           setTasks(
@@ -126,11 +200,11 @@ export function TaskDetailsDialog() {
             )
           );
         } else {
-          console.error('Invalid task details response:', ret);
           setTasks([]);
         }
-      } catch (error) {
-        console.error('Error fetching task details:', error);
+      } catch (err) {
+        // 使用 err 变量或移除它
+        console.error('Failed to fetch task details:', err);
         setTasks([]);
       } finally {
         setLoading(false);
@@ -144,7 +218,7 @@ export function TaskDetailsDialog() {
 
   // 添加一个新的 useEffect 来计算表格高度
   useEffect(() => {
-    if (tasks.length === 0) {
+    if (filteredTasks.length === 0) {
       setShouldScroll(false);
       return;
     }
@@ -152,11 +226,11 @@ export function TaskDetailsDialog() {
     // 计算内容高度
     const rowHeight = 32; // 行高
     const headerHeight = 40; // 表头高度
-    const contentHeight = rowHeight * tasks.length + headerHeight;
+    const contentHeight = rowHeight * filteredTasks.length + headerHeight;
 
     // 如果内容高度超过400px，则需要滚动条
     setShouldScroll(contentHeight > 400);
-  }, [tasks]);
+  }, [filteredTasks]);
 
   // 定义表格列，使用 useMemo 优化性能
   const columns = useMemo<ColumnDef<TaskStateDetailType>[]>(
@@ -268,7 +342,7 @@ export function TaskDetailsDialog() {
 
   // 创建表格实例
   const table = useReactTable({
-    data: tasks,
+    data: filteredTasks, // 使用过滤后的数据
     columns,
     getCoreRowModel: getCoreRowModel(),
     state: {
@@ -287,16 +361,38 @@ export function TaskDetailsDialog() {
 
   // 使用虚拟列表优化表格渲染
   const { rows } = table.getRowModel();
+
+  // 优化虚拟列表配置
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
-    estimateSize: () => 32, // 行高估计值
+    estimateSize: useCallback(() => 32, []), // 使用 useCallback 优化行高估计函数
     getScrollElement: () => tableContainerRef.current,
-    overscan: 40, // 预渲染行数
-    measureElement:
-      typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
-        ? (element) => element?.getBoundingClientRect().height
-        : undefined,
+    overscan: 10, // 减少预渲染行数，从 40 降低到 10
+    // 移除 measureElement 回调，使用固定行高以提高性能
+    // 仅在初始渲染时测量一次，而不是每次滚动都测量
+    initialRect: { width: 0, height: 32 },
   });
+
+  // 使用 useMemo 优化虚拟行列表，避免不必要的重新计算
+  const virtualRows = useMemo(() => rowVirtualizer.getVirtualItems(), [rowVirtualizer]);
+
+  // 添加防抖滚动处理
+  const handleScroll = useDebounce(() => {
+    // 滚动时触发虚拟列表更新，但使用防抖减少更新频率
+    rowVirtualizer.measure();
+  }, 50); // 50ms 的防抖时间
+
+  // 添加滚动事件监听
+  useEffect(() => {
+    const scrollElement = tableContainerRef.current;
+    if (!scrollElement) return;
+
+    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      scrollElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [handleScroll]);
 
   return (
     <>
@@ -319,11 +415,38 @@ export function TaskDetailsDialog() {
               </div>
             ) : (
               <div className="border rounded-md" style={{ height: '400px' }}>
+                {/* 添加任务状态过滤下拉框 */}
+                <div className="p-2 border-b flex items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">任务状态:</span>
+                    <Select
+                      value={taskStateFilter || 'all'}
+                      onValueChange={handleTaskStateFilterChange}
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-sm">
+                        <SelectValue placeholder="选择状态" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部</SelectItem>
+                        <SelectItem value="success">成功</SelectItem>
+                        <SelectItem value="failed">失败</SelectItem>
+                        <SelectItem value="running">执行中</SelectItem>
+                        <SelectItem value="not_run">未运行</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {taskStateFilter && (
+                    <div className="ml-2 text-xs text-muted-foreground">
+                      已过滤: {filteredTasks.length}/{tasks.length} 条记录
+                    </div>
+                  )}
+                </div>
                 <div
                   ref={tableContainerRef}
-                  className={`relative h-[400px] ${shouldScroll ? 'overflow-auto' : 'overflow-y-hidden'}`}
+                  className={`relative h-[360px] ${shouldScroll ? 'overflow-auto' : 'overflow-y-hidden'}`}
                   style={{
                     width: '100%',
+                    willChange: 'transform', // 提示浏览器优化渲染
                   }}
                 >
                   <table
@@ -375,7 +498,7 @@ export function TaskDetailsDialog() {
                         position: 'relative',
                       }}
                     >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      {virtualRows.map((virtualRow) => {
                         const row = rows[virtualRow.index];
                         return (
                           <TableBodyRow
@@ -383,7 +506,7 @@ export function TaskDetailsDialog() {
                             row={row}
                             virtualRow={virtualRow}
                             rowVirtualizer={rowVirtualizer}
-                            handleRowClick={handleRowClick}
+                            handleRowClick={handleRowClickCallback}
                           />
                         );
                       })}
@@ -399,6 +522,7 @@ export function TaskDetailsDialog() {
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         taskPk={selectedTaskPk}
+        redate={format(new Date(redate as number), 'yyyy-MM-dd')}
       />
     </>
   );
