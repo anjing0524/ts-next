@@ -138,12 +138,6 @@ export function TaskDetailsDialog() {
   const [selectedTaskPk, setSelectedTaskPk] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // 使用 useCallback 优化行点击处理函数
-  const handleRowClickCallback = useCallback((taskPk: string) => {
-    setSelectedTaskPk(taskPk);
-    setIsDetailOpen(true);
-  }, []);
-
   // 处理任务状态过滤变化
   const handleTaskStateFilterChange = (value: string) => {
     setTaskStateFilter(value === 'all' ? null : value);
@@ -373,8 +367,11 @@ export function TaskDetailsDialog() {
     initialRect: { width: 0, height: 32 },
   });
 
-  // 使用 useMemo 优化虚拟行列表，避免不必要的重新计算
-  const virtualRows = useMemo(() => rowVirtualizer.getVirtualItems(), [rowVirtualizer]);
+  // 使用 useCallback 优化行点击处理函数
+  const handleRowClickCallback = useCallback((taskPk: string) => {
+    setSelectedTaskPk(taskPk);
+    setIsDetailOpen(true);
+  }, []);
 
   // 添加防抖滚动处理
   const handleScroll = useDebounce(() => {
@@ -498,7 +495,7 @@ export function TaskDetailsDialog() {
                         position: 'relative',
                       }}
                     >
-                      {virtualRows.map((virtualRow) => {
+                      {rowVirtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
                         const row = rows[virtualRow.index];
                         return (
                           <TableBodyRow
