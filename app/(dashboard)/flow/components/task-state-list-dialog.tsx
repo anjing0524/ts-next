@@ -2,7 +2,6 @@
 import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
 import { TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
 import { getTaskDetails } from '@/app/actions/flow-actions';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +32,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React from 'react';
+
+type StateInfo = { label: string; variant: string; color?: string };
 
 // 表格行组件接口
 interface TableBodyRowProps {
@@ -90,26 +91,38 @@ const TableBodyRow = React.memo(function TableBodyRow({
   );
 });
 
-// 添加防抖函数
-function useDebounce<T extends (...args: unknown[]) => unknown>(
-  callback: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+// 恢复 TruncateCell 组件
+const TruncateCell: React.FC<{ value: string; maxWidth: string }> = React.memo(
+  function TruncateCell({ value, maxWidth }) {
+    return (
+      <div className="truncate" style={{ maxWidth }} title={value}>
+        {value}
+      </div>
+    );
+  }
+);
+TruncateCell.displayName = 'TruncateCell';
 
-  return useCallback(
-    (...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        callback(...args);
-      }, delay);
-    },
-    [callback, delay]
+// 极致性能 FastBadge 组件
+const FastBadge: React.FC<{ state: string }> = React.memo(function FastBadge({ state }) {
+  const info: StateInfo = TASK_STATE_MAP[state] || { label: state || '', variant: 'default' };
+  let color = 'bg-gray-100 text-gray-800';
+  if (info.color) {
+    color = info.color;
+  } else if (info.variant === 'success') {
+    color = 'bg-green-100 text-green-800';
+  } else if (info.variant === 'destructive') {
+    color = 'bg-red-100 text-red-800';
+  } else if (info.variant === 'warning') {
+    color = 'bg-yellow-100 text-yellow-800';
+  }
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>
+      {info.label || state}
+    </span>
   );
-}
+});
+FastBadge.displayName = 'FastBadge';
 
 export function TaskDetailsDialog() {
   // 从 store 中获取任务详情对话框状态
@@ -246,14 +259,9 @@ export function TaskDetailsDialog() {
         accessorKey: 'task_id',
         header: '调度任务',
         size: 180,
-        cell: ({ row }) => {
-          const taskId = row.getValue('task_id') as string;
-          return (
-            <div className="max-w-[180px] truncate" title={taskId}>
-              {taskId}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <TruncateCell value={row.getValue('task_id') as string} maxWidth="180px" />
+        ),
       },
       {
         id: 'plan_id',
@@ -266,14 +274,9 @@ export function TaskDetailsDialog() {
         accessorKey: 'exec_cmd',
         header: '执行命令',
         size: 200,
-        cell: ({ row }) => {
-          const cmd = row.getValue('exec_cmd') as string;
-          return (
-            <div className="max-w-[200px] truncate" title={cmd}>
-              {cmd}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <TruncateCell value={row.getValue('exec_cmd') as string} maxWidth="200px" />
+        ),
       },
       {
         id: 'exe_id',
@@ -286,11 +289,7 @@ export function TaskDetailsDialog() {
         accessorKey: 'task_state',
         header: '任务状态',
         size: 100,
-        cell: ({ row }) => {
-          const state = row.getValue('task_state') as string;
-          const stateInfo = TASK_STATE_MAP[state] || { label: state, variant: 'default' };
-          return <Badge variant={stateInfo.variant}>{stateInfo.label || state}</Badge>;
-        },
+        cell: ({ row }) => <FastBadge state={row.getValue('task_state') as string} />,
       },
       {
         id: 'start_time',
@@ -317,11 +316,7 @@ export function TaskDetailsDialog() {
         size: 200,
         cell: ({ row }) => {
           const desc = row.getValue('exec_desc') as string;
-          return desc ? (
-            <div className="max-w-[300px] truncate" title={desc}>
-              {desc}
-            </div>
-          ) : null;
+          return desc ? <TruncateCell value={desc} maxWidth="300px" /> : null;
         },
       },
       {
@@ -359,37 +354,22 @@ export function TaskDetailsDialog() {
   // 优化虚拟列表配置
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
-    estimateSize: useCallback(() => 32, []), // 使用 useCallback 优化行高估计函数
+    estimateSize: useCallback(() => 32, []),
     getScrollElement: () => tableContainerRef.current,
-    overscan: 10, // 减少预渲染行数，从 40 降低到 10
-    // 移除 measureElement 回调，使用固定行高以提高性能
-    // 仅在初始渲染时测量一次，而不是每次滚动都测量
+    overscan: 5, // 进一步降低 overscan
     initialRect: { width: 0, height: 32 },
   });
+
+  // 只在 filteredTasks 变化时 measure
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [filteredTasks, rowVirtualizer]);
 
   // 使用 useCallback 优化行点击处理函数
   const handleRowClickCallback = useCallback((taskPk: string) => {
     setSelectedTaskPk(taskPk);
     setIsDetailOpen(true);
   }, []);
-
-  // 添加防抖滚动处理
-  const handleScroll = useDebounce(() => {
-    // 滚动时触发虚拟列表更新，但使用防抖减少更新频率
-    rowVirtualizer.measure();
-  }, 50); // 50ms 的防抖时间
-
-  // 添加滚动事件监听
-  useEffect(() => {
-    const scrollElement = tableContainerRef.current;
-    if (!scrollElement) return;
-
-    scrollElement.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      scrollElement.removeEventListener('scroll', handleScroll);
-    };
-  }, [handleScroll]);
 
   return (
     <>
