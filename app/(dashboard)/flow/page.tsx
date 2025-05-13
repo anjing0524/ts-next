@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import '@xyflow/react/dist/style.css';
 import { DagFlow } from './components/dag-flow';
 import { Query } from './components/query';
