@@ -307,7 +307,7 @@ impl OverlayRenderer {
         {
             // 在成交量区域内
             y_value = layout.map_y_to_volume(mouse_y_constrained, max_volume);
-            y_label_text = layout.format_volume(y_value, 1);
+            y_label_text = time::format_volume(y_value, 1);
         } else {
             return; // Outside relevant chart areas
         }
@@ -384,7 +384,7 @@ impl OverlayRenderer {
                 let _ = ctx.fill_text("价格:", text_x, current_y);
                 let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
                 let _ = ctx.fill_text("数量:", text_x, current_y + 20.0);
-                let formatted_volume = layout.format_volume(volume, 2);
+                let formatted_volume = time::format_volume(volume, 2);
                 let _ = ctx.fill_text(&formatted_volume, label_x, current_y + 20.0);
             })),
             _ => (6, Box::new(|_, volume, mut current_y, layout, ctx, text_x, label_x| {
@@ -396,7 +396,7 @@ impl OverlayRenderer {
                 draw_line("最高:", format!("{:.2}", item.high()), current_y); current_y += 20.0;
                 draw_line("最低:", format!("{:.2}", item.low()), current_y); current_y += 20.0;
                 draw_line("收盘:", format!("{:.2}", item.close()), current_y); current_y += 20.0;
-                let formatted_volume = layout.format_volume(volume, 2);
+                let formatted_volume = time::format_volume(volume, 2);
                 draw_line("成交量:", formatted_volume, current_y);
             })),
         };
@@ -654,7 +654,7 @@ impl OverlayRenderer {
         let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
         current_y += line_height;
         let _ = ctx.fill_text("数量:", text_x, current_y);
-        let formatted_volume = layout.format_volume(volume, 2);
+        let formatted_volume = time::format_volume(volume, 2);
         let _ = ctx.fill_text(&formatted_volume, label_x, current_y);
     }
 

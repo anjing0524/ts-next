@@ -1,5 +1,4 @@
 // 图表布局配置 - 定义整个K线图的布局参数
-use chrono::DateTime;
 pub struct ChartLayout {
     // 基础尺寸
     pub canvas_width: f64,  // 画布总宽度
@@ -238,34 +237,6 @@ impl ChartLayout {
         }
     }
 
-    /// 格式化成交量显示，根据数值大小自动添加K或M后缀
-    /// * `volume` - 需要格式化的成交量
-    /// * `precision` - 小数点后保留的位数
-    /// * 返回格式化后的字符串
-    pub fn format_volume(&self, volume: f64, precision: usize) -> String {
-        if volume >= 1_000_000.0 {
-            format!(
-                "{:.precision$}M",
-                volume / 1_000_000.0,
-                precision = precision
-            )
-        } else if volume >= 1_000.0 {
-            format!("{:.precision$}K", volume / 1_000.0, precision = precision)
-        } else {
-            format!("{:.precision$}", volume, precision = precision)
-        }
-    }
-
-    /// 格式化时间戳为可读的日期时间格式
-    /// * `timestamp_secs` - Unix时间戳（秒）
-    /// * `format_str` - 格式化字符串，例如"%Y/%m/%d %H:%M"
-    /// * 返回格式化后的时间字符串
-    pub fn format_timestamp(&self, timestamp_secs: i64, format_str: &str) -> String {
-        let dt = DateTime::from_timestamp(timestamp_secs, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap());
-        dt.format(format_str).to_string()
-    }
-
     /// 计算导航器中每个K线的宽度
     /// * `items_len` - 数据项总数
     /// * 返回导航器中每个K线的宽度
@@ -275,7 +246,6 @@ impl ChartLayout {
         }
         self.chart_area_width / items_len as f64
     }
-
     /// 计算导航器中可见区域的起始和结束X坐标
     /// * `items_len` - 数据项总数
     /// * `visible_start` - 可见区域起始索引
