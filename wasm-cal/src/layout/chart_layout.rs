@@ -217,7 +217,7 @@ impl ChartLayout {
     // 
     // # 返回值
     // 数据索引，如果X坐标超出范围则返回None
-    pub fn map_x_to_index(&self, x: f64, visible_start: usize, visible_count: usize, items_len: usize) -> Option<usize> {
+    pub fn map_x_to_index(&self, x: f64, visible_start: usize, _visible_count: usize, items_len: usize) -> Option<usize> {
         // 如果X坐标超出图表区域，返回None
         if x < self.chart_area_x || x > self.chart_area_x + self.chart_area_width {
             return None;

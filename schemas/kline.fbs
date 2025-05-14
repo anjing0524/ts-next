@@ -14,6 +14,9 @@ table KlineItem {
     b_vol: double;
     s_vol: double;
     volumes: [PriceVolume];
+    last_price: double;  // 最新成交价
+    bid_price: double;   // 买一价
+    ask_price: double;   // 卖一价
 }
 
 table KlineData {

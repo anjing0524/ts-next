@@ -3,10 +3,11 @@
 use super::axis_renderer::AxisRenderer;
 use super::datazoom_renderer::DataZoomRenderer;
 use super::heat_renderer::HeatRenderer;
+use super::line_renderer::LineRenderer;
 use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
-use crate::canvas::{self, CanvasLayerType, CanvasManager};
+use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
@@ -39,6 +40,8 @@ pub struct ChartRenderer {
     volume_renderer: VolumeRenderer,
     /// 热图渲染器
     heat_renderer: HeatRenderer,
+    /// 线图渲染器
+    line_renderer: LineRenderer,
     /// 交互元素渲染器
     overlay_renderer: Rc<RefCell<OverlayRenderer>>,
     /// 数据管理器
@@ -81,6 +84,7 @@ impl ChartRenderer {
         let price_renderer = PriceRenderer {};
         let volume_renderer = VolumeRenderer {};
         let heat_renderer = HeatRenderer::default();
+        let line_renderer = LineRenderer::new();
         let overlay_renderer = Rc::new(RefCell::new(OverlayRenderer::new()));
         let datazoom_renderer = Rc::new(RefCell::new(DataZoomRenderer::new()));
 
@@ -90,6 +94,7 @@ impl ChartRenderer {
             price_renderer,
             volume_renderer,
             heat_renderer,
+            line_renderer,
             overlay_renderer,
             data_manager,
             datazoom_renderer,
@@ -154,6 +159,13 @@ impl ChartRenderer {
                     &self.data_manager,
                 );
                 
+                // 渲染价格线
+                self.line_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                );
+                
                 // 渲染成交量图 
                 self.volume_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
@@ -168,6 +180,12 @@ impl ChartRenderer {
                     layout,
                     &self.data_manager,
                 ); 
+                // 渲染价格线
+                self.line_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    layout,
+                    &self.data_manager,
+                );
                 // 渲染成交量图 
                 self.volume_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
@@ -360,5 +378,15 @@ impl ChartRenderer {
         }
         
         false
+    }
+
+    /// 获取线图渲染器
+    pub fn get_line_renderer(&self) -> &LineRenderer {
+        &self.line_renderer
+    }
+
+    /// 获取线图渲染器的可变引用
+    pub fn get_line_renderer_mut(&mut self) -> &mut LineRenderer {
+        &mut self.line_renderer
     }
 }

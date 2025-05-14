@@ -70,8 +70,23 @@ volumesLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+lastPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
+
+bidPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
+
+askPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 24);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
+
 static startKlineItem(builder:flatbuffers.Builder) {
-  builder.startObject(8);
+  builder.startObject(11);
 }
 
 static addTimestamp(builder:flatbuffers.Builder, timestamp:number) {
@@ -118,12 +133,24 @@ static startVolumesVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addLastPrice(builder:flatbuffers.Builder, lastPrice:number) {
+  builder.addFieldFloat64(8, lastPrice, 0.0);
+}
+
+static addBidPrice(builder:flatbuffers.Builder, bidPrice:number) {
+  builder.addFieldFloat64(9, bidPrice, 0.0);
+}
+
+static addAskPrice(builder:flatbuffers.Builder, askPrice:number) {
+  builder.addFieldFloat64(10, askPrice, 0.0);
+}
+
 static endKlineItem(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createKlineItem(builder:flatbuffers.Builder, timestamp:number, open:number, high:number, low:number, close:number, bVol:number, sVol:number, volumesOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createKlineItem(builder:flatbuffers.Builder, timestamp:number, open:number, high:number, low:number, close:number, bVol:number, sVol:number, volumesOffset:flatbuffers.Offset, lastPrice:number, bidPrice:number, askPrice:number):flatbuffers.Offset {
   KlineItem.startKlineItem(builder);
   KlineItem.addTimestamp(builder, timestamp);
   KlineItem.addOpen(builder, open);
@@ -133,6 +160,9 @@ static createKlineItem(builder:flatbuffers.Builder, timestamp:number, open:numbe
   KlineItem.addBVol(builder, bVol);
   KlineItem.addSVol(builder, sVol);
   KlineItem.addVolumes(builder, volumesOffset);
+  KlineItem.addLastPrice(builder, lastPrice);
+  KlineItem.addBidPrice(builder, bidPrice);
+  KlineItem.addAskPrice(builder, askPrice);
   return KlineItem.endKlineItem(builder);
 }
 }

@@ -423,6 +423,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_moveTo_1e871c64cf5d1fc1 = function(arg0, arg1, arg2) {
         arg0.moveTo(arg1, arg2);
     };
+    imports.wbg.__wbg_new_78c8a92080461d08 = function(arg0) {
+        const ret = new Float64Array(arg0);
+        return ret;
+    };
     imports.wbg.__wbg_new_78feb108b6472713 = function() {
         const ret = new Array();
         return ret;
@@ -435,8 +439,16 @@ function __wbg_get_imports() {
         const ret = new Uint8Array(arg0);
         return ret;
     };
+    imports.wbg.__wbg_newwithbyteoffsetandlength_93c8e0c1a479fa1a = function(arg0, arg1, arg2) {
+        const ret = new Float64Array(arg0, arg1 >>> 0, arg2 >>> 0);
+        return ret;
+    };
     imports.wbg.__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a = function(arg0, arg1, arg2) {
         const ret = new Uint8Array(arg0, arg1 >>> 0, arg2 >>> 0);
+        return ret;
+    };
+    imports.wbg.__wbg_newwithlength_5ebc38e611488614 = function(arg0) {
+        const ret = new Float64Array(arg0 >>> 0);
         return ret;
     };
     imports.wbg.__wbg_of_66b3ee656cbd962b = function(arg0, arg1) {
@@ -472,6 +484,15 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_setheight_433680330c9420c3 = function(arg0, arg1) {
         arg0.height = arg1 >>> 0;
+    };
+    imports.wbg.__wbg_setimageSmoothingEnabled_15335584d0f077b6 = function(arg0, arg1) {
+        arg0.imageSmoothingEnabled = arg1 !== 0;
+    };
+    imports.wbg.__wbg_setlineCap_3a3987ad3f03b31d = function(arg0, arg1, arg2) {
+        arg0.lineCap = getStringFromWasm0(arg1, arg2);
+    };
+    imports.wbg.__wbg_setlineJoin_79ca64e7e9efaff7 = function(arg0, arg1, arg2) {
+        arg0.lineJoin = getStringFromWasm0(arg1, arg2);
     };
     imports.wbg.__wbg_setlineWidth_3c8b7156949a9f4b = function(arg0, arg1) {
         arg0.lineWidth = arg1;

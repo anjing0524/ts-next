@@ -19,8 +19,11 @@ impl ChartColors {
     // --- K线颜色 ---
     pub const BULLISH: &'static str = "#26a69a"; // 上涨 (绿色)
     pub const BEARISH: &'static str = "#ef5350"; // 下跌 (红色)
-    pub const WICK: &'static str = "#888888"; // 影线 (中灰)
     
+    // --- 价格线颜色 ---
+    pub const LAST_PRICE_LINE: &'static str = "#FF9800"; // 最新价线 (橙色)
+    pub const BID_PRICE_LINE: &'static str = "#4CAF50"; // 买一价线 (绿色)
+    pub const ASK_PRICE_LINE: &'static str = "#F44336"; // 卖一价线 (红色)
 
     // --- 导航器颜色 ---
     pub const NAVIGATOR_BG: &'static str = "#f8f9fa"; // 导航器背景 (非常浅的灰)
@@ -38,13 +41,13 @@ impl ChartColors {
     // --- 交互元素 ---
     pub const CROSSHAIR: &'static str = "rgba(100, 100, 100, 0.5)"; // 十字线 (半透明灰)
     pub const TOOLTIP_BG: &'static str = "rgba(255, 255, 255, 0.95)"; // 提示框背景 (半透明白色)
-    pub const TOOLTIP_BORDER: &'static str = "#dddddd"; // 提示框边框 (浅灰)
+    pub const TOOLTIP_BORDER: &'static str = "#e0e0e0"; // 提示框边框 (浅灰)
     pub const TOOLTIP_TEXT: &'static str = "#333333"; // 提示框文本颜色
     
     // --- 开关按钮 ---
     pub const SWITCH_BG: &'static str = "#f0f0f0"; // 开关背景色
-    pub const SWITCH_ACTIVE_BG: &'static str = "#5c7cfa"; // 开关激活背景色
+    pub const SWITCH_ACTIVE_BG: &'static str = "#e0e0e0"; // 开关激活背景色
     pub const SWITCH_BORDER: &'static str = "#dddddd"; // 开关边框
-    pub const SWITCH_TEXT: &'static str = "#555555"; // 开关文本颜色
-    pub const SWITCH_ACTIVE_TEXT: &'static str = "#ffffff"; // 开关激活文本颜色
+    pub const SWITCH_TEXT: &'static str = "#666666"; // 开关文本颜色
+    pub const SWITCH_ACTIVE_TEXT: &'static str = "#333333"; // 开关激活文本颜色
 }

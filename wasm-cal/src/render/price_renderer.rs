@@ -39,7 +39,8 @@ impl PriceRenderer {
         let x_coordinates = visible_range.precompute_x_coordinates(layout);
 
         // 优化：使用临时数组收集所有绘制操作，减少绘制调用次数
-        let mut high_low_lines = Vec::with_capacity(visible_count);
+        let mut bullish_high_low_lines = Vec::with_capacity(visible_count);
+        let mut bearish_high_low_lines = Vec::with_capacity(visible_count);
         let mut bullish_rects = Vec::with_capacity(visible_count);
         let mut bearish_rects = Vec::with_capacity(visible_count);
 
@@ -58,8 +59,14 @@ impl PriceRenderer {
             let open_y = layout.map_price_to_y(item.open(), min_low, max_high);
             let close_y = layout.map_price_to_y(item.close(), min_low, max_high);
             
-            // 收集影线绘制信息
-            high_low_lines.push((x_center, high_y, x_center, low_y));
+            // 收集影线绘制信息 - 根据涨跌分别收集
+            if item.close() >= item.open() {
+                // 上涨K线 - 绿色影线
+                bullish_high_low_lines.push((x_center, high_y, x_center, low_y));
+            } else {
+                // 下跌K线 - 红色影线
+                bearish_high_low_lines.push((x_center, high_y, x_center, low_y));
+            }
             
             // 收集实体绘制信息
             let candle_x = x_center - (layout.candle_width / 2.0);
@@ -76,16 +83,33 @@ impl PriceRenderer {
             }
         }
         
-        // 批量绘制所有K线影线
-        ctx.begin_path();
-        ctx.set_stroke_style_str(ChartColors::WICK);
-        ctx.set_line_width(1.0);
-        
-        for (x1, y1, x2, y2) in high_low_lines {
-            ctx.move_to(x1, y1);
-            ctx.line_to(x2, y2);
+        // 批量绘制所有上涨K线影线 (绿色)
+        if !bullish_high_low_lines.is_empty() {
+            ctx.begin_path();
+            ctx.set_stroke_style_str(ChartColors::BULLISH);
+            ctx.set_line_width(1.5);
+            let empty_array = js_sys::Float64Array::new_with_length(0);
+            ctx.set_line_dash(&empty_array).unwrap();
+            for (x1, y1, x2, y2) in bullish_high_low_lines {
+                ctx.move_to(x1, y1);
+                ctx.line_to(x2, y2);
+            }
+            ctx.stroke();
         }
-        ctx.stroke();
+        
+        // 批量绘制所有下跌K线影线 (红色)
+        if !bearish_high_low_lines.is_empty() {
+            ctx.begin_path();
+            ctx.set_stroke_style_str(ChartColors::BEARISH);
+            ctx.set_line_width(1.5);
+            let empty_array = js_sys::Float64Array::new_with_length(0);
+            ctx.set_line_dash(&empty_array).unwrap();
+            for (x1, y1, x2, y2) in bearish_high_low_lines {
+                ctx.move_to(x1, y1);
+                ctx.line_to(x2, y2);
+            }
+            ctx.stroke();
+        }
         
         // 批量绘制所有上涨K线实体
         if !bullish_rects.is_empty() {

@@ -61,3 +61,5 @@ test-results
 /public/
 
 /build-docker/node-*
+
+.continue

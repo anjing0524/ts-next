@@ -156,6 +156,9 @@ impl<'a> KlineItem<'a> {
   pub const VT_B_VOL: flatbuffers::VOffsetT = 14;
   pub const VT_S_VOL: flatbuffers::VOffsetT = 16;
   pub const VT_VOLUMES: flatbuffers::VOffsetT = 18;
+  pub const VT_LAST_PRICE: flatbuffers::VOffsetT = 20;
+  pub const VT_BID_PRICE: flatbuffers::VOffsetT = 22;
+  pub const VT_ASK_PRICE: flatbuffers::VOffsetT = 24;
 
   #[inline]
   pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -167,6 +170,9 @@ impl<'a> KlineItem<'a> {
     args: &'args KlineItemArgs<'args>
   ) -> flatbuffers::WIPOffset<KlineItem<'bldr>> {
     let mut builder = KlineItemBuilder::new(_fbb);
+    builder.add_ask_price(args.ask_price);
+    builder.add_bid_price(args.bid_price);
+    builder.add_last_price(args.last_price);
     builder.add_s_vol(args.s_vol);
     builder.add_b_vol(args.b_vol);
     builder.add_close(args.close);
@@ -235,6 +241,27 @@ impl<'a> KlineItem<'a> {
     // which contains a valid value in this slot
     unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<PriceVolume>>>>(KlineItem::VT_VOLUMES, None)}
   }
+  #[inline]
+  pub fn last_price(&self) -> f64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<f64>(KlineItem::VT_LAST_PRICE, Some(0.0)).unwrap()}
+  }
+  #[inline]
+  pub fn bid_price(&self) -> f64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<f64>(KlineItem::VT_BID_PRICE, Some(0.0)).unwrap()}
+  }
+  #[inline]
+  pub fn ask_price(&self) -> f64 {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<f64>(KlineItem::VT_ASK_PRICE, Some(0.0)).unwrap()}
+  }
 }
 
 impl flatbuffers::Verifiable for KlineItem<'_> {
@@ -252,6 +279,9 @@ impl flatbuffers::Verifiable for KlineItem<'_> {
      .visit_field::<f64>("b_vol", Self::VT_B_VOL, false)?
      .visit_field::<f64>("s_vol", Self::VT_S_VOL, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<PriceVolume>>>>("volumes", Self::VT_VOLUMES, false)?
+     .visit_field::<f64>("last_price", Self::VT_LAST_PRICE, false)?
+     .visit_field::<f64>("bid_price", Self::VT_BID_PRICE, false)?
+     .visit_field::<f64>("ask_price", Self::VT_ASK_PRICE, false)?
      .finish();
     Ok(())
   }
@@ -265,6 +295,9 @@ pub struct KlineItemArgs<'a> {
     pub b_vol: f64,
     pub s_vol: f64,
     pub volumes: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<PriceVolume<'a>>>>>,
+    pub last_price: f64,
+    pub bid_price: f64,
+    pub ask_price: f64,
 }
 impl<'a> Default for KlineItemArgs<'a> {
   #[inline]
@@ -278,6 +311,9 @@ impl<'a> Default for KlineItemArgs<'a> {
       b_vol: 0.0,
       s_vol: 0.0,
       volumes: None,
+      last_price: 0.0,
+      bid_price: 0.0,
+      ask_price: 0.0,
     }
   }
 }
@@ -320,6 +356,18 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> KlineItemBuilder<'a, 'b, A> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(KlineItem::VT_VOLUMES, volumes);
   }
   #[inline]
+  pub fn add_last_price(&mut self, last_price: f64) {
+    self.fbb_.push_slot::<f64>(KlineItem::VT_LAST_PRICE, last_price, 0.0);
+  }
+  #[inline]
+  pub fn add_bid_price(&mut self, bid_price: f64) {
+    self.fbb_.push_slot::<f64>(KlineItem::VT_BID_PRICE, bid_price, 0.0);
+  }
+  #[inline]
+  pub fn add_ask_price(&mut self, ask_price: f64) {
+    self.fbb_.push_slot::<f64>(KlineItem::VT_ASK_PRICE, ask_price, 0.0);
+  }
+  #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> KlineItemBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     KlineItemBuilder {
@@ -345,6 +393,9 @@ impl core::fmt::Debug for KlineItem<'_> {
       ds.field("b_vol", &self.b_vol());
       ds.field("s_vol", &self.s_vol());
       ds.field("volumes", &self.volumes());
+      ds.field("last_price", &self.last_price());
+      ds.field("bid_price", &self.bid_price());
+      ds.field("ask_price", &self.ask_price());
       ds.finish()
   }
 }

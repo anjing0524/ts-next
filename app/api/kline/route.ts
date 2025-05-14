@@ -12,6 +12,9 @@ type KlineItem = {
   b_vol: number; // 买方成交量
   s_vol: number; // 卖方成交量
   volumes: Array<{ price: number; volume: number }>; // 价格订单量数组
+  last_price: number; // 最新成交价
+  bid_price: number;  // 买一价
+  ask_price: number;  // 卖一价
 };
 
 // 生成模拟K线数据（独立函数）- 价格范围在2000-3000之间
@@ -50,6 +53,19 @@ function generateKlineData(count: number): KlineItem[] {
     const b_vol = parseFloat((totalVolume * buyRatio).toFixed(2));
     const s_vol = parseFloat((totalVolume * (1 - buyRatio)).toFixed(2));
 
+    // 生成最新价、买一价、卖一价
+    // 最新价通常在收盘价附近波动
+    const lastPriceVariation = (Math.random() - 0.5) * 0.01; // -0.5% 到 +0.5% 的波动
+    const last_price = parseFloat((boundedClose * (1 + lastPriceVariation)).toFixed(2));
+    
+    // 买一价通常略低于最新价
+    const bidVariation = -Math.random() * 0.005; // -0.5% 到 0% 的波动
+    const bid_price = parseFloat((last_price * (1 + bidVariation)).toFixed(2));
+    
+    // 卖一价通常略高于最新价
+    const askVariation = Math.random() * 0.005; // 0% 到 +0.5% 的波动
+    const ask_price = parseFloat((last_price * (1 + askVariation)).toFixed(2));
+
     // 生成价格订单量数据
     const tick = 10; // 档位间隔
     const priceLevels: Array<{ price: number; volume: number }> = [];
@@ -75,6 +91,9 @@ function generateKlineData(count: number): KlineItem[] {
       b_vol,
       s_vol,
       volumes: priceLevels,
+      last_price,
+      bid_price,
+      ask_price,
     });
 
     // 为下一个周期设置开盘价
@@ -94,7 +113,7 @@ function serializeKlineData(data: KlineItem[]): Uint8Array {
   console.log('序列化前的前3条数据:');
   for (let i = 0; i < Math.min(3, data.length); i++) {
     console.log(
-      `第${i + 1}条: 时间戳=${data[i].timestamp}, 开盘=${data[i].open}, 最高=${data[i].high}, 最低=${data[i].low}, 收盘=${data[i].close}, 买量=${data[i].b_vol}, 卖量=${data[i].s_vol}, 价格点数量=${data[i].volumes.length}`
+      `第${i + 1}条: 时间戳=${data[i].timestamp}, 开盘=${data[i].open}, 最高=${data[i].high}, 最低=${data[i].low}, 收盘=${data[i].close}, 买量=${data[i].b_vol}, 卖量=${data[i].s_vol}, 最新价=${data[i].last_price}, 买一价=${data[i].bid_price}, 卖一价=${data[i].ask_price}, 价格点数量=${data[i].volumes.length}`
     );
   }
 
@@ -127,6 +146,9 @@ function serializeKlineData(data: KlineItem[]): Uint8Array {
     Kline.KlineItem.addBVol(builder, item.b_vol);
     Kline.KlineItem.addSVol(builder, item.s_vol);
     Kline.KlineItem.addVolumes(builder, volumesVector);
+    Kline.KlineItem.addLastPrice(builder, item.last_price);
+    Kline.KlineItem.addBidPrice(builder, item.bid_price);
+    Kline.KlineItem.addAskPrice(builder, item.ask_price);
     const offset = Kline.KlineItem.endKlineItem(builder);
     itemOffsets.push(offset);
   }
