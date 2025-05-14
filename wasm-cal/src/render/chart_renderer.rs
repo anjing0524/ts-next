@@ -17,21 +17,6 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use web_sys::{OffscreenCanvas};
 use super::datazoom_renderer::DragResult;
-use wasm_bindgen::prelude::*;
-
-// 添加私有日志函数
-#[wasm_bindgen]
-unsafe extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-}
-
-// 添加安全的日志包装函数
-fn log_message(message: &str) {
-    unsafe {
-        log(message);
-    }
-}
 
 // 定义每次重绘的间隔计数
 thread_local! {
@@ -65,7 +50,6 @@ pub struct ChartRenderer {
     data_manager: Rc<RefCell<DataManager>>,
     /// DataZoom渲染器
     datazoom_renderer: Rc<RefCell<DataZoomRenderer>>,
-
     // 采用哪种渲染引擎
     mode: RenderMode,
 }
@@ -399,8 +383,6 @@ impl ChartRenderer {
 
     /// 处理鼠标点击事件 (特别用于切换图表模式)
     pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
-        // 添加调试日志，记录当前模式
-        log_message(&format!("ChartRenderer::handle_click: current mode = {:?}", self.mode));
         
         // 检查是否点击了切换按钮
         let new_mode = {
@@ -410,29 +392,20 @@ impl ChartRenderer {
         };
 
         if let Some(new_mode) = new_mode {
-            // 添加调试日志，记录模式变化
-            log_message(&format!("ChartRenderer::handle_click: mode changing from {:?} to {:?}", self.mode, new_mode));
             
             // 根据点击的按钮设置渲染模式
             self.mode = new_mode;
-            
             // 重新渲染图表
             // 确保所有借用都已释放后再调用render
             self.render();
-            
             // 重新绘制交互元素
             {
                 let overlay_renderer = self.overlay_renderer.borrow();
                 overlay_renderer.redraw(&self.canvas_manager, &self.data_manager, self.mode);
             } // 在这里释放 overlay_renderer 的借用
             
-            // 添加调试日志，确认模式已更新
-            log_message(&format!("ChartRenderer::handle_click: mode updated to {:?}", self.mode));
             return true;
         }
-        
-        // 添加调试日志，表示没有模式变化
-        log_message("ChartRenderer::handle_click: no mode change");
         false
     }
 

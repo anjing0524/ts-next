@@ -10,21 +10,6 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::utils::time;
-use wasm_bindgen::prelude::*;
-
-// 添加私有日志函数
-#[wasm_bindgen]
-unsafe extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-}
-
-// 添加安全的日志包装函数
-fn log_message(message: &str) {
-    unsafe {
-        log(message);
-    }
-}
 
 /// 交互层渲染器
 #[derive(Default)]
@@ -536,31 +521,17 @@ impl OverlayRenderer {
         let button_x = (layout.canvas_width - button_width) / 2.0;
         let button_y = layout.padding;
         
-        // 保留关键日志，用于调试按钮点击
-        log_message(&format!(
-            "check_switch_button_click: button_x = {}, button_y = {}, button_width = {}, button_height = {}, click_x = {}, click_y = {}", 
-            button_x, button_y, button_width, button_height, x, y
-        ));
-        
         // 检查点击是否在按钮区域内
         if x >= button_x && x <= button_x + button_width && y >= button_y && y <= button_y + button_height {
             // 确定点击的是哪个选项
             let kline_button_x = button_x;
             let heatmap_button_x = button_x + layout.switch_btn_width;
             
-            // 保留关键日志，用于调试按钮选项
-            log_message(&format!(
-                "check_switch_button_click: kline_button_x = {}, heatmap_button_x = {}", 
-                kline_button_x, heatmap_button_x
-            ));
-            
             if x >= kline_button_x && x < heatmap_button_x {
                 // 点击了K线选项
-                log_message("check_switch_button_click: K线选项被点击");
                 return Some(true);
             } else {
                 // 点击了热图选项
-                log_message("check_switch_button_click: 热图选项被点击");
                 return Some(false);
             }
         }
@@ -660,25 +631,16 @@ impl OverlayRenderer {
 
     /// 处理鼠标点击事件 (特别用于切换图表模式)
     pub fn handle_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<RenderMode> {
-        // 保留关键日志，用于调试点击事件
-        log_message(&format!("OverlayRenderer::handle_click: x = {}, y = {}", x, y));
         
         // 检查是否点击了切换按钮
         if let Some(is_kmap) = self.check_switch_button_click(x, y, layout) {
-            // 保留关键日志，用于调试模式切换
-            log_message(&format!("OverlayRenderer::handle_click: button clicked, is_kmap = {}", is_kmap));
-            
             // 根据点击的按钮返回对应的渲染模式
             if is_kmap {
                 return Some(RenderMode::KMAP);
             } else {
                 return Some(RenderMode::HEATMAP);
             }
-        } else {
-            // 移除不必要的日志
-            // log_message("OverlayRenderer::handle_click: no button clicked");
-        }
-        
+        } 
         None
     }
 
