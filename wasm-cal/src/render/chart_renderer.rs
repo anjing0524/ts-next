@@ -1,6 +1,7 @@
 //! 图表渲染器 - 整合所有模块，提供统一的渲染接口
 
 use super::axis_renderer::AxisRenderer;
+use super::cursor_style::CursorStyle;
 use super::datazoom_renderer::DataZoomRenderer;
 use super::heat_renderer::HeatRenderer;
 use super::line_renderer::LineRenderer;
@@ -14,7 +15,8 @@ use crate::layout::ChartLayout;
 use crate::utils::WasmError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use web_sys::OffscreenCanvas;
+use web_sys::{OffscreenCanvas};
+use super::datazoom_renderer::DragResult;
 
 // 定义每次重绘的间隔计数
 thread_local! {
@@ -206,7 +208,7 @@ impl ChartRenderer {
     }
 
     /// 获取当前鼠标位置的光标样式
-    pub fn get_cursor_style(&self, x: f64, y: f64) -> &'static str {
+    pub fn get_cursor_style(&self, x: f64, y: f64) -> CursorStyle {
         // 先检查是否在DataZoom上，并获取对应的光标样式
         let datazoom_cursor = self.datazoom_renderer.borrow().get_cursor_style(
             x,
@@ -216,14 +218,15 @@ impl ChartRenderer {
         );
 
         // 如果DataZoom返回了非默认样式，则使用该样式
-        if datazoom_cursor != "default" {
+        if datazoom_cursor != CursorStyle::Default {
             return datazoom_cursor;
         }
+        
         // 默认光标样式
-        "default"
+        CursorStyle::Default
     }
 
-    // 处理鼠标移动事件
+    /// 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
         
         // 直接交给OverlayRenderer处理鼠标移动
@@ -269,33 +272,48 @@ impl ChartRenderer {
 
     // 处理鼠标拖动事件
     pub fn handle_mouse_drag(&self, x: f64, y: f64) -> bool {
-        // 检查DataZoom是否处于拖动状态
-        let need_redraw = {
+        let drag_result = {
             let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
             datazoom_renderer.handle_mouse_drag(x, y, &self.canvas_manager, &self.data_manager)
         };
 
-        // 不需要重绘就直接返回
-        if !need_redraw {
-            return false;
+        // 更新鼠标样式的辅助函数 - 提取重复逻辑
+        let update_mouse_style = || {
+            let mut overlay_renderer = self.overlay_renderer.borrow_mut();
+            overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager);
+            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
+        };
+
+        match drag_result {
+            DragResult::Released => {
+                // 由于DataZoomRenderer已经重置了拖动状态，我们只需要重新渲染
+                self.render();
+                // 更新鼠标样式 - 确保在所有情况下都更新鼠标样式
+                update_mouse_style();
+                true
+            },
+            DragResult::NeedRedraw => {
+                let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
+                    let current = counter.get();
+                    let next = (current + 1) % 3;
+                    counter.set(next);
+                    next == 0
+                });
+                
+                if should_render {
+                    self.render();
+                }
+                
+                // 无论是否需要重绘，都更新鼠标样式
+                update_mouse_style();
+                true
+            },
+            DragResult::None => {
+                // 即使没有拖动结果，也更新鼠标样式以确保一致性
+                update_mouse_style();
+                false
+            },
         }
-
-        // 性能优化：使用线程局部变量进行节流
-        // 实际应用中应该使用时间戳，这里简化实现为每隔几次渲染
-        let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
-            let current = counter.get();
-            let next = (current + 1) % 3; // 每3次拖动事件渲染一次
-            counter.set(next);
-            next == 0
-        });
-
-        // 如果通过节流控制，才重新绘制所有图表
-        if should_render {
-            self.render();
-            return true;
-        }
-
-        need_redraw
     }
 
     // 处理鼠标离开事件 - 清除所有交互元素并重置拖动状态
@@ -312,15 +330,27 @@ impl ChartRenderer {
         // 检查DataZoom是否处于拖动状态，如果是则重置并返回需要重绘
         let was_dragging = {
             let mut datazoom_renderer = self.datazoom_renderer.borrow_mut();
-            datazoom_renderer.handle_mouse_up(&self.data_manager)
+            // 使用强制重置方法确保拖动状态被正确重置
+            datazoom_renderer.force_reset_drag_state()
         };
 
+        // 清除交互层并重绘的辅助函数 - 提取重复逻辑
+        // 注意：这里使用 &mut 而不是 mut 变量声明，因为闭包需要可变借用
+        let clear_and_redraw_overlay = || {
+            let overlay_renderer = self.overlay_renderer.borrow_mut();
+            overlay_renderer.clear(&self.canvas_manager);
+            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
+        };
+
+        // 无论是否有拖动状态，都清除交互层
+        clear_and_redraw_overlay();
+        
         // 如果之前在拖动，重绘图表并返回true表示已处理
         if was_dragging {
             self.render();
             return true;
         }
-
+        
         false
     }
 

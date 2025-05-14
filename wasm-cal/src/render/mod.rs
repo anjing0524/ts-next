@@ -2,6 +2,7 @@
 
 pub mod axis_renderer;
 pub mod chart_renderer;
+pub mod cursor_style;
 pub mod datazoom_renderer;
 pub mod heat_renderer;
 pub mod line_renderer;

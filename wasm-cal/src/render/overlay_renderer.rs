@@ -54,6 +54,8 @@ impl OverlayRenderer {
         // 更新鼠标坐标
         self.mouse_x = x;
         self.mouse_y = y;
+        self.mouse_in_chart = false;
+        self.hover_candle_index = None;
 
         // 计算移动距离
         let distance = ((x - prev_x).powi(2) + (y - prev_y).powi(2)).sqrt();
@@ -91,11 +93,23 @@ impl OverlayRenderer {
 
     /// 处理鼠标离开事件
     pub fn handle_mouse_leave(&mut self, canvas_manager: &CanvasManager) {
+        // 重置所有鼠标状态
         self.mouse_in_chart = false;
         self.hover_candle_index = None;
-
-        // 清除交互层
+        self.mouse_x = 0.0;
+        self.mouse_y = 0.0;
+        
+        // 清除交互层 - 确保完全清除所有交互元素
         self.clear(canvas_manager);
+        
+        // 重新绘制覆盖层，只显示切换按钮
+        // 注意：这里不调用draw方法，因为它会检查mouse_in_chart并可能绘制其他元素
+        // 我们只需要确保切换按钮被绘制
+        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
+        let layout = canvas_manager.layout.borrow();
+        
+        // 只绘制切换按钮
+        self.draw_switch_button(&ctx, &layout, RenderMode::KMAP);
     }
 
     /// 绘制交互层

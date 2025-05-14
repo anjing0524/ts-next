@@ -109,6 +109,8 @@ export default function Main() {
           setIsLoading(false);
         },
         cursorStyle: (data) => {
+          // 直接使用从WASM返回的cursor style字符串
+          // 这些字符串现在来自CursorStyle枚举的to_string()方法
           setCursorStyle(data.style);
         },
         mousedownHandled: (data) => {

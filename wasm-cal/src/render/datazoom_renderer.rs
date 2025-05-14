@@ -4,6 +4,7 @@ use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
+use crate::render::cursor_style::CursorStyle;
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,6 +31,12 @@ pub struct DataZoomRenderer {
     drag_start_x: f64,
     /// 当前拖动的手柄类型
     drag_handle_type: DragHandleType,
+}
+
+pub enum DragResult {
+    None,
+    NeedRedraw,
+    Released,
 }
 
 impl DataZoomRenderer {
@@ -127,22 +134,28 @@ impl DataZoomRenderer {
         y: f64,
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
-    ) -> &'static str {
+    ) -> CursorStyle {
         // 如果正在拖动，根据拖动手柄类型返回对应的鼠标样式
         if self.is_dragging {
             return match self.drag_handle_type {
-                DragHandleType::Left | DragHandleType::Right => "ew-resize", // 东西方向调整大小
-                DragHandleType::Middle => "grab",                            // 抓取样式
-                DragHandleType::None => "default",
+                DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize, // 东西方向调整大小
+                DragHandleType::Middle => CursorStyle::Grabbing,                       // 抓取中样式
+                DragHandleType::None => CursorStyle::Default,                          // 不应该发生，但为了安全起见
             };
         }
 
         // 如果没有在拖动，检查鼠标位置对应的手柄类型
+        // 确保鼠标在导航器区域内
+        let layout = canvas_manager.layout.borrow();
+        if !layout.is_point_in_navigator(x, y) {
+            return CursorStyle::Default;
+        }
+
         let handle_type = self.get_handle_at_position(x, y, canvas_manager, data_manager);
         match handle_type {
-            DragHandleType::Left | DragHandleType::Right => "ew-resize", // 东西方向调整大小
-            DragHandleType::Middle => "grab",                            // 抓取样式
-            DragHandleType::None => "default",
+            DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize, // 东西方向调整大小
+            DragHandleType::Middle => CursorStyle::Grab,                           // 抓取样式
+            DragHandleType::None => CursorStyle::Default,
         }
     }
 
@@ -160,6 +173,14 @@ impl DataZoomRenderer {
         was_dragging
     }
 
+    /// 强制重置拖动状态
+    /// 在特殊情况下（如鼠标离开图表区域）调用此函数，确保拖动状态被正确重置
+    pub fn force_reset_drag_state(&mut self) -> bool{
+        self.is_dragging = false;
+        self.drag_handle_type = DragHandleType::None;
+        false
+    }
+
     /// 处理鼠标拖动事件
     /// 当用户拖动鼠标时调用此函数，更新导航器的位置
     /// 与handle_mouse_move类似，但专门用于拖动状态
@@ -173,27 +194,35 @@ impl DataZoomRenderer {
         _y: f64,
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
-    ) -> bool {
+    ) -> DragResult {
         // 如果没有在拖动，不处理
         if !self.is_dragging {
-            return false;
+            return DragResult::None;
+        }
+
+        // 检查鼠标是否在导航器区域内
+        let layout = canvas_manager.layout.borrow();
+        if !layout.is_point_in_navigator(x, _y) {
+            // 如果鼠标不在导航器区域内，强制重置拖动状态
+            self.is_dragging = false;
+            self.drag_handle_type = DragHandleType::None;
+            return DragResult::Released;
         }
 
         // 计算拖动距离
         let drag_distance = x - self.drag_start_x;
 
         // 获取布局和数据
-        let layout = canvas_manager.layout.borrow();
         let mut data_manager_ref = data_manager.borrow_mut();
 
         // 获取数据总量
         let items_len = match data_manager_ref.get_items() {
             Some(items) => items.len(),
-            None => return false,
+            None => return DragResult::None,
         };
 
         if items_len == 0 {
-            return false;
+            return DragResult::None;
         }
 
         // 计算拖动距离对应的索引变化
@@ -205,7 +234,7 @@ impl DataZoomRenderer {
 
         // 如果没有明显变化，不需要处理
         if index_change == 0 {
-            return false;
+            return DragResult::None;
         }
 
         // 获取当前可见范围
@@ -214,47 +243,48 @@ impl DataZoomRenderer {
         // 根据拖动手柄类型计算新的可见范围
         let (new_start, new_end) = match self.drag_handle_type {
             DragHandleType::Left => {
-                // 拖动左侧手柄，改变可见区域起始位置和数量
-                let  new_start = (visible_start as isize + index_change)
+                let new_start = (visible_start as isize + index_change)
                     .max(0)
                     .min((items_len - 1) as isize) as usize;
-
-                // 如果左手柄超过了右手柄位置，交换操作类型
-                if new_start >= visible_end {
-                    // 交换手柄类型
+                if new_start == 0 {
+                    // 重置拖动状态，确保光标样式被正确更新
+                    self.is_dragging = false;
+                    self.drag_handle_type = DragHandleType::None;
+                    return DragResult::Released;
+                } else if new_start >= visible_end {
+                    // 如果左侧手柄超过了右侧手柄，交换手柄类型
                     self.drag_handle_type = DragHandleType::Right;
                     (visible_end, visible_end)
                 } else {
-                    // 正常计算新可见区域
                     (new_start, visible_end)
                 }
             }
             DragHandleType::Right => {
-                // 计算新的可见数量
-                let  new_end = ((visible_end as isize + index_change) as usize)
-                    .max(1) // 确保至少显示1根K线
-                    .min(items_len - 1); // 不超过数据范围
-                if new_end <= visible_start {
-                    // 交换
+                let new_end = ((visible_end as isize + index_change) as usize)
+                    .max(1)
+                    .min(items_len - 1);
+                if new_end == items_len - 1 {
+                    // 重置拖动状态，确保光标样式被正确更新
+                    self.is_dragging = false;
+                    self.drag_handle_type = DragHandleType::None;
+                    return DragResult::Released;
+                } else if new_end <= visible_start {
+                    // 如果右侧手柄超过了左侧手柄，交换手柄类型
                     self.drag_handle_type = DragHandleType::Left;
-                    (visible_start,visible_start)
+                    (visible_start, visible_start)
                 } else {
-                    // 正常情况，不需要交换
                     (visible_start, new_end)
                 }
-             
             }
             DragHandleType::Middle => {
-                // 拖动中间区域，平移整个可见区域
                 let new_start = (visible_start as isize + index_change)
                     .max(0)
                     .min((items_len - visible_count) as isize)
                     as usize;
-
                 (new_start, new_start + visible_count)
             }
             DragHandleType::None => {
-                return false;
+                return DragResult::None;
             }
         };
 
@@ -280,11 +310,10 @@ impl DataZoomRenderer {
             // 重新计算数据范围
             data_manager_ref.calculate_data_ranges();
 
-            // 返回true表示需要重绘
-            return true;
+            return DragResult::NeedRedraw;
         }
 
-        false
+        DragResult::None
     }
 
     /// 绘制DataZoom导航器
@@ -565,5 +594,18 @@ impl DataZoomRenderer {
 
         // 恢复渲染状态，取消裁剪区域
         ctx.restore();
+    }
+
+    /// 检查点是否在DataZoom区域内
+    pub fn is_point_in_datazoom(
+        &self,
+        x: f64,
+        y: f64,
+        canvas_manager: &CanvasManager,
+        _data_manager: &Rc<RefCell<DataManager>>,
+    ) -> bool {
+        // 使用canvas_manager的layout来检查点是否在导航器区域内
+        let layout = canvas_manager.layout.borrow();
+        layout.is_point_in_navigator(x, y)
     }
 }
