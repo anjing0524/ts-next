@@ -175,10 +175,11 @@ impl DataZoomRenderer {
 
     /// 强制重置拖动状态
     /// 在特殊情况下（如鼠标离开图表区域）调用此函数，确保拖动状态被正确重置
-    pub fn force_reset_drag_state(&mut self) -> bool{
+    pub fn force_reset_drag_state(&mut self) -> bool {
+        let was_dragging = self.is_dragging;
         self.is_dragging = false;
         self.drag_handle_type = DragHandleType::None;
-        false
+        was_dragging
     }
 
     /// 处理鼠标拖动事件
@@ -202,11 +203,12 @@ impl DataZoomRenderer {
 
         // 检查鼠标是否在导航器区域内
         let layout = canvas_manager.layout.borrow();
-        if !layout.is_point_in_navigator(x, _y) {
-            // 如果鼠标不在导航器区域内，强制重置拖动状态
-            self.is_dragging = false;
-            self.drag_handle_type = DragHandleType::None;
-            return DragResult::Released;
+        // 允许鼠标在拖动状态下不一定在导航器区域内，但不能超出canvas范围
+        let is_in_canvas = x >= 0.0 && x <= layout.canvas_width && _y >= 0.0 && _y <= layout.canvas_height;
+        if !is_in_canvas {
+            // 如果鼠标不在canvas范围内，不触发重置，但继续处理拖动
+            // 允许用户拖动到canvas外部并返回时继续控制
+            return DragResult::None;
         }
 
         // 计算拖动距离

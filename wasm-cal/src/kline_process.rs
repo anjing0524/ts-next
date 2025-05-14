@@ -184,7 +184,6 @@ impl KlineProcess {
                 return;
             }
         };
-        log("moved");
         chart_renderer.handle_mouse_move(x, y);
     }
 
@@ -207,7 +206,6 @@ impl KlineProcess {
                 return false;
             }
         };
-        log("leaved");
         // 调用chart_renderer的鼠标离开处理函数，并返回是否需要重绘
         chart_renderer.handle_mouse_leave()
     }
@@ -232,7 +230,6 @@ impl KlineProcess {
             }
         };
         let result = chart_renderer.handle_mouse_down(x, y);
-        log("down");
         result
     }
 
@@ -246,7 +243,6 @@ impl KlineProcess {
             }
         };
         let result = chart_renderer.handle_mouse_up(x, y);  
-        log("up");
         result
     }
 
@@ -259,7 +255,6 @@ impl KlineProcess {
                 return;
             }
         };
-        log("drag");
         // 调用chart_renderer的鼠标拖动处理函数
         chart_renderer.handle_mouse_drag(x, y);
     }

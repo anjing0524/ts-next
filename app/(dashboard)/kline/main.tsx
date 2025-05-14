@@ -123,6 +123,14 @@ export default function Main() {
             setIsDragging(false);
           }
         },
+        mouseleaveHandled: (data) => {
+          // 处理鼠标离开事件的结果
+          if (data.needsRedraw) {
+            // 如果需要重绘，可以在这里执行任何必要的UI更新
+            // 例如，可以重置拖动状态
+            setIsDragging(false);
+          }
+        },
         clickHandled: (data) => {
           // 点击事件导致了模式切换，可以在这里执行任何额外操作
           if (data.modeChanged) {
@@ -279,6 +287,9 @@ export default function Main() {
     sendMessageToWorker({
       type: 'mouseleave',
     });
+    
+    // 记录鼠标已离开canvas，但不立即重置isDragging状态
+    // 让window事件处理程序来管理拖动结束
   }, [sendMessageToWorker]);
 
   // 处理滚轮事件 - 使用节流优化
@@ -381,6 +392,62 @@ export default function Main() {
       window.removeEventListener('error', handleGlobalError);
     };
   }, [handleError]);
+
+  // 添加全局鼠标事件处理
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 处理全局鼠标释放事件，用于捕获canvas外的释放
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      if (isDragging) {
+        // 当在canvas外释放鼠标时，需要通知worker结束拖动
+        sendMessageToWorker({
+          type: 'mouseup',
+          x: -1, // 使用-1表示canvas外的位置
+          y: -1,
+        });
+        
+        // 直接重置拖动状态
+        setIsDragging(false);
+      }
+    };
+
+    // 在拖动状态下处理全局鼠标移动
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDragging && canvasRef.current) {
+        // 获取canvas位置
+        const rect = canvasRef.current.getBoundingClientRect();
+        
+        // 计算相对于canvas的坐标
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // 判断鼠标是否在canvas内
+        const isInCanvas = 
+          x >= 0 && x <= rect.width && 
+          y >= 0 && y <= rect.height;
+        
+        if (isInCanvas) {
+          // 如果在canvas内，发送正常的拖动事件
+          sendMessageToWorker({
+            type: 'mousedrag',
+            x: x,
+            y: y,
+          });
+        }
+      }
+    };
+
+    // 添加全局事件监听器
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+
+    return () => {
+      // 清理事件监听器
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+    };
+  }, [isDragging, sendMessageToWorker]);
 
   return (
     <div className="p-4">

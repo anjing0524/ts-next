@@ -116,7 +116,20 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       case 'mouseup':
         if (!processorRef) return;
         // 调用WASM中的鼠标释放处理函数
-        const isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
+        // 处理canvas外的情况，如果坐标为-1，说明是canvas外的事件
+        const isOutsideCanvas = data.x === -1 && data.y === -1;
+        let isDragEnd;
+        
+        if (isOutsideCanvas) {
+          // 对于canvas外的事件，首先发送mouseleave
+          processorRef.handle_mouse_leave();
+          // 然后处理鼠标抬起，使用最后一个有效位置或特殊值
+          isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
+        } else {
+          // 正常处理canvas内的鼠标抬起
+          isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
+        }
+        
         // 通知主线程鼠标释放事件处理结果
         self.postMessage({
           type: 'mouseupHandled',
@@ -130,7 +143,13 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         break;
       case 'mouseleave':
         if (!processorRef) return;
-        processorRef.handle_mouse_leave();
+        // 调用WASM中的鼠标离开处理函数，返回是否需要重绘
+        const needsRedraw = processorRef.handle_mouse_leave();
+        // 通知主线程鼠标离开处理结果
+        self.postMessage({
+          type: 'mouseleaveHandled',
+          needsRedraw: needsRedraw
+        });
         break;
       case 'wheel':
         if (!processorRef) return;
@@ -139,11 +158,20 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         break;
       case 'getCursorStyle':
         if (!processorRef) return;
-        const cursorStyle = processorRef.get_cursor_style(data.x, data.y);
-        self.postMessage({
-          type: 'cursorStyle',
-          style: cursorStyle,
-        });
+        try {
+          const cursorStyle = processorRef.get_cursor_style(data.x, data.y);
+          self.postMessage({
+            type: 'cursorStyle',
+            style: cursorStyle,
+          });
+        } catch (err) {
+          console.error('[Worker] 获取光标样式错误:', err);
+          // 出错时使用默认样式
+          self.postMessage({
+            type: 'cursorStyle',
+            style: 'default',
+          });
+        }
         break;
       case 'click':
         if (!processorRef) return;

@@ -8,7 +8,23 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 use crate::render::chart_renderer::RenderMode;
+use crate::render::cursor_style::CursorStyle;
 use crate::utils::time;
+use wasm_bindgen::prelude::*;
+
+// 添加私有日志函数
+#[wasm_bindgen]
+unsafe extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(message: &str);
+}
+
+// 添加安全的日志包装函数
+fn log_message(message: &str) {
+    unsafe {
+        log(message);
+    }
+}
 
 /// 交互层渲染器
 #[derive(Default)]
@@ -47,6 +63,7 @@ impl OverlayRenderer {
         y: f64,
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
     ) {
         let prev_x = self.mouse_x;
         let prev_y = self.mouse_y;
@@ -87,12 +104,12 @@ impl OverlayRenderer {
             self.hover_candle_index = None;
         }
 
-        // 绘制交互层 - 默认使用KMAP模式
-        self.draw(canvas_manager, data_manager, RenderMode::KMAP);
+        // 绘制交互层 - 使用传入的mode参数
+        self.draw(canvas_manager, data_manager, mode);
     }
 
     /// 处理鼠标离开事件
-    pub fn handle_mouse_leave(&mut self, canvas_manager: &CanvasManager) {
+    pub fn handle_mouse_leave(&mut self, canvas_manager: &CanvasManager, mode: RenderMode) {
         // 重置所有鼠标状态
         self.mouse_in_chart = false;
         self.hover_candle_index = None;
@@ -108,8 +125,8 @@ impl OverlayRenderer {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
         
-        // 只绘制切换按钮
-        self.draw_switch_button(&ctx, &layout, RenderMode::KMAP);
+        // 只绘制切换按钮，使用传入的mode参数
+        self.draw_switch_button(&ctx, &layout, mode);
     }
 
     /// 绘制交互层
@@ -125,8 +142,10 @@ impl OverlayRenderer {
             Some(items) => items,
             None => return,
         };
-        // 绘制切换按钮
+        
+        // 绘制切换按钮 - 确保使用传入的mode参数
         self.draw_switch_button(&ctx, &layout, mode);
+        
         if !self.mouse_in_chart {
             return;
         }
@@ -452,68 +471,63 @@ impl OverlayRenderer {
         content_drawer(price, volume, current_y, layout, ctx, text_x, label_x);
     }
 
-    /// 绘制模式切换按钮 (K线/热图)
+    /// 绘制切换按钮
     fn draw_switch_button(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout, mode: RenderMode) {
-        // 计算切换按钮的位置 - 在标题区域中间顶部
-        let button_width = layout.switch_btn_width * 2.0; // 总宽度 (两个选项)
+        // 使用布局参数计算按钮位置和尺寸
+        let button_width = layout.switch_btn_width * 2.0;
         let button_height = layout.switch_btn_height;
         let button_x = (layout.canvas_width - button_width) / 2.0;
         let button_y = layout.padding;
-
-        // 绘制边框
+        
+        // 绘制按钮背景
+        ctx.set_fill_style_str(ChartColors::SWITCH_BG);
+        ctx.fill_rect(button_x, button_y, button_width, button_height);
+        
+        // 绘制按钮边框
         ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
         ctx.set_line_width(1.0);
         ctx.stroke_rect(button_x, button_y, button_width, button_height);
-
-        // 根据当前模式确定哪个选项是激活的
-        let is_kmap_active = mode == RenderMode::KMAP;
-
-        // 绘制K线选项
-        let kline_button_x = button_x;
-        self.draw_switch_option(ctx, "K线", kline_button_x, button_y, layout.switch_btn_width, button_height, is_kmap_active);
-
-        // 绘制热图选项
-        let heatmap_button_x = button_x + layout.switch_btn_width;
-        self.draw_switch_option(ctx, "热图", heatmap_button_x, button_y, layout.switch_btn_width, button_height, !is_kmap_active);
-    }
-
-    /// 绘制单个切换选项
-    fn draw_switch_option(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        text: &str,
-        x: f64,
-        y: f64,
-        width: f64,
-        height: f64,
-        is_active: bool,
-    ) {
-        // 设置选项样式
-        if is_active {
-            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
-        } else {
-            ctx.set_fill_style_str(ChartColors::SWITCH_BG);
-        }
-
-        // 绘制选项背景
-        ctx.fill_rect(x, y, width, height);
-
+        
+        // 绘制按钮分隔线
+        ctx.begin_path();
+        ctx.move_to(button_x + layout.switch_btn_width, button_y);
+        ctx.line_to(button_x + layout.switch_btn_width, button_y + button_height);
+        ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
+        ctx.stroke();
+        
         // 设置文本样式
-        if is_active {
+        ctx.set_font("14px Arial");
+        ctx.set_text_align("center");
+        ctx.set_text_baseline("middle");
+        
+        // K线按钮区域
+        let kline_x = button_x + layout.switch_btn_width / 2.0;
+        let kline_y = button_y + button_height / 2.0;
+        // 热力图按钮区域
+        let heatmap_x = button_x + layout.switch_btn_width + layout.switch_btn_width / 2.0;
+        let heatmap_y = button_y + button_height / 2.0;
+        
+        // K线按钮样式
+        if mode == RenderMode::KMAP {
+            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
+            ctx.fill_rect(button_x, button_y, layout.switch_btn_width, button_height);
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
         } else {
             ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
         }
-        ctx.set_text_align("center");
-        ctx.set_text_baseline("middle");
-        ctx.set_font("12px Arial");
-
-        // 绘制文本
-        let text_x = x + width / 2.0;
-        let text_y = y + height / 2.0;
-        ctx.fill_text(text, text_x, text_y).unwrap();
+        ctx.fill_text("K线", kline_x, kline_y).unwrap();
+        
+        // 热力图按钮样式
+        if mode == RenderMode::HEATMAP {
+            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
+            ctx.fill_rect(button_x + layout.switch_btn_width, button_y, layout.switch_btn_width, button_height);
+            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
+        } else {
+            ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
+        }
+        ctx.fill_text("热力图", heatmap_x, heatmap_y).unwrap();
     }
-    
+
     /// 检查点击是否在切换按钮区域内，如果是，返回选中的模式
     pub fn check_switch_button_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<bool> {
         // 计算切换按钮的位置
@@ -522,21 +536,36 @@ impl OverlayRenderer {
         let button_x = (layout.canvas_width - button_width) / 2.0;
         let button_y = layout.padding;
         
+        // 保留关键日志，用于调试按钮点击
+        log_message(&format!(
+            "check_switch_button_click: button_x = {}, button_y = {}, button_width = {}, button_height = {}, click_x = {}, click_y = {}", 
+            button_x, button_y, button_width, button_height, x, y
+        ));
+        
         // 检查点击是否在按钮区域内
         if x >= button_x && x <= button_x + button_width && y >= button_y && y <= button_y + button_height {
             // 确定点击的是哪个选项
             let kline_button_x = button_x;
             let heatmap_button_x = button_x + layout.switch_btn_width;
             
+            // 保留关键日志，用于调试按钮选项
+            log_message(&format!(
+                "check_switch_button_click: kline_button_x = {}, heatmap_button_x = {}", 
+                kline_button_x, heatmap_button_x
+            ));
+            
             if x >= kline_button_x && x < heatmap_button_x {
                 // 点击了K线选项
+                log_message("check_switch_button_click: K线选项被点击");
                 return Some(true);
             } else {
                 // 点击了热图选项
+                log_message("check_switch_button_click: 热图选项被点击");
                 return Some(false);
             }
         }
         
+        // 移除不必要的日志
         None
     }
 
@@ -627,5 +656,62 @@ impl OverlayRenderer {
         let _ = ctx.fill_text("数量:", text_x, current_y);
         let formatted_volume = layout.format_volume(volume, 2);
         let _ = ctx.fill_text(&formatted_volume, label_x, current_y);
+    }
+
+    /// 处理鼠标点击事件 (特别用于切换图表模式)
+    pub fn handle_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<RenderMode> {
+        // 保留关键日志，用于调试点击事件
+        log_message(&format!("OverlayRenderer::handle_click: x = {}, y = {}", x, y));
+        
+        // 检查是否点击了切换按钮
+        if let Some(is_kmap) = self.check_switch_button_click(x, y, layout) {
+            // 保留关键日志，用于调试模式切换
+            log_message(&format!("OverlayRenderer::handle_click: button clicked, is_kmap = {}", is_kmap));
+            
+            // 根据点击的按钮返回对应的渲染模式
+            if is_kmap {
+                return Some(RenderMode::KMAP);
+            } else {
+                return Some(RenderMode::HEATMAP);
+            }
+        } else {
+            // 移除不必要的日志
+            // log_message("OverlayRenderer::handle_click: no button clicked");
+        }
+        
+        None
+    }
+
+    /// 处理鼠标拖动事件 - 只处理与交互层相关的拖动
+    pub fn handle_mouse_drag(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+        // 更新鼠标位置并重新绘制交互层
+        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
+        // 不需要再次调用draw，因为handle_mouse_move已经调用了draw
+    }
+
+    /// 处理鼠标滚轮事件 - 只处理与交互层相关的部分
+    pub fn handle_wheel(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+        // 更新鼠标位置并重新绘制交互层
+        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
+        // 不需要再次调用draw，因为handle_mouse_move已经调用了draw
+    }
+
+    /// 获取当前鼠标位置的光标样式
+    pub fn get_cursor_style(&self, x: f64, y: f64, layout: &ChartLayout) -> CursorStyle {
+        // 检查是否在图表区域内
+        if layout.is_point_in_chart_area(x, y) {
+            return CursorStyle::Default;
+        }
+        
+        // 默认光标样式
+        CursorStyle::Default
+    }
+
+    /// 清除并重绘交互层
+    pub fn redraw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+        // 清除交互层
+        self.clear(canvas_manager);
+        // 重新绘制交互层
+        self.draw(canvas_manager, data_manager, mode);
     }
 }
