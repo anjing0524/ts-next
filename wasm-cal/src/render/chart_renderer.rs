@@ -8,6 +8,7 @@ use super::line_renderer::LineRenderer;
 use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
+use super::book_renderer::BookRenderer;
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
@@ -44,6 +45,8 @@ pub struct ChartRenderer {
     heat_renderer: HeatRenderer,
     /// 线图渲染器
     line_renderer: LineRenderer,
+    /// 订单簿渲染器
+    book_renderer: BookRenderer,
     /// 交互元素渲染器
     overlay_renderer: Rc<RefCell<OverlayRenderer>>,
     /// 数据管理器
@@ -86,6 +89,7 @@ impl ChartRenderer {
         let volume_renderer = VolumeRenderer {};
         let heat_renderer = HeatRenderer::default();
         let line_renderer = LineRenderer::new();
+        let book_renderer = BookRenderer::new();
         let overlay_renderer = Rc::new(RefCell::new(OverlayRenderer::new()));
         let datazoom_renderer = Rc::new(RefCell::new(DataZoomRenderer::new()));
 
@@ -96,6 +100,7 @@ impl ChartRenderer {
             volume_renderer,
             heat_renderer,
             line_renderer,
+            book_renderer,
             overlay_renderer,
             data_manager,
             datazoom_renderer,
@@ -183,6 +188,13 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                 );
+                // 渲染订单簿可视化
+                self.book_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    &layout,
+                    &self.data_manager,
+                    self.overlay_renderer.borrow().get_hover_candle_index(),
+                );
             }
             RenderMode::HEATMAP => {
                 // 热图模式下，热图占据整个区域
@@ -202,6 +214,13 @@ impl ChartRenderer {
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                );
+                // 渲染订单簿可视化
+                self.book_renderer.draw(
+                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    &layout,
+                    &self.data_manager,
+                    self.overlay_renderer.borrow().get_hover_candle_index(),
                 );
             }
         }
@@ -229,24 +248,62 @@ impl ChartRenderer {
             &self.data_manager,
         );
 
-        // 如果DataZoom返回了非默认样式，则使用该样式
         if datazoom_cursor != CursorStyle::Default {
             return datazoom_cursor;
         }
-        
-        // 如果DataZoom没有返回特定样式，则检查交互层
+
+        // 提前借用 layout，避免嵌套 borrow
         let layout = self.canvas_manager.layout.borrow();
-        let overlay_cursor = self.overlay_renderer.borrow().get_cursor_style(x, y, &layout);
-        
-        // 返回交互层的光标样式
+        // 只借用 overlay_renderer，不在同一作用域 borrow layout
+        let overlay_cursor = {
+            let overlay_renderer = self.overlay_renderer.borrow();
+            overlay_renderer.get_cursor_style(x, y, &layout)
+        };
+
         overlay_cursor
+    }
+
+    /// 只重绘订单簿区域
+    pub fn render_book_only(&self) {
+        let layout = self.canvas_manager.layout.borrow();
+        let ctx = self.canvas_manager.get_context(CanvasLayerType::Main);
+        // 先获取 hover_candle_index，立刻释放 RefCell
+        let hover_index = {
+            let overlay = self.overlay_renderer.borrow();
+            overlay.get_hover_candle_index()
+        };
+        // 清理订单簿区域
+        let area_x = layout.chart_area_x + layout.chart_area_width * 0.8;
+        let area_y = layout.chart_area_y;
+        let area_width = layout.chart_area_width * 0.2;
+        let area_height = layout.price_chart_height;
+        ctx.clear_rect(area_x, area_y, area_width, area_height);
+        // 重绘订单簿
+        self.book_renderer.draw(
+            &ctx,
+            &layout,
+            &self.data_manager,
+            hover_index,
+        );
     }
 
     /// 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64) {
-        // 直接交给OverlayRenderer处理鼠标移动，传递当前模式
-        let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-        overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager, self.mode);
+        let prev_hover = {
+            let overlay = self.overlay_renderer.borrow();
+            overlay.get_hover_candle_index()
+        };
+        {
+            let mut overlay_renderer = self.overlay_renderer.borrow_mut();
+            overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager, self.mode);
+        } // 作用域结束，借用释放
+        let curr_hover = {
+            let overlay = self.overlay_renderer.borrow();
+            overlay.get_hover_candle_index()
+        };
+        if prev_hover != curr_hover {
+            self.render_book_only();
+        }
     }
 
     // 处理鼠标按下事件
@@ -337,10 +394,10 @@ impl ChartRenderer {
             let mut overlay_renderer = self.overlay_renderer.borrow_mut();
             overlay_renderer.handle_mouse_leave(&self.canvas_manager, self.mode);
         } // 在这里释放 overlay_renderer 的可变借用
-        
+
         // 3. 如果之前在拖动，重绘图表并返回true表示已处理
         if was_dragging {
-            // 确保所有借用都已释放后再调用render
+            // 这里所有 borrow 都已经 drop，可以安全调用 render
             self.render();
             return true;
         }
@@ -409,13 +466,4 @@ impl ChartRenderer {
         false
     }
 
-    /// 获取线图渲染器
-    pub fn get_line_renderer(&self) -> &LineRenderer {
-        &self.line_renderer
-    }
-
-    /// 获取线图渲染器的可变引用
-    pub fn get_line_renderer_mut(&mut self) -> &mut LineRenderer {
-        &mut self.line_renderer
-    }
 }

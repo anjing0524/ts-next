@@ -676,4 +676,9 @@ impl OverlayRenderer {
         // 重新绘制交互层
         self.draw(canvas_manager, data_manager, mode);
     }
+
+    /// 获取当前悬停的K线索引
+    pub fn get_hover_candle_index(&self) -> Option<usize> {
+        self.hover_candle_index
+    }
 }

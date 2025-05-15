@@ -103,11 +103,14 @@ impl HeatRenderer {
         }
         
         // 计算全局最大值的对数，避免在循环中重复计算
-        let global_max_bin_ln = global_max_bin.ln();
-        let min_heat_threshold = 0.01; // 最小热度阈值
+        let global_max_bin_ln = (global_max_bin + 1.0).ln();
+        let min_heat_threshold = 0.001; // 最小热度阈值，调低以显示更多小 volume
 
         // 绘制每根K线的tick区间色块
         for (rel_idx, bins) in all_bins.iter().enumerate() {
+            if rel_idx >= x_coordinates.len() {
+                break;
+            }
             let x_center = x_coordinates[rel_idx];
             let x_left = x_center - half_width;
 
@@ -123,16 +126,16 @@ impl HeatRenderer {
                 let rect_y = y_high.min(y_low);
                 let rect_height = (y_low - y_high).abs();
 
-                // 使用对数归一化，避免在循环中重复计算
-                let norm = volume.ln() / global_max_bin_ln;
+                // 使用对数归一化（加1防止小volume不可见）
+                let norm = (volume + 1.0).ln() / global_max_bin_ln;
                 if norm < min_heat_threshold { 
                     continue; // 跳过极小热度
                 }
                 
                 let color = self.get_cached_color(norm);
 
-                // 只用透明度渐变
-                let alpha = 0.15 + 0.85 * norm.powf(1.5);
+                // 只用透明度渐变，最低0.25，线性变化
+                let alpha = 0.25 + 0.75 * norm;
 
                 ctx.set_global_alpha(alpha);
                 ctx.set_fill_style_str(&color);

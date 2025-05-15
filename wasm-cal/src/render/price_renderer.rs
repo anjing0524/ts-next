@@ -46,7 +46,7 @@ impl PriceRenderer {
 
         // 遍历所有可见的K线数据
         for (rel_idx, global_idx) in (visible_start..visible_end).enumerate() {
-            if global_idx >= items.len() {
+            if global_idx >= items.len() || rel_idx >= x_coordinates.len() {
                 break;
             }
             

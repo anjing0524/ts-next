@@ -69,7 +69,7 @@ impl AxisRenderer {
             ctx.fill_rect(
                 layout.chart_area_x, // 从图表区域左边界开始
                 band_y,
-                layout.chart_area_width, // 宽度限制在图表区域
+                layout.main_chart_width, // 只绘制主图区域宽度
                 band_height,
             );
         }
@@ -90,37 +90,10 @@ impl AxisRenderer {
             ctx.fill_rect(
                 layout.chart_area_x, // 从图表区域左边界开始
                 band_y,
-                layout.chart_area_width, // 宽度限制在图表区域
+                layout.main_chart_width, // 只绘制主图区域宽度
                 vol_band_height,
             );
         }
-    }
-
-    /// 绘制热图背景 - 使用热图配色方案中最深的颜色
-    fn draw_heatmap_background(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-    ) {
-        // 使用热图配色方案中最深的颜色 (#000033)
-        ctx.set_fill_style_str("#FFF");
-        
-        // 绘制价格图区域背景
-        ctx.fill_rect(
-            layout.chart_area_x, // 从图表区域左边界开始
-            layout.header_height,
-            layout.chart_area_width, // 宽度限制在图表区域
-            layout.price_chart_height,
-        );
-        
-        // 绘制成交量图区域背景 - 使用稍浅的颜色
-        ctx.set_fill_style_str("#FFF");
-        ctx.fill_rect(
-            layout.chart_area_x, // 从图表区域左边界开始
-            layout.volume_chart_y,
-            layout.chart_area_width, // 宽度限制在图表区域
-            layout.volume_chart_height,
-        );
     }
 
     /// 绘制价格Y轴
@@ -316,12 +289,12 @@ impl AxisRenderer {
         ctx.set_line_width(1.0);
         ctx.begin_path();
         ctx.move_to(layout.chart_area_x, x_axis_y); // 从图表区域左边界开始
-        ctx.line_to(layout.chart_area_x + layout.chart_area_width, x_axis_y); // 到图表区域右边界结束
+        ctx.line_to(layout.chart_area_x + layout.main_chart_width, x_axis_y); // 只到主图区域右边界
         ctx.stroke();
 
         // 动态计算标签间距，避免过于密集或稀疏
         let min_label_spacing = 70.0; // 最小标签间距（像素）
-        let max_labels = (layout.chart_area_width / min_label_spacing).floor() as usize;
+        let max_labels = (layout.main_chart_width / min_label_spacing).floor() as usize;
         let candle_interval = (visible_count as f64 / max_labels as f64)
             .ceil()
             .max(1.0) as usize; // 每隔多少根K线显示一个标签
@@ -342,6 +315,9 @@ impl AxisRenderer {
             let x = layout.chart_area_x
                 + (i as f64 * layout.total_candle_width)
                 + layout.candle_width / 2.0;
+            if x > layout.chart_area_x + layout.main_chart_width {
+                break; // 不绘制到订单簿区域
+            }
 
             let item = items.get(data_idx);
             let timestamp_secs = item.timestamp() as i64; // 获取 Unix 时间戳 (秒)

@@ -9,5 +9,6 @@ pub mod line_renderer;
 pub mod overlay_renderer;
 pub mod price_renderer;
 pub mod volume_renderer; // 添加 utils 模块
+pub mod book_renderer;
 
 pub use chart_renderer::ChartRenderer;

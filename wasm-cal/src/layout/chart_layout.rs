@@ -47,7 +47,11 @@ pub struct ChartLayout {
 
     //  切换按钮
     pub switch_btn_width: f64,
-    pub switch_btn_height: f64
+    pub switch_btn_height: f64,
+
+    // 新增主图和订单簿分区宽度
+    pub main_chart_width: f64,  // 主图区域宽度(80%)
+    pub book_area_width: f64    // 订单簿区域宽度(20%)
 }
 
 impl ChartLayout {
@@ -85,6 +89,8 @@ impl ChartLayout {
         let chart_area_x = y_axis_width; // 图表区域X起点(从Y轴右侧开始)
         let chart_area_y = header_height; // 图表区域Y起点(从标题下方开始)
         let chart_area_width = canvas_width - y_axis_width; // 图表区域宽度
+        let main_chart_width = chart_area_width * 0.8;
+        let book_area_width = chart_area_width * 0.2;
         // chart_area_height 会自动根据新的 time_axis_height 调整
         let chart_area_height = canvas_height - header_height - navigator_height - time_axis_height; // 主图区域高度
 
@@ -128,7 +134,9 @@ impl ChartLayout {
             navigator_y, // 使用更新后的值
             navigator_handle_width,
             switch_btn_height,
-            switch_btn_width
+            switch_btn_width,
+            main_chart_width,
+            book_area_width
         }
     }
 
@@ -244,7 +252,7 @@ impl ChartLayout {
         if items_len == 0 {
             return 1.0; // 默认值
         }
-        self.chart_area_width / items_len as f64
+        self.main_chart_width / items_len as f64
     }
     /// 计算导航器中可见区域的起始和结束X坐标
     /// * `items_len` - 数据项总数
@@ -258,7 +266,7 @@ impl ChartLayout {
         visible_count: usize,
     ) -> (f64, f64) {
         let nav_x = self.chart_area_x;
-        let nav_width = self.chart_area_width;
+        let nav_width = self.main_chart_width;
 
         if items_len == 0 {
             return (nav_x, nav_x + nav_width);
@@ -306,7 +314,7 @@ impl ChartLayout {
             return 8.0; // 默认宽度
         }
         // 计算每根K线的总宽度（包括间距）
-        let total_width_per_candle = self.chart_area_width / visible_count as f64;
+        let total_width_per_candle = self.main_chart_width / visible_count as f64;
         // 蜡烛图实体宽度 = 总宽度 - 间距
         let candle_width = (total_width_per_candle * 0.8).max(1.0);
 
@@ -318,10 +326,12 @@ impl ChartLayout {
         if visible_count > 0 {
             // 计算新的蜡烛图宽度
             self.candle_width = self.calculate_candle_width(visible_count);
-
             // 更新K线总宽度（包括间距）
-            self.total_candle_width = self.chart_area_width / visible_count as f64;
+            self.total_candle_width = self.main_chart_width / visible_count as f64;
         }
+        // 同步主图和订单簿宽度
+        self.main_chart_width = self.chart_area_width * 0.8;
+        self.book_area_width = self.chart_area_width * 0.2;
     }
 
     /// 对布局应用热图模式设置

@@ -327,7 +327,7 @@ impl DataZoomRenderer {
         // 计算导航器位置
         let nav_x = layout.chart_area_x;
         let nav_y = layout.canvas_height - layout.navigator_height;
-        let nav_width = layout.chart_area_width;
+        let nav_width = layout.main_chart_width; // 只用主图宽度
         let nav_height = layout.navigator_height;
 
         // 绘制前清除整个DataZoom区域及周围
@@ -385,8 +385,8 @@ impl DataZoomRenderer {
             return;
         }
 
-        // 使用ChartLayout中的方法计算导航器中每个K线的宽度
-        let nav_candle_width = layout.calculate_navigator_candle_width(items_len);
+        // 使用ChartLayout中的方法计算导航器中每个K线的宽度（基于main_chart_width）
+        let nav_candle_width = layout.main_chart_width / items_len as f64;
 
         // 找出最大成交量，用于缩放
         let mut max_volume: f64 = 0.0;
@@ -596,18 +596,5 @@ impl DataZoomRenderer {
 
         // 恢复渲染状态，取消裁剪区域
         ctx.restore();
-    }
-
-    /// 检查点是否在DataZoom区域内
-    pub fn is_point_in_datazoom(
-        &self,
-        x: f64,
-        y: f64,
-        canvas_manager: &CanvasManager,
-        _data_manager: &Rc<RefCell<DataManager>>,
-    ) -> bool {
-        // 使用canvas_manager的layout来检查点是否在导航器区域内
-        let layout = canvas_manager.layout.borrow();
-        layout.is_point_in_navigator(x, y)
     }
 }
