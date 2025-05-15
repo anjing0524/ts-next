@@ -13,17 +13,31 @@ type KlineItem = {
   s_vol: number; // 卖方成交量
   volumes: Array<{ price: number; volume: number }>; // 价格订单量数组
   last_price: number; // 最新成交价
-  bid_price: number;  // 买一价
-  ask_price: number;  // 卖一价
+  bid_price: number; // 买一价
+  ask_price: number; // 卖一价
 };
 
 // 生成模拟K线数据（独立函数）- 价格范围在2000-3000之间
-function generateKlineData(count: number): KlineItem[] {
+function generateKlineData(
+  count: number,
+  options?: {
+    numLevels?: number; // 档位数，默认30档
+    tickSize?: number; // 价格档位间隔，默认5
+    largeOrderRatio?: number; // 大单比例，默认0.1 (10%)
+    largeOrderMultiplier?: number; // 大单倍数，默认5-10倍
+  }
+): KlineItem[] {
   const data: KlineItem[] = [];
   // 使用整数时间戳，避免精度问题
   let currentTimestamp = Math.floor(Date.now() / 1000); // 使用秒级时间戳
   // 初始价格设置在2000-3000范围内
   let currentPrice = 2000 + Math.random() * 1000;
+
+  // 设置默认参数
+  const numLevels = options?.numLevels || 30; // 默认30档
+  const tickSize = options?.tickSize || 5; // 默认价格间隔为5
+  const largeOrderRatio = options?.largeOrderRatio || 0.1; // 默认10%的档位是大单
+  const largeOrderMultiplier = options?.largeOrderMultiplier || 5 + Math.random() * 5; // 默认5-10倍
 
   for (let i = 0; i < count; i++) {
     const open = parseFloat(currentPrice.toFixed(2)); // 保留两位小数，避免精度问题
@@ -57,28 +71,74 @@ function generateKlineData(count: number): KlineItem[] {
     // 最新价通常在收盘价附近波动
     const lastPriceVariation = (Math.random() - 0.5) * 0.01; // -0.5% 到 +0.5% 的波动
     const last_price = parseFloat((boundedClose * (1 + lastPriceVariation)).toFixed(2));
-    
+
     // 买一价通常略低于最新价
     const bidVariation = -Math.random() * 0.005; // -0.5% 到 0% 的波动
     const bid_price = parseFloat((last_price * (1 + bidVariation)).toFixed(2));
-    
+
     // 卖一价通常略高于最新价
     const askVariation = Math.random() * 0.005; // 0% 到 +0.5% 的波动
     const ask_price = parseFloat((last_price * (1 + askVariation)).toFixed(2));
 
-    // 生成价格订单量数据
-    const tick = 10; // 档位间隔
+    // 生成价格订单量数据（多档位，tick区分，含大单）
     const priceLevels: Array<{ price: number; volume: number }> = [];
-    for (
-      let p = Math.floor(boundedLow / tick) * tick;
-      p <= Math.ceil(boundedHigh / tick) * tick;
-      p += tick
-    ) {
-      // 以收盘价为中心，挂单量呈高斯分布
-      const center = boundedClose;
-      const sigma = (boundedHigh - boundedLow) / 6 || 1; // 防止除0
-      const base = Math.exp(-Math.pow(p - center, 2) / (2 * sigma * sigma));
-      const volume = Math.round(base * (Math.random() * 2000 + 500));
+    const center = boundedClose;
+    const sigma = (boundedHigh - boundedLow) / 4 || 1; // 防止除0，调整sigma使分布更集中
+
+    // 计算价格范围，确保覆盖足够的价格区间
+    const halfLevels = Math.floor(numLevels / 2);
+    const startPrice = Math.floor(center / tickSize - halfLevels) * tickSize;
+
+    // 确定大单数量
+    const numLargeOrders = Math.max(1, Math.floor(numLevels * largeOrderRatio));
+
+    // 随机选择大单位置，但确保分布更自然（集中在某些区域）
+    const largeOrderIndices = new Set<number>();
+    // 创建2-3个热点区域
+    const numHotSpots = 2 + Math.floor(Math.random() * 2); // 2-3个热点
+    for (let spot = 0; spot < numHotSpots; spot++) {
+      // 热点中心位置
+      const hotSpotCenter = Math.floor(Math.random() * numLevels);
+      // 热点范围
+      const hotSpotRange = 1 + Math.floor(Math.random() * 3); // 1-3个连续档位
+
+      // 在热点范围内随机选择大单位置
+      for (let j = 0; j < hotSpotRange && largeOrderIndices.size < numLargeOrders; j++) {
+        const offset = Math.floor(Math.random() * hotSpotRange) - Math.floor(hotSpotRange / 2);
+        const index = (hotSpotCenter + offset + numLevels) % numLevels; // 确保在有效范围内
+        largeOrderIndices.add(index);
+      }
+    }
+
+    // 如果大单数量不足，随机补充
+    while (largeOrderIndices.size < numLargeOrders) {
+      largeOrderIndices.add(Math.floor(Math.random() * numLevels));
+    }
+
+    // 生成所有价格档位
+    for (let i = 0; i < numLevels; i++) {
+      const p = startPrice + i * tickSize;
+
+      // 基础成交量 - 使用改进的高斯分布
+      // 价格越接近中心价格，成交量越大
+      const distanceFromCenter = Math.abs(p - center);
+      const base = Math.exp(-Math.pow(distanceFromCenter, 2) / (2 * sigma * sigma));
+
+      // 基础成交量范围：500-3000
+      let volume = Math.round(base * (Math.random() * 2500 + 500));
+
+      // 如果是大单档位，增加成交量
+      if (largeOrderIndices.has(i)) {
+        // 大单倍数：5-10倍，但根据距离中心的远近有所调整
+        // 距离中心越近，大单倍数越大
+        const distanceFactor = 1 - distanceFromCenter / (sigma * 3); // 0-1之间，越近越大
+        const multiplier = largeOrderMultiplier * (0.7 + 0.3 * distanceFactor);
+        volume = Math.round(volume * multiplier);
+      }
+
+      // 确保成交量至少为1
+      volume = Math.max(1, volume);
+
       priceLevels.push({ price: parseFloat(p.toFixed(2)), volume });
     }
 
@@ -164,7 +224,7 @@ function serializeKlineData(data: KlineItem[]): Uint8Array {
   // 创建KlineData根对象
   Kline.KlineData.startKlineData(builder);
   Kline.KlineData.addItems(builder, itemsVector);
-  Kline.KlineData.addTick(builder,10);
+  Kline.KlineData.addTick(builder, 10);
   const klineDataOffset = Kline.KlineData.endKlineData(builder);
 
   // 完成构建并设置文件标识符
@@ -173,13 +233,33 @@ function serializeKlineData(data: KlineItem[]): Uint8Array {
 }
 
 // 主处理函数改为POST方法
-export async function POST() {
+export async function POST(request: Request) {
   const startTime = performance.now();
+
+  // 尝试从请求中获取参数
+  let options = {};
+  try {
+    const url = new URL(request.url);
+    const numLevels = url.searchParams.get('numLevels');
+    const tickSize = url.searchParams.get('tickSize');
+    const largeOrderRatio = url.searchParams.get('largeOrderRatio');
+
+    if (numLevels || tickSize || largeOrderRatio) {
+      options = {
+        numLevels: numLevels ? parseInt(numLevels) : undefined,
+        tickSize: tickSize ? parseFloat(tickSize) : undefined,
+        largeOrderRatio: largeOrderRatio ? parseFloat(largeOrderRatio) : undefined,
+      };
+    }
+  } catch (e) {
+    console.log('解析请求参数失败，使用默认参数', e);
+  }
 
   // 生成数据
   const genStart = performance.now();
-  const klineData = generateKlineData(10_000); // 减少数据量以适应更复杂的结构
-  console.log(klineData[0]);
+  const klineData = generateKlineData(10_000, options); // 使用可选参数
+  console.log('生成数据示例:', klineData[0]);
+  console.log(`档位数: ${klineData[0].volumes.length}`);
   const genEnd = performance.now();
 
   // 序列化数据

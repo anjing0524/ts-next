@@ -364,15 +364,15 @@ impl OverlayRenderer {
         let tooltip_width = 150.0;
         let line_height = 20.0;
         let padding = 10.0;
-        let (num_lines, content_drawer): (usize, Box<dyn Fn(f64, f64, f64, &ChartLayout, &OffscreenCanvasRenderingContext2d, f64, f64)>) = match mode {
-            RenderMode::HEATMAP => (3, Box::new(|price, volume, current_y, layout, ctx, text_x, label_x| {
+        let (num_lines, content_drawer): (usize, Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>) = match mode {
+            RenderMode::HEATMAP => (3, Box::new(|price, volume, current_y, ctx, text_x, label_x| {
                 let _ = ctx.fill_text("价格:", text_x, current_y);
                 let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
                 let _ = ctx.fill_text("数量:", text_x, current_y + 20.0);
                 let formatted_volume = time::format_volume(volume, 2);
                 let _ = ctx.fill_text(&formatted_volume, label_x, current_y + 20.0);
             })),
-            _ => (6, Box::new(|_, volume, mut current_y, layout, ctx, text_x, label_x| {
+            _ => (6, Box::new(|_, volume, mut current_y, ctx, text_x, label_x| {
                 let draw_line = |label: &str, value: String, y: f64| {
                     let _ = ctx.fill_text(label, text_x, y);
                     let _ = ctx.fill_text(&value, label_x, y);
@@ -453,7 +453,7 @@ impl OverlayRenderer {
         let mut current_y = tooltip_y + padding;
         let _ = ctx.fill_text(&datetime_str, text_x, current_y);
         current_y += line_height;
-        content_drawer(price, volume, current_y, layout, ctx, text_x, label_x);
+        content_drawer(price, volume, current_y, ctx, text_x, label_x);
     }
 
     /// 绘制切换按钮
