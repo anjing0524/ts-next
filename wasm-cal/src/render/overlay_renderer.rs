@@ -2,7 +2,7 @@
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::{ChartColors, ChartLayout, ChartFont};
 use js_sys;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -270,7 +270,7 @@ impl OverlayRenderer {
 
         // 绘制Y轴标签文本
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font("10px Arial"); // Match axis font
+        ctx.set_font(ChartFont::AXIS);
         ctx.set_text_align("right"); // Align to the right within the axis area
         ctx.set_text_baseline("middle");
 
@@ -337,7 +337,7 @@ impl OverlayRenderer {
                 let time_str = time::format_timestamp(timestamp, "%H:%M:%S");
 
                 ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-                ctx.set_font("10px Arial"); // Match axis font
+                ctx.set_font(ChartFont::AXIS);
                 ctx.set_text_align("center");
                 ctx.set_text_baseline("middle"); // Center text vertically
                 let _ = ctx.fill_text(
@@ -405,7 +405,7 @@ impl OverlayRenderer {
         }
         tooltip_y = tooltip_y.max(layout.header_height);
         let corner_radius = 4.0;
-        ctx.set_shadow_color("rgba(0, 0, 0, 0.5)");
+        ctx.set_shadow_color(ChartColors::SHADOW);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
@@ -445,7 +445,7 @@ impl OverlayRenderer {
         ctx.set_shadow_offset_x(0.0);
         ctx.set_shadow_offset_y(0.0);
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font("12px Arial");
+        ctx.set_font(ChartFont::LEGEND);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
         let text_x = tooltip_x + padding;
@@ -481,7 +481,7 @@ impl OverlayRenderer {
         ctx.stroke();
         
         // 设置文本样式
-        ctx.set_font("14px Arial");
+        ctx.set_font(ChartFont::SWITCH);
         ctx.set_text_align("center");
         ctx.set_text_baseline("middle");
         
@@ -573,7 +573,7 @@ impl OverlayRenderer {
         }
         tooltip_y = tooltip_y.max(layout.header_height);
         let corner_radius = 4.0;
-        ctx.set_shadow_color("rgba(0, 0, 0, 0.5)");
+        ctx.set_shadow_color(ChartColors::SHADOW);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
@@ -613,7 +613,7 @@ impl OverlayRenderer {
         ctx.set_shadow_offset_x(0.0);
         ctx.set_shadow_offset_y(0.0);
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font("12px Arial");
+        ctx.set_font(ChartFont::LEGEND);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
         let text_x = tooltip_x + padding;

@@ -1,7 +1,7 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::{ChartColors, ChartLayout, ChartFont};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -94,8 +94,8 @@ impl BookRenderer {
                 // 计算文本位置
                 let text_x = bar_x + bar_width + 4.0; // 柱状图右端+4像素
                 let text_y = bar_y + bar_height / 2.0; // 垂直居中
-                ctx.set_fill_style_str("#333"); // 文本颜色
-                ctx.set_font("12px sans-serif");
+                ctx.set_fill_style_str(ChartColors::TEXT); // 文本颜色
+                ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
                 ctx.fill_text(&text, text_x, text_y).ok();

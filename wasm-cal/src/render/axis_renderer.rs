@@ -10,6 +10,8 @@ use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
+use crate::layout::ChartFont;
+use std::cmp::Ordering;
 
 /// 坐标轴绘制器
 pub struct AxisRenderer;
@@ -25,6 +27,7 @@ impl AxisRenderer {
             None => return,
         };
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
+        let tick = data_manager_ref.get_tick();
         
         // 优先绘制标题和图例以确保头部区域被正确清空和绘制
         self.draw_header(&ctx, &layout_ref, mode);
@@ -38,7 +41,7 @@ impl AxisRenderer {
         }
         
         // 绘制价格Y轴
-        self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high);
+        self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high, tick);
         
         // 绘制成交量Y轴
         self.draw_volume_y_axis(&ctx, &layout_ref, max_volume);
@@ -103,12 +106,13 @@ impl AxisRenderer {
         layout: &ChartLayout,
         min_low: f64,
         max_high: f64,
+        tick: f64,
     ) {
         // 设置轴线和标签样式
         ctx.set_stroke_style_str(ChartColors::BORDER);  // 使用 BORDER 颜色替代 AXIS
         ctx.set_line_width(1.0);
         ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
-        ctx.set_font("10px Arial");
+        ctx.set_font(ChartFont::AXIS);
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
         
@@ -118,27 +122,70 @@ impl AxisRenderer {
         ctx.line_to(layout.chart_area_x, layout.chart_area_y + layout.chart_area_height);
         ctx.stroke();
         
-        // 计算价格区间，创建等距网格线
+        // 计算价格区间
         let price_range = max_high - min_low;
-        if price_range <= 0.0 {
+        if price_range <= 0.0 || tick <= 0.0 {
             return;
         }
-        
-        // 决定网格线数量 - 使用图表布局中的值
-        let grid_count = layout.grid_line_count;
-        let step = price_range / grid_count as f64;
-        
-        // 绘制价格标签
-        for i in 0..=grid_count {
-            let price = min_low + step * i as f64;
+        // 以tick为步长，从不小于min_low的最小tick整数倍开始，到不大于max_high的最大tick整数倍结束
+        let first_tick = (min_low / tick).ceil() * tick;
+        let last_tick = (max_high / tick).floor() * tick;
+        let mut tick_vec = Vec::new();
+        let mut t = first_tick;
+        while t <= last_tick + tick * 0.5 {
+            tick_vec.push((t * 1e8).round() / 1e8);
+            t += tick;
+        }
+        // 计算最大可显示标签数
+        let font_height = 12.0; // ChartFont::AXIS = "10px Arial"，加2px间距
+        let max_labels = (layout.price_chart_height / font_height).floor() as usize;
+        let tick_count = tick_vec.len();
+        let mut sampled_ticks = Vec::new();
+        if tick_count > max_labels && max_labels > 0 {
+            let step = (tick_count as f64 / max_labels as f64).ceil() as usize;
+            for (i, &v) in tick_vec.iter().enumerate() {
+                if i % step == 0 {
+                    sampled_ticks.push(v);
+                }
+            }
+        } else {
+            sampled_ticks = tick_vec;
+        }
+        // 先将采样tick节点映射到Y坐标，便于后续极值插入时做像素距离判断
+        let mut label_points: Vec<(f64, f64)> = sampled_ticks.iter().map(|&price| {
             let y = layout.map_price_to_y(price, min_low, max_high);
-            
-            let price_text = if price_range > 100.0 {
+            (price, y)
+        }).collect();
+        // 插入最高/最低价标签时，判断其Y坐标与已存在标签的Y坐标距离，若小于10像素则不插入
+        let min_dist = font_height * 0.8; // 允许的最小像素间距
+        let min_low_tick = (min_low * 1e8).round() / 1e8;
+        let max_high_tick = (max_high * 1e8).round() / 1e8;
+        let min_low_y = layout.map_price_to_y(min_low_tick, min_low, max_high);
+        let max_high_y = layout.map_price_to_y(max_high_tick, min_low, max_high);
+        if !label_points.iter().any(|&(_, y)| (y - min_low_y).abs() < min_dist) {
+            label_points.push((min_low_tick, min_low_y));
+        }
+        if !label_points.iter().any(|&(_, y)| (y - max_high_y).abs() < min_dist) {
+            label_points.push((max_high_tick, max_high_y));
+        }
+        // 按价格从大到小排序（Y轴从上到下）
+        label_points.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        // 绘制所有价格标签和短横线
+        for &(price, y) in label_points.iter() {
+            // 绘制短横线
+            ctx.set_stroke_style_str(ChartColors::BORDER);
+            ctx.begin_path();
+            ctx.move_to(layout.chart_area_x - 3.0, y);
+            ctx.line_to(layout.chart_area_x, y);
+            ctx.stroke();
+            // 绘制价格文本
+            let price_text = if price.abs() >= 100.0 {
                 format!("{:.0}", price)
-            } else {
+            } else if price.abs() >= 1.0 {
                 format!("{:.2}", price)
+            } else {
+                format!("{:.4}", price)
             };
-            
             ctx.fill_text(
                 &price_text,
                 layout.chart_area_x - 5.0,
@@ -177,7 +224,7 @@ impl AxisRenderer {
         // --- 绘制Y轴刻度和标签 ---
         let num_y_labels = 2; // 成交量图只需要少量标签
         ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
-        ctx.set_font("10px Arial");
+        ctx.set_font(ChartFont::AXIS);
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
 
@@ -230,7 +277,7 @@ impl AxisRenderer {
 
         // 绘制标题
         ctx.set_fill_style_str(ChartColors::TEXT);
-        ctx.set_font("bold 14px Arial");
+        ctx.set_font(ChartFont::HEADER);
         ctx.set_text_align("left");
         ctx.set_text_baseline("middle");
         let _ = ctx.fill_text("BTC/USDT", layout.padding, layout.header_height / 2.0);
@@ -243,7 +290,7 @@ impl AxisRenderer {
         ctx.set_fill_style_str(ChartColors::BULLISH);
         ctx.fill_rect(legend_x, legend_y - 5.0, 10.0, 10.0);
         ctx.set_fill_style_str(ChartColors::TEXT);
-        ctx.set_font("12px Arial");
+        ctx.set_font(ChartFont::LEGEND);
         ctx.set_text_align("left");
         let _ = ctx.fill_text("上涨", legend_x + 15.0, legend_y);
 
@@ -300,7 +347,7 @@ impl AxisRenderer {
             .max(1.0) as usize; // 每隔多少根K线显示一个标签
 
         ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
-        ctx.set_font("10px Arial");
+        ctx.set_font(ChartFont::AXIS);
         ctx.set_text_align("center");
         ctx.set_text_baseline("top");
 

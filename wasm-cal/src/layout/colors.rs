@@ -50,4 +50,6 @@ impl ChartColors {
     pub const SWITCH_BORDER: &'static str = "#dddddd"; // 开关边框
     pub const SWITCH_TEXT: &'static str = "#666666"; // 开关文本颜色
     pub const SWITCH_ACTIVE_TEXT: &'static str = "#333333"; // 开关激活文本颜色
+
+    pub const SHADOW: &'static str = "rgba(0, 0, 0, 0.5)"; // 阴影色
 }
