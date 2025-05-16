@@ -49,16 +49,16 @@ impl PriceRenderer {
             if global_idx >= items.len() || rel_idx >= x_coordinates.len() {
                 break;
             }
-            
+
             let item = items.get(global_idx);
             let x_center = x_coordinates[rel_idx];
-            
+
             // 计算价格对应的Y坐标
             let high_y = layout.map_price_to_y(item.high(), min_low, max_high);
             let low_y = layout.map_price_to_y(item.low(), min_low, max_high);
             let open_y = layout.map_price_to_y(item.open(), min_low, max_high);
             let close_y = layout.map_price_to_y(item.close(), min_low, max_high);
-            
+
             // 收集影线绘制信息 - 根据涨跌分别收集
             if item.close() >= item.open() {
                 // 上涨K线 - 绿色影线
@@ -67,11 +67,11 @@ impl PriceRenderer {
                 // 下跌K线 - 红色影线
                 bearish_high_low_lines.push((x_center, high_y, x_center, low_y));
             }
-            
+
             // 收集实体绘制信息
             let candle_x = x_center - (layout.candle_width / 2.0);
             let candle_width = layout.candle_width.max(1.0);
-            
+
             if item.close() >= item.open() {
                 // 上涨K线
                 let height = (open_y - close_y).max(1.0);
@@ -82,7 +82,7 @@ impl PriceRenderer {
                 bearish_rects.push((candle_x, open_y, candle_width, height));
             }
         }
-        
+
         // 批量绘制所有上涨K线影线 (绿色)
         if !bullish_high_low_lines.is_empty() {
             ctx.begin_path();
@@ -96,7 +96,7 @@ impl PriceRenderer {
             }
             ctx.stroke();
         }
-        
+
         // 批量绘制所有下跌K线影线 (红色)
         if !bearish_high_low_lines.is_empty() {
             ctx.begin_path();
@@ -110,7 +110,7 @@ impl PriceRenderer {
             }
             ctx.stroke();
         }
-        
+
         // 批量绘制所有上涨K线实体
         if !bullish_rects.is_empty() {
             ctx.set_fill_style_str(ChartColors::BULLISH);
@@ -120,7 +120,7 @@ impl PriceRenderer {
             }
             ctx.fill();
         }
-        
+
         // 批量绘制所有下跌K线实体
         if !bearish_rects.is_empty() {
             ctx.set_fill_style_str(ChartColors::BEARISH);

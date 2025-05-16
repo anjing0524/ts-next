@@ -1,8 +1,8 @@
 //! 数据管理器 - 负责管理K线数据和可见范围
 
+use crate::data::visible_range::{DataRange, VisibleRange};
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
-use crate::data::visible_range::{DataRange, VisibleRange};
 use flatbuffers;
 
 /// 数据管理器 - 负责管理K线数据和可见范围
@@ -35,7 +35,7 @@ impl DataManager {
     pub fn set_items(
         &mut self,
         items: flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>,
-        tick: f64
+        tick: f64,
     ) {
         // 清除缓存的范围计算
         self.invalidate_cache();
@@ -114,11 +114,11 @@ impl DataManager {
         if let Some(items) = &self.items {
             // 使用VisibleRange的calculate_data_ranges方法计算数据范围
             let data_range = self.visible_range.calculate_data_ranges(items);
-            
+
             // 缓存计算结果
             self.cached_data_range = Some(data_range);
             self.cached_range_valid = true;
-            
+
             return data_range.get();
         }
 
@@ -135,7 +135,6 @@ impl DataManager {
         chart_area_width: f64,
         is_in_chart: bool,
     ) -> bool {
-
         // 如果没有数据或不在图表区域内，则不处理
         if !is_in_chart || self.items.is_none() {
             return false;
@@ -147,23 +146,22 @@ impl DataManager {
         }
 
         // 使用VisibleRange的handle_wheel方法计算新的可见范围
-        let (new_visible_start, new_visible_count) = self.visible_range.handle_wheel(
-            mouse_x, 
-            chart_area_x, 
-            chart_area_width, 
-            delta
-        );
+        let (new_visible_start, new_visible_count) =
+            self.visible_range
+                .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
 
         // 无论是否更新可见范围，都无效化缓存
         // 这确保即使可见范围不变，也会重新计算数据范围
         self.invalidate_cache();
-        
+
         // 更新可见范围并返回结果
-        let range_updated = self.visible_range.update(new_visible_start, new_visible_count);
-        
+        let range_updated = self
+            .visible_range
+            .update(new_visible_start, new_visible_count);
+
         // 始终重新计算数据范围，确保使用最新的数据边界
         self.calculate_data_ranges();
-        
+
         // 如果发生了更新，或者Delta很大（表示快速缩放），则返回需要重绘
         range_updated || delta.abs() > 5.0
     }

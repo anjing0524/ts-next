@@ -10,4 +10,4 @@ impl ChartFont {
     pub const LEGEND: &'static str = "12px Arial"; // 图例
     pub const SWITCH: &'static str = "14px Arial"; // 切换按钮
     pub const TOOLTIP: &'static str = "10px Arial"; // 提示框
-} 
+}

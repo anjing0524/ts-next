@@ -3,15 +3,15 @@
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
+use crate::layout::ChartFont;
 use crate::layout::{ChartColors, ChartLayout};
-use crate::utils::time;
 use crate::render::chart_renderer::RenderMode;
+use crate::utils::time;
 use flatbuffers;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
-use crate::layout::ChartFont;
-use std::cmp::Ordering;
 
 /// 坐标轴绘制器
 pub struct AxisRenderer;
@@ -23,7 +23,12 @@ const MIN_Y_LABEL_DIST: f64 = FONT_HEIGHT * 0.8; // Y轴最小像素间距
 
 impl AxisRenderer {
     /// 绘制所有坐标轴
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+    pub fn draw(
+        &self,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
+    ) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Base);
         let layout_ref = canvas_manager.layout.borrow();
         let data_manager_ref = data_manager.borrow();
@@ -93,7 +98,13 @@ impl AxisRenderer {
     }
 
     /// 采样价格tick节点
-    fn sample_price_ticks(&self, min_low: f64, max_high: f64, tick: f64, chart_height: f64) -> Vec<f64> {
+    fn sample_price_ticks(
+        &self,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+        chart_height: f64,
+    ) -> Vec<f64> {
         let first_tick = (min_low / tick).ceil() * tick;
         let last_tick = (max_high / tick).floor() * tick;
         let mut tick_vec = Vec::new();
@@ -119,15 +130,27 @@ impl AxisRenderer {
     }
 
     /// 插入极值标签，避免与已有标签重叠
-    fn insert_extreme_price_labels(&self, mut label_points: Vec<(f64, f64)>, min_low: f64, max_high: f64, layout: &ChartLayout) -> Vec<(f64, f64)> {
+    fn insert_extreme_price_labels(
+        &self,
+        mut label_points: Vec<(f64, f64)>,
+        min_low: f64,
+        max_high: f64,
+        layout: &ChartLayout,
+    ) -> Vec<(f64, f64)> {
         let min_low_tick = (min_low * 1e8).round() / 1e8;
         let max_high_tick = (max_high * 1e8).round() / 1e8;
         let min_low_y = layout.map_price_to_y(min_low_tick, min_low, max_high);
         let max_high_y = layout.map_price_to_y(max_high_tick, min_low, max_high);
-        if !label_points.iter().any(|&(_, y)| (y - min_low_y).abs() < MIN_Y_LABEL_DIST) {
+        if !label_points
+            .iter()
+            .any(|&(_, y)| (y - min_low_y).abs() < MIN_Y_LABEL_DIST)
+        {
             label_points.push((min_low_tick, min_low_y));
         }
-        if !label_points.iter().any(|&(_, y)| (y - max_high_y).abs() < MIN_Y_LABEL_DIST) {
+        if !label_points
+            .iter()
+            .any(|&(_, y)| (y - max_high_y).abs() < MIN_Y_LABEL_DIST)
+        {
             label_points.push((max_high_tick, max_high_y));
         }
         label_points.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
@@ -144,8 +167,7 @@ impl AxisRenderer {
         format_label: G,
         x_text: f64,
         x_tick: f64,
-    )
-    where
+    ) where
         F: Fn(f64) -> f64,
         G: Fn(f64) -> String,
     {
@@ -182,18 +204,26 @@ impl AxisRenderer {
         ctx.set_text_baseline("middle");
         ctx.begin_path();
         ctx.move_to(layout.chart_area_x, layout.chart_area_y);
-        ctx.line_to(layout.chart_area_x, layout.chart_area_y + layout.chart_area_height);
+        ctx.line_to(
+            layout.chart_area_x,
+            layout.chart_area_y + layout.chart_area_height,
+        );
         ctx.stroke();
         let price_range = max_high - min_low;
         if price_range <= 0.0 || tick <= 0.0 {
             return;
         }
-        let sampled_ticks = self.sample_price_ticks(min_low, max_high, tick, layout.price_chart_height);
-        let mut label_points: Vec<(f64, f64)> = sampled_ticks.iter().map(|&price| {
-            let y = layout.map_price_to_y(price, min_low, max_high);
-            (price, y)
-        }).collect();
-        let label_points = self.insert_extreme_price_labels(label_points, min_low, max_high, layout);
+        let sampled_ticks =
+            self.sample_price_ticks(min_low, max_high, tick, layout.price_chart_height);
+        let mut label_points: Vec<(f64, f64)> = sampled_ticks
+            .iter()
+            .map(|&price| {
+                let y = layout.map_price_to_y(price, min_low, max_high);
+                (price, y)
+            })
+            .collect();
+        let label_points =
+            self.insert_extreme_price_labels(label_points, min_low, max_high, layout);
         // 使用通用Y轴标签绘制
         self.draw_y_axis_labels(
             ctx,
@@ -258,7 +288,12 @@ impl AxisRenderer {
     }
 
     /// 绘制标题和图例
-    fn draw_header(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout, mode: RenderMode) {
+    fn draw_header(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        mode: RenderMode,
+    ) {
         // 绘制标题区域背景
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
@@ -339,9 +374,7 @@ impl AxisRenderer {
 
         // 动态计算标签间距，避免过于密集或稀疏
         let max_labels = (layout.main_chart_width / MIN_LABEL_SPACING).floor() as usize;
-        let candle_interval = (visible_count as f64 / max_labels as f64)
-            .ceil()
-            .max(1.0) as usize; // 每隔多少根K线显示一个标签
+        let candle_interval = (visible_count as f64 / max_labels as f64).ceil().max(1.0) as usize; // 每隔多少根K线显示一个标签
 
         ctx.set_fill_style_str(ChartColors::AXIS_TEXT); // 使用更深的文本颜色
         ctx.set_font(ChartFont::AXIS);

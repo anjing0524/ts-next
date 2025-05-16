@@ -27,10 +27,8 @@ impl HeatRenderer {
             let norm = i as f64 / 99.0;
             color_cache.push(Self::calculate_heat_color_static(norm));
         }
-        
-        Self { 
-            color_cache,
-        }
+
+        Self { color_cache }
     }
 
     /// 绘制热图 - 按 tick 区间绘制色块
@@ -70,7 +68,7 @@ impl HeatRenderer {
         // 先找全局最大tick区间成交量（用于归一化）
         let mut global_max_bin = 0.0;
         let mut all_bins: Vec<Vec<f64>> = Vec::with_capacity(visible_end - visible_start);
-        
+
         // 预分配bin数组，避免重复分配
         for global_idx in visible_start..visible_end {
             if global_idx >= items.len() {
@@ -97,11 +95,11 @@ impl HeatRenderer {
             }
             all_bins.push(bins);
         }
-        
+
         if global_max_bin <= 0.0 {
             return;
         }
-        
+
         // 计算全局最大值的对数，避免在循环中重复计算
         let global_max_bin_ln = (global_max_bin + 1.0).ln();
         let min_heat_threshold = 0.001; // 最小热度阈值，调低以显示更多小 volume
@@ -118,7 +116,7 @@ impl HeatRenderer {
                 if volume <= 0.0 {
                     continue;
                 }
-                
+
                 let price_low = min_low + bin_idx as f64 * tick;
                 let price_high = price_low + tick;
                 let y_high = layout.map_price_to_y(price_high, min_low, max_high);
@@ -128,10 +126,10 @@ impl HeatRenderer {
 
                 // 使用对数归一化（加1防止小volume不可见）
                 let norm = (volume + 1.0).ln() / global_max_bin_ln;
-                if norm < min_heat_threshold { 
+                if norm < min_heat_threshold {
                     continue; // 跳过极小热度
                 }
-                
+
                 let color = self.get_cached_color(norm);
 
                 // 只用透明度渐变，最低0.25，线性变化
@@ -151,7 +149,7 @@ impl HeatRenderer {
             }
         }
     }
-    
+
     /// 从缓存获取颜色，如果缓存中没有则计算
     fn get_cached_color(&self, norm: f64) -> String {
         let norm = norm.clamp(0.0, 1.0);
@@ -162,23 +160,23 @@ impl HeatRenderer {
             Self::calculate_heat_color_static(norm)
         }
     }
-    
+
     /// 基于成交量计算热度颜色 (静态方法，用于初始化缓存)
     /// 使用更接近Bookmap的配色方案
     fn calculate_heat_color_static(norm: f64) -> String {
         let norm = norm.clamp(0.0, 1.0);
         // 更平滑的色带节点，参考Bookmap
         let color_stops = [
-            (0.0,   "#f0f9e8"), // 极淡绿
-            (0.15,  "#ccebc5"), // 淡绿
-            (0.35,  "#a8ddb5"), // 浅绿
-            (0.55,  "#7bccc4"), // 青绿
-            (0.75,  "#43a2ca"), // 蓝绿
-            (0.90,  "#0868ac"), // 深蓝
-            (0.94,  "#fff600"), // 明亮黄
-            (0.97,  "#ff9900"), // 鲜橙
-            (0.99,  "#ff6a00"), // 深橙
-            (1.0,   "#ff0000"), // 鲜红
+            (0.0, "#f0f9e8"),  // 极淡绿
+            (0.15, "#ccebc5"), // 淡绿
+            (0.35, "#a8ddb5"), // 浅绿
+            (0.55, "#7bccc4"), // 青绿
+            (0.75, "#43a2ca"), // 蓝绿
+            (0.90, "#0868ac"), // 深蓝
+            (0.94, "#fff600"), // 明亮黄
+            (0.97, "#ff9900"), // 鲜橙
+            (0.99, "#ff6a00"), // 深橙
+            (1.0, "#ff0000"),  // 鲜红
         ];
         // 找到norm所在的区间
         for i in 0..color_stops.len() - 1 {
@@ -192,21 +190,21 @@ impl HeatRenderer {
         // 超出范围默认红色
         "#ff0000".to_string()
     }
-    
+
     /// 颜色插值 (静态方法)
     fn interpolate_color_static(color1: &str, color2: &str, ratio: f64) -> String {
         // 解析颜色
         let (r1, g1, b1) = Self::parse_rgb_static(color1);
         let (r2, g2, b2) = Self::parse_rgb_static(color2);
-        
+
         // 线性插值
         let r = Self::lerp_static(r1, r2, ratio) as u8;
         let g = Self::lerp_static(g1, g2, ratio) as u8;
         let b = Self::lerp_static(b1, b2, ratio) as u8;
-        
+
         format!("rgb({}, {}, {})", r, g, b)
     }
-    
+
     /// 解析RGB颜色 (静态方法)
     fn parse_rgb_static(color: &str) -> (u8, u8, u8) {
         if color.starts_with("#") && color.len() == 7 {
@@ -220,9 +218,9 @@ impl HeatRenderer {
             (0, 0, 0)
         }
     }
-    
+
     /// 线性插值 (静态方法)
     fn lerp_static(a: u8, b: u8, t: f64) -> f64 {
         a as f64 * (1.0 - t) + b as f64 * t
     }
-} 
+}

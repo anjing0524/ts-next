@@ -2,14 +2,14 @@
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout, ChartFont};
+use crate::layout::{ChartColors, ChartFont, ChartLayout};
+use crate::render::chart_renderer::RenderMode;
+use crate::render::cursor_style::CursorStyle;
+use crate::utils::time;
 use js_sys;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
-use crate::render::chart_renderer::RenderMode;
-use crate::render::cursor_style::CursorStyle;
-use crate::utils::time;
 
 /// 交互层渲染器
 #[derive(Default)]
@@ -64,7 +64,8 @@ impl OverlayRenderer {
         let data_manager_ref = data_manager.borrow();
         let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
         let relative_x = x - layout.chart_area_x;
-        let idx_in_visible = ((relative_x / layout.main_chart_width) * visible_count as f64).floor() as usize;
+        let idx_in_visible =
+            ((relative_x / layout.main_chart_width) * visible_count as f64).floor() as usize;
         let global_idx = visible_start + idx_in_visible;
         if global_idx >= visible_start && global_idx < visible_end {
             self.hover_candle_index = Some(global_idx);
@@ -85,22 +86,27 @@ impl OverlayRenderer {
         self.hover_candle_index = None;
         self.mouse_x = 0.0;
         self.mouse_y = 0.0;
-        
+
         // 清除交互层 - 确保完全清除所有交互元素
         self.clear(canvas_manager);
-        
+
         // 重新绘制覆盖层，只显示切换按钮
         // 注意：这里不调用draw方法，因为它会检查mouse_in_chart并可能绘制其他元素
         // 我们只需要确保切换按钮被绘制
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
-        
+
         // 只绘制切换按钮，使用传入的mode参数
         self.draw_switch_button(&ctx, &layout, mode);
     }
 
     /// 绘制交互层
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+    pub fn draw(
+        &self,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
+    ) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout: std::cell::Ref<'_, ChartLayout> = canvas_manager.layout.borrow();
         self.clear(canvas_manager);
@@ -145,7 +151,9 @@ impl OverlayRenderer {
                         };
                         let volume = if let (Some(vols), Some(bin)) = (kline.volumes(), tick_idx) {
                             vols.iter()
-                                .filter(|pv| ((pv.price() - min_low) / tick).floor() as usize == bin)
+                                .filter(|pv| {
+                                    ((pv.price() - min_low) / tick).floor() as usize == bin
+                                })
                                 .map(|pv| pv.volume())
                                 .sum::<f64>()
                         } else {
@@ -167,14 +175,9 @@ impl OverlayRenderer {
     pub fn clear(&self, canvas_manager: &CanvasManager) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
-        
+
         // 只清除非导航器区域，保留DataZoom部分
-        ctx.clear_rect(
-            0.0,
-            0.0,
-            layout.canvas_width,
-            layout.navigator_y
-        );
+        ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.navigator_y);
     }
 
     /// 绘制十字光标
@@ -350,26 +353,39 @@ impl OverlayRenderer {
         let tooltip_width = 150.0;
         let line_height = 20.0;
         let padding = 10.0;
-        let (num_lines, content_drawer): (usize, Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>) = match mode {
-            RenderMode::HEATMAP => (3, Box::new(|price, volume, current_y, ctx, text_x, label_x| {
-                let _ = ctx.fill_text("价格:", text_x, current_y);
-                let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
-                let _ = ctx.fill_text("数量:", text_x, current_y + 20.0);
-                let formatted_volume = time::format_volume(volume, 2);
-                let _ = ctx.fill_text(&formatted_volume, label_x, current_y + 20.0);
-            })),
-            _ => (6, Box::new(|_, volume, mut current_y, ctx, text_x, label_x| {
-                let draw_line = |label: &str, value: String, y: f64| {
-                    let _ = ctx.fill_text(label, text_x, y);
-                    let _ = ctx.fill_text(&value, label_x, y);
-                };
-                draw_line("开盘:", format!("{:.2}", item.open()), current_y); current_y += 20.0;
-                draw_line("最高:", format!("{:.2}", item.high()), current_y); current_y += 20.0;
-                draw_line("最低:", format!("{:.2}", item.low()), current_y); current_y += 20.0;
-                draw_line("收盘:", format!("{:.2}", item.close()), current_y); current_y += 20.0;
-                let formatted_volume = time::format_volume(volume, 2);
-                draw_line("成交量:", formatted_volume, current_y);
-            })),
+        let (num_lines, content_drawer): (
+            usize,
+            Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>,
+        ) = match mode {
+            RenderMode::HEATMAP => (
+                3,
+                Box::new(|price, volume, current_y, ctx, text_x, label_x| {
+                    let _ = ctx.fill_text("价格:", text_x, current_y);
+                    let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
+                    let _ = ctx.fill_text("数量:", text_x, current_y + 20.0);
+                    let formatted_volume = time::format_volume(volume, 2);
+                    let _ = ctx.fill_text(&formatted_volume, label_x, current_y + 20.0);
+                }),
+            ),
+            _ => (
+                6,
+                Box::new(|_, volume, mut current_y, ctx, text_x, label_x| {
+                    let draw_line = |label: &str, value: String, y: f64| {
+                        let _ = ctx.fill_text(label, text_x, y);
+                        let _ = ctx.fill_text(&value, label_x, y);
+                    };
+                    draw_line("开盘:", format!("{:.2}", item.open()), current_y);
+                    current_y += 20.0;
+                    draw_line("最高:", format!("{:.2}", item.high()), current_y);
+                    current_y += 20.0;
+                    draw_line("最低:", format!("{:.2}", item.low()), current_y);
+                    current_y += 20.0;
+                    draw_line("收盘:", format!("{:.2}", item.close()), current_y);
+                    current_y += 20.0;
+                    let formatted_volume = time::format_volume(volume, 2);
+                    draw_line("成交量:", formatted_volume, current_y);
+                }),
+            ),
         };
         let tooltip_height = (num_lines as f64 * line_height) + padding * 2.0;
         let mouse_offset = 15.0;
@@ -443,41 +459,46 @@ impl OverlayRenderer {
     }
 
     /// 绘制切换按钮
-    fn draw_switch_button(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout, mode: RenderMode) {
+    fn draw_switch_button(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        mode: RenderMode,
+    ) {
         // 使用布局参数计算按钮位置和尺寸
         let button_width = layout.switch_btn_width * 2.0;
         let button_height = layout.switch_btn_height;
         let button_x = (layout.canvas_width - button_width) / 2.0;
         let button_y = layout.padding;
-        
+
         // 绘制按钮背景
         ctx.set_fill_style_str(ChartColors::SWITCH_BG);
         ctx.fill_rect(button_x, button_y, button_width, button_height);
-        
+
         // 绘制按钮边框
         ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
         ctx.set_line_width(1.0);
         ctx.stroke_rect(button_x, button_y, button_width, button_height);
-        
+
         // 绘制按钮分隔线
         ctx.begin_path();
         ctx.move_to(button_x + layout.switch_btn_width, button_y);
         ctx.line_to(button_x + layout.switch_btn_width, button_y + button_height);
         ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
         ctx.stroke();
-        
+
         // 设置文本样式
         ctx.set_font(ChartFont::SWITCH);
         ctx.set_text_align("center");
         ctx.set_text_baseline("middle");
-        
+
         // K线按钮区域
         let kline_x = button_x + layout.switch_btn_width / 2.0;
         let kline_y = button_y + button_height / 2.0;
         // 热力图按钮区域
         let heatmap_x = button_x + layout.switch_btn_width + layout.switch_btn_width / 2.0;
         let heatmap_y = button_y + button_height / 2.0;
-        
+
         // K线按钮样式
         if mode == RenderMode::KMAP {
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
@@ -487,11 +508,16 @@ impl OverlayRenderer {
             ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
         }
         ctx.fill_text("K线", kline_x, kline_y).unwrap();
-        
+
         // 热力图按钮样式
         if mode == RenderMode::HEATMAP {
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
-            ctx.fill_rect(button_x + layout.switch_btn_width, button_y, layout.switch_btn_width, button_height);
+            ctx.fill_rect(
+                button_x + layout.switch_btn_width,
+                button_y,
+                layout.switch_btn_width,
+                button_height,
+            );
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
         } else {
             ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
@@ -506,13 +532,17 @@ impl OverlayRenderer {
         let button_height = layout.switch_btn_height;
         let button_x = (layout.canvas_width - button_width) / 2.0;
         let button_y = layout.padding;
-        
+
         // 检查点击是否在按钮区域内
-        if x >= button_x && x <= button_x + button_width && y >= button_y && y <= button_y + button_height {
+        if x >= button_x
+            && x <= button_x + button_width
+            && y >= button_y
+            && y <= button_y + button_height
+        {
             // 确定点击的是哪个选项
             let kline_button_x = button_x;
             let heatmap_button_x = button_x + layout.switch_btn_width;
-            
+
             if x >= kline_button_x && x < heatmap_button_x {
                 // 点击了K线选项
                 return Some(true);
@@ -521,7 +551,7 @@ impl OverlayRenderer {
                 return Some(false);
             }
         }
-        
+
         // 移除不必要的日志
         None
     }
@@ -617,7 +647,6 @@ impl OverlayRenderer {
 
     /// 处理鼠标点击事件 (特别用于切换图表模式)
     pub fn handle_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<RenderMode> {
-        
         // 检查是否点击了切换按钮
         if let Some(is_kmap) = self.check_switch_button_click(x, y, layout) {
             // 根据点击的按钮返回对应的渲染模式
@@ -626,17 +655,31 @@ impl OverlayRenderer {
             } else {
                 return Some(RenderMode::HEATMAP);
             }
-        } 
+        }
         None
     }
 
     /// 处理鼠标拖动事件（只在主图区域 main_chart 内响应）
-    pub fn handle_mouse_drag(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+    pub fn handle_mouse_drag(
+        &mut self,
+        x: f64,
+        y: f64,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
+    ) {
         self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
     }
 
     /// 处理鼠标滚轮事件（只在主图区域 main_chart 内响应）
-    pub fn handle_wheel(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+    pub fn handle_wheel(
+        &mut self,
+        x: f64,
+        y: f64,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
+    ) {
         self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
     }
 
@@ -646,13 +689,18 @@ impl OverlayRenderer {
         if layout.is_point_in_chart_area(x, y) {
             return CursorStyle::Default;
         }
-        
+
         // 默认光标样式
         CursorStyle::Default
     }
 
     /// 清除并重绘交互层
-    pub fn redraw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
+    pub fn redraw(
+        &self,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        mode: RenderMode,
+    ) {
         // 清除交互层
         self.clear(canvas_manager);
         // 重新绘制交互层

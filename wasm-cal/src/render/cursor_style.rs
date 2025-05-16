@@ -56,4 +56,4 @@ impl Default for CursorStyle {
     fn default() -> Self {
         CursorStyle::Default
     }
-} 
+}

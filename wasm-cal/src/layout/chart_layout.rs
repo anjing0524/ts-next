@@ -50,8 +50,8 @@ pub struct ChartLayout {
     pub switch_btn_height: f64,
 
     // 新增主图和订单簿分区宽度
-    pub main_chart_width: f64,  // 主图区域宽度(80%)
-    pub book_area_width: f64    // 订单簿区域宽度(20%)
+    pub main_chart_width: f64, // 主图区域宽度(80%)
+    pub book_area_width: f64,  // 订单簿区域宽度(20%)
 }
 
 impl ChartLayout {
@@ -136,7 +136,7 @@ impl ChartLayout {
             switch_btn_height,
             switch_btn_width,
             main_chart_width,
-            book_area_width
+            book_area_width,
         }
     }
 
@@ -196,12 +196,12 @@ impl ChartLayout {
     }
 
     // 将数据索引映射到X坐标
-    // 
+    //
     // # 参数
     // * `index` - 在可见区域内的索引，从0开始
     // * `visible_start` - 当前可见区域的起始索引
     // * `visible_count` - 当前可见区域的数据数量
-    // 
+    //
     // # 返回值
     // X坐标（画布坐标系）
     pub fn map_index_to_x(&self, index: usize, visible_start: usize) -> f64 {
@@ -210,32 +210,40 @@ impl ChartLayout {
         } else {
             0
         };
-        
-        self.chart_area_x + (relative_index as f64 * self.total_candle_width) + (self.candle_width / 2.0)
+
+        self.chart_area_x
+            + (relative_index as f64 * self.total_candle_width)
+            + (self.candle_width / 2.0)
     }
 
     // 将X坐标映射到数据索引
-    // 
+    //
     // # 参数
     // * `x` - X坐标（画布坐标系）
     // * `visible_start` - 当前可见区域的起始索引
     // * `visible_count` - 当前可见区域的数据数量
     // * `items_len` - 数据总长度
-    // 
+    //
     // # 返回值
     // 数据索引，如果X坐标超出范围则返回None
-    pub fn map_x_to_index(&self, x: f64, visible_start: usize, _visible_count: usize, items_len: usize) -> Option<usize> {
+    pub fn map_x_to_index(
+        &self,
+        x: f64,
+        visible_start: usize,
+        _visible_count: usize,
+        items_len: usize,
+    ) -> Option<usize> {
         // 如果X坐标超出图表区域，返回None
         if x < self.chart_area_x || x > self.chart_area_x + self.chart_area_width {
             return None;
         }
-        
+
         // 计算相对X坐标
         let relative_x = x - self.chart_area_x;
-        
+
         // 计算相对索引
         let relative_index = (relative_x / self.total_candle_width).floor() as usize;
-        
+
         // 计算绝对索引并确保不超出数据范围
         let absolute_index = visible_start + relative_index;
         if absolute_index < items_len {
@@ -337,9 +345,9 @@ impl ChartLayout {
     /// 对布局应用热图模式设置
     pub fn apply_heatmap_layout(&mut self) {
         // 在热图模式下，热图占据大部分区域，成交量图在底部
-        self.volume_chart_height = self.chart_area_height * 0.1;  // 成交量图占10%
-        self.price_chart_height = self.chart_area_height - self.volume_chart_height;  // 热图占剩余空间
-        self.volume_chart_y = self.chart_area_y + self.price_chart_height;  // 成交量图在热图下方
+        self.volume_chart_height = self.chart_area_height * 0.1; // 成交量图占10%
+        self.price_chart_height = self.chart_area_height - self.volume_chart_height; // 热图占剩余空间
+        self.volume_chart_y = self.chart_area_y + self.price_chart_height; // 成交量图在热图下方
     }
 
     /// 恢复到标准K线模式布局

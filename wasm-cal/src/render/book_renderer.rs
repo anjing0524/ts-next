@@ -1,12 +1,12 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout, ChartFont};
+use crate::layout::{ChartColors, ChartFont, ChartLayout};
+use crate::render::chart_renderer::RenderMode;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::OffscreenCanvasRenderingContext2d;
-use std::cell::Cell;
-use crate::render::chart_renderer::RenderMode; // 假设RenderMode定义在这里
+use web_sys::OffscreenCanvasRenderingContext2d; // 假设RenderMode定义在这里
 
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
@@ -28,14 +28,8 @@ impl BookRenderer {
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
         hover_index: Option<usize>,
-        mode: RenderMode, // 新增
+        mode: RenderMode,
     ) {
-        // 检查mode是否变化
-        let last_mode = self.last_mode.get();
-        if last_mode != Some(mode) {
-            self.last_idx.set(None); // mode变化，强制重绘
-            self.last_mode.set(Some(mode));
-        }
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -46,20 +40,19 @@ impl BookRenderer {
         if visible_start >= visible_end {
             return;
         }
-        // 优先渲染hover_index的订单簿，否则渲染最后一个可见K线
         let idx = hover_index.unwrap_or_else(|| visible_end - 1);
         if idx >= items.len() {
             return;
         }
 
-        // 判断 idx 是否变化
-        if let Some(last) = self.last_idx.get() {
-            if last == idx {
-                // idx 未变化，跳过渲染
-                return;
-            }
+        // 只要mode或idx有变化就渲染，否则跳过
+        let last_mode = self.last_mode.get();
+        let last_idx = self.last_idx.get();
+        let need_render = last_mode != Some(mode) || last_idx != Some(idx);
+        if !need_render {
+            return;
         }
-        // idx 变化，更新 last_idx
+        self.last_mode.set(Some(mode));
         self.last_idx.set(Some(idx));
 
         let item = items.get(idx);
@@ -112,7 +105,11 @@ impl BookRenderer {
             let bar_width = (area_width - text_reserved_width) * norm;
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
-            ctx.set_fill_style_str(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH });
+            ctx.set_fill_style_str(if *is_ask {
+                ChartColors::BEARISH
+            } else {
+                ChartColors::BULLISH
+            });
             ctx.global_alpha(); // 确保透明度为1
             ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0);
             // --- 新增：在柱状图末尾右侧绘制数量文本 ---
@@ -132,15 +129,11 @@ impl BookRenderer {
         ctx.set_global_alpha(1.0); // 恢复透明度
     }
 
-    pub fn clear_area(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-    ) {
+    pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
         let area_x = layout.chart_area_x + layout.main_chart_width;
         let area_y = layout.chart_area_y;
         let area_width = layout.book_area_width;
         let area_height = layout.price_chart_height;
         ctx.clear_rect(area_x, area_y, area_width, area_height);
     }
-} 
+}

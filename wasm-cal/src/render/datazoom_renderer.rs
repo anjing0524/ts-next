@@ -140,7 +140,7 @@ impl DataZoomRenderer {
             return match self.drag_handle_type {
                 DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize, // 东西方向调整大小
                 DragHandleType::Middle => CursorStyle::Grabbing,                       // 抓取中样式
-                DragHandleType::None => CursorStyle::Default,                          // 不应该发生，但为了安全起见
+                DragHandleType::None => CursorStyle::Default, // 不应该发生，但为了安全起见
             };
         }
 
@@ -204,7 +204,8 @@ impl DataZoomRenderer {
         // 检查鼠标是否在导航器区域内
         let layout = canvas_manager.layout.borrow();
         // 允许鼠标在拖动状态下不一定在导航器区域内，但不能超出canvas范围
-        let is_in_canvas = x >= 0.0 && x <= layout.canvas_width && _y >= 0.0 && _y <= layout.canvas_height;
+        let is_in_canvas =
+            x >= 0.0 && x <= layout.canvas_width && _y >= 0.0 && _y <= layout.canvas_height;
         if !is_in_canvas {
             // 如果鼠标不在canvas范围内，不触发重置，但继续处理拖动
             // 允许用户拖动到canvas外部并返回时继续控制
@@ -292,7 +293,7 @@ impl DataZoomRenderer {
 
         // 检查是否有显著变化
         let start_diff = (visible_start as isize - new_start as isize).abs();
-        let end_diff  = (visible_end as isize - new_end as isize).abs();
+        let end_diff = (visible_end as isize - new_end as isize).abs();
 
         let has_significant_change = start_diff > 0 || end_diff > 0;
 
@@ -302,7 +303,7 @@ impl DataZoomRenderer {
             data_manager_ref.invalidate_cache();
 
             // 更新可见范围
-            data_manager_ref.update_visible_range(new_start, new_end-new_start);
+            data_manager_ref.update_visible_range(new_start, new_end - new_start);
 
             // 如果拖动距离较大，更新起始拖动位置以提供更好的用户体验
             if start_diff > 10 || end_diff > 10 {

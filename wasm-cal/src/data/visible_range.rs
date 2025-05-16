@@ -1,7 +1,7 @@
 //! 可见数据范围模块 - 封装可见数据范围的计算和管理
 
-use crate::layout::ChartLayout;
 use crate::kline_generated::kline::KlineItem;
+use crate::layout::ChartLayout;
 use flatbuffers;
 
 /// 可见数据范围结构体
@@ -85,8 +85,8 @@ impl VisibleRange {
         }
 
         // 计算一屏可以显示的K线数量
-        let initial_visible_count = ((layout.chart_area_width / layout.total_candle_width)
-            .floor() as usize)
+        let initial_visible_count = ((layout.chart_area_width / layout.total_candle_width).floor()
+            as usize)
             .max(1) // 确保至少显示1根K线
             .min(items_len); // 不能超过总数据量
 
@@ -163,10 +163,10 @@ impl VisibleRange {
     }
 
     /// 计算可见范围的屏幕坐标
-    /// 
+    ///
     /// # 参数
     /// * `layout` - 图表布局
-    /// 
+    ///
     /// # 返回值
     /// 可见范围的起始和结束X坐标
     pub fn get_screen_coordinates(&self, layout: &ChartLayout) -> (f64, f64) {
@@ -188,7 +188,7 @@ impl VisibleRange {
     ) -> (usize, usize) {
         // 确保相对位置在有效范围内
         let relative_position = relative_position.min(1.0).max(0.0);
-        
+
         let visible_count = self.count.max(1);
         let visible_center_idx = self.start as f64 + (visible_count as f64 * relative_position);
 
@@ -225,7 +225,9 @@ impl VisibleRange {
     ) -> (usize, usize) {
         // 计算相对位置
         let relative_position = if chart_area_width > 0.0 {
-            ((mouse_x - chart_area_x) / chart_area_width).min(1.0).max(0.0)
+            ((mouse_x - chart_area_x) / chart_area_width)
+                .min(1.0)
+                .max(0.0)
         } else {
             0.5
         };
@@ -287,10 +289,10 @@ impl VisibleRange {
     }
 
     /// 预计算所有可见项的X坐标，用于批量渲染
-    /// 
+    ///
     /// # 参数
     /// * `layout` - 图表布局
-    /// 
+    ///
     /// # 返回值
     /// 返回包含所有可见项X坐标的向量（仅限主图区域）
     pub fn precompute_x_coordinates(&self, layout: &ChartLayout) -> Vec<f64> {

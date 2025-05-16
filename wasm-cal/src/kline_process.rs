@@ -242,7 +242,7 @@ impl KlineProcess {
                 return false;
             }
         };
-        let result = chart_renderer.handle_mouse_up(x, y);  
+        let result = chart_renderer.handle_mouse_up(x, y);
         result
     }
 

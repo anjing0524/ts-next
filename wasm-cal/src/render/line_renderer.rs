@@ -3,10 +3,10 @@
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartColors, ChartLayout};
+use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
-use flatbuffers;
 
 /// 线图渲染器 - 负责绘制最新价、买一价、卖一价曲线
 #[derive(Default)]
@@ -143,7 +143,7 @@ impl LineRenderer {
 
         // 收集所有点的坐标
         let mut points = Vec::with_capacity(visible_end - visible_start);
-        
+
         for i in visible_start..visible_end {
             let item = items.get(i);
             let price = price_extractor(&item);
@@ -151,69 +151,61 @@ impl LineRenderer {
             let y = layout.map_price_to_y(price, min_low, max_high);
             points.push((x, y));
         }
-        
+
         // 如果点数太少，直接绘制直线
         if points.len() <= 2 {
             self.draw_straight_line(ctx, &points);
             return;
         }
-        
+
         // 使用贝塞尔曲线绘制平滑曲线
         self.draw_bezier_curve(ctx, &points);
     }
-    
+
     /// 绘制直线（当点数较少时使用）
-    fn draw_straight_line(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        points: &[(f64, f64)],
-    ) {
+    fn draw_straight_line(&self, ctx: &OffscreenCanvasRenderingContext2d, points: &[(f64, f64)]) {
         if points.is_empty() {
             return;
         }
-        
+
         ctx.begin_path();
         ctx.move_to(points[0].0, points[0].1);
-        
+
         for i in 1..points.len() {
             ctx.line_to(points[i].0, points[i].1);
         }
-        
+
         ctx.stroke();
     }
-    
+
     /// 使用贝塞尔曲线绘制平滑曲线
-    fn draw_bezier_curve(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        points: &[(f64, f64)],
-    ) {
+    fn draw_bezier_curve(&self, ctx: &OffscreenCanvasRenderingContext2d, points: &[(f64, f64)]) {
         if points.len() < 2 {
             return;
         }
-        
+
         ctx.begin_path();
         ctx.move_to(points[0].0, points[0].1);
-        
+
         // 对于每三个点，使用二次贝塞尔曲线
         // 控制点取相邻两点的中点
         for i in 0..points.len() - 1 {
             let current = points[i];
             let next = points[i + 1];
-            
+
             // 计算控制点（当前点和下一个点的中点）
             let control_x = (current.0 + next.0) / 2.0;
             let control_y = (current.1 + next.1) / 2.0;
-            
+
             // 使用二次贝塞尔曲线
             let _ = ctx.quadratic_curve_to(current.0, current.1, control_x, control_y);
         }
-        
+
         // 绘制到最后一个点
         if let Some(last) = points.last() {
             ctx.line_to(last.0, last.1);
         }
-        
+
         ctx.stroke();
     }
-} 
+}

@@ -1,14 +1,15 @@
 //! 图表渲染器 - 整合所有模块，提供统一的渲染接口
 
 use super::axis_renderer::AxisRenderer;
+use super::book_renderer::{self, BookRenderer};
 use super::cursor_style::CursorStyle;
 use super::datazoom_renderer::DataZoomRenderer;
+use super::datazoom_renderer::DragResult;
 use super::heat_renderer::HeatRenderer;
 use super::line_renderer::LineRenderer;
 use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
-use super::book_renderer::{self, BookRenderer};
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
@@ -16,8 +17,7 @@ use crate::layout::ChartLayout;
 use crate::utils::WasmError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use web_sys::{OffscreenCanvas};
-use super::datazoom_renderer::DragResult;
+use web_sys::OffscreenCanvas;
 
 // 定义每次重绘的间隔计数
 thread_local! {
@@ -74,7 +74,7 @@ impl ChartRenderer {
                 let items = data.items().expect("Data must contain items");
                 let tick = data.tick();
                 let mut data_manager_ref = data_manager.borrow_mut();
-                data_manager_ref.set_items(items,tick);
+                data_manager_ref.set_items(items, tick);
                 let layout = &canvas_manager.layout.borrow();
                 data_manager_ref.initialize_visible_range(layout);
                 data_manager_ref.calculate_data_ranges();
@@ -132,7 +132,7 @@ impl ChartRenderer {
             let mut layout = self.canvas_manager.layout.borrow_mut();
             // 先更新基本布局
             layout.update_for_visible_count(visible_count);
-            
+
             // 根据当前模式应用相应的布局
             match self.mode {
                 RenderMode::KMAP => layout.apply_kline_layout(),
@@ -148,7 +148,7 @@ impl ChartRenderer {
 
         // 4. 获取布局信息用于后续渲染
         let layout = self.canvas_manager.layout.borrow();
-        
+
         // 5. 获取上下文
         let base_ctx = self.canvas_manager.get_context(CanvasLayerType::Base);
         let main_ctx = self.canvas_manager.get_context(CanvasLayerType::Main);
@@ -174,15 +174,15 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                 );
-                
+
                 // 渲染价格线
                 self.line_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
-                
-                // 渲染成交量图 
+
+                // 渲染成交量图
                 self.volume_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
@@ -194,7 +194,7 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
-                    self.mode
+                    self.mode,
                 );
             }
             RenderMode::HEATMAP => {
@@ -203,14 +203,14 @@ impl ChartRenderer {
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
-                ); 
+                );
                 // 渲染价格线
                 self.line_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
-                // 渲染成交量图 
+                // 渲染成交量图
                 self.volume_renderer.draw(
                     &self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
@@ -222,7 +222,7 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
-                    self.mode
+                    self.mode,
                 );
             }
         }
@@ -232,7 +232,7 @@ impl ChartRenderer {
             let datazoom_renderer = self.datazoom_renderer.borrow();
             datazoom_renderer.draw(&self.canvas_manager, &self.data_manager);
         } // 在这里释放 datazoom_renderer 的借用
-        
+
         // 10. 最后渲染交互层的静态元素（如模式切换按钮）
         {
             let overlay_renderer = self.overlay_renderer.borrow();
@@ -275,13 +275,8 @@ impl ChartRenderer {
             overlay.get_hover_candle_index()
         };
         // 重绘订单簿
-        self.book_renderer.draw(
-            &ctx,
-            &layout,
-            &self.data_manager,
-            hover_index,
-            self.mode
-        );
+        self.book_renderer
+            .draw(&ctx, &layout, &self.data_manager, hover_index, self.mode);
     }
 
     /// 处理鼠标移动事件
@@ -292,7 +287,13 @@ impl ChartRenderer {
         };
         {
             let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-            overlay_renderer.handle_mouse_move(x, y, &self.canvas_manager, &self.data_manager, self.mode);
+            overlay_renderer.handle_mouse_move(
+                x,
+                y,
+                &self.canvas_manager,
+                &self.data_manager,
+                self.mode,
+            );
         } // 作用域结束，借用释放
         let curr_hover = {
             let overlay = self.overlay_renderer.borrow();
@@ -347,7 +348,13 @@ impl ChartRenderer {
         // 2. 处理交互层的拖动
         {
             let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-            overlay_renderer.handle_mouse_drag(x, y, &self.canvas_manager, &self.data_manager, self.mode);
+            overlay_renderer.handle_mouse_drag(
+                x,
+                y,
+                &self.canvas_manager,
+                &self.data_manager,
+                self.mode,
+            );
         } // 在这里释放 overlay_renderer 的可变借用
 
         match drag_result {
@@ -356,7 +363,7 @@ impl ChartRenderer {
                 // 确保所有借用都已释放后再调用render
                 self.render();
                 true
-            },
+            }
             DragResult::NeedRedraw => {
                 let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
                     let current = counter.get();
@@ -364,16 +371,14 @@ impl ChartRenderer {
                     counter.set(next);
                     next == 0
                 });
-                
+
                 if should_render {
                     // 确保所有借用都已释放后再调用render
                     self.render();
                 }
                 true
-            },
-            DragResult::None => {
-                false
-            },
+            }
+            DragResult::None => false,
         }
     }
 
@@ -398,7 +403,7 @@ impl ChartRenderer {
             self.render();
             return true;
         }
-        
+
         false
     }
 
@@ -425,7 +430,13 @@ impl ChartRenderer {
         // 2. 处理交互层的滚轮事件
         {
             let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-            overlay_renderer.handle_wheel(x, y, &self.canvas_manager, &self.data_manager, self.mode);
+            overlay_renderer.handle_wheel(
+                x,
+                y,
+                &self.canvas_manager,
+                &self.data_manager,
+                self.mode,
+            );
         } // 在这里释放 overlay_renderer 的可变借用
 
         // 3. 如果需要重绘，则重绘图表
@@ -437,30 +448,26 @@ impl ChartRenderer {
 
     /// 处理鼠标点击事件 (特别用于切换图表模式)
     pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
-        
-        // 检查是否点击了切换按钮
+        // 1. 先获取 new_mode，作用域最小化
         let new_mode = {
             let layout = self.canvas_manager.layout.borrow();
             let overlay_renderer = self.overlay_renderer.borrow();
             overlay_renderer.handle_click(x, y, &layout)
         };
 
+        // 2. 判断是否需要切换
         if let Some(new_mode) = new_mode {
-            
-            // 根据点击的按钮设置渲染模式
-            self.mode = new_mode;
-            // 重新渲染图表
-            // 确保所有借用都已释放后再调用render
-            self.render();
-            // 重新绘制交互元素
-            {
-                let overlay_renderer = self.overlay_renderer.borrow();
-                overlay_renderer.redraw(&self.canvas_manager, &self.data_manager, self.mode);
-            } // 在这里释放 overlay_renderer 的借用
-            
-            return true;
+            if new_mode != self.mode {
+                self.mode = new_mode;
+                self.render();
+                // 重新绘制交互元素
+                {
+                    let overlay_renderer = self.overlay_renderer.borrow();
+                    overlay_renderer.redraw(&self.canvas_manager, &self.data_manager, self.mode);
+                }
+                return true;
+            }
         }
         false
     }
-
 }
