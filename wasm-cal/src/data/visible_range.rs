@@ -295,7 +295,6 @@ impl VisibleRange {
     /// 返回包含所有可见项X坐标的向量（仅限主图区域）
     pub fn precompute_x_coordinates(&self, layout: &ChartLayout) -> Vec<f64> {
         let mut x_coords = Vec::with_capacity(self.count);
-        let x_min = layout.chart_area_x;
         let x_max = layout.chart_area_x + layout.main_chart_width;
         for global_index in self.start..self.end {
             let x = layout.map_index_to_x(global_index, self.start);

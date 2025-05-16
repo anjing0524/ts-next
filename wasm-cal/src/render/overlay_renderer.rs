@@ -41,7 +41,7 @@ impl OverlayRenderer {
         }
     }
 
-    /// 处理鼠标移动事件
+    /// 处理鼠标移动事件（只在主图区域 main_chart 内响应）
     pub fn handle_mouse_move(
         &mut self,
         x: f64,
@@ -50,46 +50,31 @@ impl OverlayRenderer {
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
     ) {
+        let layout = canvas_manager.layout.borrow();
+        if !layout.is_point_in_chart_area(x, y) {
+            self.hover_candle_index = None;
+            self.handle_mouse_leave(canvas_manager, mode);
+            return;
+        }
         let prev_x = self.mouse_x;
         let prev_y = self.mouse_y;
-
-        // 更新鼠标坐标
         self.mouse_x = x;
         self.mouse_y = y;
-        self.mouse_in_chart = false;
-        self.hover_candle_index = None;
-
-        // 计算移动距离
+        self.mouse_in_chart = true;
+        let data_manager_ref = data_manager.borrow();
+        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
+        let relative_x = x - layout.chart_area_x;
+        let idx_in_visible = ((relative_x / layout.main_chart_width) * visible_count as f64).floor() as usize;
+        let global_idx = visible_start + idx_in_visible;
+        if global_idx >= visible_start && global_idx < visible_end {
+            self.hover_candle_index = Some(global_idx);
+        } else {
+            self.hover_candle_index = None;
+        }
         let distance = ((x - prev_x).powi(2) + (y - prev_y).powi(2)).sqrt();
         if distance < 1.0 {
             return;
         }
-
-        // 判断鼠标是否在图表区域内
-        let layout = canvas_manager.layout.borrow();
-        self.mouse_in_chart = layout.is_point_in_chart_area(x, y);
-
-        let data_manager_ref = data_manager.borrow();
-        // 获取可见范围
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
-
-        // 如果鼠标在图表区域内，计算当前悬停的K线索引
-        if self.mouse_in_chart {
-            // 计算鼠标X坐标对应的K线索引
-            let relative_x = x - layout.chart_area_x;
-            let candle_idx = (relative_x / layout.total_candle_width).floor() as usize;
-
-            // 判断索引是否在可见范围内
-            if candle_idx < visible_count {
-                self.hover_candle_index = Some(visible_start + candle_idx);
-            } else {
-                self.hover_candle_index = None;
-            }
-        } else {
-            self.hover_candle_index = None;
-        }
-
-        // 绘制交互层 - 使用传入的mode参数
         self.draw(canvas_manager, data_manager, mode);
     }
 
@@ -127,29 +112,30 @@ impl OverlayRenderer {
             Some(items) => items,
             None => return,
         };
-        
         // 绘制切换按钮 - 确保使用传入的mode参数
         self.draw_switch_button(&ctx, &layout, mode);
-        
         if !self.mouse_in_chart {
             return;
         }
-        self.draw_crosshair(&ctx, &layout);
-        self.draw_axis_labels(
-            &ctx,
-            &layout,
-            min_low,
-            max_high,
-            max_volume,
-            items,
-            self.hover_candle_index,
-        );
+        // 只在主图区域绘制十字线和坐标轴标签
+        if layout.is_point_in_main_chart_area(self.mouse_x, self.mouse_y) {
+            self.draw_crosshair(&ctx, &layout);
+            self.draw_axis_labels(
+                &ctx,
+                &layout,
+                min_low,
+                max_high,
+                max_volume,
+                items,
+                self.hover_candle_index, // 直接传递全局下标
+            );
+        }
         // 计算热图tooltip数据
-        if let Some(hover_idx) = self.hover_candle_index {
-            if hover_idx < items.len() {
+        if let Some(global_idx) = self.hover_candle_index {
+            if global_idx < items.len() {
                 match mode {
                     RenderMode::HEATMAP => {
-                        let kline = items.get(hover_idx);
+                        let kline = items.get(global_idx);
                         let timestamp = kline.timestamp() as i64;
                         let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
                         let tick_idx = if tick > 0.0 && price >= min_low && price < max_high {
@@ -170,7 +156,7 @@ impl OverlayRenderer {
                         }
                     }
                     _ => {
-                        self.draw_tooltip(&ctx, &layout, items.get(hover_idx), mode);
+                        self.draw_tooltip(&ctx, &layout, items.get(global_idx), mode);
                     }
                 }
             }
@@ -644,18 +630,14 @@ impl OverlayRenderer {
         None
     }
 
-    /// 处理鼠标拖动事件 - 只处理与交互层相关的拖动
+    /// 处理鼠标拖动事件（只在主图区域 main_chart 内响应）
     pub fn handle_mouse_drag(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
-        // 更新鼠标位置并重新绘制交互层
         self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
-        // 不需要再次调用draw，因为handle_mouse_move已经调用了draw
     }
 
-    /// 处理鼠标滚轮事件 - 只处理与交互层相关的部分
+    /// 处理鼠标滚轮事件（只在主图区域 main_chart 内响应）
     pub fn handle_wheel(&mut self, x: f64, y: f64, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
-        // 更新鼠标位置并重新绘制交互层
         self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
-        // 不需要再次调用draw，因为handle_mouse_move已经调用了draw
     }
 
     /// 获取当前鼠标位置的光标样式

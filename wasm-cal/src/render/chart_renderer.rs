@@ -8,7 +8,7 @@ use super::line_renderer::LineRenderer;
 use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
-use super::book_renderer::BookRenderer;
+use super::book_renderer::{self, BookRenderer};
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
@@ -272,12 +272,6 @@ impl ChartRenderer {
             let overlay = self.overlay_renderer.borrow();
             overlay.get_hover_candle_index()
         };
-        // 清理订单簿区域
-        let area_x = layout.chart_area_x + layout.chart_area_width * 0.8;
-        let area_y = layout.chart_area_y;
-        let area_width = layout.chart_area_width * 0.2;
-        let area_height = layout.price_chart_height;
-        ctx.clear_rect(area_x, area_y, area_width, area_height);
         // 重绘订单簿
         self.book_renderer.draw(
             &ctx,

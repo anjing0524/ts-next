@@ -352,6 +352,22 @@ impl ChartLayout {
 
     /// 检查当前布局是否为热图模式
     pub fn is_heatmap_mode(&self) -> bool {
-        self.volume_chart_height == 0.0
+        self.volume_chart_height < self.chart_area_height * 0.15
+    }
+
+    /// 判断点是否在订单簿区域内
+    pub fn is_point_in_book_area(&self, x: f64, y: f64) -> bool {
+        x >= self.chart_area_x + self.chart_area_width * 0.8
+            && x <= self.chart_area_x + self.chart_area_width
+            && y >= self.chart_area_y
+            && y <= self.chart_area_y + self.price_chart_height
+    }
+
+    /// 判断点是否在主图区域（不含订单簿）
+    pub fn is_point_in_main_chart_area(&self, x: f64, y: f64) -> bool {
+        x >= self.chart_area_x
+            && x <= self.chart_area_x + self.main_chart_width
+            && y >= self.chart_area_y
+            && y <= self.chart_area_y + self.price_chart_height
     }
 }

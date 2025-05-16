@@ -16,37 +16,30 @@ use std::cmp::Ordering;
 /// 坐标轴绘制器
 pub struct AxisRenderer;
 
+// ===== 常量定义 =====
+const FONT_HEIGHT: f64 = 12.0; // 10px字体+2px间距
+const MIN_LABEL_SPACING: f64 = 70.0; // X轴最小标签间距
+const MIN_Y_LABEL_DIST: f64 = FONT_HEIGHT * 0.8; // Y轴最小像素间距
+
 impl AxisRenderer {
     /// 绘制所有坐标轴
     pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>, mode: RenderMode) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Base);
-        let layout_ref = canvas_manager.layout.borrow(); // 使用 borrow 获取引用
-        let data_manager_ref = data_manager.borrow(); // 使用 borrow 获取引用
+        let layout_ref = canvas_manager.layout.borrow();
+        let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
             None => return,
         };
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
         let tick = data_manager_ref.get_tick();
-        
-        // 优先绘制标题和图例以确保头部区域被正确清空和绘制
         self.draw_header(&ctx, &layout_ref, mode);
-        
-        // 只在K线图模式下绘制交替背景色
         if mode == RenderMode::KMAP {
             self.draw_alternating_background(&ctx, &layout_ref);
-        } else {
-            // 热图模式下，使用热图配色方案中最深的颜色作为背景
-            // self.draw_heatmap_background(&ctx, &layout_ref);
         }
-        
-        // 绘制价格Y轴
+        // 优化：抽象Y轴标签绘制
         self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high, tick);
-        
-        // 绘制成交量Y轴
         self.draw_volume_y_axis(&ctx, &layout_ref, max_volume);
-        
-        // 绘制X轴
         self.draw_x_axis(&ctx, &layout_ref, items, data_manager);
     }
 
@@ -99,35 +92,8 @@ impl AxisRenderer {
         }
     }
 
-    /// 绘制价格Y轴
-    fn draw_price_y_axis(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        min_low: f64,
-        max_high: f64,
-        tick: f64,
-    ) {
-        // 设置轴线和标签样式
-        ctx.set_stroke_style_str(ChartColors::BORDER);  // 使用 BORDER 颜色替代 AXIS
-        ctx.set_line_width(1.0);
-        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
-        ctx.set_font(ChartFont::AXIS);
-        ctx.set_text_align("right");
-        ctx.set_text_baseline("middle");
-        
-        // 绘制Y轴
-        ctx.begin_path();
-        ctx.move_to(layout.chart_area_x, layout.chart_area_y);
-        ctx.line_to(layout.chart_area_x, layout.chart_area_y + layout.chart_area_height);
-        ctx.stroke();
-        
-        // 计算价格区间
-        let price_range = max_high - min_low;
-        if price_range <= 0.0 || tick <= 0.0 {
-            return;
-        }
-        // 以tick为步长，从不小于min_low的最小tick整数倍开始，到不大于max_high的最大tick整数倍结束
+    /// 采样价格tick节点
+    fn sample_price_ticks(&self, min_low: f64, max_high: f64, tick: f64, chart_height: f64) -> Vec<f64> {
         let first_tick = (min_low / tick).ceil() * tick;
         let last_tick = (max_high / tick).floor() * tick;
         let mut tick_vec = Vec::new();
@@ -136,9 +102,7 @@ impl AxisRenderer {
             tick_vec.push((t * 1e8).round() / 1e8);
             t += tick;
         }
-        // 计算最大可显示标签数
-        let font_height = 12.0; // ChartFont::AXIS = "10px Arial"，加2px间距
-        let max_labels = (layout.price_chart_height / font_height).floor() as usize;
+        let max_labels = (chart_height / FONT_HEIGHT).floor() as usize;
         let tick_count = tick_vec.len();
         let mut sampled_ticks = Vec::new();
         if tick_count > max_labels && max_labels > 0 {
@@ -151,57 +115,112 @@ impl AxisRenderer {
         } else {
             sampled_ticks = tick_vec;
         }
-        // 先将采样tick节点映射到Y坐标，便于后续极值插入时做像素距离判断
-        let mut label_points: Vec<(f64, f64)> = sampled_ticks.iter().map(|&price| {
-            let y = layout.map_price_to_y(price, min_low, max_high);
-            (price, y)
-        }).collect();
-        // 插入最高/最低价标签时，判断其Y坐标与已存在标签的Y坐标距离，若小于10像素则不插入
-        let min_dist = font_height * 0.8; // 允许的最小像素间距
+        sampled_ticks
+    }
+
+    /// 插入极值标签，避免与已有标签重叠
+    fn insert_extreme_price_labels(&self, mut label_points: Vec<(f64, f64)>, min_low: f64, max_high: f64, layout: &ChartLayout) -> Vec<(f64, f64)> {
         let min_low_tick = (min_low * 1e8).round() / 1e8;
         let max_high_tick = (max_high * 1e8).round() / 1e8;
         let min_low_y = layout.map_price_to_y(min_low_tick, min_low, max_high);
         let max_high_y = layout.map_price_to_y(max_high_tick, min_low, max_high);
-        if !label_points.iter().any(|&(_, y)| (y - min_low_y).abs() < min_dist) {
+        if !label_points.iter().any(|&(_, y)| (y - min_low_y).abs() < MIN_Y_LABEL_DIST) {
             label_points.push((min_low_tick, min_low_y));
         }
-        if !label_points.iter().any(|&(_, y)| (y - max_high_y).abs() < min_dist) {
+        if !label_points.iter().any(|&(_, y)| (y - max_high_y).abs() < MIN_Y_LABEL_DIST) {
             label_points.push((max_high_tick, max_high_y));
         }
-        // 按价格从大到小排序（Y轴从上到下）
         label_points.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
-        // 绘制所有价格标签和短横线
-        for &(price, y) in label_points.iter() {
+        label_points
+    }
+
+    /// 通用Y轴标签绘制
+    fn draw_y_axis_labels<F, G>(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        values: &[f64],
+        value_to_y: F,
+        format_label: G,
+        x_text: f64,
+        x_tick: f64,
+    )
+    where
+        F: Fn(f64) -> f64,
+        G: Fn(f64) -> String,
+    {
+        for &v in values {
+            let y = value_to_y(v);
             // 绘制短横线
             ctx.set_stroke_style_str(ChartColors::BORDER);
             ctx.begin_path();
-            ctx.move_to(layout.chart_area_x - 3.0, y);
+            ctx.move_to(x_tick, y);
             ctx.line_to(layout.chart_area_x, y);
             ctx.stroke();
-            // 绘制价格文本
-            let price_text = if price.abs() >= 100.0 {
-                format!("{:.0}", price)
-            } else if price.abs() >= 1.0 {
-                format!("{:.2}", price)
-            } else {
-                format!("{:.4}", price)
-            };
-            ctx.fill_text(
-                &price_text,
-                layout.chart_area_x - 5.0,
-                y,
-            ).unwrap_or_default();
+            // 绘制文本
+            let label = format_label(v);
+            if ctx.fill_text(&label, x_text, y).is_err() {
+                // 可选：记录日志或忽略
+            }
         }
     }
 
-    /// 绘制成交量Y轴
+    /// 绘制价格Y轴（重构后）
+    fn draw_price_y_axis(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) {
+        ctx.set_stroke_style_str(ChartColors::BORDER);
+        ctx.set_line_width(1.0);
+        ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
+        ctx.set_font(ChartFont::AXIS);
+        ctx.set_text_align("right");
+        ctx.set_text_baseline("middle");
+        ctx.begin_path();
+        ctx.move_to(layout.chart_area_x, layout.chart_area_y);
+        ctx.line_to(layout.chart_area_x, layout.chart_area_y + layout.chart_area_height);
+        ctx.stroke();
+        let price_range = max_high - min_low;
+        if price_range <= 0.0 || tick <= 0.0 {
+            return;
+        }
+        let sampled_ticks = self.sample_price_ticks(min_low, max_high, tick, layout.price_chart_height);
+        let mut label_points: Vec<(f64, f64)> = sampled_ticks.iter().map(|&price| {
+            let y = layout.map_price_to_y(price, min_low, max_high);
+            (price, y)
+        }).collect();
+        let label_points = self.insert_extreme_price_labels(label_points, min_low, max_high, layout);
+        // 使用通用Y轴标签绘制
+        self.draw_y_axis_labels(
+            ctx,
+            layout,
+            &label_points.iter().map(|&(p, _)| p).collect::<Vec<_>>(),
+            |price| layout.map_price_to_y(price, min_low, max_high),
+            |price| {
+                if price.abs() >= 100.0 {
+                    format!("{:.0}", price)
+                } else if price.abs() >= 1.0 {
+                    format!("{:.2}", price)
+                } else {
+                    format!("{:.4}", price)
+                }
+            },
+            layout.chart_area_x - 5.0,
+            layout.chart_area_x - 3.0,
+        );
+    }
+
+    /// 绘制成交量Y轴（重构后）
     fn draw_volume_y_axis(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         max_volume: f64,
     ) {
-        // --- 绘制Y轴背景 (Y轴标签区域) ---
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(
             0.0,
@@ -209,8 +228,6 @@ impl AxisRenderer {
             layout.y_axis_width,
             layout.volume_chart_height,
         );
-
-        // --- 绘制Y轴右侧边界线 ---
         ctx.set_stroke_style_str(ChartColors::BORDER);
         ctx.set_line_width(1.0);
         ctx.begin_path();
@@ -220,43 +237,24 @@ impl AxisRenderer {
             layout.volume_chart_y + layout.volume_chart_height,
         );
         ctx.stroke();
-
-        // --- 绘制Y轴刻度和标签 ---
-        let num_y_labels = 2; // 成交量图只需要少量标签
         ctx.set_fill_style_str(ChartColors::AXIS_TEXT);
         ctx.set_font(ChartFont::AXIS);
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
-
-        // 绘制Y轴标签
-        for i in 0..=num_y_labels {
-            let volume = max_volume * i as f64 / num_y_labels as f64;
-            // 确保成交量不为负无穷或正无穷
-            if !volume.is_finite() {
-                continue;
-            }
-
-            // Map volume to Y coordinate
-            let mut y = layout.map_volume_to_y(volume, max_volume);
-
-            // If this is the zero line (i == 0), shift it up slightly to prevent overlap with the bottom border
-            if i == 0 {
-                y -= 2.0; // Shift up by 1 pixel
-            }
-
-            // 使用ChartLayout的方法格式化成交量 - 改为使用 render::utils::format_volume
-            let volume_text = time::format_volume(volume, 1);
-
-            // 绘制标签
-            let _ = ctx.fill_text(&volume_text, layout.y_axis_width - 5.0, y);
-
-            // 绘制小刻度线
-            ctx.set_stroke_style_str(ChartColors::BORDER);
-            ctx.begin_path();
-            ctx.move_to(layout.y_axis_width - 3.0, y);
-            ctx.line_to(layout.y_axis_width, y);
-            ctx.stroke();
-        }
+        let num_y_labels = 2;
+        let values: Vec<f64> = (0..=num_y_labels)
+            .map(|i| max_volume * i as f64 / num_y_labels as f64)
+            .filter(|v| v.is_finite())
+            .collect();
+        self.draw_y_axis_labels(
+            ctx,
+            layout,
+            &values,
+            |v| layout.map_volume_to_y(v, max_volume) - if v == 0.0 { 2.0 } else { 0.0 },
+            |v| time::format_volume(v, 1),
+            layout.y_axis_width - 5.0,
+            layout.y_axis_width - 3.0,
+        );
     }
 
     /// 绘制标题和图例
@@ -340,8 +338,7 @@ impl AxisRenderer {
         ctx.stroke();
 
         // 动态计算标签间距，避免过于密集或稀疏
-        let min_label_spacing = 70.0; // 最小标签间距（像素）
-        let max_labels = (layout.main_chart_width / min_label_spacing).floor() as usize;
+        let max_labels = (layout.main_chart_width / MIN_LABEL_SPACING).floor() as usize;
         let candle_interval = (visible_count as f64 / max_labels as f64)
             .ceil()
             .max(1.0) as usize; // 每隔多少根K线显示一个标签

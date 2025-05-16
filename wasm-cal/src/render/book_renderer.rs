@@ -5,12 +5,15 @@ use crate::layout::{ChartColors, ChartLayout, ChartFont};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
+use std::cell::Cell;
 
-pub struct BookRenderer;
+pub struct BookRenderer {
+    last_idx: Cell<Option<usize>>,
+}
 
 impl BookRenderer {
     pub fn new() -> Self {
-        Self {}
+        Self { last_idx: Cell::new(None) }
     }
 
     /// 在main层右侧20%宽度区域绘制订单簿
@@ -36,6 +39,17 @@ impl BookRenderer {
         if idx >= items.len() {
             return;
         }
+
+        // 判断 idx 是否变化
+        if let Some(last) = self.last_idx.get() {
+            if last == idx {
+                // idx 未变化，跳过渲染
+                return;
+            }
+        }
+        // idx 变化，更新 last_idx
+        self.last_idx.set(Some(idx));
+
         let item = items.get(idx);
         let last_price = item.last_price();
         let volumes = match item.volumes() {
@@ -43,9 +57,9 @@ impl BookRenderer {
             None => return,
         };
         // 计算区域
-        let area_x = layout.chart_area_x + layout.chart_area_width * 0.8;
+        let area_x = layout.chart_area_x + layout.main_chart_width;
         let area_y = layout.chart_area_y;
-        let area_width = layout.chart_area_width * 0.2;
+        let area_width = layout.book_area_width;
         let area_height = layout.price_chart_height;
         // 分离买卖盘
         let mut bids = Vec::new();
@@ -76,6 +90,8 @@ impl BookRenderer {
         if max_volume <= 0.0 {
             return;
         }
+        // 清理订单簿区域
+        self.clear_area(&ctx, &layout);
         // 绘制
         let bar_height = area_height / all_levels.len().max(1) as f64;
         for (i, (_price, volume, is_ask)) in all_levels.iter().enumerate() {
@@ -102,5 +118,17 @@ impl BookRenderer {
             }
         }
         ctx.set_global_alpha(1.0); // 恢复透明度
+    }
+
+    pub fn clear_area(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+    ) {
+        let area_x = layout.chart_area_x + layout.main_chart_width;
+        let area_y = layout.chart_area_y;
+        let area_width = layout.book_area_width;
+        let area_height = layout.price_chart_height;
+        ctx.clear_rect(area_x, area_y, area_width, area_height);
     }
 } 
