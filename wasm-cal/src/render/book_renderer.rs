@@ -6,14 +6,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 use std::cell::Cell;
+use crate::render::chart_renderer::RenderMode; // 假设RenderMode定义在这里
 
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
+    last_mode: Cell<Option<RenderMode>>, // 新增
 }
 
 impl BookRenderer {
     pub fn new() -> Self {
-        Self { last_idx: Cell::new(None) }
+        Self {
+            last_idx: Cell::new(None),
+            last_mode: Cell::new(None), // 新增
+        }
     }
 
     /// 在main层右侧20%宽度区域绘制订单簿
@@ -23,7 +28,14 @@ impl BookRenderer {
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
         hover_index: Option<usize>,
+        mode: RenderMode, // 新增
     ) {
+        // 检查mode是否变化
+        let last_mode = self.last_mode.get();
+        if last_mode != Some(mode) {
+            self.last_idx.set(None); // mode变化，强制重绘
+            self.last_mode.set(Some(mode));
+        }
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,

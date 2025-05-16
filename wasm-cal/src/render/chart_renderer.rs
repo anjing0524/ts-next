@@ -194,6 +194,7 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
+                    self.mode
                 );
             }
             RenderMode::HEATMAP => {
@@ -221,6 +222,7 @@ impl ChartRenderer {
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
+                    self.mode
                 );
             }
         }
@@ -278,6 +280,7 @@ impl ChartRenderer {
             &layout,
             &self.data_manager,
             hover_index,
+            self.mode
         );
     }
 
