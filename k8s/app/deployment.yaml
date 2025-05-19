@@ -56,6 +56,11 @@ spec:
                 configMapKeyRef:
                   name: ts-next-template-config
                   key: PORT
+            - name: SCHEDULER_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ts-next-template-config
+                  key: SCHEDULER_API_URL
           resources:
             requests:
               cpu: '0.8'

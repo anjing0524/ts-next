@@ -427,6 +427,7 @@ async function callSchedulerApi(
   payload: { date: string; planId: string; rerunMode: number; param?: string }
 ): Promise<{ success: boolean; message: string; state: number }> {
   try {
+    logger.info(process.env.SCHEDULER_API_URL);
     const response = await fetch(`${process.env.SCHEDULER_API_URL}${endpoint}`, {
       method: 'POST',
       headers: {
