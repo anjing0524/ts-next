@@ -432,7 +432,7 @@ async function callSchedulerApi(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.SCHEDULER_API_KEY || ''}`,
+        // Authorization: `Bearer ${process.env.SCHEDULER_API_KEY || ''}`,
       },
       body: JSON.stringify(payload),
     });
@@ -612,7 +612,7 @@ export async function stopPlan(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.SCHEDULER_API_KEY || ''}`,
+        // Authorization: `Bearer ${process.env.SCHEDULER_API_KEY || ''}`,
       },
       body: JSON.stringify({
         date: redate,
