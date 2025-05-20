@@ -33,14 +33,12 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
       if (!dependencyGraph[edge.source]) {
         dependencyGraph[edge.source] = [];
       }
-
       dependencyGraph[edge.source].push(edge.target);
 
       // 确保目标节点存在于入度记录中
       if (incomingEdges[edge.target] === undefined) {
         incomingEdges[edge.target] = 0;
       }
-
       incomingEdges[edge.target]++;
     }
   });
@@ -54,7 +52,6 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
 
   while (currentLayer.length > 0) {
     layers.push(currentLayer);
-
     const nextLayer: string[] = [];
     currentLayer.forEach((nodeId) => {
       // 遍历当前节点的所有目标节点
@@ -66,29 +63,35 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
         }
       });
     });
-
     currentLayer = nextLayer;
   }
 
   // 计算每个节点的位置
   const nodePositions: Record<string, { x: number; y: number }> = {};
 
-  // 水平间距和垂直间距（可根据节点大小调整）
-  const horizontalGap = 250; // 增加水平间距，避免节点重叠
-  const verticalGap = 200; // 增加垂直间距，提高可读性
+  // 增加间距以提高可读性
+  const horizontalGap = 300; // 增加水平间距
+  const verticalGap = 250; // 增加垂直间距
 
   // 为每一层的节点分配位置
   layers.forEach((layer, layerIndex) => {
     // 计算当前层的总宽度
-    const layerWidth = layer.length * horizontalGap;
+    const layerWidth = (layer.length - 1) * horizontalGap;
     // 计算起始X坐标，使当前层居中
-    const startX = -layerWidth / 2 + horizontalGap / 2;
+    const startX = -layerWidth / 2;
 
     // 为当前层的每个节点分配位置
     layer.forEach((nodeId, nodeIndex) => {
+      // 计算基础位置
+      const baseX = startX + nodeIndex * horizontalGap;
+      const baseY = layerIndex * verticalGap;
+
+      // 为节点添加一些随机偏移，避免边完全重叠
+      const offsetX = (nodeIndex % 2 === 0 ? 1 : -1) * 20;
+
       nodePositions[nodeId] = {
-        x: startX + nodeIndex * horizontalGap,
-        y: layerIndex * verticalGap,
+        x: baseX + offsetX,
+        y: baseY,
       };
     });
   });
@@ -187,11 +190,10 @@ export function DagFlow() {
                     duration: 800, // 平滑过渡动画
                   }}
                   defaultEdgeOptions={{
-                    type: 'smoothstep',
+                    type: 'default',
                     style: {
                       strokeWidth: 2,
-                      stroke: '#888', // 设置边的颜色
-                      strokeDasharray: '', // 实线
+                      stroke: '#888',
                     },
                     animated: true, // 添加动画效果
                     markerEnd: {
