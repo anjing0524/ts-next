@@ -319,20 +319,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
           </div>
         );
       default: // 其他状态
-        return (
-          <div className="flex gap-1 mt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1"
-              onClick={(e) => handleButtonClick(e, handleViewDetails)}
-              disabled={loading !== null}
-            >
-              <Info className="h-3 w-3" />
-              详情
-            </Button>
-          </div>
-        );
+        return <div className="flex gap-1 mt-2"></div>;
     }
   };
 

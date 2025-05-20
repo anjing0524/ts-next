@@ -75,7 +75,7 @@ export function MultiSelect({
           >
             <div className="flex-1 flex items-center justify-between overflow-hidden">
               {selectedOptions.length > 0 ? (
-                <div className="flex flex-wrap gap-1 max-w-[200px] overflow-hidden">
+                <div className="flex flex-wrap gap-1 max-w-[300px] overflow-hidden">
                   {selectedOptions.length <= maxDisplay ? (
                     selectedOptions.map((option) => (
                       <Badge key={option} variant="secondary" className="mr-1 text-xs py-0 px-2">
@@ -111,7 +111,7 @@ export function MultiSelect({
             <CommandInput placeholder="搜索选项..." />
             <CommandList>
               <CommandEmpty>未找到结果</CommandEmpty>
-              <ScrollArea className="max-h-[200px]">
+              <ScrollArea className="max-h-[300px]">
                 <CommandGroup>
                   <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-sm text-muted-foreground">选项 ({options.length})</span>

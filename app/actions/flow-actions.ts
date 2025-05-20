@@ -165,6 +165,10 @@ export async function handleSearch(
     });
     logger.info(`[${stage}] 节点数: ${nodes.length}, 边数: ${edges.length}`);
   }
+
+  // 按照name字段进行升序排序
+  result.sort((a, b) => a.name.localeCompare(b.name));
+
   return result;
 }
 
