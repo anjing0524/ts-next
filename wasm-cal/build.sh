@@ -12,6 +12,9 @@ fi
 # 确保当前目录是wasm-cal
 cd "$(dirname "$0")"
 
+# 格式化代码
+cargo fmt
+
 # 编译为WebAssembly
 wasm-pack build --target web --out-dir pkg --release 
 

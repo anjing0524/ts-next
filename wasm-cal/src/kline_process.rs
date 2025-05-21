@@ -23,7 +23,8 @@ extern "C" {
 #[wasm_bindgen]
 pub struct KlineProcess {
     // 数据相关
-    data: Vec<u8>,                           // 原始FlatBuffer数据
+    #[allow(dead_code)]
+    data: Vec<u8>, // 原始FlatBuffer数据
     parsed_data: Option<KlineData<'static>>, // 解析后的数据
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
@@ -114,7 +115,7 @@ impl KlineProcess {
                 chart_renderer.render();
             }
             None => {
-                return Err(WasmError::RenderError("未设置Canvas".into()).into());
+                return Err(WasmError::Render("未设置Canvas".into()).into());
             }
         }
         time_end("KlineProcess::draw_all");
@@ -131,7 +132,7 @@ impl KlineProcess {
         let memory = memory_val
             .dyn_into::<js_sys::WebAssembly::Memory>()
             .map_err(|_| {
-                WasmError::BufferError("无法将提供的 JSValue 转换为 WebAssembly.Memory".into())
+                WasmError::Buffer("无法将提供的 JSValue 转换为 WebAssembly.Memory".into())
             })?;
 
         let buffer = memory.buffer();
@@ -143,7 +144,7 @@ impl KlineProcess {
 
         let data = memory_view.to_vec();
         if data.len() != data_length {
-            return Err(WasmError::BufferError("Memory copy length mismatch".into()).into());
+            return Err(WasmError::Buffer("Memory copy length mismatch".into()).into());
         }
 
         Ok(data)
@@ -152,12 +153,12 @@ impl KlineProcess {
     /// 验证FlatBuffer数据
     fn verify_kline_data_slice(bytes: &[u8]) -> Result<(), WasmError> {
         if bytes.len() < 8 {
-            return Err(WasmError::ValidationError("FlatBuffer数据长度不足".into()));
+            return Err(WasmError::Validation("FlatBuffer数据长度不足".into()));
         }
 
         let identifier = String::from_utf8_lossy(&bytes[4..8]);
         if identifier != crate::kline_generated::kline::KLINE_DATA_IDENTIFIER {
-            return Err(WasmError::ValidationError(format!(
+            return Err(WasmError::Validation(format!(
                 "无效的FlatBuffer标识符, 期望: {}, 实际: {}",
                 crate::kline_generated::kline::KLINE_DATA_IDENTIFIER,
                 identifier
@@ -173,7 +174,7 @@ impl KlineProcess {
         let mut opts = flatbuffers::VerifierOptions::default();
         opts.max_tables = 1_000_000_000;
         root_as_kline_data_with_opts(&opts, data)
-            .map_err(|e| WasmError::ParseError(format!("Flatbuffer 解析失败: {}", e)))
+            .map_err(|e| WasmError::Parse(format!("Flatbuffer 解析失败: {}", e)))
     }
 
     #[wasm_bindgen]
@@ -229,8 +230,7 @@ impl KlineProcess {
                 return false;
             }
         };
-        let result = chart_renderer.handle_mouse_down(x, y);
-        result
+        chart_renderer.handle_mouse_down(x, y)
     }
 
     /// 处理鼠标释放事件
@@ -242,8 +242,7 @@ impl KlineProcess {
                 return false;
             }
         };
-        let result = chart_renderer.handle_mouse_up(x, y);
-        result
+        chart_renderer.handle_mouse_up(x, y)
     }
 
     /// 处理鼠标拖动事件

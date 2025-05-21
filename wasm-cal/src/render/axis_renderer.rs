@@ -38,14 +38,14 @@ impl AxisRenderer {
         };
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
         let tick = data_manager_ref.get_tick();
-        self.draw_header(&ctx, &layout_ref, mode);
+        self.draw_header(ctx, &layout_ref, mode);
         if mode == RenderMode::KMAP {
-            self.draw_alternating_background(&ctx, &layout_ref);
+            self.draw_alternating_background(ctx, &layout_ref);
         }
         // 优化：抽象Y轴标签绘制
-        self.draw_price_y_axis(&ctx, &layout_ref, min_low, max_high, tick);
-        self.draw_volume_y_axis(&ctx, &layout_ref, max_volume);
-        self.draw_x_axis(&ctx, &layout_ref, items, data_manager);
+        self.draw_price_y_axis(ctx, &layout_ref, min_low, max_high, tick);
+        self.draw_volume_y_axis(ctx, &layout_ref, max_volume);
+        self.draw_x_axis(ctx, &layout_ref, items, data_manager);
     }
 
     /// 绘制交替背景色
@@ -215,7 +215,7 @@ impl AxisRenderer {
         }
         let sampled_ticks =
             self.sample_price_ticks(min_low, max_high, tick, layout.price_chart_height);
-        let mut label_points: Vec<(f64, f64)> = sampled_ticks
+        let label_points: Vec<(f64, f64)> = sampled_ticks
             .iter()
             .map(|&price| {
                 let y = layout.map_price_to_y(price, min_low, max_high);

@@ -8,31 +8,31 @@ use wasm_bindgen::JsValue;
 pub enum WasmError {
     /// Canvas相关错误
     #[error("Canvas错误: {0}")]
-    CanvasError(String),
+    Canvas(String),
 
     /// 数据处理错误
     #[error("数据处理错误: {0}")]
-    DataError(String),
+    Data(String),
 
     /// 渲染错误
     #[error("渲染错误: {0}")]
-    RenderError(String),
+    Render(String),
 
     #[error("缓冲区错误: {0}")]
-    BufferError(String),
+    Buffer(String),
 
     #[error("数据验证错误: {0}")]
-    ValidationError(String),
+    Validation(String),
 
     #[error("解析错误: {0}")]
-    ParseError(String),
+    Parse(String),
 
     #[error("缓存数据错误: {0}")]
-    CacheError(String),
+    Cache(String),
 
     /// 其他错误
     #[error("其他错误: {0}")]
-    OtherError(String),
+    Other(String),
 }
 
 // 添加从 WasmError 到 JsValue 的自动转换实现

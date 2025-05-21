@@ -3,7 +3,6 @@
 use crate::data::visible_range::{DataRange, VisibleRange};
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
-use flatbuffers;
 
 /// 数据管理器 - 负责管理K线数据和可见范围
 pub struct DataManager {
@@ -141,7 +140,7 @@ impl DataManager {
         }
 
         let items = self.items.unwrap();
-        if items.len() == 0 {
+        if items.is_empty() {
             return false;
         }
 

@@ -2,7 +2,6 @@
 
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
-use flatbuffers;
 
 /// 可见数据范围结构体
 ///
@@ -91,11 +90,7 @@ impl VisibleRange {
             .min(items_len); // 不能超过总数据量
 
         // 默认显示末尾的数据，而不是从0开始
-        let start = if items_len > initial_visible_count {
-            items_len - initial_visible_count
-        } else {
-            0
-        };
+        let start = items_len.saturating_sub(initial_visible_count);
 
         Self::new(start, initial_visible_count, items_len)
     }
@@ -187,7 +182,7 @@ impl VisibleRange {
         relative_position: f64,
     ) -> (usize, usize) {
         // 确保相对位置在有效范围内
-        let relative_position = relative_position.min(1.0).max(0.0);
+        let relative_position = relative_position.clamp(0.0, 1.0);
 
         let visible_count = self.count.max(1);
         let visible_center_idx = self.start as f64 + (visible_count as f64 * relative_position);
@@ -225,9 +220,7 @@ impl VisibleRange {
     ) -> (usize, usize) {
         // 计算相对位置
         let relative_position = if chart_area_width > 0.0 {
-            ((mouse_x - chart_area_x) / chart_area_width)
-                .min(1.0)
-                .max(0.0)
+            ((mouse_x - chart_area_x) / chart_area_width).clamp(0.0, 1.0)
         } else {
             0.5
         };
@@ -256,7 +249,7 @@ impl VisibleRange {
 
         // 只计算可见范围内的最大最小值
         let (min_low, max_high, max_volume) = (self.start..self.end).fold(
-            (f64::MAX, f64::MIN, 0.0 as f64),
+            (f64::MAX, f64::MIN, 0.0_f64),
             |(min_low, max_high, max_volume), idx| {
                 let item = items.get(idx);
                 let low = item.low();

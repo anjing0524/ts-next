@@ -1,7 +1,7 @@
 //! 热图渲染器 - 专门负责绘制类似Bookmap的热度图
 
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;

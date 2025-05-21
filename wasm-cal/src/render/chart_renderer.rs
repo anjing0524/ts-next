@@ -1,7 +1,7 @@
 //! 图表渲染器 - 整合所有模块，提供统一的渲染接口
 
 use super::axis_renderer::AxisRenderer;
-use super::book_renderer::{self, BookRenderer};
+use super::book_renderer::BookRenderer;
 use super::cursor_style::CursorStyle;
 use super::datazoom_renderer::DataZoomRenderer;
 use super::datazoom_renderer::DragResult;
@@ -80,7 +80,7 @@ impl ChartRenderer {
                 data_manager_ref.calculate_data_ranges();
             }
             None => {
-                return Err(WasmError::DataError("No data provided".to_string()));
+                return Err(WasmError::Data("No data provided".to_string()));
             }
         }
         // 创建各个渲染模块

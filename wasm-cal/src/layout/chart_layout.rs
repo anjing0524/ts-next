@@ -205,12 +205,7 @@ impl ChartLayout {
     // # 返回值
     // X坐标（画布坐标系）
     pub fn map_index_to_x(&self, index: usize, visible_start: usize) -> f64 {
-        let relative_index = if index >= visible_start {
-            index - visible_start
-        } else {
-            0
-        };
-
+        let relative_index = index.saturating_sub(visible_start);
         self.chart_area_x
             + (relative_index as f64 * self.total_candle_width)
             + (self.candle_width / 2.0)
@@ -324,9 +319,7 @@ impl ChartLayout {
         // 计算每根K线的总宽度（包括间距）
         let total_width_per_candle = self.main_chart_width / visible_count as f64;
         // 蜡烛图实体宽度 = 总宽度 - 间距
-        let candle_width = (total_width_per_candle * 0.8).max(1.0);
-
-        candle_width
+        (total_width_per_candle * 0.8).max(1.0)
     }
 
     /// 更新布局参数以适应当前可见K线数量
