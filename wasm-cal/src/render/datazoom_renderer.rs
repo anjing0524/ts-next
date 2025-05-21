@@ -351,7 +351,7 @@ impl DataZoomRenderer {
         };
 
         // 如果数据为空，直接返回
-        if items.len() == 0 {
+        if items.is_empty() {
             return;
         }
 

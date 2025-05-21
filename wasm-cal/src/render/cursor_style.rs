@@ -3,9 +3,10 @@
 use std::fmt;
 
 /// 光标样式枚举 - 定义图表中使用的所有光标样式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CursorStyle {
     /// 默认光标
+    #[default]
     Default,
     /// 东西方向调整大小 (用于DataZoom左右手柄)
     EwResize,
@@ -36,7 +37,7 @@ impl fmt::Display for CursorStyle {
 
 impl CursorStyle {
     /// 将枚举转换为CSS光标样式字符串
-    pub fn to_css_string(&self) -> &'static str {
+    pub fn to_css_string(self) -> &'static str {
         match self {
             CursorStyle::Default => "default",
             CursorStyle::EwResize => "ew-resize",
@@ -49,11 +50,5 @@ impl CursorStyle {
             CursorStyle::Help => "help",
             CursorStyle::NotAllowed => "not-allowed",
         }
-    }
-}
-
-impl Default for CursorStyle {
-    fn default() -> Self {
-        CursorStyle::Default
     }
 }

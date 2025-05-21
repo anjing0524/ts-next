@@ -170,11 +170,9 @@ impl LineRenderer {
 
         ctx.begin_path();
         ctx.move_to(points[0].0, points[0].1);
-
-        for i in 1..points.len() {
-            ctx.line_to(points[i].0, points[i].1);
+        for point in points.iter().skip(1) {
+            ctx.line_to(point.0, point.1);
         }
-
         ctx.stroke();
     }
 
@@ -198,7 +196,7 @@ impl LineRenderer {
             let control_y = (current.1 + next.1) / 2.0;
 
             // 使用二次贝塞尔曲线
-            let _ = ctx.quadratic_curve_to(current.0, current.1, control_x, control_y);
+            ctx.quadratic_curve_to(current.0, current.1, control_x, control_y);
         }
 
         // 绘制到最后一个点

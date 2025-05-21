@@ -21,14 +21,14 @@ use web_sys::OffscreenCanvas;
 
 // 定义每次重绘的间隔计数
 thread_local! {
-    static DRAG_THROTTLE_COUNTER: Cell<u8> = Cell::new(0);
+    static DRAG_THROTTLE_COUNTER: Cell<u8> = const { Cell::new(0) };
 }
 
 // 定义渲染图形引擎
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RenderMode {
-    KMAP,    // K线图和成交量图
-    HEATMAP, // 热图和成交量图
+    Kmap,    // K线图和成交量图
+    Heatmap, // 热图和成交量图
 }
 
 /// 图表渲染器 - 整合所有模块，提供统一的渲染接口
@@ -104,7 +104,7 @@ impl ChartRenderer {
             overlay_renderer,
             data_manager,
             datazoom_renderer,
-            mode: RenderMode::KMAP,
+            mode: RenderMode::Kmap,
         })
     }
 
@@ -135,8 +135,8 @@ impl ChartRenderer {
 
             // 根据当前模式应用相应的布局
             match self.mode {
-                RenderMode::KMAP => layout.apply_kline_layout(),
-                RenderMode::HEATMAP => layout.apply_heatmap_layout(),
+                RenderMode::Kmap => layout.apply_kline_layout(),
+                RenderMode::Heatmap => layout.apply_heatmap_layout(),
             }
         } // 在这里释放 layout 的可变借用
 
@@ -167,58 +167,58 @@ impl ChartRenderer {
 
         // 8. 根据模式渲染不同的图表
         match self.mode {
-            RenderMode::KMAP => {
+            RenderMode::Kmap => {
                 // 渲染K线图
                 self.price_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
 
                 // 渲染价格线
                 self.line_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
 
                 // 渲染成交量图
                 self.volume_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
                 // 渲染订单簿可视化
                 self.book_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
                     self.mode,
                 );
             }
-            RenderMode::HEATMAP => {
+            RenderMode::Heatmap => {
                 // 热图模式下，热图占据整个区域
                 self.heat_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
                 // 渲染价格线
                 self.line_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
                 // 渲染成交量图
                 self.volume_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                 );
                 // 渲染订单簿可视化
                 self.book_renderer.draw(
-                    &self.canvas_manager.get_context(CanvasLayerType::Main),
+                    self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
@@ -276,7 +276,7 @@ impl ChartRenderer {
         };
         // 重绘订单簿
         self.book_renderer
-            .draw(&ctx, &layout, &self.data_manager, hover_index, self.mode);
+            .draw(ctx, &layout, &self.data_manager, hover_index, self.mode);
     }
 
     /// 处理鼠标移动事件

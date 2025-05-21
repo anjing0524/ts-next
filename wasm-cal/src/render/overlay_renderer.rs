@@ -97,7 +97,7 @@ impl OverlayRenderer {
         let layout = canvas_manager.layout.borrow();
 
         // 只绘制切换按钮，使用传入的mode参数
-        self.draw_switch_button(&ctx, &layout, mode);
+        self.draw_switch_button(ctx, &layout, mode);
     }
 
     /// 绘制交互层
@@ -119,15 +119,15 @@ impl OverlayRenderer {
             None => return,
         };
         // 绘制切换按钮 - 确保使用传入的mode参数
-        self.draw_switch_button(&ctx, &layout, mode);
+        self.draw_switch_button(ctx, &layout, mode);
         if !self.mouse_in_chart {
             return;
         }
         // 只在主图区域绘制十字线和坐标轴标签
         if layout.is_point_in_main_chart_area(self.mouse_x, self.mouse_y) {
-            self.draw_crosshair(&ctx, &layout);
+            self.draw_crosshair(ctx, &layout);
             self.draw_axis_labels(
-                &ctx,
+                ctx,
                 &layout,
                 min_low,
                 max_high,
@@ -140,7 +140,7 @@ impl OverlayRenderer {
         if let Some(global_idx) = self.hover_candle_index {
             if global_idx < items.len() {
                 match mode {
-                    RenderMode::HEATMAP => {
+                    RenderMode::Heatmap => {
                         let kline = items.get(global_idx);
                         let timestamp = kline.timestamp() as i64;
                         let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
@@ -160,11 +160,11 @@ impl OverlayRenderer {
                             0.0
                         };
                         if volume > 0.0 {
-                            self.draw_heatmap_tooltip(&ctx, &layout, timestamp, price, volume);
+                            self.draw_heatmap_tooltip(ctx, &layout, timestamp, price, volume);
                         }
                     }
                     _ => {
-                        self.draw_tooltip(&ctx, &layout, items.get(global_idx), mode);
+                        self.draw_tooltip(ctx, &layout, items.get(global_idx), mode);
                     }
                 }
             }
@@ -357,7 +357,7 @@ impl OverlayRenderer {
             usize,
             Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>,
         ) = match mode {
-            RenderMode::HEATMAP => (
+            RenderMode::Heatmap => (
                 3,
                 Box::new(|price, volume, current_y, ctx, text_x, label_x| {
                     let _ = ctx.fill_text("价格:", text_x, current_y);
@@ -500,7 +500,7 @@ impl OverlayRenderer {
         let heatmap_y = button_y + button_height / 2.0;
 
         // K线按钮样式
-        if mode == RenderMode::KMAP {
+        if mode == RenderMode::Kmap {
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
             ctx.fill_rect(button_x, button_y, layout.switch_btn_width, button_height);
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
@@ -510,7 +510,7 @@ impl OverlayRenderer {
         ctx.fill_text("K线", kline_x, kline_y).unwrap();
 
         // 热力图按钮样式
-        if mode == RenderMode::HEATMAP {
+        if mode == RenderMode::Heatmap {
             ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
             ctx.fill_rect(
                 button_x + layout.switch_btn_width,
@@ -651,9 +651,9 @@ impl OverlayRenderer {
         if let Some(is_kmap) = self.check_switch_button_click(x, y, layout) {
             // 根据点击的按钮返回对应的渲染模式
             if is_kmap {
-                return Some(RenderMode::KMAP);
+                return Some(RenderMode::Kmap);
             } else {
-                return Some(RenderMode::HEATMAP);
+                return Some(RenderMode::Heatmap);
             }
         }
         None

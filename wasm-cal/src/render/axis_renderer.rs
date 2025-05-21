@@ -21,6 +21,38 @@ const FONT_HEIGHT: f64 = 12.0; // 10px字体+2px间距
 const MIN_LABEL_SPACING: f64 = 70.0; // X轴最小标签间距
 const MIN_Y_LABEL_DIST: f64 = FONT_HEIGHT * 0.8; // Y轴最小像素间距
 
+/// 简化的Y轴标签参数
+pub struct YAxisLabelParams<'a> {
+    /// 画布上下文
+    pub ctx: &'a OffscreenCanvasRenderingContext2d,
+    /// 图表布局
+    pub layout: &'a ChartLayout,
+    /// 要显示的值
+    pub values: &'a [f64],
+    /// 文本X坐标
+    pub x_text: f64,
+    /// 刻度线X坐标
+    pub x_tick: f64,
+    /// 轴类型 (价格或成交量)
+    pub axis_type: AxisType,
+}
+
+/// Y轴类型
+pub enum AxisType {
+    /// 价格轴
+    Price {
+        /// 最低价格
+        min_low: f64,
+        /// 最高价格
+        max_high: f64,
+    },
+    /// 成交量轴
+    Volume {
+        /// 最大成交量
+        max_volume: f64,
+    },
+}
+
 impl AxisRenderer {
     /// 绘制所有坐标轴
     pub fn draw(
@@ -39,7 +71,7 @@ impl AxisRenderer {
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
         let tick = data_manager_ref.get_tick();
         self.draw_header(ctx, &layout_ref, mode);
-        if mode == RenderMode::KMAP {
+        if mode == RenderMode::Kmap {
             self.draw_alternating_background(ctx, &layout_ref);
         }
         // 优化：抽象Y轴标签绘制
@@ -158,30 +190,40 @@ impl AxisRenderer {
     }
 
     /// 通用Y轴标签绘制
-    fn draw_y_axis_labels<F, G>(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        values: &[f64],
-        value_to_y: F,
-        format_label: G,
-        x_text: f64,
-        x_tick: f64,
-    ) where
-        F: Fn(f64) -> f64,
-        G: Fn(f64) -> String,
-    {
-        for &v in values {
-            let y = value_to_y(v);
+    fn draw_y_axis_labels(&self, params: YAxisLabelParams<'_>) {
+        for &v in params.values {
+            // 根据轴类型计算Y坐标
+            let y = match &params.axis_type {
+                AxisType::Price { min_low, max_high } => {
+                    params.layout.map_price_to_y(v, *min_low, *max_high)
+                }
+                AxisType::Volume { max_volume } => {
+                    params.layout.map_volume_to_y(v, *max_volume) - if v == 0.0 { 2.0 } else { 0.0 }
+                }
+            };
+
             // 绘制短横线
-            ctx.set_stroke_style_str(ChartColors::BORDER);
-            ctx.begin_path();
-            ctx.move_to(x_tick, y);
-            ctx.line_to(layout.chart_area_x, y);
-            ctx.stroke();
+            params.ctx.set_stroke_style_str(ChartColors::BORDER);
+            params.ctx.begin_path();
+            params.ctx.move_to(params.x_tick, y);
+            params.ctx.line_to(params.layout.chart_area_x, y);
+            params.ctx.stroke();
+
             // 绘制文本
-            let label = format_label(v);
-            if ctx.fill_text(&label, x_text, y).is_err() {
+            let label = match &params.axis_type {
+                AxisType::Price { .. } => {
+                    if v.abs() >= 100.0 {
+                        format!("{:.0}", v)
+                    } else if v.abs() >= 1.0 {
+                        format!("{:.2}", v)
+                    } else {
+                        format!("{:.4}", v)
+                    }
+                }
+                AxisType::Volume { .. } => time::format_volume(v, 1),
+            };
+
+            if params.ctx.fill_text(&label, params.x_text, y).is_err() {
                 // 可选：记录日志或忽略
             }
         }
@@ -224,24 +266,16 @@ impl AxisRenderer {
             .collect();
         let label_points =
             self.insert_extreme_price_labels(label_points, min_low, max_high, layout);
-        // 使用通用Y轴标签绘制
-        self.draw_y_axis_labels(
+
+        // 使用简化的Y轴标签参数
+        self.draw_y_axis_labels(YAxisLabelParams {
             ctx,
             layout,
-            &label_points.iter().map(|&(p, _)| p).collect::<Vec<_>>(),
-            |price| layout.map_price_to_y(price, min_low, max_high),
-            |price| {
-                if price.abs() >= 100.0 {
-                    format!("{:.0}", price)
-                } else if price.abs() >= 1.0 {
-                    format!("{:.2}", price)
-                } else {
-                    format!("{:.4}", price)
-                }
-            },
-            layout.chart_area_x - 5.0,
-            layout.chart_area_x - 3.0,
-        );
+            values: &label_points.iter().map(|&(p, _)| p).collect::<Vec<_>>(),
+            x_text: layout.chart_area_x - 5.0,
+            x_tick: layout.chart_area_x - 3.0,
+            axis_type: AxisType::Price { min_low, max_high },
+        });
     }
 
     /// 绘制成交量Y轴（重构后）
@@ -276,15 +310,16 @@ impl AxisRenderer {
             .map(|i| max_volume * i as f64 / num_y_labels as f64)
             .filter(|v| v.is_finite())
             .collect();
-        self.draw_y_axis_labels(
+
+        // 使用简化的Y轴标签参数
+        self.draw_y_axis_labels(YAxisLabelParams {
             ctx,
             layout,
-            &values,
-            |v| layout.map_volume_to_y(v, max_volume) - if v == 0.0 { 2.0 } else { 0.0 },
-            |v| time::format_volume(v, 1),
-            layout.y_axis_width - 5.0,
-            layout.y_axis_width - 3.0,
-        );
+            values: &values,
+            x_text: layout.y_axis_width - 5.0,
+            x_tick: layout.y_axis_width - 3.0,
+            axis_type: AxisType::Volume { max_volume },
+        });
     }
 
     /// 绘制标题和图例
@@ -298,8 +333,8 @@ impl AxisRenderer {
         ctx.set_fill_style_str(ChartColors::HEADER_BG);
         ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
 
-        // 只在KMAP模式下绘制标题区域底部边界
-        if mode == RenderMode::KMAP {
+        // 只在Kmap模式下绘制标题区域底部边界
+        if mode == RenderMode::Kmap {
             ctx.set_stroke_style_str(ChartColors::BORDER);
             ctx.set_line_width(1.0);
             ctx.begin_path();
