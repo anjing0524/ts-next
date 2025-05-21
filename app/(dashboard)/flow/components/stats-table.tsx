@@ -178,7 +178,7 @@ export function StatsTable() {
                   data-state={row.getValue('name') === currentStage ? 'selected' : undefined}
                   className={
                     row.getValue('name') === currentStage
-                      ? 'bg-muted/50 hover:bg-muted/70 cursor-pointer'
+                      ? 'bg-blue-700 hover:bg-blue-800 cursor-pointer'
                       : 'hover:bg-muted/30 cursor-pointer'
                   }
                   onDoubleClick={() => handleRowDoubleClick(row.getValue('name'))}

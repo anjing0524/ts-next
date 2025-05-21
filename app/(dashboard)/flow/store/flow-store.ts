@@ -60,7 +60,7 @@ export const useFlowStore = create<FlowState>()(
     setStages: (stages) =>
       set((state) => {
         state.stages = stages;
-        state.currentStage = null;
+        // state.currentStage = null;
       }),
 
     setCurrentStage: (stage) =>

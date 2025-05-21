@@ -7,6 +7,7 @@ import { PlanConf } from '@/types/db-types';
 import { StatsTable } from './components/stats-table';
 import { TaskDetailsDialog } from './components/task-state-list-dialog';
 import { Suspense } from 'react';
+import { BackToTop } from './components/back-to-top';
 
 export default async function Flow() {
   const planConfs: PlanConf[] = await getAllPlanConf();
@@ -26,6 +27,7 @@ export default async function Flow() {
         <DagFlow />
       </Suspense>
       <TaskDetailsDialog />
+      <BackToTop />
     </>
   );
 }
