@@ -114,7 +114,7 @@ impl ComprehensiveRenderer for BookRenderer {
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
             
-            ctx.set_fill_style_js_value(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
+            ctx.set_fill_style(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
             ctx.set_global_alpha(1.0);
             // Use BOOK_BAR_BORDER_ADJUST
             ctx.fill_rect(bar_x, bar_y, bar_width.max(0.0), bar_height - BOOK_BAR_BORDER_ADJUST); // Ensure bar_width is not negative
@@ -124,7 +124,7 @@ impl ComprehensiveRenderer for BookRenderer {
                 // Use BOOK_TEXT_X_OFFSET
                 let text_x = bar_x + bar_width.max(0.0) + BOOK_TEXT_X_OFFSET; // Ensure bar_width is not negative for text placement
                 let text_y = bar_y + bar_height / 2.0; // 2.0 is factor for centering
-                ctx.set_fill_style_js_value(&ChartColors::TEXT.into());
+                ctx.set_fill_style(&ChartColors::TEXT.into());
                 ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
