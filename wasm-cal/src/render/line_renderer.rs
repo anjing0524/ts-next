@@ -95,7 +95,7 @@ impl LineRenderer {
     ) where
         F: Fn(&KlineItem) -> f64,
     {
-        ctx.set_stroke_style_js_value(&color.into());
+        ctx.set_stroke_style(&color.into());
         ctx.set_line_width(line_width);
         ctx.set_line_cap("round"); // Keep as string literals, less critical for theming
         ctx.set_line_join("round"); // Keep as string literals
