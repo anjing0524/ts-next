@@ -1,10 +1,12 @@
 //! DataZoom导航器模块 - 负责绘制和处理数据缩放导航器
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
-use crate::render::cursor_style::CursorStyle;
+use crate::{
+    canvas::{CanvasLayerType, CanvasManager},
+    data::DataManager,
+    kline_generated::kline::KlineItem,
+    layout::{ChartColors, ChartLayout},
+    render::{chart_renderer::RenderMode, cursor_style::CursorStyle, traits::ComprehensiveRenderer},
+};
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -318,9 +320,17 @@ impl DataZoomRenderer {
 
         DragResult::None
     }
+}
 
+impl ComprehensiveRenderer for DataZoomRenderer {
     /// 绘制DataZoom导航器
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+    fn render_component(
+        &self,
+        canvas_manager: &CanvasManager,
+        _layout_param: &ChartLayout, // layout will be obtained from canvas_manager
+        data_manager: &Rc<RefCell<DataManager>>,
+        _mode: RenderMode, // _mode is unused in this renderer
+    ) {
         // 获取 上下文和布局
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();

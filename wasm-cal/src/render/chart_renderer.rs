@@ -12,6 +12,7 @@ use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
+use crate::render::traits::{ComprehensiveRenderer, LayerRenderer};
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
 use crate::utils::WasmError;
@@ -162,82 +163,68 @@ impl ChartRenderer {
 
         // 7. 首先通过AxisRenderer渲染背景和坐标轴
         // 这会先绘制Header, Y轴背景等
-        self.axis_renderer
-            .draw(&self.canvas_manager, &self.data_manager, self.mode);
+        self.axis_renderer.render_component(
+            &self.canvas_manager,
+            &layout,
+            &self.data_manager,
+            self.mode,
+        );
 
         // 8. 根据模式渲染不同的图表
         match self.mode {
             RenderMode::Kmap => {
                 // 渲染K线图
-                self.price_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
+                self.price_renderer.draw_on_layer(
+                    main_ctx,
                     &layout,
                     &self.data_manager,
-                );
-
-                // 渲染价格线
-                self.line_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                );
-
-                // 渲染成交量图
-                self.volume_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                );
-                // 渲染订单簿可视化
-                self.book_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                    self.overlay_renderer.borrow().get_hover_candle_index(),
                     self.mode,
                 );
             }
             RenderMode::Heatmap => {
                 // 热图模式下，热图占据整个区域
-                self.heat_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
+                self.heat_renderer.draw_on_layer(
+                    main_ctx,
                     &layout,
                     &self.data_manager,
-                );
-                // 渲染价格线
-                self.line_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                );
-                // 渲染成交量图
-                self.volume_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                );
-                // 渲染订单簿可视化
-                self.book_renderer.draw(
-                    self.canvas_manager.get_context(CanvasLayerType::Main),
-                    &layout,
-                    &self.data_manager,
-                    self.overlay_renderer.borrow().get_hover_candle_index(),
                     self.mode,
                 );
             }
         }
 
+        // 渲染价格线 (both modes)
+        self.line_renderer
+            .draw_on_layer(main_ctx, &layout, &self.data_manager, self.mode);
+
+        // 渲染成交量图 (both modes)
+        self.volume_renderer
+            .draw_on_layer(main_ctx, &layout, &self.data_manager, self.mode);
+
+        // 渲染订单簿可视化 (both modes) - Call original draw method
+        let hover_candle_index = self.overlay_renderer.borrow().get_hover_candle_index();
+        self.book_renderer.draw(
+            main_ctx,
+            &layout,
+            &self.data_manager,
+            hover_candle_index,
+            self.mode,
+        );
+
         // 9. 渲染DataZoom - 确保它在任何情况下都被渲染
-        {
-            let datazoom_renderer = self.datazoom_renderer.borrow();
-            datazoom_renderer.draw(&self.canvas_manager, &self.data_manager);
-        } // 在这里释放 datazoom_renderer 的借用
+        self.datazoom_renderer.borrow().render_component(
+            &self.canvas_manager,
+            &layout,
+            &self.data_manager,
+            self.mode,
+        );
 
         // 10. 最后渲染交互层的静态元素（如模式切换按钮）
-        {
-            let overlay_renderer = self.overlay_renderer.borrow();
-            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
-        } // 在这里释放 overlay_renderer 的借用
+        self.overlay_renderer.borrow().render_component(
+            &self.canvas_manager,
+            &layout,
+            &self.data_manager,
+            self.mode,
+        );
     }
 
     /// 获取当前鼠标位置的光标样式

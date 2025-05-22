@@ -1,12 +1,13 @@
 //! 坐标轴模块 - 负责绘制X轴和Y轴
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::ChartFont;
-use crate::layout::{ChartColors, ChartLayout};
-use crate::render::chart_renderer::RenderMode;
-use crate::utils::time;
+use crate::{
+    canvas::{CanvasLayerType, CanvasManager},
+    data::DataManager,
+    kline_generated::kline::KlineItem,
+    layout::{ChartColors, ChartFont, ChartLayout},
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer},
+    utils::time,
+};
 use flatbuffers;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -53,11 +54,12 @@ pub enum AxisType {
     },
 }
 
-impl AxisRenderer {
+impl ComprehensiveRenderer for AxisRenderer {
     /// 绘制所有坐标轴
-    pub fn draw(
+    fn render_component(
         &self,
         canvas_manager: &CanvasManager,
+        _layout_param: &ChartLayout, // layout will be obtained from canvas_manager
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
     ) {

@@ -1,11 +1,14 @@
 //! 交互层渲染器 - 负责绘制十字光标、提示框等交互元素
-use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartFont, ChartLayout};
-use crate::render::chart_renderer::RenderMode;
-use crate::render::cursor_style::CursorStyle;
-use crate::utils::time;
+use crate::{
+    canvas::{CanvasLayerType, CanvasManager},
+    data::DataManager,
+    kline_generated::kline::KlineItem,
+    layout::{ChartColors, ChartFont, ChartLayout},
+    render::{
+        chart_renderer::RenderMode, cursor_style::CursorStyle, traits::ComprehensiveRenderer,
+    },
+    utils::time,
+};
 use js_sys;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -99,11 +102,14 @@ impl OverlayRenderer {
         // 只绘制切换按钮，使用传入的mode参数
         self.draw_switch_button(ctx, &layout, mode);
     }
+}
 
+impl ComprehensiveRenderer for OverlayRenderer {
     /// 绘制交互层
-    pub fn draw(
+    fn render_component(
         &self,
         canvas_manager: &CanvasManager,
+        _layout_param: &ChartLayout, // layout will be obtained from canvas_manager
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
     ) {

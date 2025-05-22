@@ -1,8 +1,11 @@
 //! 线图渲染器 - 负责绘制最新价、买一价、卖一价曲线
 
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::{
+    data::DataManager,
+    kline_generated::kline::KlineItem,
+    layout::{ChartColors, ChartLayout},
+    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+};
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,13 +31,16 @@ impl LineRenderer {
             show_ask_price: true,
         }
     }
+}
 
+impl LayerRenderer for LineRenderer {
     /// 绘制线图
-    pub fn draw(
+    fn draw_on_layer(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        _mode: RenderMode, // _mode is unused in this renderer
     ) {
         let data_manager_ref = data_manager.borrow();
         let (visible_start, visible_count, _) = data_manager_ref.get_visible();

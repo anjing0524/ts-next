@@ -1,7 +1,10 @@
 //! 成交量图模块 - 专门负责绘制成交量图部分
 
-use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::{
+    data::DataManager,
+    layout::{ChartColors, ChartLayout},
+    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;

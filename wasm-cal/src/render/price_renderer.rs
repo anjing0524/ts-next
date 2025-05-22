@@ -1,7 +1,10 @@
 //! 价格图(K线图)模块 - 专门负责绘制K线图部分
 
-use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::{
+    data::DataManager,
+    layout::{ChartColors, ChartLayout},
+    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -9,13 +12,14 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 /// 价格图(K线图)绘制器
 pub struct PriceRenderer;
 
-impl PriceRenderer {
+impl LayerRenderer for PriceRenderer {
     /// 绘制价格图使用DataManager获取所有数据
-    pub fn draw(
+    fn draw_on_layer(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        _mode: RenderMode, // _mode is unused in this renderer
     ) {
         let data_manager_ref = data_manager.borrow();
         // 获取数据

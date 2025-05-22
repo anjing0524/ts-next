@@ -1,8 +1,10 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
-use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartFont, ChartLayout};
-use crate::render::chart_renderer::RenderMode;
+use crate::{
+    data::DataManager,
+    layout::{ChartColors, ChartFont, ChartLayout},
+    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+};
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,16 +22,18 @@ impl BookRenderer {
             last_mode: Cell::new(None), // 新增
         }
     }
+}
 
+impl LayerRenderer for BookRenderer {
     /// 在main层右侧20%宽度区域绘制订单簿
-    pub fn draw(
+    fn draw_on_layer(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
-        hover_index: Option<usize>,
         mode: RenderMode,
     ) {
+        let hover_index: Option<usize> = None; // Using None as per instructions
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
