@@ -1,34 +1,32 @@
 //! 价格图(K线图)模块 - 专门负责绘制K线图部分
 
 use crate::{
+    canvas::{CanvasLayerType, CanvasManager},
     data::DataManager,
-    layout::{ChartColors, ChartLayout},
-    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+    layout::{ChartColors, ChartLayout, theme::*}, // Added theme::*
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer},
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 价格图(K线图)绘制器
 pub struct PriceRenderer;
 
-impl LayerRenderer for PriceRenderer {
-    /// 绘制价格图使用DataManager获取所有数据
-    fn draw_on_layer(
+impl ComprehensiveRenderer for PriceRenderer {
+    fn render_component(
         &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
+        canvas_manager: &CanvasManager,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
-        _mode: RenderMode, // _mode is unused in this renderer
+        _mode: RenderMode,
     ) {
+        let ctx = canvas_manager.get_context(CanvasLayerType::Main);
         let data_manager_ref = data_manager.borrow();
-        // 获取数据
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
             None => return,
         };
 
-        // 获取可见范围
         let visible_range = data_manager_ref.get_visible_range();
         let (visible_start, visible_count, visible_end) = visible_range.get_range();
 
@@ -36,19 +34,14 @@ impl LayerRenderer for PriceRenderer {
             return;
         }
 
-        // 获取价格范围
         let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
-
-        // 预先计算所有可见K线的X坐标
         let x_coordinates = visible_range.precompute_x_coordinates(layout);
 
-        // 优化：使用临时数组收集所有绘制操作，减少绘制调用次数
         let mut bullish_high_low_lines = Vec::with_capacity(visible_count);
         let mut bearish_high_low_lines = Vec::with_capacity(visible_count);
         let mut bullish_rects = Vec::with_capacity(visible_count);
         let mut bearish_rects = Vec::with_capacity(visible_count);
 
-        // 遍历所有可见的K线数据
         for (rel_idx, global_idx) in (visible_start..visible_end).enumerate() {
             if global_idx >= items.len() || rel_idx >= x_coordinates.len() {
                 break;
@@ -57,41 +50,36 @@ impl LayerRenderer for PriceRenderer {
             let item = items.get(global_idx);
             let x_center = x_coordinates[rel_idx];
 
-            // 计算价格对应的Y坐标
             let high_y = layout.map_price_to_y(item.high(), min_low, max_high);
             let low_y = layout.map_price_to_y(item.low(), min_low, max_high);
             let open_y = layout.map_price_to_y(item.open(), min_low, max_high);
             let close_y = layout.map_price_to_y(item.close(), min_low, max_high);
 
-            // 收集影线绘制信息 - 根据涨跌分别收集
             if item.close() >= item.open() {
-                // 上涨K线 - 绿色影线
                 bullish_high_low_lines.push((x_center, high_y, x_center, low_y));
             } else {
-                // 下跌K线 - 红色影线
                 bearish_high_low_lines.push((x_center, high_y, x_center, low_y));
             }
 
-            // 收集实体绘制信息
             let candle_x = x_center - (layout.candle_width / 2.0);
-            let candle_width = layout.candle_width.max(1.0);
+            // Use PRICE_MIN_CANDLE_WIDTH for minimum candle width
+            let candle_width = layout.candle_width.max(PRICE_MIN_CANDLE_WIDTH); 
 
             if item.close() >= item.open() {
-                // 上涨K线
-                let height = (open_y - close_y).max(1.0);
+                // Use PRICE_MIN_CANDLE_BODY_HEIGHT for minimum height
+                let height = (open_y - close_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT); 
                 bullish_rects.push((candle_x, close_y, candle_width, height));
             } else {
-                // 下跌K线
-                let height = (close_y - open_y).max(1.0);
+                // Use PRICE_MIN_CANDLE_BODY_HEIGHT for minimum height
+                let height = (close_y - open_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT); 
                 bearish_rects.push((candle_x, open_y, candle_width, height));
             }
         }
 
-        // 批量绘制所有上涨K线影线 (绿色)
         if !bullish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_str(ChartColors::BULLISH);
-            ctx.set_line_width(1.5);
+            ctx.set_stroke_style_value(&ChartColors::BULLISH.into());
+            ctx.set_line_width(PRICE_WICK_LINE_WIDTH); // Use constant
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
             for (x1, y1, x2, y2) in bullish_high_low_lines {
@@ -101,11 +89,10 @@ impl LayerRenderer for PriceRenderer {
             ctx.stroke();
         }
 
-        // 批量绘制所有下跌K线影线 (红色)
         if !bearish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_str(ChartColors::BEARISH);
-            ctx.set_line_width(1.5);
+            ctx.set_stroke_style_value(&ChartColors::BEARISH.into());
+            ctx.set_line_width(PRICE_WICK_LINE_WIDTH); // Use constant
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
             for (x1, y1, x2, y2) in bearish_high_low_lines {
@@ -115,9 +102,8 @@ impl LayerRenderer for PriceRenderer {
             ctx.stroke();
         }
 
-        // 批量绘制所有上涨K线实体
         if !bullish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BULLISH);
+            ctx.set_fill_style_value(&ChartColors::BULLISH.into());
             ctx.begin_path();
             for (x, y, width, height) in bullish_rects {
                 ctx.rect(x, y, width, height);
@@ -125,9 +111,8 @@ impl LayerRenderer for PriceRenderer {
             ctx.fill();
         }
 
-        // 批量绘制所有下跌K线实体
         if !bearish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BEARISH);
+            ctx.set_fill_style_value(&ChartColors::BEARISH.into());
             ctx.begin_path();
             for (x, y, width, height) in bearish_rects {
                 ctx.rect(x, y, width, height);

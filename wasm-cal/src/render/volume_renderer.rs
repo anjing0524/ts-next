@@ -1,25 +1,30 @@
 //! 成交量图模块 - 专门负责绘制成交量图部分
 
 use crate::{
+    canvas::{CanvasLayerType, CanvasManager}, // Added
     data::DataManager,
     layout::{ChartColors, ChartLayout},
-    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer}, // Added
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::OffscreenCanvasRenderingContext2d;
+use web_sys::OffscreenCanvasRenderingContext2d; // Ensure this is present
 
 /// 成交量图绘制器
 pub struct VolumeRenderer;
 
 impl VolumeRenderer {
     /// 绘制成交量图使用DataManager获取所有数据
+    // Ensure this draw method is the one being called by render_component
+    // and its signature matches: ctx, layout, data_manager
     pub fn draw(
         &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
+        ctx: &OffscreenCanvasRenderingContext2d, // Signature for draw
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        // mode: RenderMode, // Optional: if VolumeRenderer's draw needs mode
     ) {
+        // ... (draw method logic remains unchanged)
         let data_manager_ref = data_manager.borrow();
         // 获取数据
         let items = match data_manager_ref.get_items() {
@@ -98,5 +103,19 @@ impl VolumeRenderer {
             }
             ctx.fill();
         }
+    }
+}
+
+impl ComprehensiveRenderer for VolumeRenderer {
+    fn render_component(
+        &self,
+        canvas_manager: &CanvasManager,
+        layout: &ChartLayout,
+        data_manager: &Rc<RefCell<DataManager>>,
+        _mode: RenderMode, // _mode is unused by current VolumeRenderer::draw
+    ) {
+        let ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        // Assuming draw method does not use mode for now
+        self.draw(ctx, layout, data_manager);
     }
 }

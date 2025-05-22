@@ -12,7 +12,7 @@ use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
-use crate::render::traits::{ComprehensiveRenderer, LayerRenderer};
+use crate::render::traits::ComprehensiveRenderer; // LayerRenderer removed
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
 use crate::utils::WasmError;
@@ -124,7 +124,8 @@ impl ChartRenderer {
         // 1. 获取可见范围 - 使用作用域限制借用生命周期
         let visible_count = {
             let data_manager_ref = self.data_manager.borrow();
-            let (_, visible_count, _) = data_manager_ref.get_visible();
+            let visible_range = data_manager_ref.get_visible_range(); // get_visible_range()
+            let (_, visible_count, _) = visible_range.get_range(); // then get_range()
             visible_count
         };
 
@@ -174,8 +175,8 @@ impl ChartRenderer {
         match self.mode {
             RenderMode::Kmap => {
                 // 渲染K线图
-                self.price_renderer.draw_on_layer(
-                    main_ctx,
+                self.price_renderer.render_component( // MODIFIED
+                    &self.canvas_manager,            // Pass canvas_manager
                     &layout,
                     &self.data_manager,
                     self.mode,
@@ -183,8 +184,8 @@ impl ChartRenderer {
             }
             RenderMode::Heatmap => {
                 // 热图模式下，热图占据整个区域
-                self.heat_renderer.draw_on_layer(
-                    main_ctx,
+                self.heat_renderer.render_component( // MODIFIED
+                    &self.canvas_manager,           // Pass canvas_manager
                     &layout,
                     &self.data_manager,
                     self.mode,
@@ -193,21 +194,28 @@ impl ChartRenderer {
         }
 
         // 渲染价格线 (both modes)
-        self.line_renderer
-            .draw_on_layer(main_ctx, &layout, &self.data_manager, self.mode);
-
-        // 渲染成交量图 (both modes)
-        self.volume_renderer
-            .draw_on_layer(main_ctx, &layout, &self.data_manager, self.mode);
-
-        // 渲染订单簿可视化 (both modes) - Call original draw method
-        let hover_candle_index = self.overlay_renderer.borrow().get_hover_candle_index();
-        self.book_renderer.draw(
-            main_ctx,
+        self.line_renderer.render_component( // MODIFIED
+            &self.canvas_manager,        // Pass canvas_manager
             &layout,
             &self.data_manager,
-            hover_candle_index,
             self.mode,
+        );
+
+        // 渲染成交量图 (both modes)
+        self.volume_renderer.render_component( // MODIFIED
+            &self.canvas_manager,          // Pass canvas_manager
+            &layout,
+            &self.data_manager,
+            self.mode,
+        );
+
+        // MODIFIED CALL for book_renderer
+        // let hover_candle_index = self.overlay_renderer.borrow().get_hover_candle_index(); // This line is no longer needed for book_renderer call
+        self.book_renderer.render_component( // Changed from draw
+            &self.canvas_manager,           // Pass canvas_manager
+            &layout,
+            &self.data_manager,
+            self.mode,                      // Pass mode
         );
 
         // 9. 渲染DataZoom - 确保它在任何情况下都被渲染
@@ -255,15 +263,19 @@ impl ChartRenderer {
     /// 只重绘订单簿区域
     pub fn render_book_only(&self) {
         let layout = self.canvas_manager.layout.borrow();
-        let ctx = self.canvas_manager.get_context(CanvasLayerType::Main);
-        // 先获取 hover_candle_index，立刻释放 RefCell
-        let hover_index = {
-            let overlay = self.overlay_renderer.borrow();
-            overlay.get_hover_candle_index()
-        };
-        // 重绘订单簿
-        self.book_renderer
-            .draw(ctx, &layout, &self.data_manager, hover_index, self.mode);
+        // let ctx = self.canvas_manager.get_context(CanvasLayerType::Main); // ctx is no longer passed directly
+        // let hover_index = { // hover_index is no longer passed directly
+        //     let overlay = self.overlay_renderer.borrow();
+        //     overlay.get_hover_candle_index()
+        // };
+        
+        // MODIFIED CALL for book_renderer
+        self.book_renderer.render_component( // Changed from draw
+            &self.canvas_manager,           // Pass canvas_manager
+            &layout,
+            &self.data_manager,
+            self.mode,                      // Pass mode
+        );
     }
 
     /// 处理鼠标移动事件

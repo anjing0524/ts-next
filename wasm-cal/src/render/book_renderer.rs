@@ -1,39 +1,54 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
 use crate::{
+    canvas::{CanvasLayerType, CanvasManager}, // Added
     data::DataManager,
     layout::{ChartColors, ChartFont, ChartLayout},
-    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer}, // Changed
 };
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::OffscreenCanvasRenderingContext2d; // 假设RenderMode定义在这里
+use web_sys::OffscreenCanvasRenderingContext2d;
 
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
-    last_mode: Cell<Option<RenderMode>>, // 新增
+    last_mode: Cell<Option<RenderMode>>,
 }
 
 impl BookRenderer {
     pub fn new() -> Self {
         Self {
             last_idx: Cell::new(None),
-            last_mode: Cell::new(None), // 新增
+            last_mode: Cell::new(None),
         }
+    }
+
+    // clear_area remains a helper method for BookRenderer
+    pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
+        let area_x = layout.chart_area_x + layout.main_chart_width;
+        let area_y = layout.chart_area_y;
+        let area_width = layout.book_area_width;
+        let area_height = layout.price_chart_height;
+        ctx.clear_rect(area_x, area_y, area_width, area_height);
     }
 }
 
-impl LayerRenderer for BookRenderer {
+// impl LayerRenderer for BookRenderer { ... } // This block is removed
+
+impl ComprehensiveRenderer for BookRenderer {
     /// 在main层右侧20%宽度区域绘制订单簿
-    fn draw_on_layer(
+    fn render_component(
         &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
+        canvas_manager: &CanvasManager, // Added
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
     ) {
-        let hover_index: Option<usize> = None; // Using None as per instructions
+        let ctx = canvas_manager.get_context(CanvasLayerType::Main); // Get context
+
+        // Logic from old draw_on_layer, hover_index is internally None as per original file
+        let hover_index: Option<usize> = None; 
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -49,12 +64,12 @@ impl LayerRenderer for BookRenderer {
             return;
         }
 
-        // 只要mode或idx有变化就渲染，否则跳过
-        let last_mode = self.last_mode.get();
-        let last_idx = self.last_idx.get();
-        let need_render = last_mode != Some(mode) || last_idx != Some(idx);
+        let last_mode_val = self.last_mode.get(); // Use a distinct variable name
+        let last_idx_val = self.last_idx.get();   // Use a distinct variable name
+        let need_render = last_mode_val != Some(mode) || last_idx_val != Some(idx);
+        
         if !need_render {
-            return;
+            // return; // Commenting out to ensure it always clears and redraws if called by chart_renderer
         }
         self.last_mode.set(Some(mode));
         self.last_idx.set(Some(idx));
@@ -65,12 +80,12 @@ impl LayerRenderer for BookRenderer {
             Some(vols) => vols,
             None => return,
         };
-        // 计算区域
+        
         let area_x = layout.chart_area_x + layout.main_chart_width;
         let area_y = layout.chart_area_y;
         let area_width = layout.book_area_width;
         let area_height = layout.price_chart_height;
-        // 分离买卖盘
+        
         let mut bids = Vec::new();
         let mut asks = Vec::new();
         for i in 0..volumes.len() {
@@ -83,61 +98,51 @@ impl LayerRenderer for BookRenderer {
                 asks.push((price, volume));
             }
         }
-        // 按价格排序：卖盘从高到低，买盘从高到低（可选，便于视觉一致）
+        
         asks.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         bids.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        // 合并买卖盘用于统一绘制（自上而下）
+        
         let mut all_levels = Vec::new();
         for (p, v) in asks.iter() {
-            all_levels.push((p, v, true)); // true: 卖盘
+            all_levels.push((*p, *v, true)); // true: 卖盘
         }
         for (p, v) in bids.iter() {
-            all_levels.push((p, v, false)); // false: 买盘
+            all_levels.push((*p, *v, false)); // false: 买盘
         }
-        // 计算最大volume用于归一化
-        let max_volume = all_levels.iter().map(|(_, v, _)| **v).fold(0.0, f64::max);
+        
+        let max_volume = all_levels.iter().map(|(_, v, _)| *v).fold(0.0, f64::max);
         if max_volume <= 0.0 {
+             // Still clear if max_volume is 0, to erase previous drawing
+            self.clear_area(ctx, layout);
             return;
         }
-        // 清理订单簿区域
-        self.clear_area(&ctx, &layout);
-        // 绘制
+        
+        self.clear_area(ctx, layout); // Clear before drawing new content
+        
         let bar_height = area_height / all_levels.len().max(1) as f64;
-        for (i, (_price, volume, is_ask)) in all_levels.iter().enumerate() {
-            let norm = (*volume / max_volume).min(1.0);
-            let text_reserved_width = 40.0;
+        for (i, (price_val, volume_val, is_ask)) in all_levels.iter().enumerate() { // Renamed to avoid conflict
+            let norm = (*volume_val / max_volume).min(1.0);
+            let text_reserved_width = 40.0; // Magic number
             let bar_width = (area_width - text_reserved_width) * norm;
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
-            ctx.set_fill_style_str(if *is_ask {
-                ChartColors::BEARISH
-            } else {
-                ChartColors::BULLISH
-            });
-            ctx.global_alpha(); // 确保透明度为1
-            ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0);
-            // --- 新增：在柱状图末尾右侧绘制数量文本 ---
-            if **volume > 0.0 {
-                // 格式化数量为整数
-                let text = format!("{}", **volume as u64);
-                // 计算文本位置
-                let text_x = bar_x + bar_width + 4.0; // 柱状图右端+4像素
-                let text_y = bar_y + bar_height / 2.0; // 垂直居中
-                ctx.set_fill_style_str(ChartColors::TEXT); // 文本颜色
+            
+            ctx.set_fill_style_value(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
+            // ctx.global_alpha(); // This method does not exist. set_global_alpha(1.0) is likely intended.
+            ctx.set_global_alpha(1.0); // Ensuring full opacity for bars
+            ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0); // Magic number 1.0
+            
+            if *volume_val > 0.0 {
+                let text = format!("{}", *volume_val as u64);
+                let text_x = bar_x + bar_width + 4.0; // Magic number 4.0
+                let text_y = bar_y + bar_height / 2.0;
+                ctx.set_fill_style_value(&ChartColors::TEXT.into());
                 ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
                 ctx.fill_text(&text, text_x, text_y).ok();
             }
         }
-        ctx.set_global_alpha(1.0); // 恢复透明度
-    }
-
-    pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
-        let area_x = layout.chart_area_x + layout.main_chart_width;
-        let area_y = layout.chart_area_y;
-        let area_width = layout.book_area_width;
-        let area_height = layout.price_chart_height;
-        ctx.clear_rect(area_x, area_y, area_width, area_height);
+        ctx.set_global_alpha(1.0); // Restore global alpha
     }
 }

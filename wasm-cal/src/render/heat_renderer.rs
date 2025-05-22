@@ -1,13 +1,14 @@
 //! 热图渲染器 - 专门负责绘制类似Bookmap的热度图
 
 use crate::{
+    canvas::{CanvasLayerType, CanvasManager}, // Added
     data::DataManager,
     layout::ChartLayout,
-    render::{chart_renderer::RenderMode, traits::LayerRenderer},
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer}, // Added
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_sys::OffscreenCanvasRenderingContext2d;
+use web_sys::OffscreenCanvasRenderingContext2d; // Ensure this is present
 
 /// 热图渲染器
 pub struct HeatRenderer {
@@ -24,6 +25,7 @@ impl Default for HeatRenderer {
 impl HeatRenderer {
     /// 创建新的热图渲染器
     pub fn new() -> Self {
+        // ... (new method remains unchanged)
         // 预计算100个颜色值，对应0.0-1.0的归一化值
         let mut color_cache = Vec::with_capacity(100);
         for i in 0..100 {
@@ -35,12 +37,16 @@ impl HeatRenderer {
     }
 
     /// 绘制热图 - 按 tick 区间绘制色块
+    // Ensure this draw method is the one being called by render_component
+    // and its signature matches: ctx, layout, data_manager
     pub fn draw(
         &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
+        ctx: &OffscreenCanvasRenderingContext2d, // Signature for draw
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        // mode: RenderMode, // Optional: if HeatRenderer's draw needs mode
     ) {
+        // ... (draw method logic remains unchanged)
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -48,7 +54,8 @@ impl HeatRenderer {
         };
 
         let visible_range = data_manager_ref.get_visible_range();
-        let (visible_start, _visible_count, visible_end) = data_manager_ref.get_visible();
+        // Corrected to use get_range() for consistency if get_visible() has issues
+        let (visible_start, _visible_count, visible_end) = visible_range.get_range(); 
         if visible_start >= visible_end {
             return;
         }
@@ -141,18 +148,12 @@ impl HeatRenderer {
                 ctx.set_global_alpha(alpha);
                 ctx.set_fill_style_str(&color);
                 ctx.fill_rect(x_left, rect_y, x_width - 1.0, rect_height - 1.0);
-
-                // 极端热度描边（可选）
-                // if norm > 0.95 {
-                //     ctx.set_global_alpha(1.0);
-                //     ctx.set_stroke_style_str("#b71c1c");
-                //     ctx.stroke_rect(x_left, rect_y, x_width - 1.0, rect_height - 1.0);
-                // }
                 ctx.set_global_alpha(1.0); // 恢复
             }
         }
     }
 
+    // ... (other helper methods like get_cached_color, calculate_heat_color_static, etc. remain unchanged)
     /// 从缓存获取颜色，如果缓存中没有则计算
     fn get_cached_color(&self, norm: f64) -> String {
         let norm = norm.clamp(0.0, 1.0);
@@ -225,5 +226,18 @@ impl HeatRenderer {
     /// 线性插值 (静态方法)
     fn lerp_static(a: u8, b: u8, t: f64) -> f64 {
         a as f64 * (1.0 - t) + b as f64 * t
+    }
+}
+
+impl ComprehensiveRenderer for HeatRenderer {
+    fn render_component(
+        &self,
+        canvas_manager: &CanvasManager,
+        layout: &ChartLayout,
+        data_manager: &Rc<RefCell<DataManager>>,
+        _mode: RenderMode, // _mode is unused by current HeatRenderer::draw
+    ) {
+        let ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        self.draw(ctx, layout, data_manager /*, mode */); // Pass mode if draw is updated
     }
 }
