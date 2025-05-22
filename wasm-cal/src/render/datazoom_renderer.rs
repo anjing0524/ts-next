@@ -12,6 +12,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
+// Structs for draw_visible_range_indicator arguments
+struct NavIndicatorVisualParams {
+    nav_x: f64,
+    nav_y: f64,
+    nav_width: f64,
+    nav_height: f64,
+}
+
+struct NavIndicatorDataParams<'a> {
+    items: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<KlineItem<'a>>>,
+    data_manager: &'a Rc<RefCell<DataManager>>,
+}
+
 /// 导航器拖动手柄类型
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DragHandleType {
@@ -67,9 +80,9 @@ impl ComprehensiveRenderer for DataZoomRenderer {
         }
 
         self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height); // Call helper
-        self.draw_visible_range_indicator( // Call helper
-            ctx, &layout, items, nav_x, nav_y, nav_width, nav_height, data_manager,
-        );
+        let visual_params = NavIndicatorVisualParams { nav_x, nav_y, nav_width, nav_height };
+        let data_params = NavIndicatorDataParams { items, data_manager };
+        self.draw_visible_range_indicator(ctx, &layout, visual_params, data_params);
     }
 }
 
@@ -317,51 +330,47 @@ impl DataZoomRenderer {
     }
 
     // Helper: Draw visible range indicator
-    fn draw_visible_range_indicator(
+    fn draw_visible_range_indicator<'a>(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        nav_x: f64,
-        nav_y: f64,
-        nav_width: f64,
-        nav_height: f64,
-        data_manager: &Rc<RefCell<DataManager>>,
+        visual_params: NavIndicatorVisualParams,
+        data_params: NavIndicatorDataParams<'a>,
     ) {
-        let items_len = items.len();
+        let items_len = data_params.items.len();
         if items_len == 0 { return; }
-        let data_manager_ref = data_manager.borrow();
+        let data_manager_ref = data_params.data_manager.borrow();
         let visible_range_obj = data_manager_ref.get_visible_range();
         let (visible_start, visible_count, _) = visible_range_obj.get_range();
         if visible_start == 0 && visible_count >= items_len { return; }
 
         let (visible_start_x, visible_end_x) = visible_range_obj.get_screen_coordinates(layout);
-        let clamped_start_x = visible_start_x.max(nav_x).min(nav_x + nav_width);
-        let clamped_end_x = visible_end_x.max(nav_x).min(nav_x + nav_width);
+        let clamped_start_x = visible_start_x.max(visual_params.nav_x).min(visual_params.nav_x + visual_params.nav_width);
+        let clamped_end_x = visible_end_x.max(visual_params.nav_x).min(visual_params.nav_x + visual_params.nav_width);
 
         ctx.save();
         ctx.begin_path();
-        ctx.rect(nav_x, nav_y, nav_width, nav_height);
+        ctx.rect(visual_params.nav_x, visual_params.nav_y, visual_params.nav_width, visual_params.nav_height);
         ctx.clip();
 
         ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);
-        ctx.fill_rect(nav_x, nav_y, clamped_start_x - nav_x, nav_height);
-        ctx.fill_rect(clamped_end_x, nav_y, nav_x + nav_width - clamped_end_x, nav_height);
+        ctx.fill_rect(visual_params.nav_x, visual_params.nav_y, clamped_start_x - visual_params.nav_x, visual_params.nav_height);
+        ctx.fill_rect(clamped_end_x, visual_params.nav_y, visual_params.nav_x + visual_params.nav_width - clamped_end_x, visual_params.nav_height);
 
         let border_left = clamped_start_x;
         let border_width = (clamped_end_x - clamped_start_x).max(0.0);
         if border_width > 0.0 {
             ctx.set_stroke_style_str(ChartColors::NAVIGATOR_BORDER);
             ctx.set_line_width(DATAZOOM_INDICATOR_LINE_WIDTH);
-            ctx.stroke_rect(border_left, nav_y, border_width, nav_height);
+            ctx.stroke_rect(border_left, visual_params.nav_y, border_width, visual_params.nav_height);
         }
 
         let handle_color = if self.is_dragging { ChartColors::NAVIGATOR_ACTIVE_HANDLE } else { ChartColors::NAVIGATOR_HANDLE };
         let handle_width = if self.is_dragging { layout.navigator_handle_width * DATAZOOM_DRAGGING_HANDLE_WIDTH_MULTIPLIER } else { layout.navigator_handle_width };
         
         let shadow_blur = if self.is_dragging {
-            let left_edge_distance = clamped_start_x - nav_x;
-            let right_edge_distance = nav_x + nav_width - clamped_end_x;
+            let left_edge_distance = clamped_start_x - visual_params.nav_x;
+            let right_edge_distance = visual_params.nav_x + visual_params.nav_width - clamped_end_x;
             let min_distance = left_edge_distance.min(right_edge_distance);
             if min_distance < DATAZOOM_SHADOW_EDGE_DISTANCE_THRESHOLD {
                 DATAZOOM_SHADOW_MAX_BLUR * (min_distance / DATAZOOM_SHADOW_EDGE_DISTANCE_THRESHOLD)
@@ -369,17 +378,17 @@ impl DataZoomRenderer {
         } else { 0.0 };
         let shadow_color = if self.is_dragging { ChartColors::NAVIGATOR_ACTIVE_HANDLE_SHADOW } else { ChartColors::TRANSPARENT };
 
-        if clamped_start_x >= nav_x && clamped_start_x <= nav_x + nav_width {
+        if clamped_start_x >= visual_params.nav_x && clamped_start_x <= visual_params.nav_x + visual_params.nav_width {
             ctx.set_fill_style_str(handle_color);
             ctx.set_shadow_blur(shadow_blur);
             ctx.set_shadow_color(shadow_color);
-            ctx.fill_rect(clamped_start_x - handle_width / 2.0, nav_y + nav_height / 4.0, handle_width, nav_height / 2.0);
+            ctx.fill_rect(clamped_start_x - handle_width / 2.0, visual_params.nav_y + visual_params.nav_height / 4.0, handle_width, visual_params.nav_height / 2.0);
         }
-        if clamped_end_x >= nav_x && clamped_end_x <= nav_x + nav_width && clamped_end_x > clamped_start_x {
+        if clamped_end_x >= visual_params.nav_x && clamped_end_x <= visual_params.nav_x + visual_params.nav_width && clamped_end_x > clamped_start_x {
             ctx.set_fill_style_str(handle_color);
             ctx.set_shadow_blur(shadow_blur);
             ctx.set_shadow_color(shadow_color);
-            ctx.fill_rect(clamped_end_x - handle_width / 2.0, nav_y + nav_height / 4.0, handle_width, nav_height / 2.0);
+            ctx.fill_rect(clamped_end_x - handle_width / 2.0, visual_params.nav_y + visual_params.nav_height / 4.0, handle_width, visual_params.nav_height / 2.0);
         }
         ctx.restore();
     }

@@ -12,6 +12,25 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d; // Keep for ctx type in helpers
 
+// Structs for draw_smooth_price_line arguments
+struct SmoothPriceLineDataParams<'a, F>
+where
+    F: Fn(&KlineItem) -> f64,
+{
+    items: &'a flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<KlineItem<'a>>>,
+    visible_start: usize,
+    visible_end: usize,
+    min_low: f64,
+    max_high: f64,
+    price_extractor: F,
+}
+
+struct SmoothPriceLineStyleParams<'a> {
+    color: &'a str,
+    line_width: f64,
+    is_dashed: bool,
+}
+
 /// 线图渲染器 - 负责绘制最新价、买一价、卖一价曲线
 #[derive(Default)]
 pub struct LineRenderer {
@@ -46,24 +65,34 @@ impl ComprehensiveRenderer for LineRenderer {
             // ctx.set_image_smoothing_enabled(true); // Original was commented out
 
             if self.show_last_price {
-                self.draw_smooth_price_line(
-                    &ctx, layout, &items, visible_start, visible_end,
-                    min_low, max_high, |item| item.last_price(),
-                    ChartColors::LAST_PRICE_LINE, LINE_LAST_PRICE_WIDTH, false, // Use constant
-                );
+                let data_params = SmoothPriceLineDataParams {
+                    items: &items, visible_start, visible_end, min_low, max_high,
+                    price_extractor: |item| item.last_price(),
+                };
+                let style_params = SmoothPriceLineStyleParams {
+                    color: ChartColors::LAST_PRICE_LINE, line_width: LINE_LAST_PRICE_WIDTH, is_dashed: false,
+                };
+                self.draw_smooth_price_line(ctx, layout, data_params, style_params);
             }
             if self.show_bid_price {
-                self.draw_smooth_price_line(
-                    &ctx, layout, &items, visible_start, visible_end,
-                    min_low, max_high, |item| item.bid_price(),
-                    ChartColors::BID_PRICE_LINE, LINE_DEFAULT_WIDTH, true, // Use constant
-                );
+                let data_params = SmoothPriceLineDataParams {
+                    items: &items, visible_start, visible_end, min_low, max_high,
+                    price_extractor: |item| item.bid_price(),
+                };
+                let style_params = SmoothPriceLineStyleParams {
+                    color: ChartColors::BID_PRICE_LINE, line_width: LINE_DEFAULT_WIDTH, is_dashed: true,
+                };
+                self.draw_smooth_price_line(ctx, layout, data_params, style_params);
             }
             if self.show_ask_price {
-                self.draw_smooth_price_line(
-                    &ctx, layout, &items, visible_start, visible_end,
-                    min_low, max_high, |item| item.ask_price(),
-                    ChartColors::ASK_PRICE_LINE, LINE_DEFAULT_WIDTH, true, // Use constant
+                let data_params = SmoothPriceLineDataParams {
+                    items: &items, visible_start, visible_end, min_low, max_high,
+                    price_extractor: |item| item.ask_price(),
+                };
+                let style_params = SmoothPriceLineStyleParams {
+                    color: ChartColors::ASK_PRICE_LINE, line_width: LINE_DEFAULT_WIDTH, is_dashed: true,
+                };
+                self.draw_smooth_price_line(ctx, layout, data_params, style_params);
                 );
             }
         }
@@ -79,30 +108,23 @@ impl LineRenderer {
         }
     }
 
-    fn draw_smooth_price_line<F>(
+    fn draw_smooth_price_line<'a, F>(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: &flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<KlineItem<'_>>>,
-        visible_start: usize,
-        visible_end: usize,
-        min_low: f64,
-        max_high: f64,
-        price_extractor: F,
-        color: &str,
-        line_width: f64,
-        is_dashed: bool,
+        data_params: SmoothPriceLineDataParams<'a, F>,
+        style_params: SmoothPriceLineStyleParams<'a>,
     ) where
         F: Fn(&KlineItem) -> f64,
     {
-        ctx.set_stroke_style(&color.into());
-        ctx.set_line_width(line_width);
+        ctx.set_stroke_style_str(style_params.color);
+        ctx.set_line_width(style_params.line_width);
         ctx.set_line_cap("round"); // Keep as string literals, less critical for theming
         ctx.set_line_join("round"); // Keep as string literals
 
-        if is_dashed {
+        if style_params.is_dashed {
             // Use LINE_DASH_PATTERN_VALUE for dash pattern
-            let dash_values = [LINE_DASH_PATTERN_VALUE, LINE_DASH_PATTERN_VALUE]; 
+            let dash_values = [LINE_DASH_PATTERN_VALUE, LINE_DASH_PATTERN_VALUE];
             let dash_pattern = js_sys::Float64Array::from(&dash_values[..]);
             let _ = ctx.set_line_dash(&dash_pattern);
         } else {
@@ -110,12 +132,12 @@ impl LineRenderer {
             let _ = ctx.set_line_dash(&empty_array);
         }
 
-        let mut points = Vec::with_capacity(visible_end - visible_start);
-        for i in visible_start..visible_end {
-            let item = items.get(i);
-            let price = price_extractor(&item);
-            let x = layout.map_index_to_x(i, visible_start);
-            let y = layout.map_price_to_y(price, min_low, max_high);
+        let mut points = Vec::with_capacity(data_params.visible_end - data_params.visible_start);
+        for i in data_params.visible_start..data_params.visible_end {
+            let item = data_params.items.get(i);
+            let price = (data_params.price_extractor)(&item);
+            let x = layout.map_index_to_x(i, data_params.visible_start);
+            let y = layout.map_price_to_y(price, data_params.min_low, data_params.max_high);
             points.push((x, y));
         }
 

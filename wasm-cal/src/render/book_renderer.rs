@@ -52,13 +52,13 @@ impl ComprehensiveRenderer for BookRenderer {
         let (visible_start, _visible_count, visible_end) = visible_range.get_range();
         if visible_start >= visible_end { return; }
         
-        let idx = hover_index.unwrap_or_else(|| visible_end.saturating_sub(1)); // Use saturating_sub
+        let idx = visible_end.saturating_sub(1); // Use saturating_sub
         if idx >= items.len() && !items.is_empty() { // Allow idx == 0 if items.len() == 0
              // If items is not empty, but idx is out of bounds (e.g. visible_end was 0), return.
              // This can happen if visible_range gives 0,0,0 but items is not empty (e.g. after full zoom out then zoom in)
              // A more robust fix might be in how visible_range is calculated or handled when items exist.
              // For now, just guard against panic.
-            if items.len() > 0 { return; }
+            if !items.is_empty() { return; }
         } else if items.is_empty() { // If items is empty, idx will be high, so return.
             return;
         }
@@ -114,7 +114,7 @@ impl ComprehensiveRenderer for BookRenderer {
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
             
-            ctx.set_fill_style(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
+            ctx.set_fill_style_str(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH });
             ctx.set_global_alpha(1.0);
             // Use BOOK_BAR_BORDER_ADJUST
             ctx.fill_rect(bar_x, bar_y, bar_width.max(0.0), bar_height - BOOK_BAR_BORDER_ADJUST); // Ensure bar_width is not negative
@@ -124,7 +124,7 @@ impl ComprehensiveRenderer for BookRenderer {
                 // Use BOOK_TEXT_X_OFFSET
                 let text_x = bar_x + bar_width.max(0.0) + BOOK_TEXT_X_OFFSET; // Ensure bar_width is not negative for text placement
                 let text_y = bar_y + bar_height / 2.0; // 2.0 is factor for centering
-                ctx.set_fill_style(&ChartColors::TEXT.into());
+                ctx.set_fill_style_str(ChartColors::TEXT);
                 ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
