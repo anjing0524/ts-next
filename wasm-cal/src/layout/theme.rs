@@ -124,3 +124,35 @@ pub const CHART_DRAG_THROTTLE_COUNT: u8 = 3; // For DRAG_THROTTLE_COUNTER
 pub const MIN_PRICE_DIFF_THRESHOLD: f64 = 0.000001;
 pub const DEFAULT_FALLBACK_CANDLE_WIDTH: f64 = 8.0;
 pub const CANDLE_WIDTH_RATIO_OF_TOTAL: f64 = 0.8; // Fraction of total_width_per_candle for candle body
+
+// OverlayRenderer specific line widths
+pub const OVERLAY_BORDER_LINE_WIDTH: f64 = 1.0;
+pub const OVERLAY_SWITCH_BUTTON_LINE_WIDTH: f64 = 1.0;
+
+// OverlayRenderer specific thresholds
+pub const OVERLAY_MIN_PRICE_DISPLAY_THRESHOLD: f64 = 0.001;
+
+// OverlayRenderer UI Text Strings
+pub const TEXT_TOOLTIP_PRICE: &str = "价格:";
+pub const TEXT_TOOLTIP_VOLUME: &str = "数量:";
+pub const TEXT_TOOLTIP_OPEN: &str = "开盘:";
+pub const TEXT_TOOLTIP_HIGH: &str = "最高:";
+pub const TEXT_TOOLTIP_LOW: &str = "最低:";
+pub const TEXT_TOOLTIP_CLOSE: &str = "收盘:";
+pub const TEXT_TOOLTIP_TOTAL_VOLUME: &str = "成交量:";
+pub const TEXT_SWITCH_KLINE: &str = "K线";
+pub const TEXT_SWITCH_HEATMAP: &str = "热力图";
+
+// Price formatting thresholds (used in AxisRenderer and potentially OverlayRenderer)
+pub const PRICE_FORMAT_THRESHOLD_NO_DECIMAL: f64 = 100.0;
+pub const PRICE_FORMAT_THRESHOLD_DEFAULT: f64 = 1.0;
+// OVERLAY_MIN_PRICE_DISPLAY_THRESHOLD already exists for specific overlay label use
+
+// VisibleRange specific buffer constants
+pub const VISIBLE_RANGE_PRICE_BUFFER_PERCENT: f64 = 0.05;
+pub const VISIBLE_RANGE_DEFAULT_PRICE_BUFFER: f64 = 1.0;
+pub const VISIBLE_RANGE_DEFAULT_MAX_VOLUME: f64 = 1.0; // For calculate_data_ranges
+pub const VISIBLE_RANGE_VOLUME_BUFFER_PERCENT: f64 = 1.05;
+
+// OverlayRenderer tooltip positioning related (can be used by ChartLayout helper)
+// OVERLAY_TOOLTIP_MOUSE_OFFSET is already defined

@@ -278,4 +278,79 @@ impl ChartLayout {
         self.candle_width = self.calculate_candle_width(visible_count);
         self.total_candle_width = self.candle_width + self.candle_spacing;
     }
+
+    /// Calculates the adjusted (x, y) position for a tooltip to keep it within chart boundaries.
+    ///
+    /// # Arguments
+    /// * `mouse_x`: Current X position of the mouse.
+    /// * `mouse_y`: Current Y position of the mouse.
+    /// * `tooltip_width`: The width of the tooltip.
+    /// * `tooltip_height`: The height of the tooltip.
+    /// * `mouse_offset`: The desired offset from the mouse cursor.
+    ///
+    /// # Returns
+    /// A tuple `(f64, f64)` representing the adjusted top-left (x, y) for the tooltip.
+    pub fn calculate_tooltip_position(
+        &self,
+        mouse_x: f64,
+        mouse_y: f64,
+        tooltip_width: f64,
+        tooltip_height: f64,
+        mouse_offset: f64, // e.g., OVERLAY_TOOLTIP_MOUSE_OFFSET
+    ) -> (f64, f64) {
+        let mut tooltip_x = mouse_x + mouse_offset;
+        let mut tooltip_y = mouse_y - mouse_offset - tooltip_height; // Prefer above cursor
+
+        let chart_right_edge = self.chart_area_x + self.chart_area_width;
+        let chart_bottom_edge = self.header_height + self.chart_area_height;
+
+        // Adjust X position
+        if tooltip_x + tooltip_width > chart_right_edge {
+            tooltip_x = mouse_x - mouse_offset - tooltip_width; // Try left of cursor
+        }
+        if tooltip_x < self.chart_area_x { // Still out of bounds (left)?
+            tooltip_x = self.chart_area_x; // Align to left chart edge
+        }
+        if tooltip_x + tooltip_width > chart_right_edge { // Still out of bounds (right, e.g. tooltip wider than chart)?
+             tooltip_x = chart_right_edge - tooltip_width; // Align to right chart edge
+        }
+
+
+        // Adjust Y position
+        if tooltip_y < self.header_height { // If trying to go above header
+            tooltip_y = mouse_y + mouse_offset; // Try below cursor
+        }
+        if tooltip_y + tooltip_height > chart_bottom_edge { // Still out of bounds (bottom)?
+            tooltip_y = chart_bottom_edge - tooltip_height; // Align to bottom chart edge
+        }
+        if tooltip_y < self.header_height { // Still out of bounds (top, e.g. tooltip taller than chart)?
+            tooltip_y = self.header_height; // Align to top chart edge (header bottom)
+        }
+        
+        (tooltip_x.max(self.chart_area_x), tooltip_y.max(self.header_height))
+    }
+
+    /// Calculates the adjusted Y position for a floating axis label to keep it within chart boundaries.
+    pub fn calculate_floating_axis_label_y_position(
+        &self,
+        mouse_y_constrained: f64, // Already constrained to chart_area_y boundaries
+        label_height: f64,
+    ) -> f64 {
+        // Center label on mouse_y_constrained, then clamp to ensure it's fully visible within chart_area
+        let y_label_y = mouse_y_constrained - label_height / 2.0;
+        y_label_y.max(self.header_height) // Max with header_height (top of chart_area)
+                 .min(self.header_height + self.chart_area_height - label_height) // Min with bottom of chart_area
+    }
+
+    /// Calculates the adjusted X position for a floating axis label to keep it within chart boundaries.
+    pub fn calculate_floating_axis_label_x_position(
+        &self,
+        mouse_x_constrained: f64, // Already constrained to chart_area_x boundaries
+        label_width: f64,
+    ) -> f64 {
+        // Center label on mouse_x_constrained, then clamp
+        let x_label_x = mouse_x_constrained - label_width / 2.0;
+        x_label_x.max(self.chart_area_x) // Max with chart_area_x (left of chart_area)
+                 .min(self.chart_area_x + self.chart_area_width - label_width) // Min with right of chart_area
+    }
 }

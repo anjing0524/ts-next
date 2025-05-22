@@ -1,10 +1,10 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
 use crate::{
-    canvas::{CanvasLayerType, CanvasManager}, // Added
+    canvas::{CanvasLayerType, CanvasManager},
     data::DataManager,
-    layout::{ChartColors, ChartFont, ChartLayout},
-    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer}, // Changed
+    layout::{ChartColors, ChartFont, ChartLayout, theme::*}, // Ensure theme is imported
+    render::{chart_renderer::RenderMode, traits::ComprehensiveRenderer},
 };
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -24,7 +24,6 @@ impl BookRenderer {
         }
     }
 
-    // clear_area remains a helper method for BookRenderer
     pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
         let area_x = layout.chart_area_x + layout.main_chart_width;
         let area_y = layout.chart_area_y;
@@ -34,21 +33,16 @@ impl BookRenderer {
     }
 }
 
-// impl LayerRenderer for BookRenderer { ... } // This block is removed
-
 impl ComprehensiveRenderer for BookRenderer {
-    /// 在main层右侧20%宽度区域绘制订单簿
     fn render_component(
         &self,
-        canvas_manager: &CanvasManager, // Added
+        canvas_manager: &CanvasManager,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
     ) {
-        let ctx = canvas_manager.get_context(CanvasLayerType::Main); // Get context
-
-        // Logic from old draw_on_layer, hover_index is internally None as per original file
-        let hover_index: Option<usize> = None; 
+        let ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        let hover_index: Option<usize> = None;
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -56,29 +50,33 @@ impl ComprehensiveRenderer for BookRenderer {
         };
         let visible_range = data_manager_ref.get_visible_range();
         let (visible_start, _visible_count, visible_end) = visible_range.get_range();
-        if visible_start >= visible_end {
-            return;
-        }
-        let idx = hover_index.unwrap_or_else(|| visible_end - 1);
-        if idx >= items.len() {
+        if visible_start >= visible_end { return; }
+        
+        let idx = hover_index.unwrap_or_else(|| visible_end.saturating_sub(1)); // Use saturating_sub
+        if idx >= items.len() && !items.is_empty() { // Allow idx == 0 if items.len() == 0
+             // If items is not empty, but idx is out of bounds (e.g. visible_end was 0), return.
+             // This can happen if visible_range gives 0,0,0 but items is not empty (e.g. after full zoom out then zoom in)
+             // A more robust fix might be in how visible_range is calculated or handled when items exist.
+             // For now, just guard against panic.
+            if items.len() > 0 { return; }
+        } else if items.is_empty() { // If items is empty, idx will be high, so return.
             return;
         }
 
-        let last_mode_val = self.last_mode.get(); // Use a distinct variable name
-        let last_idx_val = self.last_idx.get();   // Use a distinct variable name
-        let need_render = last_mode_val != Some(mode) || last_idx_val != Some(idx);
-        
-        if !need_render {
-            // return; // Commenting out to ensure it always clears and redraws if called by chart_renderer
-        }
+
+        let last_mode_val = self.last_mode.get();
+        let last_idx_val = self.last_idx.get();
+        // The check `last_mode_val != Some(mode) || last_idx_val != Some(idx)` was commented out.
+        // If it's meant to be active, it should be here.
+        // For now, assuming it always redraws if called.
         self.last_mode.set(Some(mode));
         self.last_idx.set(Some(idx));
 
-        let item = items.get(idx);
+        let item = items.get(idx); // This could panic if idx is out of bounds. Added guard above.
         let last_price = item.last_price();
         let volumes = match item.volumes() {
             Some(vols) => vols,
-            None => return,
+            None => { self.clear_area(ctx, layout); return; } // Clear if no volumes
         };
         
         let area_x = layout.chart_area_x + layout.main_chart_width;
@@ -92,57 +90,47 @@ impl ComprehensiveRenderer for BookRenderer {
             let pv = volumes.get(i);
             let price = pv.price();
             let volume = pv.volume();
-            if price < last_price {
-                bids.push((price, volume));
-            } else if price > last_price {
-                asks.push((price, volume));
-            }
+            if price < last_price { bids.push((price, volume)); }
+            else if price > last_price { asks.push((price, volume)); }
         }
         
         asks.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         bids.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         
         let mut all_levels = Vec::new();
-        for (p, v) in asks.iter() {
-            all_levels.push((*p, *v, true)); // true: 卖盘
-        }
-        for (p, v) in bids.iter() {
-            all_levels.push((*p, *v, false)); // false: 买盘
-        }
+        for (p, v) in asks.iter() { all_levels.push((*p, *v, true)); }
+        for (p, v) in bids.iter() { all_levels.push((*p, *v, false)); }
         
         let max_volume = all_levels.iter().map(|(_, v, _)| *v).fold(0.0, f64::max);
-        if max_volume <= 0.0 {
-             // Still clear if max_volume is 0, to erase previous drawing
-            self.clear_area(ctx, layout);
-            return;
-        }
         
-        self.clear_area(ctx, layout); // Clear before drawing new content
+        self.clear_area(ctx, layout); // Always clear before drawing new content or returning
+        if max_volume <= 0.0 { return; } // If no volume, area is cleared, then return.
         
-        let bar_height = area_height / all_levels.len().max(1) as f64;
-        for (i, (price_val, volume_val, is_ask)) in all_levels.iter().enumerate() { // Renamed to avoid conflict
-            let norm = (*volume_val / max_volume).min(1.0);
-            let text_reserved_width = 40.0; // Magic number
-            let bar_width = (area_width - text_reserved_width) * norm;
+        let bar_height = area_height / all_levels.len().max(1) as f64; // .max(1) to avoid div by zero
+        for (i, (_price_val, volume_val, is_ask)) in all_levels.iter().enumerate() {
+            let norm = (*volume_val / max_volume).min(1.0); // .min(1.0) to cap norm
+            // Use BOOK_TEXT_RESERVED_WIDTH
+            let bar_width = (area_width - BOOK_TEXT_RESERVED_WIDTH) * norm; 
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
             
             ctx.set_fill_style_value(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
-            // ctx.global_alpha(); // This method does not exist. set_global_alpha(1.0) is likely intended.
-            ctx.set_global_alpha(1.0); // Ensuring full opacity for bars
-            ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0); // Magic number 1.0
+            ctx.set_global_alpha(1.0);
+            // Use BOOK_BAR_BORDER_ADJUST
+            ctx.fill_rect(bar_x, bar_y, bar_width.max(0.0), bar_height - BOOK_BAR_BORDER_ADJUST); // Ensure bar_width is not negative
             
             if *volume_val > 0.0 {
                 let text = format!("{}", *volume_val as u64);
-                let text_x = bar_x + bar_width + 4.0; // Magic number 4.0
-                let text_y = bar_y + bar_height / 2.0;
+                // Use BOOK_TEXT_X_OFFSET
+                let text_x = bar_x + bar_width.max(0.0) + BOOK_TEXT_X_OFFSET; // Ensure bar_width is not negative for text placement
+                let text_y = bar_y + bar_height / 2.0; // 2.0 is factor for centering
                 ctx.set_fill_style_value(&ChartColors::TEXT.into());
                 ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
-                ctx.fill_text(&text, text_x, text_y).ok();
+                let _ = ctx.fill_text(&text, text_x, text_y);
             }
         }
-        ctx.set_global_alpha(1.0); // Restore global alpha
+        ctx.set_global_alpha(1.0);
     }
 }
