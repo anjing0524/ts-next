@@ -1,38 +1,25 @@
-//! 可见数据范围模块 - 封装可见数据范围的计算和管理
-
+// wasm-cal/src/data/visible_range.rs
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::ChartLayout;
+use crate::layout::{ChartLayout, theme::*}; // Added theme import
+use flatbuffers; // Ensure flatbuffers is imported if items are of this type
 
-/// 可见数据范围结构体
-///
-/// 封装了可见数据的起始索引、数量和结束索引，提供了安全的边界检查和范围计算
+// ... (VisibleRange struct and other methods remain the same) ...
 #[derive(Debug, Clone, Copy)]
 pub struct VisibleRange {
-    /// 可见区域起始索引
     start: usize,
-    /// 可见区域数据数量
     count: usize,
-    /// 可见区域结束索引（不包含）
     end: usize,
-    /// 数据总长度
     total_len: usize,
 }
 
-/// 数据范围结构体
-///
-/// 存储计算后的价格范围和成交量范围
 #[derive(Debug, Clone, Copy)]
 pub struct DataRange {
-    /// 最低价格
     pub min_low: f64,
-    /// 最高价格
     pub max_high: f64,
-    /// 最大成交量
     pub max_volume: f64,
 }
 
 impl DataRange {
-    /// 创建新的数据范围
     pub fn new() -> Self {
         Self {
             min_low: 0.0,
@@ -40,261 +27,146 @@ impl DataRange {
             max_volume: 0.0,
         }
     }
-
-    /// 获取数据范围
     pub fn get(&self) -> (f64, f64, f64) {
         (self.min_low, self.max_high, self.max_volume)
     }
 }
 
 impl VisibleRange {
-    /// 创建新的可见数据范围
-    ///
-    /// # 参数
-    /// * `start` - 起始索引
-    /// * `count` - 数据数量
-    /// * `total_len` - 数据总长度
-    ///
-    /// # 返回值
-    /// 返回一个新的VisibleRange实例，自动处理边界情况
     pub fn new(start: usize, count: usize, total_len: usize) -> Self {
-        let count = count.max(1).min(total_len); // 确保至少显示1个数据点，且不超过总数据量
-        let start = start.min(total_len.saturating_sub(count)); // 确保起始位置有效
-        let end = (start + count).min(total_len); // 确保结束位置不超过总数据量
-
-        Self {
-            start,
-            count,
-            end,
-            total_len,
-        }
+        let count = count.max(1).min(total_len); 
+        let start = start.min(total_len.saturating_sub(count)); 
+        let end = (start + count).min(total_len); 
+        Self { start, count, end, total_len }
     }
 
-    /// 根据布局初始化可见范围
-    ///
-    /// # 参数
-    /// * `layout` - 图表布局
-    /// * `items_len` - 数据总长度
-    ///
-    /// # 返回值
-    /// 返回一个新的VisibleRange实例，基于布局计算初始可见范围
     pub fn from_layout(layout: &ChartLayout, items_len: usize) -> Self {
         if items_len == 0 {
             return Self::new(0, 0, 0);
         }
-
-        // 计算一屏可以显示的K线数量
-        let initial_visible_count = ((layout.chart_area_width / layout.total_candle_width).floor()
-            as usize)
-            .max(1) // 确保至少显示1根K线
-            .min(items_len); // 不能超过总数据量
-
-        // 默认显示末尾的数据，而不是从0开始
+        let initial_visible_count = if layout.total_candle_width > 0.0 {
+             ((layout.main_chart_width / layout.total_candle_width).floor() as usize)
+                .max(1) 
+                .min(items_len)
+        } else {
+            items_len.min(100) // Fallback if total_candle_width is 0, show up to 100 items
+        };
         let start = items_len.saturating_sub(initial_visible_count);
-
         Self::new(start, initial_visible_count, items_len)
     }
-
-    /// 更新可见范围
-    ///
-    /// # 参数
-    /// * `start` - 新的起始索引
-    /// * `count` - 新的数据数量
-    ///
-    /// # 返回值
-    /// 返回是否发生了变化
+    
     pub fn update(&mut self, start: usize, count: usize) -> bool {
         let old_start = self.start;
         let old_count = self.count;
-
-        let count = count.max(1).min(self.total_len); // 确保至少显示1个数据点，且不超过总数据量
-        let start = start.min(self.total_len.saturating_sub(count)); // 确保起始位置有效
-        let end = (start + count).min(self.total_len); // 确保结束位置不超过总数据量
-
+        let count = count.max(1).min(self.total_len); 
+        let start = start.min(self.total_len.saturating_sub(count)); 
+        let end = (start + count).min(self.total_len); 
         self.start = start;
         self.count = count;
         self.end = end;
-
-        // 返回是否发生了变化
         old_start != start || old_count != count
     }
 
-    /// 更新数据总长度
-    ///
-    /// 当数据源变化时调用此方法更新总长度，并自动调整可见范围
-    ///
-    /// # 参数
-    /// * `new_total_len` - 新的数据总长度
-    ///
-    /// # 返回值
-    /// 返回是否发生了变化
     pub fn update_total_len(&mut self, new_total_len: usize) -> bool {
-        if self.total_len == new_total_len {
-            return false;
-        }
-
+        if self.total_len == new_total_len { return false; }
         let old_start = self.start;
         let old_count = self.count;
-
         self.total_len = new_total_len;
-        let count = self.count.max(1).min(new_total_len); // 确保至少显示1个数据点，且不超过总数据量
-        let start = self.start.min(new_total_len.saturating_sub(count)); // 确保起始位置有效
-        let end = (start + count).min(new_total_len); // 确保结束位置不超过总数据量
-
+        let count = self.count.max(1).min(new_total_len); 
+        let start = self.start.min(new_total_len.saturating_sub(count)); 
+        let end = (start + count).min(new_total_len); 
         self.start = start;
         self.count = count;
         self.end = end;
-
-        // 返回是否发生了变化
         old_start != start || old_count != count
     }
 
-    /// 获取完整的可见范围信息
-    ///
-    /// # 返回值
-    /// 返回一个元组 (start, count, end)
     pub fn get_range(&self) -> (usize, usize, usize) {
         (self.start, self.count, self.end)
     }
 
-    /// 计算可见范围的屏幕坐标
-    ///
-    /// # 参数
-    /// * `layout` - 图表布局
-    ///
-    /// # 返回值
-    /// 可见范围的起始和结束X坐标
     pub fn get_screen_coordinates(&self, layout: &ChartLayout) -> (f64, f64) {
-        layout.calculate_visible_range_coordinates(self.total_len, self.start, self.count)
+        // This method was defined in ChartLayout in the original structure.
+        // Assuming it's moved here or ChartLayout provides a similar utility.
+        // For now, let's use the logic from ChartLayout's calculate_visible_range_coordinates
+        // if items_len is self.total_len, visible_start_index is self.start, visible_count is self.count
+        if self.total_len == 0 {
+            return (layout.chart_area_x, layout.chart_area_x + layout.main_chart_width);
+        }
+        let nav_candle_width = layout.main_chart_width / self.total_len as f64;
+        let visible_start_x = layout.chart_area_x + self.start as f64 * nav_candle_width;
+        let visible_end_x = layout.chart_area_x + (self.start + self.count) as f64 * nav_candle_width;
+        (visible_start_x, visible_end_x)
     }
-
-    /// 基于相对位置的缩放方法
-    ///
-    /// # 参数
-    /// * `zoom_factor` - 缩放因子（小于1缩小可见范围，大于1扩大可见范围）
-    /// * `relative_position` - 鼠标在可见区域内的相对位置 (0.0-1.0)
-    ///
-    /// # 返回值
-    /// 返回新的起始索引和可见数量
-    pub fn zoom_with_relative_position(
-        &self,
-        zoom_factor: f64,
-        relative_position: f64,
-    ) -> (usize, usize) {
-        // 确保相对位置在有效范围内
+    
+    pub fn zoom_with_relative_position(&self, zoom_factor: f64, relative_position: f64) -> (usize, usize) {
         let relative_position = relative_position.clamp(0.0, 1.0);
-
         let visible_count = self.count.max(1);
         let visible_center_idx = self.start as f64 + (visible_count as f64 * relative_position);
-
-        // 计算新的可见数量，并确保在有效范围内
-        let new_visible_count = ((visible_count as f64 * zoom_factor).round() as usize)
-            .max(1)
-            .min(self.total_len);
-
-        // 计算新的起始位置，保持相对位置点不变
-        let new_start = ((visible_center_idx - (new_visible_count as f64 * relative_position))
-            .round() as isize)
-            .max(0)
-            .min((self.total_len - new_visible_count) as isize) as usize;
-
+        let new_visible_count = ((visible_count as f64 * zoom_factor).round() as usize).max(1).min(self.total_len);
+        let new_start = ((visible_center_idx - (new_visible_count as f64 * relative_position)).round() as isize)
+            .max(0).min((self.total_len.saturating_sub(new_visible_count)) as isize) as usize;
         (new_start, new_visible_count)
     }
 
-    /// 处理鼠标滚轮事件
-    ///
-    /// # 参数
-    /// * `mouse_x` - 鼠标X坐标
-    /// * `chart_area_x` - 图表区域X坐标
-    /// * `chart_area_width` - 图表区域宽度
-    /// * `delta` - 滚轮滚动量
-    ///
-    /// # 返回值
-    /// 返回新的起始索引和可见数量
-    pub fn handle_wheel(
-        &self,
-        mouse_x: f64,
-        chart_area_x: f64,
-        chart_area_width: f64,
-        delta: f64,
-    ) -> (usize, usize) {
-        // 计算相对位置
+    pub fn handle_wheel(&self, mouse_x: f64, chart_area_x: f64, chart_area_width: f64, delta: f64) -> (usize, usize) {
         let relative_position = if chart_area_width > 0.0 {
             ((mouse_x - chart_area_x) / chart_area_width).clamp(0.0, 1.0)
-        } else {
-            0.5
-        };
-
-        // 计算缩放因子
-        let zoom_factor = if delta > 0.0 { 0.8 } else { 1.25 };
-
-        // 调用通用缩放方法
+        } else { 0.5 }; 
+        let zoom_factor = if delta > 0.0 { 0.8 } else { 1.25 }; 
         self.zoom_with_relative_position(zoom_factor, relative_position)
     }
 
-    /// 计算可见区域的数据范围
-    ///
-    /// # 参数
-    /// * `items` - K线数据
-    ///
-    /// # 返回值
-    /// 返回计算出的数据范围
     pub fn calculate_data_ranges(
         &self,
         items: &flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<KlineItem<'_>>>,
     ) -> DataRange {
-        if items.is_empty() || self.start >= self.end {
+        if items.is_empty() || self.start >= self.end || self.count == 0 {
             return DataRange::new();
         }
 
-        // 只计算可见范围内的最大最小值
         let (min_low, max_high, max_volume) = (self.start..self.end).fold(
             (f64::MAX, f64::MIN, 0.0_f64),
-            |(min_low, max_high, max_volume), idx| {
+            |(min_l, max_h, max_v), idx| { // Renamed to avoid conflict
+                if idx >= items.len() { return (min_l, max_h, max_v); } 
                 let item = items.get(idx);
-                let low = item.low();
-                let high = item.high();
-                let volume = item.b_vol() + item.s_vol();
-                (min_low.min(low), max_high.max(high), max_volume.max(volume))
+                (min_l.min(item.low()), max_h.max(item.high()), max_v.max(item.b_vol() + item.s_vol()))
             },
         );
-
-        // 为价格范围添加一点缓冲，让K线不贴边
-        let price_range = max_high - min_low;
-        let buffer = if price_range > 0.0 {
-            price_range * 0.05 // 上下各增加5%的缓冲
+        
+        let (final_min_low, final_max_high) = if (max_high - min_low).abs() < MIN_PRICE_DIFF_THRESHOLD {
+            (min_low - VISIBLE_RANGE_DEFAULT_PRICE_BUFFER / 2.0, max_high + VISIBLE_RANGE_DEFAULT_PRICE_BUFFER / 2.0)
         } else {
-            1.0 // 如果价格范围为0（例如只有一个点），添加固定边距
+            let price_range = max_high - min_low;
+            let buffer = price_range * VISIBLE_RANGE_PRICE_BUFFER_PERCENT;
+            (min_low - buffer, max_high + buffer)
         };
 
-        // 如果最大成交量为0，设置一个默认值
-        let max_volume = if max_volume == 0.0 {
-            1.0 // 返回 1.0 而不是更大的值，避免坐标轴刻度过大
+        let final_max_volume = if max_volume == 0.0 {
+            VISIBLE_RANGE_DEFAULT_MAX_VOLUME
         } else {
-            max_volume * 1.05 // 添加5%的边距，使图表更美观
+            max_volume * VISIBLE_RANGE_VOLUME_BUFFER_PERCENT
         };
 
         DataRange {
-            min_low: min_low - buffer,
-            max_high: max_high + buffer,
-            max_volume,
+            min_low: final_min_low,
+            max_high: final_max_high,
+            max_volume: final_max_volume,
         }
     }
 
-    /// 预计算所有可见项的X坐标，用于批量渲染
-    ///
-    /// # 参数
-    /// * `layout` - 图表布局
-    ///
-    /// # 返回值
-    /// 返回包含所有可见项X坐标的向量（仅限主图区域）
     pub fn precompute_x_coordinates(&self, layout: &ChartLayout) -> Vec<f64> {
         let mut x_coords = Vec::with_capacity(self.count);
         let x_max = layout.chart_area_x + layout.main_chart_width;
-        for global_index in self.start..self.end {
-            let x = layout.map_index_to_x(global_index, self.start);
-            if x <= x_max {
-                x_coords.push(x);
+        for i in 0..self.count { 
+            let global_index = self.start + i;
+            if global_index < self.total_len { 
+                 let x = layout.map_index_to_x(global_index, self.start); 
+                 if x <= x_max + layout.total_candle_width { 
+                    x_coords.push(x);
+                } else if x_coords.is_empty() && i == 0 { 
+                    x_coords.push(x);
+                }
             }
         }
         x_coords
