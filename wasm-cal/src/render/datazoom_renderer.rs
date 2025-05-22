@@ -100,7 +100,7 @@ impl DataZoomRenderer {
         };
         if items.is_empty() { return DragHandleType::None; }
 
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible_range().get_range();
+        let (_visible_start, _visible_count, _) = data_manager_ref.get_visible_range().get_range();
         // ChartLayout should have a method to get these coordinates based on its state
         // For now, assuming VisibleRange has a method or ChartLayout can compute this
         let (visible_start_x, visible_end_x) = data_manager_ref.get_visible_range().get_screen_coordinates(&layout);

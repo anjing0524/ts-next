@@ -13,4 +13,3 @@ pub mod traits;
 pub mod volume_renderer; // 添加 utils 模块
 
 pub use chart_renderer::ChartRenderer;
-pub use traits::{LayerRenderer};

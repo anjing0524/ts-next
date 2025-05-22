@@ -78,7 +78,7 @@ impl ComprehensiveRenderer for PriceRenderer {
 
         if !bullish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_value(&ChartColors::BULLISH.into());
+            ctx.set_stroke_style_js_value(&ChartColors::BULLISH.into());
             ctx.set_line_width(PRICE_WICK_LINE_WIDTH); // Use constant
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
@@ -91,7 +91,7 @@ impl ComprehensiveRenderer for PriceRenderer {
 
         if !bearish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_value(&ChartColors::BEARISH.into());
+            ctx.set_stroke_style_js_value(&ChartColors::BEARISH.into());
             ctx.set_line_width(PRICE_WICK_LINE_WIDTH); // Use constant
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
@@ -103,7 +103,7 @@ impl ComprehensiveRenderer for PriceRenderer {
         }
 
         if !bullish_rects.is_empty() {
-            ctx.set_fill_style_value(&ChartColors::BULLISH.into());
+            ctx.set_fill_style_js_value(&ChartColors::BULLISH.into());
             ctx.begin_path();
             for (x, y, width, height) in bullish_rects {
                 ctx.rect(x, y, width, height);
@@ -112,7 +112,7 @@ impl ComprehensiveRenderer for PriceRenderer {
         }
 
         if !bearish_rects.is_empty() {
-            ctx.set_fill_style_value(&ChartColors::BEARISH.into());
+            ctx.set_fill_style_js_value(&ChartColors::BEARISH.into());
             ctx.begin_path();
             for (x, y, width, height) in bearish_rects {
                 ctx.rect(x, y, width, height);

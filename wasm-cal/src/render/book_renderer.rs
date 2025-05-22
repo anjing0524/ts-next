@@ -64,8 +64,8 @@ impl ComprehensiveRenderer for BookRenderer {
         }
 
 
-        let last_mode_val = self.last_mode.get();
-        let last_idx_val = self.last_idx.get();
+        let _last_mode_val = self.last_mode.get();
+        let _last_idx_val = self.last_idx.get();
         // The check `last_mode_val != Some(mode) || last_idx_val != Some(idx)` was commented out.
         // If it's meant to be active, it should be here.
         // For now, assuming it always redraws if called.
@@ -114,7 +114,7 @@ impl ComprehensiveRenderer for BookRenderer {
             let bar_x = area_x;
             let bar_y = area_y + i as f64 * bar_height;
             
-            ctx.set_fill_style(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
+            ctx.set_fill_style_js_value(&(if *is_ask { ChartColors::BEARISH } else { ChartColors::BULLISH }).into());
             ctx.set_global_alpha(1.0);
             // Use BOOK_BAR_BORDER_ADJUST
             ctx.fill_rect(bar_x, bar_y, bar_width.max(0.0), bar_height - BOOK_BAR_BORDER_ADJUST); // Ensure bar_width is not negative
@@ -124,7 +124,7 @@ impl ComprehensiveRenderer for BookRenderer {
                 // Use BOOK_TEXT_X_OFFSET
                 let text_x = bar_x + bar_width.max(0.0) + BOOK_TEXT_X_OFFSET; // Ensure bar_width is not negative for text placement
                 let text_y = bar_y + bar_height / 2.0; // 2.0 is factor for centering
-                ctx.set_fill_style(&ChartColors::TEXT.into());
+                ctx.set_fill_style_js_value(&ChartColors::TEXT.into());
                 ctx.set_font(ChartFont::LEGEND);
                 ctx.set_text_align("left");
                 ctx.set_text_baseline("middle");
