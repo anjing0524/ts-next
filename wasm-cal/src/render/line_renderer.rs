@@ -93,7 +93,6 @@ impl ComprehensiveRenderer for LineRenderer {
                     color: ChartColors::ASK_PRICE_LINE, line_width: LINE_DEFAULT_WIDTH, is_dashed: true,
                 };
                 self.draw_smooth_price_line(ctx, layout, data_params, style_params);
-                );
             }
         }
     }

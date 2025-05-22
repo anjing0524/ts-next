@@ -14,8 +14,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
-type ContentDrawerFn = Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>;
-
 struct AxisLabelData<'a> {
     min_low: f64,
     max_high: f64,
@@ -290,26 +288,31 @@ impl OverlayRenderer {
         let line_height = OVERLAY_TOOLTIP_LINE_HEIGHT;
         let padding = OVERLAY_TOOLTIP_PADDING;
 
-        let (num_lines, content_drawer): (usize, ContentDrawerFn) = match mode {
-            RenderMode::Heatmap => (3, Box::new(|price_arg, volume_arg, current_y, ctx_arg, text_x_arg, label_x_arg| {
+        let (num_lines, content_drawer): (usize, ContentDrawerFn<'static>) = match mode {
+            RenderMode::Heatmap => (3, Box::new(move |price_arg, volume_arg, current_y, ctx_arg, text_x_arg, label_x_arg| {
                 let _ = ctx_arg.fill_text(TEXT_TOOLTIP_PRICE, text_x_arg, current_y);
                 let _ = ctx_arg.fill_text(&utils::format_price_dynamic(price_arg), label_x_arg, current_y); // Use new formatter
                 let _ = ctx_arg.fill_text(TEXT_TOOLTIP_VOLUME, text_x_arg, current_y + line_height);
                 let formatted_volume = time::format_volume(volume_arg, VOLUME_FORMAT_PRECISION_TOOLTIP);
                 let _ = ctx_arg.fill_text(&formatted_volume, label_x_arg, current_y + line_height);
             })),
-            _ => (6, Box::new(|_price_arg, volume_arg, mut current_y, ctx_arg, text_x_arg, label_x_arg| {
+            _ => (6, Box::new(move |_price_arg, volume_arg, mut current_y, ctx_arg, text_x_arg, label_x_arg| {
+                let item_open = item.open(); // Capture by value (Copy)
+                let item_high = item.high();
+                let item_low = item.low();
+                let item_close = item.close();
+
                 let draw_line = |label: &str, value: String, y: f64| {
                     let _ = ctx_arg.fill_text(label, text_x_arg, y);
                     let _ = ctx_arg.fill_text(&value, label_x_arg, y);
                 };
-                draw_line(TEXT_TOOLTIP_OPEN, utils::format_price_dynamic(item.open()), current_y); // Use new formatter
+                draw_line(TEXT_TOOLTIP_OPEN, utils::format_price_dynamic(item_open), current_y);
                 current_y += line_height;
-                draw_line(TEXT_TOOLTIP_HIGH, utils::format_price_dynamic(item.high()), current_y); // Use new formatter
+                draw_line(TEXT_TOOLTIP_HIGH, utils::format_price_dynamic(item_high), current_y);
                 current_y += line_height;
-                draw_line(TEXT_TOOLTIP_LOW, utils::format_price_dynamic(item.low()), current_y);   // Use new formatter
+                draw_line(TEXT_TOOLTIP_LOW, utils::format_price_dynamic(item_low), current_y);
                 current_y += line_height;
-                draw_line(TEXT_TOOLTIP_CLOSE, utils::format_price_dynamic(item.close()), current_y); // Use new formatter
+                draw_line(TEXT_TOOLTIP_CLOSE, utils::format_price_dynamic(item_close), current_y);
                 current_y += line_height;
                 let formatted_volume = time::format_volume(volume_arg, VOLUME_FORMAT_PRECISION_TOOLTIP);
                 draw_line(TEXT_TOOLTIP_TOTAL_VOLUME, formatted_volume, current_y);
