@@ -1,7 +1,6 @@
 // wasm-cal/src/data/visible_range.rs
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartLayout, theme::*}; // Added theme import
-use flatbuffers; // Ensure flatbuffers is imported if items are of this type
 
 // ... (VisibleRange struct and other methods remain the same) ...
 #[derive(Debug, Clone, Copy)]

@@ -91,7 +91,7 @@ impl DataZoomRenderer {
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> DragHandleType {
         let layout = canvas_manager.layout.borrow();
-        if !layout.is_point_in_navigator(x, y) { return DragHandleType::None; }
+        if !layout.is_point_in_navigator(y) { return DragHandleType::None; }
 
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
@@ -148,7 +148,7 @@ impl DataZoomRenderer {
             };
         }
         let layout = canvas_manager.layout.borrow();
-        if !layout.is_point_in_navigator(x, y) { return CursorStyle::Default; }
+        if !layout.is_point_in_navigator(y) { return CursorStyle::Default; }
         match self.get_handle_at_position(x, y, canvas_manager, data_manager) {
             DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize,
             DragHandleType::Middle => CursorStyle::Grab,
