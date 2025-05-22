@@ -5,9 +5,6 @@ pub const FORMAT_STR_TIME_HM: &str = "%H:%M";
 pub const FORMAT_STR_DATE_YMD: &str = "%y/%m/%d";
 pub const FORMAT_STR_DATETIME_YMDHM: &str = "%Y-%m-%d %H:%M";
 pub const FORMAT_STR_DATETIME_YMDHMS: &str = "%Y-%m-%d %H:%M:%S";
-pub const FORMAT_PRICE_DEFAULT: &str = "{:.2}";
-pub const FORMAT_PRICE_HIGH_PRECISION: &str = "{:.4}";
-pub const FORMAT_PRICE_NO_DECIMAL: &str = "{:.0}";
 
 // Numerical Precision
 pub const PRECISION_FACTOR_E8: f64 = 1e8;

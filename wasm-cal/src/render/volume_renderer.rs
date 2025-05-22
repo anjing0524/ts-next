@@ -49,7 +49,7 @@ impl VolumeRenderer {
 
             let candle_x = x_center - (layout.candle_width / 2.0);
             // Use VOLUME_MIN_BAR_WIDTH for minimum bar width
-            let candle_width = layout.candle_width.max(VOLUME_MIN_BAR_WIDTH); 
+            let candle_width = layout.candle_width.max(VOLUME_MIN_BAR_WIDTH);
 
             let volume = item.b_vol() + item.s_vol();
             let height = if max_volume > 0.0 {

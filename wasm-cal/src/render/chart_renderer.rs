@@ -12,9 +12,9 @@ use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::data::DataManager;
-use crate::render::traits::ComprehensiveRenderer; // LayerRenderer removed
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
+use crate::render::traits::ComprehensiveRenderer; // LayerRenderer removed
 use crate::utils::WasmError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -175,8 +175,9 @@ impl ChartRenderer {
         match self.mode {
             RenderMode::Kmap => {
                 // 渲染K线图
-                self.price_renderer.render_component( // MODIFIED
-                    &self.canvas_manager,            // Pass canvas_manager
+                self.price_renderer.render_component(
+                    // MODIFIED
+                    &self.canvas_manager, // Pass canvas_manager
                     &layout,
                     &self.data_manager,
                     self.mode,
@@ -184,8 +185,9 @@ impl ChartRenderer {
             }
             RenderMode::Heatmap => {
                 // 热图模式下，热图占据整个区域
-                self.heat_renderer.render_component( // MODIFIED
-                    &self.canvas_manager,           // Pass canvas_manager
+                self.heat_renderer.render_component(
+                    // MODIFIED
+                    &self.canvas_manager, // Pass canvas_manager
                     &layout,
                     &self.data_manager,
                     self.mode,
@@ -194,16 +196,18 @@ impl ChartRenderer {
         }
 
         // 渲染价格线 (both modes)
-        self.line_renderer.render_component( // MODIFIED
-            &self.canvas_manager,        // Pass canvas_manager
+        self.line_renderer.render_component(
+            // MODIFIED
+            &self.canvas_manager, // Pass canvas_manager
             &layout,
             &self.data_manager,
             self.mode,
         );
 
         // 渲染成交量图 (both modes)
-        self.volume_renderer.render_component( // MODIFIED
-            &self.canvas_manager,          // Pass canvas_manager
+        self.volume_renderer.render_component(
+            // MODIFIED
+            &self.canvas_manager, // Pass canvas_manager
             &layout,
             &self.data_manager,
             self.mode,
@@ -211,11 +215,12 @@ impl ChartRenderer {
 
         // MODIFIED CALL for book_renderer
         // let hover_candle_index = self.overlay_renderer.borrow().get_hover_candle_index(); // This line is no longer needed for book_renderer call
-        self.book_renderer.render_component( // Changed from draw
-            &self.canvas_manager,           // Pass canvas_manager
+        self.book_renderer.render_component(
+            // Changed from draw
+            &self.canvas_manager, // Pass canvas_manager
             &layout,
             &self.data_manager,
-            self.mode,                      // Pass mode
+            self.mode, // Pass mode
         );
 
         // 9. 渲染DataZoom - 确保它在任何情况下都被渲染
@@ -268,13 +273,14 @@ impl ChartRenderer {
         //     let overlay = self.overlay_renderer.borrow();
         //     overlay.get_hover_candle_index()
         // };
-        
+
         // MODIFIED CALL for book_renderer
-        self.book_renderer.render_component( // Changed from draw
-            &self.canvas_manager,           // Pass canvas_manager
+        self.book_renderer.render_component(
+            // Changed from draw
+            &self.canvas_manager, // Pass canvas_manager
             &layout,
             &self.data_manager,
-            self.mode,                      // Pass mode
+            self.mode, // Pass mode
         );
     }
 
@@ -357,12 +363,6 @@ impl ChartRenderer {
         } // 在这里释放 overlay_renderer 的可变借用
 
         match drag_result {
-            DragResult::Released => {
-                // 由于DataZoomRenderer已经重置了拖动状态，我们只需要重新渲染
-                // 确保所有借用都已释放后再调用render
-                self.render();
-                true
-            }
             DragResult::NeedRedraw => {
                 let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
                     let current = counter.get();

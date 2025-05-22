@@ -63,15 +63,15 @@ impl ComprehensiveRenderer for PriceRenderer {
 
             let candle_x = x_center - (layout.candle_width / 2.0);
             // Use PRICE_MIN_CANDLE_WIDTH for minimum candle width
-            let candle_width = layout.candle_width.max(PRICE_MIN_CANDLE_WIDTH); 
+            let candle_width = layout.candle_width.max(PRICE_MIN_CANDLE_WIDTH);
 
             if item.close() >= item.open() {
                 // Use PRICE_MIN_CANDLE_BODY_HEIGHT for minimum height
-                let height = (open_y - close_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT); 
+                let height = (open_y - close_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT);
                 bullish_rects.push((candle_x, close_y, candle_width, height));
             } else {
                 // Use PRICE_MIN_CANDLE_BODY_HEIGHT for minimum height
-                let height = (close_y - open_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT); 
+                let height = (close_y - open_y).max(PRICE_MIN_CANDLE_BODY_HEIGHT);
                 bearish_rects.push((candle_x, open_y, candle_width, height));
             }
         }

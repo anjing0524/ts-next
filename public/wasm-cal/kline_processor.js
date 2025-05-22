@@ -386,10 +386,6 @@ function __wbg_get_imports() {
         const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
         return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
     }, arguments) };
-    imports.wbg.__wbg_globalAlpha_d09f513957912176 = function(arg0) {
-        const ret = arg0.globalAlpha;
-        return ret;
-    };
     imports.wbg.__wbg_height_e3c322f23d99ad2f = function(arg0) {
         const ret = arg0.height;
         return ret;
@@ -488,9 +484,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_setheight_433680330c9420c3 = function(arg0, arg1) {
         arg0.height = arg1 >>> 0;
-    };
-    imports.wbg.__wbg_setimageSmoothingEnabled_15335584d0f077b6 = function(arg0, arg1) {
-        arg0.imageSmoothingEnabled = arg1 !== 0;
     };
     imports.wbg.__wbg_setlineCap_3a3987ad3f03b31d = function(arg0, arg1, arg2) {
         arg0.lineCap = getStringFromWasm0(arg1, arg2);

@@ -66,31 +66,49 @@ impl ComprehensiveRenderer for LineRenderer {
 
             if self.show_last_price {
                 let data_params = SmoothPriceLineDataParams {
-                    items: &items, visible_start, visible_end, min_low, max_high,
+                    items: &items,
+                    visible_start,
+                    visible_end,
+                    min_low,
+                    max_high,
                     price_extractor: |item| item.last_price(),
                 };
                 let style_params = SmoothPriceLineStyleParams {
-                    color: ChartColors::LAST_PRICE_LINE, line_width: LINE_LAST_PRICE_WIDTH, is_dashed: false,
+                    color: ChartColors::LAST_PRICE_LINE,
+                    line_width: LINE_LAST_PRICE_WIDTH,
+                    is_dashed: false,
                 };
                 self.draw_smooth_price_line(ctx, layout, data_params, style_params);
             }
             if self.show_bid_price {
                 let data_params = SmoothPriceLineDataParams {
-                    items: &items, visible_start, visible_end, min_low, max_high,
+                    items: &items,
+                    visible_start,
+                    visible_end,
+                    min_low,
+                    max_high,
                     price_extractor: |item| item.bid_price(),
                 };
                 let style_params = SmoothPriceLineStyleParams {
-                    color: ChartColors::BID_PRICE_LINE, line_width: LINE_DEFAULT_WIDTH, is_dashed: true,
+                    color: ChartColors::BID_PRICE_LINE,
+                    line_width: LINE_DEFAULT_WIDTH,
+                    is_dashed: true,
                 };
                 self.draw_smooth_price_line(ctx, layout, data_params, style_params);
             }
             if self.show_ask_price {
                 let data_params = SmoothPriceLineDataParams {
-                    items: &items, visible_start, visible_end, min_low, max_high,
+                    items: &items,
+                    visible_start,
+                    visible_end,
+                    min_low,
+                    max_high,
                     price_extractor: |item| item.ask_price(),
                 };
                 let style_params = SmoothPriceLineStyleParams {
-                    color: ChartColors::ASK_PRICE_LINE, line_width: LINE_DEFAULT_WIDTH, is_dashed: true,
+                    color: ChartColors::ASK_PRICE_LINE,
+                    line_width: LINE_DEFAULT_WIDTH,
+                    is_dashed: true,
                 };
                 self.draw_smooth_price_line(ctx, layout, data_params, style_params);
             }
@@ -148,7 +166,9 @@ impl LineRenderer {
     }
 
     fn draw_straight_line(&self, ctx: &OffscreenCanvasRenderingContext2d, points: &[(f64, f64)]) {
-        if points.is_empty() { return; }
+        if points.is_empty() {
+            return;
+        }
         ctx.begin_path();
         ctx.move_to(points[0].0, points[0].1);
         for point in points.iter().skip(1) {
@@ -158,7 +178,9 @@ impl LineRenderer {
     }
 
     fn draw_bezier_curve(&self, ctx: &OffscreenCanvasRenderingContext2d, points: &[(f64, f64)]) {
-        if points.len() < 2 { return; }
+        if points.len() < 2 {
+            return;
+        }
         ctx.begin_path();
         ctx.move_to(points[0].0, points[0].1);
         for i in 0..points.len() - 1 {

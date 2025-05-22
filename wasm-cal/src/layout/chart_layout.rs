@@ -88,7 +88,7 @@ impl ChartLayout {
         let chart_area_width = canvas_width - y_axis_width;
         let main_chart_width = chart_area_width * CL_MAIN_CHART_RATIO;
         let book_area_width = chart_area_width * CL_BOOK_AREA_RATIO;
-        
+
         let chart_area_height = canvas_height - header_height - navigator_height - time_axis_height;
 
         let volume_chart_height = chart_area_height * CL_KLINE_MODE_VOLUME_RATIO; // Default to kline mode ratio
@@ -148,7 +148,8 @@ impl ChartLayout {
     /// 将价格映射到Y坐标 (价格图)
     pub fn map_price_to_y(&self, price: f64, min_low: f64, max_high: f64) -> f64 {
         let usable_height = self.usable_price_chart_height();
-        if usable_height <= 0.0 || (max_high - min_low).abs() < MIN_PRICE_DIFF_THRESHOLD { // Use new constant
+        if usable_height <= 0.0 || (max_high - min_low).abs() < MIN_PRICE_DIFF_THRESHOLD {
+            // Use new constant
             return self.chart_area_y + self.price_margin; // 返回顶部或一个安全位置
         }
         let price_ratio = (price - min_low) / (max_high - min_low);
@@ -160,11 +161,12 @@ impl ChartLayout {
     /// 将Y坐标映射回价格 (价格图)
     pub fn map_y_to_price(&self, y: f64, min_low: f64, max_high: f64) -> f64 {
         let usable_height = self.usable_price_chart_height();
-        if usable_height <= 0.0 || (max_high - min_low).abs() < MIN_PRICE_DIFF_THRESHOLD { // Use new constant
+        if usable_height <= 0.0 || (max_high - min_low).abs() < MIN_PRICE_DIFF_THRESHOLD {
+            // Use new constant
             return min_low; // 或其他默认值
         }
-        let y_ratio = (self.chart_area_y + self.price_chart_height - self.price_margin - y)
-            / usable_height;
+        let y_ratio =
+            (self.chart_area_y + self.price_chart_height - self.price_margin - y) / usable_height;
         min_low + y_ratio * (max_high - min_low)
     }
 
@@ -207,7 +209,7 @@ impl ChartLayout {
         let index_offset = (relative_x / self.total_candle_width).floor() as isize;
         (visible_start_index as isize + index_offset).max(0) as usize
     }
-    
+
     /// 计算导航器中每个K线的宽度
     pub fn calculate_navigator_candle_width(&self, items_len: usize) -> f64 {
         if items_len == 0 {
@@ -264,7 +266,7 @@ impl ChartLayout {
             && y >= self.chart_area_y
             && y <= self.chart_area_y + self.chart_area_height
     }
-    
+
     /// 检查点是否在订单簿区域内
     pub fn is_point_in_book_area(&self, x: f64, y: f64) -> bool {
         x >= self.chart_area_x + self.chart_area_width * CL_MAIN_CHART_RATIO // Use constant
@@ -308,26 +310,33 @@ impl ChartLayout {
         if tooltip_x + tooltip_width > chart_right_edge {
             tooltip_x = mouse_x - mouse_offset - tooltip_width; // Try left of cursor
         }
-        if tooltip_x < self.chart_area_x { // Still out of bounds (left)?
+        if tooltip_x < self.chart_area_x {
+            // Still out of bounds (left)?
             tooltip_x = self.chart_area_x; // Align to left chart edge
         }
-        if tooltip_x + tooltip_width > chart_right_edge { // Still out of bounds (right, e.g. tooltip wider than chart)?
-             tooltip_x = chart_right_edge - tooltip_width; // Align to right chart edge
+        if tooltip_x + tooltip_width > chart_right_edge {
+            // Still out of bounds (right, e.g. tooltip wider than chart)?
+            tooltip_x = chart_right_edge - tooltip_width; // Align to right chart edge
         }
-
 
         // Adjust Y position
-        if tooltip_y < self.header_height { // If trying to go above header
+        if tooltip_y < self.header_height {
+            // If trying to go above header
             tooltip_y = mouse_y + mouse_offset; // Try below cursor
         }
-        if tooltip_y + tooltip_height > chart_bottom_edge { // Still out of bounds (bottom)?
+        if tooltip_y + tooltip_height > chart_bottom_edge {
+            // Still out of bounds (bottom)?
             tooltip_y = chart_bottom_edge - tooltip_height; // Align to bottom chart edge
         }
-        if tooltip_y < self.header_height { // Still out of bounds (top, e.g. tooltip taller than chart)?
+        if tooltip_y < self.header_height {
+            // Still out of bounds (top, e.g. tooltip taller than chart)?
             tooltip_y = self.header_height; // Align to top chart edge (header bottom)
         }
-        
-        (tooltip_x.max(self.chart_area_x), tooltip_y.max(self.header_height))
+
+        (
+            tooltip_x.max(self.chart_area_x),
+            tooltip_y.max(self.header_height),
+        )
     }
 
     /// Calculates the adjusted Y position for a floating axis label to keep it within chart boundaries.
@@ -338,8 +347,9 @@ impl ChartLayout {
     ) -> f64 {
         // Center label on mouse_y_constrained, then clamp to ensure it's fully visible within chart_area
         let y_label_y = mouse_y_constrained - label_height / 2.0;
-        y_label_y.max(self.header_height) // Max with header_height (top of chart_area)
-                 .min(self.header_height + self.chart_area_height - label_height) // Min with bottom of chart_area
+        y_label_y
+            .max(self.header_height) // Max with header_height (top of chart_area)
+            .min(self.header_height + self.chart_area_height - label_height) // Min with bottom of chart_area
     }
 
     /// Calculates the adjusted X position for a floating axis label to keep it within chart boundaries.
@@ -350,7 +360,8 @@ impl ChartLayout {
     ) -> f64 {
         // Center label on mouse_x_constrained, then clamp
         let x_label_x = mouse_x_constrained - label_width / 2.0;
-        x_label_x.max(self.chart_area_x) // Max with chart_area_x (left of chart_area)
-                 .min(self.chart_area_x + self.chart_area_width - label_width) // Min with right of chart_area
+        x_label_x
+            .max(self.chart_area_x) // Max with chart_area_x (left of chart_area)
+            .min(self.chart_area_x + self.chart_area_width - label_width) // Min with right of chart_area
     }
 }

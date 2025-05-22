@@ -14,8 +14,14 @@ pub fn format_volume(volume: f64, precision: usize) -> String {
             v / BILLION_THRESHOLD,
             precision = precision
         ),
-        v if v >= MILLION_THRESHOLD => format!("{:.precision$}M", v / MILLION_THRESHOLD, precision = precision),
-        v if v >= KILO_THRESHOLD => format!("{:.precision$}K", v / KILO_THRESHOLD, precision = precision),
+        v if v >= MILLION_THRESHOLD => format!(
+            "{:.precision$}M",
+            v / MILLION_THRESHOLD,
+            precision = precision
+        ),
+        v if v >= KILO_THRESHOLD => {
+            format!("{:.precision$}K", v / KILO_THRESHOLD, precision = precision)
+        }
         v => format!("{:.precision$}", v, precision = precision),
     }
 }

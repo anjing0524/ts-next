@@ -1,7 +1,7 @@
 // wasm-cal/src/utils/mod.rs
 pub mod error;
-pub mod time;
-pub mod formatters; // Added new module
+pub mod formatters;
+pub mod time; // Added new module
 
 pub use error::WasmError;
 // Re-export functions from time.rs for easier access if desired, or access via time::
