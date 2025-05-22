@@ -78,6 +78,7 @@ impl DataManager {
     }
 
     /// 获取可见范围
+    #[allow(dead_code)]
     pub fn get_visible(&self) -> (usize, usize, usize) {
         // 直接使用VisibleRange的get_range方法
         self.visible_range.get_range()

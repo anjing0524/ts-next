@@ -171,8 +171,10 @@ impl KlineProcess {
     // Helper function to parse from a slice
     fn parse_kline_data_from_slice(data: &[u8]) -> Result<KlineData, WasmError> {
         Self::verify_kline_data_slice(data)?;
-        let mut opts = flatbuffers::VerifierOptions::default();
-        opts.max_tables = 1_000_000_000;
+        let opts = flatbuffers::VerifierOptions {
+            max_tables: 1_000_000_000,
+            ..Default::default()
+        };
         root_as_kline_data_with_opts(&opts, data)
             .map_err(|e| WasmError::Parse(format!("Flatbuffer 解析失败: {}", e)))
     }

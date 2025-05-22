@@ -14,6 +14,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
+type ContentDrawerFn = Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>;
+
+struct AxisLabelData<'a> {
+    min_low: f64,
+    max_high: f64,
+    max_volume: f64,
+    items: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<KlineItem<'a>>>,
+    hover_candle_index: Option<usize>,
+}
+
 // ... (OverlayRenderer struct and impl ComprehensiveRenderer block remain the same) ...
 #[derive(Default)]
 pub struct OverlayRenderer {
@@ -58,15 +68,14 @@ impl ComprehensiveRenderer for OverlayRenderer {
         
         if layout.is_point_in_main_chart_area(self.mouse_x, self.mouse_y) {
             self.draw_crosshair(ctx, &layout); 
-            self.draw_axis_labels( 
-                ctx,
-                &layout,
+            let axis_data = AxisLabelData {
                 min_low,
                 max_high,
                 max_volume,
-                items, 
-                self.hover_candle_index,
-            );
+                items,
+                hover_candle_index: self.hover_candle_index,
+            };
+            self.draw_axis_labels(ctx, &layout, axis_data);
         }
         
         if let Some(global_idx) = self.hover_candle_index {
@@ -207,15 +216,11 @@ impl OverlayRenderer {
             let _ = ctx.set_line_dash(empty_array);
         }
     }
-    fn draw_axis_labels(
+    fn draw_axis_labels<'a>(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        min_low: f64,
-        max_high: f64,
-        max_volume: f64,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        hover_candle_index: Option<usize>,
+        data: AxisLabelData<'a>,
     ) {
         let mouse_y_constrained = self.mouse_y.max(layout.header_height).min(layout.header_height + layout.chart_area_height);
         let y_label_width = layout.y_axis_width - layout.padding;
@@ -236,11 +241,11 @@ impl OverlayRenderer {
 
         let y_label_text: String;
         if self.mouse_y >= layout.header_height && self.mouse_y <= layout.header_height + layout.price_chart_height {
-            let y_value = layout.map_y_to_price(mouse_y_constrained, min_low, max_high);
+            let y_value = layout.map_y_to_price(mouse_y_constrained, data.min_low, data.max_high);
             // Use new formatter with specific threshold for "0" display
             y_label_text = utils::format_price_with_zero_threshold(y_value, OVERLAY_MIN_PRICE_DISPLAY_THRESHOLD);
         } else if self.mouse_y >= layout.volume_chart_y && self.mouse_y <= layout.volume_chart_y + layout.volume_chart_height {
-            let y_value = layout.map_y_to_volume(mouse_y_constrained, max_volume);
+            let y_value = layout.map_y_to_volume(mouse_y_constrained, data.max_volume);
             y_label_text = time::format_volume(y_value, VOLUME_FORMAT_PRECISION_DEFAULT);
         } else {
             return;
@@ -261,9 +266,9 @@ impl OverlayRenderer {
         ctx.set_line_width(OVERLAY_BORDER_LINE_WIDTH);
         ctx.stroke_rect(adjusted_x_label_x, x_label_y, x_label_width, x_label_height);
 
-        if let Some(hover_idx) = hover_candle_index {
-            if hover_idx < items.len() {
-                let item = items.get(hover_idx);
+        if let Some(hover_idx) = data.hover_candle_index {
+            if hover_idx < data.items.len() {
+                let item = data.items.get(hover_idx);
                 let timestamp = item.timestamp() as i64;
                 let date_str = time::format_timestamp(timestamp, FORMAT_STR_DATE_YMD);
                 let time_str = time::format_timestamp(timestamp, FORMAT_STR_DATETIME_YMDHMS); 
@@ -285,7 +290,7 @@ impl OverlayRenderer {
         let line_height = OVERLAY_TOOLTIP_LINE_HEIGHT;
         let padding = OVERLAY_TOOLTIP_PADDING;
 
-        let (num_lines, content_drawer): (usize, Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>) = match mode {
+        let (num_lines, content_drawer): (usize, ContentDrawerFn) = match mode {
             RenderMode::Heatmap => (3, Box::new(|price_arg, volume_arg, current_y, ctx_arg, text_x_arg, label_x_arg| {
                 let _ = ctx_arg.fill_text(TEXT_TOOLTIP_PRICE, text_x_arg, current_y);
                 let _ = ctx_arg.fill_text(&utils::format_price_dynamic(price_arg), label_x_arg, current_y); // Use new formatter

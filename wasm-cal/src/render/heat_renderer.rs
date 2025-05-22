@@ -126,9 +126,7 @@ impl HeatRenderer {
             // This logic implies color_cache should have HEATMAP_COLOR_CACHE_SIZE elements.
             if index >= HEATMAP_COLOR_CACHE_SIZE && HEATMAP_COLOR_CACHE_SIZE > 0 {
                  self.color_cache[HEATMAP_COLOR_CACHE_SIZE - 1].clone()
-            } else if HEATMAP_COLOR_CACHE_SIZE == 0 {
-                 Self::calculate_heat_color_static(norm) // Should not happen if new() ran
-            } else {
+            } else { // Covers HEATMAP_COLOR_CACHE_SIZE == 0 and other fallbacks
                  Self::calculate_heat_color_static(norm)
             }
         }

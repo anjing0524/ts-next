@@ -161,9 +161,7 @@ impl VisibleRange {
             let global_index = self.start + i;
             if global_index < self.total_len { 
                  let x = layout.map_index_to_x(global_index, self.start); 
-                 if x <= x_max + layout.total_candle_width { 
-                    x_coords.push(x);
-                } else if x_coords.is_empty() && i == 0 { 
+                 if (x <= x_max + layout.total_candle_width) || (x_coords.is_empty() && i == 0) {
                     x_coords.push(x);
                 }
             }

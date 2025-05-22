@@ -2,7 +2,6 @@
 
 // Formatting Strings
 pub const FORMAT_STR_TIME_HM: &str = "%H:%M";
-pub const FORMAT_STR_DATE_YM: &str = "%y/%m";
 pub const FORMAT_STR_DATE_YMD: &str = "%y/%m/%d";
 pub const FORMAT_STR_DATETIME_YMDHM: &str = "%Y-%m-%d %H:%M";
 pub const FORMAT_STR_DATETIME_YMDHMS: &str = "%Y-%m-%d %H:%M:%S";
@@ -116,9 +115,6 @@ pub const HEATMAP_ALPHA_FACTOR: f64 = 0.75;
 pub const BOOK_TEXT_RESERVED_WIDTH: f64 = 40.0;
 pub const BOOK_BAR_BORDER_ADJUST: f64 = 1.0; // for bar_height - 1.0
 pub const BOOK_TEXT_X_OFFSET: f64 = 4.0;
-
-// ChartRenderer specific
-pub const CHART_DRAG_THROTTLE_COUNT: u8 = 3; // For DRAG_THROTTLE_COUNTER
 
 // Added for ChartLayout refactoring
 pub const MIN_PRICE_DIFF_THRESHOLD: f64 = 0.000001;
