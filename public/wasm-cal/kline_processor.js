@@ -455,6 +455,10 @@ function __wbg_get_imports() {
         const ret = new Float64Array(arg0 >>> 0);
         return ret;
     };
+    imports.wbg.__wbg_now_807e54c39636c349 = function() {
+        const ret = Date.now();
+        return ret;
+    };
     imports.wbg.__wbg_of_66b3ee656cbd962b = function(arg0, arg1) {
         const ret = Array.of(arg0, arg1);
         return ret;
@@ -543,6 +547,9 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_time_7aaed348524f10df = function(arg0, arg1) {
         console.time(getStringFromWasm0(arg0, arg1));
+    };
+    imports.wbg.__wbg_warn_4ca3906c248c47c4 = function(arg0) {
+        console.warn(arg0);
     };
     imports.wbg.__wbg_width_8fe4e8f77479c2a6 = function(arg0) {
         const ret = arg0.width;
