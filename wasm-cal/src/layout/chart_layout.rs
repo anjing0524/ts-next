@@ -218,15 +218,6 @@ impl ChartLayout {
         self.main_chart_width / items_len as f64
     }
 
-    /// 根据可见K线数量计算合适的K线宽度
-    pub fn calculate_candle_width(&self, visible_count: usize) -> f64 {
-        if visible_count == 0 {
-            return DEFAULT_FALLBACK_CANDLE_WIDTH; // Use new constant
-        }
-        let total_width_per_candle = self.main_chart_width / visible_count as f64;
-        (total_width_per_candle * CANDLE_WIDTH_RATIO_OF_TOTAL).max(PRICE_MIN_CANDLE_WIDTH) // Use new and existing constants
-    }
-
     /// 应用热图布局（调整价格图和成交量图的比例）
     pub fn apply_heatmap_layout(&mut self) {
         self.volume_chart_height = self.chart_area_height * CL_HEATMAP_MODE_VOLUME_RATIO; // Use constant
@@ -277,8 +268,31 @@ impl ChartLayout {
 
     /// 根据可见K线数量更新K线宽度和总宽度
     pub fn update_for_visible_count(&mut self, visible_count: usize) {
-        self.candle_width = self.calculate_candle_width(visible_count);
-        self.total_candle_width = self.candle_width + self.candle_spacing;
+        if visible_count == 0 {
+            self.candle_width = DEFAULT_FALLBACK_CANDLE_WIDTH;
+            self.total_candle_width = self.candle_width + self.candle_spacing; // Keep fixed spacing
+            return;
+        }
+
+        // Calculate the exact total width each candle slot (body + its share of space) must occupy
+        // to make all visible_count candles fill main_chart_width.
+        self.total_candle_width = self.main_chart_width / visible_count as f64;
+
+        // From this total slot width, subtract the fixed spacing to find the width available for the candle body.
+        let potential_candle_body_width = self.total_candle_width - self.candle_spacing;
+
+        // The actual candle body width is then a ratio of this available space,
+        // but not less than the minimum allowed candle width.
+        self.candle_width =
+            (potential_candle_body_width * CANDLE_WIDTH_RATIO_OF_TOTAL).max(PRICE_MIN_CANDLE_WIDTH);
+
+        // Ensure candle_width is not negative if total_candle_width was less than candle_spacing.
+        // This scenario (total_candle_width < candle_spacing) implies that visible_count is very high
+        // for the main_chart_width. The .max(PRICE_MIN_CANDLE_WIDTH) above handles this
+        // by ensuring candle_width is at least PRICE_MIN_CANDLE_WIDTH.
+        // In such extreme cases, the effective visual spacing will be (total_candle_width - self.candle_width),
+        // which could be different from self.candle_spacing if PRICE_MIN_CANDLE_WIDTH took precedence.
+        // This is an acceptable outcome as the primary goal is to fill the main_chart_width with visible_count items.
     }
 
     /// Calculates the adjusted (x, y) position for a tooltip to keep it within chart boundaries.
