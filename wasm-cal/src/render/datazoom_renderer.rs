@@ -46,6 +46,7 @@ pub struct DataZoomRenderer {
 pub enum DragResult {
     None,
     NeedRedraw,
+    Released,
 }
 
 impl ComprehensiveRenderer for DataZoomRenderer {
@@ -241,7 +242,6 @@ impl DataZoomRenderer {
         }
 
         let index_change = if layout.main_chart_width > 0.0 {
-            // Use main_chart_width for navigator scale
             (drag_distance / layout.main_chart_width * items_len as f64).round() as isize
         } else {
             0
@@ -261,39 +261,35 @@ impl DataZoomRenderer {
             data_manager_ref.get_visible_range().get_range();
         let (new_start, new_end) = match self.drag_handle_type {
             DragHandleType::Left => {
-                let mut new_start = (visible_start as isize + index_change).max(0) as usize;
-                if new_start >= items_len {
-                    new_start = items_len.saturating_sub(1);
-                }
-
-                if new_start >= visible_end.saturating_sub(1) {
-                    let temp_new_start = visible_end.saturating_sub(1);
-                    if temp_new_start == visible_start && index_change < 0 {
-                        self.drag_start_x = x;
-                        (visible_start, visible_end)
-                    } else {
-                        // self.drag_handle_type = DragHandleType::Right; // Avoid swapping here, let next interaction re-evaluate
-                        (visible_end.saturating_sub(1), visible_end)
-                    }
+                let new_start = (visible_start as isize + index_change)
+                    .max(0)
+                    .min((items_len - 1) as isize) as usize;
+                if new_start == 0 {
+                    // 重置拖动状态，确保光标样式被正确更新
+                    self.is_dragging = false;
+                    self.drag_handle_type = DragHandleType::None;
+                    return DragResult::Released;
+                } else if new_start >= visible_end {
+                    // 如果左侧手柄超过了右侧手柄，交换手柄类型
+                    self.drag_handle_type = DragHandleType::Right;
+                    (visible_end, visible_end)
                 } else {
                     (new_start, visible_end)
                 }
             }
             DragHandleType::Right => {
-                let mut new_end = (visible_end as isize + index_change).max(1) as usize;
-                if new_end > items_len {
-                    new_end = items_len;
-                }
-
-                if new_end <= visible_start.saturating_add(1) {
-                    let temp_new_end = visible_start.saturating_add(1);
-                    if temp_new_end == visible_end && index_change > 0 {
-                        self.drag_start_x = x;
-                        (visible_start, visible_end)
-                    } else {
-                        // self.drag_handle_type = DragHandleType::Left; // Avoid swapping here
-                        (visible_start, visible_start.saturating_add(1))
-                    }
+                let new_end = ((visible_end as isize + index_change) as usize)
+                    .max(1)
+                    .min(items_len - 1);
+                if new_end == items_len - 1 {
+                    // 重置拖动状态，确保光标样式被正确更新
+                    self.is_dragging = false;
+                    self.drag_handle_type = DragHandleType::None;
+                    return DragResult::Released;
+                } else if new_end <= visible_start {
+                    // 如果右侧手柄超过了左侧手柄，交换手柄类型
+                    self.drag_handle_type = DragHandleType::Left;
+                    (visible_start, visible_start)
                 } else {
                     (visible_start, new_end)
                 }
@@ -301,7 +297,7 @@ impl DataZoomRenderer {
             DragHandleType::Middle => {
                 let new_start = (visible_start as isize + index_change)
                     .max(0)
-                    .min((items_len.saturating_sub(visible_count)) as isize)
+                    .min((items_len - visible_count) as isize)
                     as usize;
                 (new_start, new_start + visible_count)
             }

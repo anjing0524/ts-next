@@ -309,14 +309,13 @@ impl OverlayRenderer {
             if hover_idx < data.items.len() {
                 let item = data.items.get(hover_idx);
                 let timestamp = item.timestamp() as i64;
-                let date_str = time::format_timestamp(timestamp, FORMAT_STR_DATE_YMD);
-                let time_str = time::format_timestamp(timestamp, FORMAT_STR_DATETIME_YMDHMS);
+                let tooltip_time = time::format_timestamp(timestamp, FORMAT_STR_DATETIME_YMDHMS);
                 ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
                 ctx.set_font(ChartFont::AXIS);
                 ctx.set_text_align("center");
                 ctx.set_text_baseline("middle");
                 let _ = ctx.fill_text(
-                    &format!("{} {}", date_str, time_str),
+                    &tooltip_time,
                     adjusted_x_label_x + x_label_width / 2.0,
                     x_label_y + x_label_height / 2.0,
                 );

@@ -363,6 +363,12 @@ impl ChartRenderer {
         } // 在这里释放 overlay_renderer 的可变借用
 
         match drag_result {
+            DragResult::Released => {
+                // 由于DataZoomRenderer已经重置了拖动状态，我们只需要重新渲染
+                // 确保所有借用都已释放后再调用render
+                self.render();
+                true
+            }
             DragResult::NeedRedraw => {
                 let should_render = DRAG_THROTTLE_COUNTER.with(|counter| {
                     let current = counter.get();
