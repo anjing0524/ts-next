@@ -191,7 +191,7 @@ impl OverlayRenderer {
             let _ = ctx.set_line_dash(dash_array);
         }
 
-        // 绘制水平线 - 横跨整个图表区域
+        // 绘制水平线 - 只在main区域显示，不超过main_chart_width
         let mouse_y_constrained = self
             .mouse_y
             .max(layout.header_height)
@@ -199,16 +199,16 @@ impl OverlayRenderer {
         ctx.begin_path();
         ctx.move_to(layout.chart_area_x, mouse_y_constrained);
         ctx.line_to(
-            layout.chart_area_x + layout.chart_area_width,
+            layout.chart_area_x + layout.main_chart_width,
             mouse_y_constrained,
         );
         ctx.stroke();
 
-        // 绘制垂直线 - 横跨整个图表区域
+        // 绘制垂直线 - 只在main区域显示，不超过main_chart_width
         let mouse_x_constrained = self
             .mouse_x
             .max(layout.chart_area_x)
-            .min(layout.chart_area_x + layout.chart_area_width);
+            .min(layout.chart_area_x + layout.main_chart_width);
         ctx.begin_path();
         ctx.move_to(mouse_x_constrained, layout.header_height);
         ctx.line_to(

@@ -160,6 +160,9 @@ impl ChartRenderer {
         // 只清除非导航器区域，以避免清除DataZoom
         overlay_ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.navigator_y);
 
+        // 重置BookRenderer的缓存，因为main_ctx已被清除，订单簿区域需要重绘
+        self.book_renderer.reset_cache();
+
         // 7. 首先通过AxisRenderer渲染背景和坐标轴
         // 这会先绘制Header, Y轴背景等
         self.axis_renderer

@@ -10,14 +10,16 @@ use web_sys::OffscreenCanvasRenderingContext2d; // 假设RenderMode定义在这�
 
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
-    last_mode: Cell<Option<RenderMode>>, // 新增
+    last_mode: Cell<Option<RenderMode>>,
+    last_visible_range: Cell<Option<(usize, usize)>>, // 新增：缓存可见范围
 }
 
 impl BookRenderer {
     pub fn new() -> Self {
         Self {
             last_idx: Cell::new(None),
-            last_mode: Cell::new(None), // 新增
+            last_mode: Cell::new(None),
+            last_visible_range: Cell::new(None), // 新增：初始化为None
         }
     }
 
@@ -45,15 +47,24 @@ impl BookRenderer {
             return;
         }
 
-        // 只要mode或idx有变化就渲染，否则跳过
+        // 检查是否需要渲染：mode变化、idx变化或可见范围变化
         let last_mode = self.last_mode.get();
         let last_idx = self.last_idx.get();
-        let need_render = last_mode != Some(mode) || last_idx != Some(idx);
+        let last_visible_range = self.last_visible_range.get();
+        let current_visible_range = (visible_start, visible_end);
+
+        let need_render = last_mode != Some(mode)
+            || last_idx != Some(idx)
+            || last_visible_range != Some(current_visible_range); // 新增：检查可见范围变化
+
         if !need_render {
             return;
         }
+
+        // 更新缓存
         self.last_mode.set(Some(mode));
         self.last_idx.set(Some(idx));
+        self.last_visible_range.set(Some(current_visible_range)); // 新增：缓存当前可见范围
 
         let item = items.get(idx);
         let last_price = item.last_price();
@@ -135,5 +146,13 @@ impl BookRenderer {
         let area_width = layout.book_area_width;
         let area_height = layout.price_chart_height;
         ctx.clear_rect(area_x, area_y, area_width, area_height);
+    }
+
+    /// 重置缓存，强制下次绘制时重新渲染
+    /// 当main canvas被清除时应该调用此方法
+    pub fn reset_cache(&self) {
+        self.last_idx.set(None);
+        self.last_mode.set(None);
+        self.last_visible_range.set(None);
     }
 }
