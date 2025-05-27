@@ -11,6 +11,52 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
+/// Tooltip配置结构体
+struct TooltipConfig<'a> {
+    width: f64,
+    height: f64,
+    num_lines: usize,
+    content_type: TooltipContentType<'a>,
+}
+
+enum TooltipContentType<'a> {
+    Heatmap { price: f64, volume: f64 },
+    Kline { item: KlineItem<'a>, volume: f64 },
+}
+
+impl<'a> TooltipConfig<'a> {
+    fn new(mode: RenderMode, item: KlineItem<'a>, volume: f64) -> Self {
+        let width = 150.0;
+        let line_height = 20.0;
+        let padding = 10.0;
+
+        let (num_lines, content_type) = match mode {
+            RenderMode::Heatmap => (
+                3,
+                TooltipContentType::Heatmap {
+                    price: item.close(),
+                    volume,
+                },
+            ),
+            _ => (6, TooltipContentType::Kline { item, volume }),
+        };
+
+        let height = (num_lines as f64 * line_height) + padding * 2.0;
+
+        Self {
+            width,
+            height,
+            num_lines,
+            content_type,
+        }
+    }
+}
+
+struct TooltipPosition {
+    x: f64,
+    y: f64,
+}
+
 /// 交互层渲染器
 #[derive(Default)]
 pub struct OverlayRenderer {
@@ -51,27 +97,42 @@ impl OverlayRenderer {
         mode: RenderMode,
     ) {
         let layout = canvas_manager.layout.borrow();
+
+        // 检查是否在整个图表区域内（包括主图和订单簿区域）
         if !layout.is_point_in_chart_area(x, y) {
             self.hover_candle_index = None;
             self.handle_mouse_leave(canvas_manager, mode);
             return;
         }
+
         let prev_x = self.mouse_x;
         let prev_y = self.mouse_y;
         self.mouse_x = x;
         self.mouse_y = y;
         self.mouse_in_chart = true;
+
+        // 计算K线索引 - 无论在主图还是订单簿区域都需要计算，因为订单簿依赖于选中的K线
         let data_manager_ref = data_manager.borrow();
-        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
-        let relative_x = x - layout.chart_area_x;
-        let idx_in_visible =
-            ((relative_x / layout.main_chart_width) * visible_count as f64).floor() as usize;
-        let global_idx = visible_start + idx_in_visible;
-        if global_idx >= visible_start && global_idx < visible_end {
-            self.hover_candle_index = Some(global_idx);
-        } else {
-            self.hover_candle_index = None;
+        let (_visible_start, _visible_count, visible_end) = data_manager_ref.get_visible();
+
+        // 如果在主图区域，根据X坐标计算hover_index
+        if layout.is_point_in_main_chart_area(x, y) {
+            let relative_x = x - layout.chart_area_x;
+            let idx_in_visible =
+                ((relative_x / layout.main_chart_width) * _visible_count as f64).floor() as usize;
+            let global_idx = _visible_start + idx_in_visible;
+            if global_idx >= _visible_start && global_idx < visible_end {
+                self.hover_candle_index = Some(global_idx);
+            } else {
+                self.hover_candle_index = None;
+            }
+        } else if layout.is_point_in_book_area(x, y) {
+            // 如果在订单簿区域，保持当前的hover_index或使用最新的K线
+            if self.hover_candle_index.is_none() {
+                self.hover_candle_index = Some(visible_end.saturating_sub(1));
+            }
         }
+
         let distance = ((x - prev_x).powi(2) + (y - prev_y).powi(2)).sqrt();
         if distance < 1.0 {
             return;
@@ -108,67 +169,228 @@ impl OverlayRenderer {
         mode: RenderMode,
     ) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout: std::cell::Ref<'_, ChartLayout> = canvas_manager.layout.borrow();
+        let layout = canvas_manager.layout.borrow();
         self.clear(canvas_manager);
+
         let data_manager_ref = data_manager.borrow();
         let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
         let tick = data_manager_ref.get_tick();
-        let items_opt = data_manager_ref.get_items();
-        let items = match items_opt {
+        let items = match data_manager_ref.get_items() {
             Some(items) => items,
             None => return,
         };
+
         // 绘制切换按钮 - 确保使用传入的mode参数
         self.draw_switch_button(ctx, &layout, mode);
+
+        // 如果鼠标不在图表区域内，只显示切换按钮
         if !self.mouse_in_chart {
             return;
         }
-        // 只在主图区域绘制十字线和坐标轴标签
-        if layout.is_point_in_main_chart_area(self.mouse_x, self.mouse_y) {
-            self.draw_crosshair(ctx, &layout);
-            self.draw_axis_labels(
-                ctx,
-                &layout,
-                min_low,
-                max_high,
-                max_volume,
-                items,
-                self.hover_candle_index, // 直接传递全局下标
-            );
+
+        // 使用枚举来表示鼠标位置状态
+        #[derive(Debug)]
+        enum MousePosition {
+            MainChart,
+            BookArea,
+            Outside,
         }
-        // 计算热图tooltip数据
-        if let Some(global_idx) = self.hover_candle_index {
-            if global_idx < items.len() {
-                match mode {
-                    RenderMode::Heatmap => {
-                        let kline = items.get(global_idx);
-                        let timestamp = kline.timestamp() as i64;
-                        let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
-                        let tick_idx = if tick > 0.0 && price >= min_low && price < max_high {
-                            Some(((price - min_low) / tick).floor() as usize)
-                        } else {
-                            None
-                        };
-                        let volume = if let (Some(vols), Some(bin)) = (kline.volumes(), tick_idx) {
-                            vols.iter()
-                                .filter(|pv| {
-                                    ((pv.price() - min_low) / tick).floor() as usize == bin
-                                })
-                                .map(|pv| pv.volume())
-                                .sum::<f64>()
-                        } else {
-                            0.0
-                        };
-                        if volume > 0.0 {
-                            self.draw_heatmap_tooltip(ctx, &layout, timestamp, price, volume);
-                        }
-                    }
-                    _ => {
-                        self.draw_tooltip(ctx, &layout, items.get(global_idx), mode);
-                    }
-                }
+
+        let mouse_position = match (
+            layout.is_point_in_main_chart_area(self.mouse_x, self.mouse_y),
+            layout.is_point_in_book_area(self.mouse_x, self.mouse_y),
+        ) {
+            (true, false) => MousePosition::MainChart,
+            (false, true) => MousePosition::BookArea,
+            _ => MousePosition::Outside,
+        };
+
+        // 根据鼠标位置执行相应的绘制逻辑
+        match mouse_position {
+            MousePosition::MainChart => {
+                self.draw_main_chart_elements(ctx, &layout, min_low, max_high, max_volume, items);
+                self.draw_main_chart_tooltip(ctx, &layout, items, mode, min_low, max_high, tick);
+            }
+            MousePosition::BookArea => {
+                self.draw_book_area_elements(
+                    ctx,
+                    &layout,
+                    &data_manager_ref,
+                    items,
+                    min_low,
+                    max_high,
+                    tick,
+                );
+            }
+            MousePosition::Outside => {
+                // 鼠标在其他区域，不绘制额外元素
             }
         }
+    }
+
+    /// 绘制主图区域的交互元素
+    fn draw_main_chart_elements(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        min_low: f64,
+        max_high: f64,
+        max_volume: f64,
+        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+    ) {
+        self.draw_crosshair(ctx, layout);
+        self.draw_axis_labels(
+            ctx,
+            layout,
+            min_low,
+            max_high,
+            max_volume,
+            items,
+            self.hover_candle_index,
+        );
+    }
+
+    /// 绘制主图区域的tooltip
+    fn draw_main_chart_tooltip(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        mode: RenderMode,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) {
+        let global_idx = match self.hover_candle_index {
+            Some(idx) if idx < items.len() => idx,
+            _ => return,
+        };
+
+        match mode {
+            RenderMode::Heatmap => {
+                self.draw_heatmap_tooltip_for_item(
+                    ctx,
+                    layout,
+                    items.get(global_idx),
+                    min_low,
+                    max_high,
+                    tick,
+                );
+            }
+            _ => {
+                self.draw_tooltip(ctx, layout, items.get(global_idx), mode);
+            }
+        }
+    }
+
+    /// 为特定K线项绘制热力图tooltip
+    fn draw_heatmap_tooltip_for_item(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        kline: KlineItem,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) {
+        let timestamp = kline.timestamp() as i64;
+        let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
+
+        let volume = self
+            .calculate_volume_for_price(kline, price, min_low, tick)
+            .unwrap_or(0.0);
+
+        if volume > 0.0 {
+            self.draw_heatmap_tooltip(ctx, layout, timestamp, price, volume);
+        }
+    }
+
+    /// 绘制订单簿区域的交互元素
+    fn draw_book_area_elements(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        data_manager_ref: &std::cell::Ref<DataManager>,
+        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) {
+        let (_visible_start, _visible_count, visible_end) = data_manager_ref.get_visible();
+        let latest_idx = self
+            .hover_candle_index
+            .unwrap_or_else(|| visible_end.saturating_sub(1));
+
+        if latest_idx >= items.len() {
+            return;
+        }
+
+        let kline = items.get(latest_idx);
+        let timestamp = kline.timestamp() as i64;
+        let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
+
+        // 使用Option链式调用来简化逻辑
+        kline
+            .volumes()
+            .and_then(|volumes| self.calculate_tick_index(price, min_low, max_high, tick))
+            .and_then(|tick_idx| {
+                let volume =
+                    self.calculate_volume_for_tick_index(kline, tick_idx, min_low, tick)?;
+
+                // 绘制悬浮选中效果
+                self.draw_book_hover_effect(ctx, layout, tick_idx, min_low, max_high, tick);
+
+                // 绘制tooltip（如果有成交量）
+                if volume > 0.0 {
+                    self.draw_book_tooltip(ctx, layout, timestamp, price, volume);
+                }
+
+                Some(())
+            });
+    }
+
+    /// 计算价格对应的tick索引
+    fn calculate_tick_index(
+        &self,
+        price: f64,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) -> Option<usize> {
+        if tick > 0.0 && price >= min_low && price < max_high {
+            Some(((price - min_low) / tick).floor() as usize)
+        } else {
+            None
+        }
+    }
+
+    /// 计算特定价格的成交量
+    fn calculate_volume_for_price(
+        &self,
+        kline: KlineItem,
+        price: f64,
+        min_low: f64,
+        tick: f64,
+    ) -> Option<f64> {
+        let tick_idx = self.calculate_tick_index(price, min_low, price + tick, tick)?;
+        self.calculate_volume_for_tick_index(kline, tick_idx, min_low, tick)
+    }
+
+    /// 计算特定tick索引的成交量
+    fn calculate_volume_for_tick_index(
+        &self,
+        kline: KlineItem,
+        tick_idx: usize,
+        min_low: f64,
+        tick: f64,
+    ) -> Option<f64> {
+        kline.volumes().map(|volumes| {
+            volumes
+                .iter()
+                .filter(|pv| ((pv.price() - min_low) / tick).floor() as usize == tick_idx)
+                .map(|pv| pv.volume())
+                .sum::<f64>()
+        })
     }
 
     /// 清除交互层
@@ -234,108 +456,172 @@ impl OverlayRenderer {
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
         hover_candle_index: Option<usize>,
     ) {
-        // --- Y轴标签 (价格/成交量) ---
+        // 绘制Y轴标签
+        self.draw_y_axis_label(ctx, layout, min_low, max_high, max_volume);
+
+        // 绘制X轴标签
+        self.draw_x_axis_label(ctx, layout, items, hover_candle_index);
+    }
+
+    /// 绘制Y轴标签（价格/成交量）
+    fn draw_y_axis_label(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        min_low: f64,
+        max_high: f64,
+        max_volume: f64,
+    ) {
         let mouse_y_constrained = self
             .mouse_y
             .max(layout.header_height)
             .min(layout.header_height + layout.chart_area_height);
-        let y_label_width = layout.y_axis_width - layout.padding; // Adjust width to fit axis area
+
+        let y_label_width = layout.y_axis_width - layout.padding;
         let y_label_height = 20.0;
-        let y_label_x = layout.padding / 2.0; // Position within the Y axis area
+        let y_label_x = layout.padding / 2.0;
         let y_label_y = mouse_y_constrained - y_label_height / 2.0;
 
-        // 确保标签不超出画布垂直范围
         let adjusted_y_label_y = y_label_y
             .max(layout.header_height)
             .min(layout.header_height + layout.chart_area_height - y_label_height);
 
-        // 绘制Y轴标签背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.fill_rect(y_label_x, adjusted_y_label_y, y_label_width, y_label_height);
-
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
-        ctx.set_line_width(1.0);
-        ctx.stroke_rect(y_label_x, adjusted_y_label_y, y_label_width, y_label_height);
-
-        // 绘制Y轴标签文本
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font(ChartFont::AXIS);
-        ctx.set_text_align("right"); // Align to the right within the axis area
-        ctx.set_text_baseline("middle");
-
-        // 根据鼠标位置判断是显示价格还是成交量
-        let y_value: f64;
-        let y_label_text: String;
-        if self.mouse_y >= layout.header_height
-            && self.mouse_y <= layout.header_height + layout.price_chart_height
-        {
-            // 在价格图区域内
-            y_value = layout.map_y_to_price(mouse_y_constrained, min_low, max_high);
-            if y_value.abs() < 0.001 {
-                y_label_text = "0".to_string();
-            } else {
-                y_label_text = format!("{:.2}", y_value);
-            }
-        } else if self.mouse_y >= layout.volume_chart_y
-            && self.mouse_y <= layout.volume_chart_y + layout.volume_chart_height
-        {
-            // 在成交量区域内
-            y_value = layout.map_y_to_volume(mouse_y_constrained, max_volume);
-            y_label_text = time::format_volume(y_value, 1);
-        } else {
-            return; // Outside relevant chart areas
-        }
-
-        let _ = ctx.fill_text(
-            &y_label_text,
-            y_label_x + y_label_width - 5.0,
-            adjusted_y_label_y + y_label_height / 2.0,
+        // 绘制背景和边框
+        self.draw_label_background(
+            ctx,
+            y_label_x,
+            adjusted_y_label_y,
+            y_label_width,
+            y_label_height,
         );
 
-        // --- X轴标签 (时间) ---
+        // 根据鼠标位置确定显示内容
+        #[derive(Debug)]
+        enum YAxisContent {
+            Price(f64),
+            Volume(f64),
+            None,
+        }
+
+        let content = match self.mouse_y {
+            y if y >= layout.header_height
+                && y <= layout.header_height + layout.price_chart_height =>
+            {
+                let price = layout.map_y_to_price(mouse_y_constrained, min_low, max_high);
+                YAxisContent::Price(price)
+            }
+            y if y >= layout.volume_chart_y
+                && y <= layout.volume_chart_y + layout.volume_chart_height =>
+            {
+                let volume = layout.map_y_to_volume(mouse_y_constrained, max_volume);
+                YAxisContent::Volume(volume)
+            }
+            _ => YAxisContent::None,
+        };
+
+        // 绘制文本内容
+        let text = match content {
+            YAxisContent::Price(price) => {
+                if price.abs() < 0.001 {
+                    "0".to_string()
+                } else {
+                    format!("{:.2}", price)
+                }
+            }
+            YAxisContent::Volume(volume) => time::format_volume(volume, 1),
+            YAxisContent::None => return,
+        };
+
+        self.draw_label_text(
+            ctx,
+            &text,
+            y_label_x + y_label_width - 5.0,
+            adjusted_y_label_y + y_label_height / 2.0,
+            "right",
+        );
+    }
+
+    /// 绘制X轴标签（时间）
+    fn draw_x_axis_label(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        hover_candle_index: Option<usize>,
+    ) {
         let x_label_width = 80.0;
         let x_label_height = 20.0;
-        // Position below the chart area, within the time axis height
         let x_axis_y = layout.header_height + layout.chart_area_height;
-        let x_label_y = x_axis_y + (layout.time_axis_height - x_label_height) / 2.0; // Center vertically in time axis area
+        let x_label_y = x_axis_y + (layout.time_axis_height - x_label_height) / 2.0;
+
         let mouse_x_constrained = self
             .mouse_x
             .max(layout.chart_area_x)
             .min(layout.chart_area_x + layout.chart_area_width);
         let x_label_x = mouse_x_constrained - x_label_width / 2.0;
 
-        // 确保标签不超出画布水平范围
         let adjusted_x_label_x = x_label_x
             .max(layout.chart_area_x)
             .min(layout.chart_area_x + layout.chart_area_width - x_label_width);
 
-        // 绘制X轴标签背景
+        // 绘制背景和边框
+        self.draw_label_background(
+            ctx,
+            adjusted_x_label_x,
+            x_label_y,
+            x_label_width,
+            x_label_height,
+        );
+
+        // 绘制时间文本（如果有悬停的K线）
+        if let Some(hover_idx) = hover_candle_index.filter(|&idx| idx < items.len()) {
+            let item = items.get(hover_idx);
+            let timestamp = item.timestamp() as i64;
+            let date_str = time::format_timestamp(timestamp, "%y/%m/%d");
+            let time_str = time::format_timestamp(timestamp, "%H:%M:%S");
+            let text = format!("{} {}", date_str, time_str);
+
+            self.draw_label_text(
+                ctx,
+                &text,
+                adjusted_x_label_x + x_label_width / 2.0,
+                x_label_y + x_label_height / 2.0,
+                "center",
+            );
+        }
+    }
+
+    /// 绘制标签背景
+    fn draw_label_background(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    ) {
         ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.fill_rect(adjusted_x_label_x, x_label_y, x_label_width, x_label_height);
+        ctx.fill_rect(x, y, width, height);
 
         ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
         ctx.set_line_width(1.0);
-        ctx.stroke_rect(adjusted_x_label_x, x_label_y, x_label_width, x_label_height);
+        ctx.stroke_rect(x, y, width, height);
+    }
 
-        // 绘制X轴标签文本（如果有悬停的K线，显示其时间）
-        if let Some(hover_idx) = hover_candle_index {
-            if hover_idx < items.len() {
-                let item = items.get(hover_idx);
-                let timestamp = item.timestamp() as i64;
-                let date_str = time::format_timestamp(timestamp, "%y/%m/%d");
-                let time_str = time::format_timestamp(timestamp, "%H:%M:%S");
-
-                ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-                ctx.set_font(ChartFont::AXIS);
-                ctx.set_text_align("center");
-                ctx.set_text_baseline("middle"); // Center text vertically
-                let _ = ctx.fill_text(
-                    &format!("{} {}", date_str, time_str),
-                    adjusted_x_label_x + x_label_width / 2.0,
-                    x_label_y + x_label_height / 2.0,
-                );
-            }
-        }
+    /// 绘制标签文本
+    fn draw_label_text(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        text: &str,
+        x: f64,
+        y: f64,
+        align: &str,
+    ) {
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
+        ctx.set_font(ChartFont::AXIS);
+        ctx.set_text_align(align);
+        ctx.set_text_baseline("middle");
+        let _ = ctx.fill_text(text, x, y);
     }
 
     /// 绘制提示框
@@ -348,114 +634,178 @@ impl OverlayRenderer {
     ) {
         let timestamp = item.timestamp() as i64;
         let datetime_str = time::format_timestamp(timestamp, "%Y-%m-%d %H:%M");
-        let price = item.close();
         let volume = item.b_vol() + item.s_vol();
-        let tooltip_width = 150.0;
-        let line_height = 20.0;
-        let padding = 10.0;
-        let (num_lines, content_drawer): (
-            usize,
-            Box<dyn Fn(f64, f64, f64, &OffscreenCanvasRenderingContext2d, f64, f64)>,
-        ) = match mode {
-            RenderMode::Heatmap => (
-                3,
-                Box::new(|price, volume, current_y, ctx, text_x, label_x| {
-                    let _ = ctx.fill_text("价格:", text_x, current_y);
-                    let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
-                    let _ = ctx.fill_text("数量:", text_x, current_y + 20.0);
-                    let formatted_volume = time::format_volume(volume, 2);
-                    let _ = ctx.fill_text(&formatted_volume, label_x, current_y + 20.0);
-                }),
-            ),
-            _ => (
-                6,
-                Box::new(|_, volume, mut current_y, ctx, text_x, label_x| {
-                    let draw_line = |label: &str, value: String, y: f64| {
-                        let _ = ctx.fill_text(label, text_x, y);
-                        let _ = ctx.fill_text(&value, label_x, y);
-                    };
-                    draw_line("开盘:", format!("{:.2}", item.open()), current_y);
-                    current_y += 20.0;
-                    draw_line("最高:", format!("{:.2}", item.high()), current_y);
-                    current_y += 20.0;
-                    draw_line("最低:", format!("{:.2}", item.low()), current_y);
-                    current_y += 20.0;
-                    draw_line("收盘:", format!("{:.2}", item.close()), current_y);
-                    current_y += 20.0;
-                    let formatted_volume = time::format_volume(volume, 2);
-                    draw_line("成交量:", formatted_volume, current_y);
-                }),
-            ),
-        };
-        let tooltip_height = (num_lines as f64 * line_height) + padding * 2.0;
+
+        let tooltip_config = TooltipConfig::new(mode, item, volume);
+        let position =
+            self.calculate_tooltip_position(layout, tooltip_config.width, tooltip_config.height);
+
+        self.draw_tooltip_background(ctx, &position, tooltip_config.width, tooltip_config.height);
+        self.draw_tooltip_content(ctx, &position, &datetime_str, &tooltip_config);
+    }
+
+    /// 计算tooltip位置
+    fn calculate_tooltip_position(
+        &self,
+        layout: &ChartLayout,
+        width: f64,
+        height: f64,
+    ) -> TooltipPosition {
         let mouse_offset = 15.0;
-        let mut tooltip_x = self.mouse_x + mouse_offset;
-        let mut tooltip_y = self.mouse_y - mouse_offset - tooltip_height;
+        let mut x = self.mouse_x + mouse_offset;
+        let mut y = self.mouse_y - mouse_offset - height;
+
         let chart_right_edge = layout.chart_area_x + layout.chart_area_width;
         let chart_bottom_edge = layout.header_height + layout.chart_area_height;
-        if tooltip_x + tooltip_width > chart_right_edge {
-            tooltip_x = self.mouse_x - mouse_offset - tooltip_width;
+
+        // 调整X位置
+        if x + width > chart_right_edge {
+            x = self.mouse_x - mouse_offset - width;
         }
-        if tooltip_x < layout.chart_area_x {
-            tooltip_x = layout.chart_area_x;
+        x = x.max(layout.chart_area_x);
+
+        // 调整Y位置
+        if y < layout.header_height {
+            y = self.mouse_y + mouse_offset;
         }
-        if tooltip_y < layout.header_height {
-            tooltip_y = self.mouse_y + mouse_offset;
+        if y + height > chart_bottom_edge {
+            y = chart_bottom_edge - height;
         }
-        if tooltip_y + tooltip_height > chart_bottom_edge {
-            tooltip_y = chart_bottom_edge - tooltip_height;
-        }
-        tooltip_y = tooltip_y.max(layout.header_height);
+        y = y.max(layout.header_height);
+
+        TooltipPosition { x, y }
+    }
+
+    /// 绘制tooltip背景
+    fn draw_tooltip_background(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        position: &TooltipPosition,
+        width: f64,
+        height: f64,
+    ) {
         let corner_radius = 4.0;
+
+        // 设置阴影
         ctx.set_shadow_color(ChartColors::SHADOW);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
+
+        // 绘制圆角矩形背景
         ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
-        ctx.begin_path();
-        ctx.move_to(tooltip_x + corner_radius, tooltip_y);
-        ctx.line_to(tooltip_x + tooltip_width - corner_radius, tooltip_y);
-        ctx.quadratic_curve_to(
-            tooltip_x + tooltip_width,
-            tooltip_y,
-            tooltip_x + tooltip_width,
-            tooltip_y + corner_radius,
-        );
-        ctx.line_to(
-            tooltip_x + tooltip_width,
-            tooltip_y + tooltip_height - corner_radius,
-        );
-        ctx.quadratic_curve_to(
-            tooltip_x + tooltip_width,
-            tooltip_y + tooltip_height,
-            tooltip_x + tooltip_width - corner_radius,
-            tooltip_y + tooltip_height,
-        );
-        ctx.line_to(tooltip_x + corner_radius, tooltip_y + tooltip_height);
-        ctx.quadratic_curve_to(
-            tooltip_x,
-            tooltip_y + tooltip_height,
-            tooltip_x,
-            tooltip_y + tooltip_height - corner_radius,
-        );
-        ctx.line_to(tooltip_x, tooltip_y + corner_radius);
-        ctx.quadratic_curve_to(tooltip_x, tooltip_y, tooltip_x + corner_radius, tooltip_y);
-        ctx.close_path();
+        self.draw_rounded_rect(ctx, position.x, position.y, width, height, corner_radius);
         ctx.fill();
+
+        // 重置阴影
         ctx.set_shadow_color("transparent");
         ctx.set_shadow_blur(0.0);
         ctx.set_shadow_offset_x(0.0);
         ctx.set_shadow_offset_y(0.0);
+    }
+
+    /// 绘制圆角矩形
+    fn draw_rounded_rect(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        radius: f64,
+    ) {
+        ctx.begin_path();
+        ctx.move_to(x + radius, y);
+        ctx.line_to(x + width - radius, y);
+        ctx.quadratic_curve_to(x + width, y, x + width, y + radius);
+        ctx.line_to(x + width, y + height - radius);
+        ctx.quadratic_curve_to(x + width, y + height, x + width - radius, y + height);
+        ctx.line_to(x + radius, y + height);
+        ctx.quadratic_curve_to(x, y + height, x, y + height - radius);
+        ctx.line_to(x, y + radius);
+        ctx.quadratic_curve_to(x, y, x + radius, y);
+        ctx.close_path();
+    }
+
+    /// 绘制tooltip内容
+    fn draw_tooltip_content(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        position: &TooltipPosition,
+        datetime_str: &str,
+        config: &TooltipConfig,
+    ) {
         ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
         ctx.set_font(ChartFont::LEGEND);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
-        let text_x = tooltip_x + padding;
-        let label_x = tooltip_x + 60.0;
-        let mut current_y = tooltip_y + padding;
-        let _ = ctx.fill_text(&datetime_str, text_x, current_y);
+
+        let padding = 10.0;
+        let line_height = 20.0;
+        let text_x = position.x + padding;
+        let label_x = position.x + 60.0;
+        let mut current_y = position.y + padding;
+
+        // 绘制时间
+        let _ = ctx.fill_text(datetime_str, text_x, current_y);
         current_y += line_height;
-        content_drawer(price, volume, current_y, ctx, text_x, label_x);
+
+        // 根据内容类型绘制具体内容
+        match &config.content_type {
+            TooltipContentType::Heatmap { price, volume } => {
+                self.draw_heatmap_content(ctx, text_x, label_x, current_y, *price, *volume);
+            }
+            TooltipContentType::Kline { item, volume } => {
+                self.draw_kline_content(ctx, text_x, label_x, current_y, *item, *volume);
+            }
+        }
+    }
+
+    /// 绘制热力图tooltip内容
+    fn draw_heatmap_content(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        text_x: f64,
+        label_x: f64,
+        mut current_y: f64,
+        price: f64,
+        volume: f64,
+    ) {
+        let _ = ctx.fill_text("价格:", text_x, current_y);
+        let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
+        current_y += 20.0;
+
+        let _ = ctx.fill_text("数量:", text_x, current_y);
+        let formatted_volume = time::format_volume(volume, 2);
+        let _ = ctx.fill_text(&formatted_volume, label_x, current_y);
+    }
+
+    /// 绘制K线tooltip内容
+    fn draw_kline_content(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        text_x: f64,
+        label_x: f64,
+        mut current_y: f64,
+        item: KlineItem,
+        volume: f64,
+    ) {
+        let draw_line =
+            |ctx: &OffscreenCanvasRenderingContext2d, label: &str, value: String, y: f64| {
+                let _ = ctx.fill_text(label, text_x, y);
+                let _ = ctx.fill_text(&value, label_x, y);
+            };
+
+        draw_line(ctx, "开盘:", format!("{:.2}", item.open()), current_y);
+        current_y += 20.0;
+        draw_line(ctx, "最高:", format!("{:.2}", item.high()), current_y);
+        current_y += 20.0;
+        draw_line(ctx, "最低:", format!("{:.2}", item.low()), current_y);
+        current_y += 20.0;
+        draw_line(ctx, "收盘:", format!("{:.2}", item.close()), current_y);
+        current_y += 20.0;
+        let formatted_volume = time::format_volume(volume, 2);
+        draw_line(ctx, "成交量:", formatted_volume, current_y);
     }
 
     /// 绘制切换按钮
@@ -710,5 +1060,148 @@ impl OverlayRenderer {
     /// 获取当前悬停的K线索引
     pub fn get_hover_candle_index(&self) -> Option<usize> {
         self.hover_candle_index
+    }
+
+    /// 绘制订单簿tooltip：时间、价格、数量
+    fn draw_book_tooltip(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        timestamp: i64,
+        price: f64,
+        volume: f64,
+    ) {
+        let datetime_str = time::format_timestamp(timestamp, "%Y-%m-%d %H:%M");
+        let tooltip_width = 150.0;
+        let line_height = 20.0;
+        let padding = 10.0;
+        let tooltip_height = 3.0 * line_height + padding * 2.0;
+        let mouse_offset = 15.0;
+
+        // 计算tooltip位置，优先显示在鼠标左侧（因为在订单簿区域，右侧空间有限）
+        let mut tooltip_x = self.mouse_x - mouse_offset - tooltip_width;
+        let mut tooltip_y = self.mouse_y - mouse_offset - tooltip_height;
+
+        let chart_left_edge = layout.chart_area_x;
+        let chart_bottom_edge = layout.header_height + layout.chart_area_height;
+
+        // 如果左侧空间不够，显示在右侧
+        if tooltip_x < chart_left_edge {
+            tooltip_x = self.mouse_x + mouse_offset;
+        }
+
+        // 确保不超出图表区域
+        if tooltip_y < layout.header_height {
+            tooltip_y = self.mouse_y + mouse_offset;
+        }
+        if tooltip_y + tooltip_height > chart_bottom_edge {
+            tooltip_y = chart_bottom_edge - tooltip_height;
+        }
+        tooltip_y = tooltip_y.max(layout.header_height);
+
+        let corner_radius = 4.0;
+
+        // 绘制阴影
+        ctx.set_shadow_color(ChartColors::SHADOW);
+        ctx.set_shadow_blur(10.0);
+        ctx.set_shadow_offset_x(3.0);
+        ctx.set_shadow_offset_y(3.0);
+
+        // 绘制tooltip背景
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.begin_path();
+        ctx.move_to(tooltip_x + corner_radius, tooltip_y);
+        ctx.line_to(tooltip_x + tooltip_width - corner_radius, tooltip_y);
+        ctx.quadratic_curve_to(
+            tooltip_x + tooltip_width,
+            tooltip_y,
+            tooltip_x + tooltip_width,
+            tooltip_y + corner_radius,
+        );
+        ctx.line_to(
+            tooltip_x + tooltip_width,
+            tooltip_y + tooltip_height - corner_radius,
+        );
+        ctx.quadratic_curve_to(
+            tooltip_x + tooltip_width,
+            tooltip_y + tooltip_height,
+            tooltip_x + tooltip_width - corner_radius,
+            tooltip_y + tooltip_height,
+        );
+        ctx.line_to(tooltip_x + corner_radius, tooltip_y + tooltip_height);
+        ctx.quadratic_curve_to(
+            tooltip_x,
+            tooltip_y + tooltip_height,
+            tooltip_x,
+            tooltip_y + tooltip_height - corner_radius,
+        );
+        ctx.line_to(tooltip_x, tooltip_y + corner_radius);
+        ctx.quadratic_curve_to(tooltip_x, tooltip_y, tooltip_x + corner_radius, tooltip_y);
+        ctx.close_path();
+        ctx.fill();
+
+        // 重置阴影
+        ctx.set_shadow_color("transparent");
+        ctx.set_shadow_blur(0.0);
+        ctx.set_shadow_offset_x(0.0);
+        ctx.set_shadow_offset_y(0.0);
+
+        // 绘制文本
+        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
+        ctx.set_font(ChartFont::LEGEND);
+        ctx.set_text_align("left");
+        ctx.set_text_baseline("top");
+
+        let text_x = tooltip_x + padding;
+        let label_x = tooltip_x + 60.0;
+        let mut current_y = tooltip_y + padding;
+
+        // 时间
+        let _ = ctx.fill_text(&datetime_str, text_x, current_y);
+        current_y += line_height;
+
+        // 价格
+        let _ = ctx.fill_text("价格:", text_x, current_y);
+        let _ = ctx.fill_text(&format!("{:.2}", price), label_x, current_y);
+        current_y += line_height;
+
+        // 数量
+        let _ = ctx.fill_text("数量:", text_x, current_y);
+        let formatted_volume = time::format_volume(volume, 2);
+        let _ = ctx.fill_text(&formatted_volume, label_x, current_y);
+    }
+
+    /// 绘制订单簿悬浮选中效果
+    fn draw_book_hover_effect(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        bin_idx: usize,
+        min_low: f64,
+        max_high: f64,
+        tick: f64,
+    ) {
+        // 计算订单簿区域
+        let book_area_x = layout.chart_area_x + layout.main_chart_width;
+        let book_area_width = layout.book_area_width;
+
+        // 计算当前bin对应的价格范围
+        let price_low = min_low + bin_idx as f64 * tick;
+        let price_high = price_low + tick;
+
+        // 将价格映射到Y坐标
+        let y_high = layout.map_price_to_y(price_high, min_low, max_high);
+        let y_low = layout.map_price_to_y(price_low, min_low, max_high);
+        let bar_y = y_high.min(y_low);
+        let bar_height = (y_low - y_high).abs().max(1.0);
+
+        // 绘制半透明的选中背景
+        ctx.set_fill_style_str(ChartColors::BOOK_HOVER_BG);
+        ctx.fill_rect(book_area_x, bar_y, book_area_width, bar_height);
+
+        // 绘制选中边框，增加边框宽度使效果更明显
+        ctx.set_stroke_style_str(ChartColors::BOOK_HOVER_BORDER);
+        ctx.set_line_width(2.0); // 增加边框宽度从1.0到2.0
+        ctx.stroke_rect(book_area_x, bar_y, book_area_width, bar_height);
     }
 }

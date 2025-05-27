@@ -52,4 +52,8 @@ impl ChartColors {
     pub const SWITCH_ACTIVE_TEXT: &'static str = "#333333"; // 开关激活文本颜色
 
     pub const SHADOW: &'static str = "rgba(0, 0, 0, 0.5)"; // 阴影色
+
+    // --- 订单簿悬浮效果 ---
+    pub const BOOK_HOVER_BG: &'static str = "rgba(255, 255, 255, 0.2)"; // 订单簿悬浮背景，增加透明度
+    pub const BOOK_HOVER_BORDER: &'static str = "rgba(255, 255, 255, 0.8)"; // 订单簿悬浮边框，增加透明度
 }
