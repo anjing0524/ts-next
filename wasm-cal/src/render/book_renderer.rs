@@ -3,8 +3,10 @@
 use crate::data::DataManager;
 use crate::layout::{ChartColors, ChartFont, ChartLayout};
 use crate::render::chart_renderer::RenderMode;
+use ordered_float::OrderedFloat;
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d; // 假设RenderMode定义在这里
 
@@ -78,28 +80,27 @@ impl BookRenderer {
         let area_width = layout.book_area_width;
         let area_height = layout.price_chart_height;
         // 分离买卖盘
-        let mut bids = Vec::new();
-        let mut asks = Vec::new();
+        let mut bids: BTreeMap<OrderedFloat<f64>, f64> = BTreeMap::new();
+        let mut asks: BTreeMap<OrderedFloat<f64>, f64> = BTreeMap::new();
         for i in 0..volumes.len() {
             let pv = volumes.get(i);
             let price = pv.price();
             let volume = pv.volume();
             if price < last_price {
-                bids.push((price, volume));
+                bids.insert(OrderedFloat(price), volume);
             } else if price > last_price {
-                asks.push((price, volume));
+                asks.insert(OrderedFloat(price), volume);
             }
         }
-        // 按价格排序：卖盘从高到低，买盘从高到低（可选，便于视觉一致）
-        asks.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        bids.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        // 合并买卖盘用于统一绘制（自上而下）
+        // 按价格排序：卖盘从高到低，买盘从高到低（BTreeMap天然有序，直接反向遍历）
         let mut all_levels = Vec::new();
-        for (p, v) in asks.iter() {
-            all_levels.push((p, v, true)); // true: 卖盘
+        for (p, v) in asks.iter().rev() {
+            // 卖盘高到低
+            all_levels.push((p.0, v, true)); // true: 卖盘
         }
-        for (p, v) in bids.iter() {
-            all_levels.push((p, v, false)); // false: 买盘
+        for (p, v) in bids.iter().rev() {
+            // 买盘高到低
+            all_levels.push((p.0, v, false)); // false: 买盘
         }
         // 计算最大volume用于归一化
         let max_volume = all_levels.iter().map(|(_, v, _)| **v).fold(0.0, f64::max);
