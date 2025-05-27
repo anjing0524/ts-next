@@ -63,3 +63,5 @@ test-results
 /build-docker/node-*
 
 .continue
+
+/lib/generated/prisma
