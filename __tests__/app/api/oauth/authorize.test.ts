@@ -195,4 +195,170 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
       expect(json.error).toBe('server_error');
     });
   });
+
+  describe('PKCE Support', () => {
+    const validCodeChallenge = 'a'.repeat(43); // Minimum valid length
+    const validCodeChallengeMethod = 'S256';
+
+    it('should successfully create an authorization code with valid PKCE parameters', async () => {
+      const mockClient = {
+        id: 'pkce-client-id',
+        secret: 'pkce-client-secret',
+        redirectUris: 'http://localhost:3000/callback',
+        name: 'PKCE Test Client',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient);
+      prismaMock.authorizationCode.create.mockResolvedValue({
+        id: 'pkce-auth-code-id',
+        code: 'mockCodeValue',
+        expiresAt: addMinutes(new Date(), 10),
+        redirectUri: 'http://localhost:3000/callback',
+        clientId: 'pkce-client-id',
+        userId: 'test-user-id',
+        scope: 'read',
+        codeChallenge: validCodeChallenge,
+        codeChallengeMethod: validCodeChallengeMethod,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const request = createMockRequest({
+        client_id: 'pkce-client-id',
+        redirect_uri: 'http://localhost:3000/callback',
+        response_type: 'code',
+        scope: 'read',
+        state: 'pkce123',
+        code_challenge: validCodeChallenge,
+        code_challenge_method: validCodeChallengeMethod,
+      });
+
+      const response = await GET(request);
+      expect(response.status).toBe(302); // Redirect
+
+      const redirectUrl = new URL(response.headers.get('Location')!);
+      expect(redirectUrl.searchParams.get('code')).toBeTruthy();
+      expect(redirectUrl.searchParams.get('state')).toBe('pkce123');
+
+      expect(prismaMock.authorizationCode.create).toHaveBeenCalledWith({
+        data: {
+          code: expect.any(String),
+          expiresAt: expect.any(Date),
+          redirectUri: 'http://localhost:3000/callback',
+          clientId: 'pkce-client-id',
+          userId: 'test-user-id',
+          scope: 'read',
+          codeChallenge: validCodeChallenge,
+          codeChallengeMethod: validCodeChallengeMethod,
+        },
+      });
+    });
+
+    it('should return 400 if code_challenge is provided without code_challenge_method', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+
+      const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge: validCodeChallenge,
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('code_challenge_method is required');
+    });
+
+    it('should return 400 if code_challenge_method is provided without code_challenge', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+       const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge_method: validCodeChallengeMethod,
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('code_challenge must be provided if code_challenge_method is present');
+    });
+
+
+    it('should return 400 if code_challenge_method is not "S256"', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+
+      const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge: validCodeChallenge,
+        code_challenge_method: 'plain', // Invalid method
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('code_challenge_method must be S256');
+    });
+
+    it('should return 400 if code_challenge is too short (less than 43 chars)', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+
+      const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge: 'short', // Invalid format
+        code_challenge_method: validCodeChallengeMethod,
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('Invalid code_challenge format');
+    });
+
+    it('should return 400 if code_challenge is too long (more than 128 chars)', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      
+      const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge: 'a'.repeat(129), // Invalid format
+        code_challenge_method: validCodeChallengeMethod,
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('Invalid code_challenge format');
+    });
+
+    it('should return 400 if code_challenge contains invalid characters', async () => {
+      const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
+      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+
+      const request = createMockRequest({
+        client_id: 'client-id',
+        redirect_uri: 'http://localhost/cb',
+        response_type: 'code',
+        code_challenge: validCodeChallenge + '!', // Invalid char
+        code_challenge_method: validCodeChallengeMethod,
+      });
+      const response = await GET(request);
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe('invalid_request');
+      expect(json.error_description).toContain('Invalid code_challenge format');
+    });
+  });
 });
