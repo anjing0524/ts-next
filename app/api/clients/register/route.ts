@@ -16,7 +16,12 @@ const clientRegisterSchema = z.object({
                        return z.string().url({ message: `Invalid URL: ${uri}` }).safeParse(uri).success;
                      });
                    }, { message: "One or more redirect URIs are invalid. Ensure they are valid URLs and comma-separated if multiple." }),
-});
+  jwksUri: z.string().url({ message: "JWKS URI must be a valid URL" }).optional().or(z.literal('')),
+})
+.transform(data => ({
+    ...data,
+    jwksUri: data.jwksUri === '' ? undefined : data.jwksUri, // Convert empty string to undefined
+}));
 
 const prisma = new PrismaClient();
 
@@ -33,9 +38,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { name, redirectUris } = validation.data;
+    const { name, redirectUris, jwksUri } = validation.data;
     clientNameForLogging = name; // Set for logging
-    logger.info(`Client registration attempt received for client name: ${name}`);
+    logger.info(`Client registration attempt received for client name: ${name}, JWKS URI: ${jwksUri || 'N/A'}`);
 
     const clientId = uuidv4();
     const clientSecret = randomBytes(32).toString('hex');
@@ -46,10 +51,11 @@ export async function POST(request: Request) {
         clientSecret, 
         name,
         redirectUris,
+        jwksUri, // Add jwksUri to the data object
       },
     });
 
-    logger.info(`Client registration success for clientId: ${newClient.clientId}, client name: ${name}`);
+    logger.info(`Client registration success for clientId: ${newClient.clientId}, client name: ${name}, JWKS URI: ${newClient.jwksUri || 'N/A'}`);
     return NextResponse.json({
       message: "Client registered successfully",
       clientId: newClient.clientId,
