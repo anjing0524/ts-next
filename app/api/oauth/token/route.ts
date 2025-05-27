@@ -17,19 +17,37 @@ function getTokenEndpointUrl(request: NextRequest): string {
   return `${protocol}://${host}/api/oauth/token`;
 }
 
+// PKCE S256 Verification Helper
+function verifyPkceChallenge(verifier: string, challenge: string): boolean {
+  if (!verifier || !challenge) {
+    logger.debug("PKCE verifyPkceChallenge: called with empty verifier or challenge.");
+    return false;
+  }
+  // Using Node.js crypto.createHash and Buffer.toString('base64url')
+  // This correctly implements SHA256 followed by base64url encoding.
+  const calculatedChallenge = crypto
+    .createHash('sha256')
+    .update(verifier)
+    .digest('base64url'); // Node.js v14.18.0+ for base64url digest
+
+  logger.debug(`PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`);
+  return calculatedChallenge === challenge;
+}
+
 
 export async function POST(request: NextRequest) {
   let body;
   try {
     body = await request.formData();
   } catch (error) {
-    console.error("Error parsing form data:", error);
+    logger.error("Error parsing form data:", { error });
     return NextResponse.json({ error: 'invalid_request', error_description: 'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.' }, { status: 400 });
   }
 
   const grant_type = body.get('grant_type') as string | null;
   const code = body.get('code') as string | null;
   const redirect_uri = body.get('redirect_uri') as string | null;
+  const code_verifier = body.get('code_verifier') as string | null; // PKCE: Get code_verifier
   
   // Client Authentication parameters
   const client_id_param = body.get('client_id') as string | null; // For client_secret_basic/post
@@ -74,18 +92,14 @@ export async function POST(request: NextRequest) {
       const { payload } = await jose.jwtVerify(client_assertion, JWKS, {
         issuer: clientIdFromJwt,
         audience: tokenEndpointUrl,
-        algorithms: ['RS256', 'ES256', 'PS256'], // Add more as needed, ensure they match what clients might use
+        algorithms: ['RS256', 'ES256', 'PS256'], 
       });
 
-      // Additional check for 'sub' claim although 'iss' is primary for client identification in this context
       if (payload.sub !== clientIdFromJwt) {
         logger.warn(`private_key_jwt: sub claim (${payload.sub}) does not match issuer/client_id (${clientIdFromJwt}).`);
         return NextResponse.json({ error: 'invalid_client', error_description: 'Invalid JWT: sub claim does not match client_id.' }, { status: 401 });
       }
       
-      // TODO: JTI replay protection (future enhancement)
-      // if (payload.jti) { ... }
-
       authenticatedClient = client;
       logger.info(`Client ${clientIdFromJwt} authenticated successfully using private_key_jwt.`);
 
@@ -122,24 +136,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'invalid_client', error_description: 'Client authentication required.' }, { status: 401 });
   }
 
-  // Proceed with token issuance if client authentication was successful
-  // Ensure all required parameters for the grant type are present
-  if (!code || !redirect_uri || !clientIdForTokenProcessing) { // client_id_param is now clientIdForTokenProcessing
+  if (!code || !redirect_uri || !clientIdForTokenProcessing) {
     logger.warn('Token request failed: Missing required parameters after client auth.', { code: !!code, redirect_uri: !!redirect_uri, clientId: !!clientIdForTokenProcessing });
     return NextResponse.json({ error: 'invalid_request', error_description: 'Missing required parameters: code, redirect_uri, client_id (derived from auth)' }, { status: 400 });
   }
 
   try {
-    // At this point, authenticatedClient is set if authentication was successful
     if (!authenticatedClient) {
-        // This should ideally not be reached if logic above is correct
         logger.error("Critical: authenticatedClient is null after client auth block.");
         return NextResponse.json({ error: 'server_error', error_description: 'Client authentication failed unexpectedly.' }, { status: 500 });
     }
 
-    // Validate Authorization Code
     const authCode = await prisma.authorizationCode.findUnique({
-      where: { code: code }, // code is from the request body
+      where: { code: code },
     });
 
     if (!authCode) {
@@ -149,37 +158,69 @@ export async function POST(request: NextRequest) {
 
     if (isPast(new Date(authCode.expiresAt))) {
       logger.warn(`Invalid grant: Expired authorization code used: ${code}`);
-      // As per RFC 6749, if the authorization code is expired, it should be deleted.
       await prisma.authorizationCode.delete({ where: { id: authCode.id }});
+      logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to expiry.`);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code has expired.' }, { status: 400 });
     }
 
-    if (authCode.clientId !== clientIdForTokenProcessing) { // Compare with the authenticated client's ID
+    if (authCode.clientId !== clientIdForTokenProcessing) {
       logger.warn(`Invalid grant: Auth code client ID (${authCode.clientId}) does not match authenticated client ID (${clientIdForTokenProcessing}).`);
+      // Note: RFC 6749 suggests not deleting the code here if client IDs mismatch, as it might be a stolen code.
+      // However, if we're sure the client is who they say they are (authenticated above), this might indicate the code
+      // was not issued to *this authenticated client*. For simplicity, we'll keep current behavior.
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code was not issued to this client.' }, { status: 400 });
     }
 
-    if (authCode.redirectUri !== redirect_uri) { // redirect_uri from request body
+    if (authCode.redirectUri !== redirect_uri) {
       logger.warn(`Invalid grant: Auth code redirect URI (${authCode.redirectUri}) does not match request redirect_uri (${redirect_uri}).`);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid redirect_uri. It must match the one used in the authorization request.' }, { status: 400 });
     }
+
+    // --- PKCE Verification ---
+    if (authCode.codeChallenge && authCode.codeChallengeMethod) { // PKCE was used for this auth code
+      logger.info(`PKCE challenge found for auth code: ${code}. Method: ${authCode.codeChallengeMethod}`);
+      if (authCode.codeChallengeMethod !== 'S256') {
+        logger.error(`PKCE Error: Unsupported code_challenge_method (${authCode.codeChallengeMethod}) stored for auth code ${code}. Only S256 is supported.`);
+        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
+        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to unsupported stored PKCE challenge method.`);
+        return NextResponse.json({ error: 'server_error', error_description: 'Internal server error: Unsupported PKCE method stored.' }, { status: 500 });
+      }
+
+      if (!code_verifier) {
+        logger.warn(`PKCE Error: Missing code_verifier for auth code ${code}.`);
+        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
+        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to missing code_verifier in PKCE flow.`);
+        return NextResponse.json({ error: 'invalid_grant', error_description: 'Missing code_verifier for PKCE flow.' }, { status: 400 });
+      }
+
+      logger.info(`Verifying code_verifier for auth code: ${code}`);
+      if (!verifyPkceChallenge(code_verifier, authCode.codeChallenge)) {
+        logger.warn(`PKCE Error: Invalid code_verifier for auth code ${code}.`);
+        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
+        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to invalid code_verifier in PKCE flow.`);
+        return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid code_verifier.' }, { status: 400 });
+      }
+      logger.info(`PKCE code_verifier validated successfully for auth code: ${code}`);
+    } else if (code_verifier) { // No challenge stored, but verifier sent by client
+      logger.warn(`PKCE Mismatch: code_verifier provided for auth code ${code}, but no PKCE challenge was recorded for this code.`);
+      // This is a client protocol violation (RFC 7636). Client should not send verifier if no challenge was used.
+      return NextResponse.json({ error: 'invalid_request', error_description: 'code_verifier provided but no PKCE challenge was initiated for this code.' }, { status: 400 });
+    }
+    // If no authCode.codeChallenge and no code_verifier, PKCE was not used, proceed.
     
     // --- JWT Access Token Generation ---
-    const jwtSecret = new TextEncoder().encode(process.env.JWT_ACCESS_TOKEN_SECRET || 'super-secret-key-for-hs256-oauth-dev-env-32-chars'); // Use env var in prod
+    const jwtSecret = new TextEncoder().encode(process.env.JWT_ACCESS_TOKEN_SECRET || 'super-secret-key-for-hs256-oauth-dev-env-32-chars');
     const jwtAlg = 'HS256';
-    const jwtIssuer = process.env.JWT_ISSUER || `https://${request.headers.get('host') || 'localhost:3000'}`; // Dynamically get issuer or default
-    const jwtAudience = process.env.JWT_AUDIENCE || 'api_resource'; // Default audience
-    const accessTokenExpiresIn = '1h'; // Access token lifetime
+    const jwtIssuer = process.env.JWT_ISSUER || `https://${request.headers.get('host') || 'localhost:3000'}`;
+    const jwtAudience = process.env.JWT_AUDIENCE || 'api_resource';
+    const accessTokenExpiresIn = '1h';
     const accessTokenExpiresAt = addHours(new Date(), 1);
 
     let permissionsClaim: string[] = [];
     if (authCode.userId) {
       const userPermissions = await prisma.userResourcePermission.findMany({
         where: { userId: authCode.userId },
-        include: {
-          resource: true,
-          permission: true,
-        },
+        include: { resource: true, permission: true },
       });
       permissionsClaim = userPermissions.map(urp => `${urp.resource.name}:${urp.permission.name}`);
       logger.info(`Fetched ${permissionsClaim.length} permissions for user ${authCode.userId} for JWT.`);
@@ -189,26 +230,24 @@ export async function POST(request: NextRequest) {
 
     const accessTokenJwt = await new jose.SignJWT({
         client_id: authenticatedClient.id,
-        scope: authCode.scope, // Include original scope
-        permissions: permissionsClaim, // Custom permissions claim
+        scope: authCode.scope,
+        permissions: permissionsClaim,
       })
       .setProtectedHeader({ alg: jwtAlg })
       .setIssuedAt()
       .setIssuer(jwtIssuer)
-      .setSubject(authCode.userId || authenticatedClient.id) // Subject is user if available, else client_id for client-only grants (not this flow though)
+      .setSubject(authCode.userId || authenticatedClient.id)
       .setAudience(jwtAudience)
       .setExpirationTime(accessTokenExpiresIn)
       .setJti(crypto.randomUUID())
       .sign(jwtSecret);
 
-    // 5. Issue Tokens (Refresh Token remains opaque)
     const refreshToken = crypto.randomBytes(32).toString('hex');
-    const refreshTokenExpiresAt = addDays(new Date(), 30); // Refresh token expires in 30 days
+    const refreshTokenExpiresAt = addDays(new Date(), 30);
 
-    // 6. Store Tokens (AccessToken now stores the JWT)
     await prisma.accessToken.create({
       data: {
-        token: accessTokenJwt, // Store the JWT
+        token: accessTokenJwt,
         expiresAt: accessTokenExpiresAt,
         userId: authCode.userId,
         clientId: authenticatedClient.id,
@@ -225,12 +264,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 7. Invalidate Authorization Code
     await prisma.authorizationCode.delete({
       where: { id: authCode.id },
     });
+    logger.info(`Authorization code ${code} (DB ID: ${authCode.id}) successfully deleted after use for token generation.`);
 
-    // 8. Construct Response
     logger.info(`JWT Access Token and Refresh Token issued successfully for client ${clientIdForTokenProcessing}.`);
     return NextResponse.json({
       access_token: accessTokenJwt,
@@ -242,7 +280,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     logger.error(`Error during token issuance for client ${clientIdForTokenProcessing || 'unknown'}:`, { error });
-    // Check for specific Prisma errors if needed, otherwise return a generic server error.
     return NextResponse.json({ error: 'server_error', error_description: 'An unexpected error occurred.' }, { status: 500 });
   }
 }
