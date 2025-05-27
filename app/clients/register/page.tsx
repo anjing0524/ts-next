@@ -18,11 +18,13 @@ const clientRegisterSchema = z.object({
                        return z.string().url({ message: `Invalid URL: ${uri}` }).safeParse(uri).success;
                      });
                    }, { message: "One or more redirect URIs are invalid. Ensure they are valid URLs and comma-separated if multiple." }),
+  jwksUri: z.string().url({ message: "JWKS URI must be a valid URL" }).optional().or(z.literal('')),
 });
 
 export default function ClientRegisterPage() {
   const [name, setName] = useState('');
   const [redirectUris, setRedirectUris] = useState('');
+  const [jwksUri, setJwksUri] = useState(''); // 1. Update State
   const [errors, setErrors] = useState<any>({});
   const [apiResponse, setApiResponse] = useState<{ type: 'success' | 'error'; message: string; data?: any } | null>(null);
 
@@ -31,7 +33,8 @@ export default function ClientRegisterPage() {
     setApiResponse(null); // Clear previous API response
     setErrors({});      // Clear previous Zod errors
 
-    const validation = clientRegisterSchema.safeParse({ name, redirectUris });
+    // 4. Update handleSubmit Function (safeParse)
+    const validation = clientRegisterSchema.safeParse({ name, redirectUris, jwksUri });
     if (!validation.success) {
       const fieldErrors: any = {};
       for (const issue of validation.error.issues) {
@@ -44,10 +47,11 @@ export default function ClientRegisterPage() {
     }
 
     try {
+      // 4. Update handleSubmit Function (fetch body)
       const response = await fetch('/api/clients/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validation.data),
+        body: JSON.stringify(validation.data), // jwksUri is now included from validation.data
       });
 
       const result = await response.json();
@@ -72,49 +76,92 @@ export default function ClientRegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Register New Client</CardTitle>
-          <CardDescription>Enter the details for the new OAuth client application.</CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 p-4">
+      <Card className="w-full max-w-lg shadow-xl bg-white/90 backdrop-blur-sm">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-3xl font-bold tracking-tight">Register OAuth Client</CardTitle>
+          <CardDescription className="text-gray-600">
+            Provide details for your new OAuth application.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <div className="grid w-full items-center gap-4">
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="name">Client Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter client application name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name}</p>}
-              </div>
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="redirectUris">Redirect URIs</Label>
-                <Input // Changed from Textarea to Input
-                  id="redirectUris"
-                  placeholder="Comma-separated URLs (e.g., https://client.com/cb)"
-                  value={redirectUris}
-                  onChange={(e) => setRedirectUris(e.target.value)}
-                />
-                {errors.redirectUris && <p className="text-sm text-red-500 mt-1">{errors.redirectUris}</p>}
-              </div>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm font-medium text-gray-700">Application Name</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="My Awesome App"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                aria-describedby="name-error"
+              />
+              {errors.name && <p id="name-error" className="text-sm text-red-600 pt-1">{errors.name}</p>}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="redirectUris" className="text-sm font-medium text-gray-700">Redirect URIs</Label>
+              <Input
+                id="redirectUris"
+                type="text"
+                placeholder="https://client.com/callback, https://another.client.com/oauth"
+                value={redirectUris}
+                onChange={(e) => setRedirectUris(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                aria-describedby="redirectUris-error"
+              />
+              {errors.redirectUris && <p id="redirectUris-error" className="text-sm text-red-600 pt-1">{errors.redirectUris}</p>}
+              <p className="text-xs text-gray-500 pt-1">
+                Comma-separated list of valid OAuth redirect URIs.
+              </p>
+            </div>
+            {/* 3. Add Input Field */}
+            <div className="space-y-2">
+              <Label htmlFor="jwksUri" className="text-sm font-medium text-gray-700">JWKS URI (Optional)</Label>
+              <Input
+                id="jwksUri"
+                type="text"
+                placeholder="e.g., https://client.com/.well-known/jwks.json"
+                value={jwksUri}
+                onChange={(e) => setJwksUri(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                aria-describedby="jwksUri-error"
+              />
+              {errors.jwksUri && <p id="jwksUri-error" className="text-sm text-red-600 pt-1">{errors.jwksUri}</p>}
+               <p className="text-xs text-gray-500 pt-1">
+                The URL to your JSON Web Key Set (JWKS) for public key client authentication.
+              </p>
+            </div>
+            <Button 
+              type="submit" 
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              onClick={handleSubmit} // Keep onClick for form submission if not relying solely on form's onSubmit
+            >
+              Register Application
+            </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col items-start">
-          <Button type="submit" className="w-full mb-4" onClick={handleSubmit}>Register Client</Button>
+        <CardFooter className="flex flex-col items-center pt-6">
           {apiResponse && (
-            <div className={`p-3 rounded-md w-full ${apiResponse.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              <p className="font-semibold">{apiResponse.type === 'success' ? 'Success!' : 'Error!'}</p>
-              <p>{apiResponse.message}</p>
+            <div className={`p-4 rounded-md w-full text-sm ${apiResponse.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+              <p className={`font-bold text-lg mb-2 ${apiResponse.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                {apiResponse.type === 'success' ? 'Registration Successful!' : 'Registration Failed!'}
+              </p>
+              <p className="mb-3">{apiResponse.message}</p>
               {apiResponse.type === 'success' && apiResponse.data && (
-                <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
-                  <p><strong>Client ID:</strong> {apiResponse.data.clientId}</p>
-                  <p><strong>Client Secret:</strong> {apiResponse.data.clientSecret}</p>
-                  <p className="text-xs text-gray-600 mt-1">Save these credentials securely. The client secret will not be shown again.</p>
+                <div className="mt-3 text-sm bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2">
+                  <p className="font-semibold text-slate-700">Your New Credentials:</p>
+                  <div>
+                    <Label htmlFor="clientIdDisplay" className="font-medium text-slate-600">Client ID:</Label>
+                    <Input id="clientIdDisplay" type="text" value={apiResponse.data.clientId} readOnly className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"/>
+                  </div>
+                  <div>
+                    <Label htmlFor="clientSecretDisplay" className="font-medium text-slate-600">Client Secret:</Label>
+                    <Input id="clientSecretDisplay" type="text" value={apiResponse.data.clientSecret} readOnly className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"/>
+                  </div>
+                  <p className="text-xs text-red-600 mt-2 font-medium">
+                    Important: Copy your client secret now. You will not be able to see it again.
+                  </p>
                 </div>
               )}
             </div>

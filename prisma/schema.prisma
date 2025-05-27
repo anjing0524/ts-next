@@ -24,6 +24,7 @@ model User {
   authorizationCodes AuthorizationCode[] @relation("UserAuthorizationCodes")
   accessTokens       AccessToken[]       @relation("UserAccessTokens")
   refreshTokens      RefreshToken[]      @relation("UserRefreshTokens")
+  permissions        UserResourcePermission[] @relation("UserPermissions") // Added relation to UserResourcePermission
 }
 
 model Client {
@@ -32,6 +33,7 @@ model Client {
   clientSecret String
   redirectUris String // Changed from String[] to String
   name         String
+  jwksUri      String?  // New field for JWKS URI
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -47,6 +49,9 @@ model AuthorizationCode {
   redirectUri String
   userId      String?
   expiresAt   DateTime
+  scope       String?  // Ensure this field exists
+  codeChallenge       String? // For PKCE
+  codeChallengeMethod String? // For PKCE, e.g., "S256"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -79,4 +84,41 @@ model RefreshToken {
 
   user   User?  @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
   client Client @relation("ClientRefreshTokens", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// New Models for Resource Management and User Permissions
+
+model Resource {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., "user_profile", "account_balance", "article_creator"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userPermissions UserResourcePermission[] @relation("ResourcePermissions")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., "read", "write", "delete", "administer_users", "read_own_profile", "edit_any_article"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userPermissions UserResourcePermission[] @relation("ActionPermissions")
+}
+
+model UserResourcePermission {
+  id           String   @id @default(uuid())
+  userId       String
+  resourceId   String
+  permissionId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User       @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  resource   Resource   @relation("ResourcePermissions", fields: [resourceId], references: [id], onDelete: Cascade)
+  permission Permission @relation("ActionPermissions", fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceId, permissionId])
 }
