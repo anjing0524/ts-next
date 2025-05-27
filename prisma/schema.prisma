@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorizationCodes AuthorizationCode[] @relation("UserAuthorizationCodes")
+  accessTokens       AccessToken[]       @relation("UserAccessTokens")
+  refreshTokens      RefreshToken[]      @relation("UserRefreshTokens")
+}
+
+model Client {
+  id           String   @id @default(uuid())
+  clientId     String   @unique
+  clientSecret String
+  redirectUris String // Changed from String[] to String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  authorizationCodes AuthorizationCode[] @relation("ClientAuthorizationCodes")
+  accessTokens       AccessToken[]       @relation("ClientAccessTokens")
+  refreshTokens      RefreshToken[]      @relation("ClientRefreshTokens")
+}
+
+model AuthorizationCode {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  clientId    String
+  redirectUri String
+  userId      String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User?  @relation("UserAuthorizationCodes", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
+  client Client @relation("ClientAuthorizationCodes", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AccessToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  clientId  String
+  userId    String?
+  expiresAt DateTime
+  scope     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User?  @relation("UserAccessTokens", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
+  client Client @relation("ClientAccessTokens", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  clientId  String
+  userId    String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User?  @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
+  client Client @relation("ClientRefreshTokens", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
