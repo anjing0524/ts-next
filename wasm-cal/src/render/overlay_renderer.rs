@@ -16,7 +16,6 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 struct TooltipConfig<'a> {
     width: f64,
     height: f64,
-    num_lines: usize,
     content_type: TooltipContentType<'a>,
 }
 
@@ -47,7 +46,6 @@ impl<'a> TooltipConfig<'a> {
         Self {
             width,
             height,
-            num_lines,
             content_type,
         }
     }
@@ -165,7 +163,7 @@ impl OverlayRenderer {
         let layout = canvas_manager.layout.borrow();
 
         // 只绘制切换按钮，使用传入的mode参数
-        self.draw_switch_button(ctx, &layout, mode, theme);
+        self.draw_switch_button(ctx, &*layout, mode, theme);
     }
 
     /// 绘制交互层
@@ -189,7 +187,7 @@ impl OverlayRenderer {
         };
 
         // 绘制切换按钮 - 确保使用传入的mode参数
-        self.draw_switch_button(ctx, &layout, mode, theme);
+        self.draw_switch_button(ctx, &*layout, mode, theme);
 
         // 如果鼠标不在图表区域内，只显示切换按钮
         if !self.mouse_in_chart {
@@ -217,16 +215,16 @@ impl OverlayRenderer {
         match mouse_position {
             MousePosition::MainChart => {
                 self.draw_main_chart_elements(
-                    ctx, &layout, min_low, max_high, max_volume, items, theme,
+                    ctx, &*layout, min_low, max_high, max_volume, items, theme,
                 );
                 self.draw_main_chart_tooltip(
-                    ctx, &layout, items, mode, min_low, max_high, tick, theme,
+                    ctx, &*layout, items, mode, min_low, max_high, tick, theme,
                 );
             }
             MousePosition::BookArea => {
                 self.draw_book_area_elements(
                     ctx,
-                    &layout,
+                    &*layout,
                     &data_manager_ref,
                     items,
                     min_low,

@@ -119,7 +119,7 @@ impl BookRenderer {
         }
 
         // 清理订单簿区域
-        self.clear_area(&ctx, &layout);
+        self.clear_area(ctx, layout);
 
         // 绘制每个bin，与heatmap的bin遍历逻辑完全一致
         for (bin_idx, &volume) in bins.iter().enumerate() {
@@ -142,15 +142,7 @@ impl BookRenderer {
             let is_ask = price_mid > last_price;
 
             self.draw_level(
-                ctx,
-                &area_x,
-                &area_width,
-                &bar_height,
-                bar_y,
-                volume,
-                max_volume,
-                is_ask,
-                theme,
+                ctx, area_x, area_width, bar_height, bar_y, volume, max_volume, is_ask, theme,
             );
         }
     }
@@ -159,9 +151,9 @@ impl BookRenderer {
     fn draw_level(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        area_x: &f64,
-        area_width: &f64,
-        bar_height: &f64,
+        area_x: f64,
+        area_width: f64,
+        bar_height: f64,
         bar_y: f64,
         volume: f64,
         max_volume: f64,
@@ -171,7 +163,7 @@ impl BookRenderer {
         let norm = (volume / max_volume).min(1.0);
         let text_reserved_width = 40.0; // 预留宽度用于显示数量
         let bar_width = (area_width - text_reserved_width) * norm;
-        let bar_x = *area_x;
+        let bar_x = area_x;
 
         // 绘制柱状图
         ctx.set_fill_style_str(if is_ask {
