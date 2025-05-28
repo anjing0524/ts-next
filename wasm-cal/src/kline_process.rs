@@ -270,4 +270,15 @@ impl KlineProcess {
         // 调用chart_renderer的处理点击事件方法
         chart_renderer.handle_click(x, y)
     }
+
+    /// 设置配置JSON（动态切换主题/配色等）
+    #[wasm_bindgen]
+    pub fn set_config_json(&mut self, json: &str) -> Result<(), JsValue> {
+        match &mut self.chart_renderer {
+            Some(renderer) => renderer
+                .load_config_from_json(json)
+                .map_err(|e| JsValue::from_str(&e)),
+            None => Err(JsValue::from_str("ChartRenderer not initialized")),
+        }
+    }
 }

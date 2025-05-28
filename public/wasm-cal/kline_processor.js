@@ -310,6 +310,18 @@ export class KlineProcess {
         const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, x, y);
         return ret !== 0;
     }
+    /**
+     * 设置配置JSON（动态切换主题/配色等）
+     * @param {string} json
+     */
+    set_config_json(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_set_config_json(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
 }
 
 async function __wbg_load(module, imports) {

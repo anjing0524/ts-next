@@ -1,7 +1,8 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
+use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartFont, ChartLayout};
+use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -31,6 +32,7 @@ impl BookRenderer {
         data_manager: &Rc<RefCell<DataManager>>,
         hover_index: Option<usize>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
@@ -148,6 +150,7 @@ impl BookRenderer {
                 volume,
                 max_volume,
                 is_ask,
+                theme,
             );
         }
     }
@@ -163,6 +166,7 @@ impl BookRenderer {
         volume: f64,
         max_volume: f64,
         is_ask: bool,
+        theme: &ChartTheme,
     ) {
         let norm = (volume / max_volume).min(1.0);
         let text_reserved_width = 40.0; // 预留宽度用于显示数量
@@ -170,11 +174,7 @@ impl BookRenderer {
         let bar_x = *area_x;
 
         // 绘制柱状图
-        ctx.set_fill_style_str(if is_ask {
-            ChartColors::BEARISH // 卖盘红色
-        } else {
-            ChartColors::BULLISH // 买盘绿色
-        });
+        ctx.set_fill_style_str(&theme.bearish);
         ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0);
 
         // 绘制数量文本（右侧）
@@ -182,8 +182,8 @@ impl BookRenderer {
             let volume_text = format!("{}", volume as u64);
             let volume_x = bar_x + bar_width + 4.0;
             let volume_y = bar_y + bar_height / 2.0;
-            ctx.set_fill_style_str(ChartColors::TEXT);
-            ctx.set_font(ChartFont::LEGEND);
+            ctx.set_fill_style_str(&theme.text);
+            ctx.set_font(&theme.font_legend);
             ctx.set_text_align("left");
             ctx.set_text_baseline("middle");
             ctx.fill_text(&volume_text, volume_x, volume_y).ok();

@@ -1,8 +1,9 @@
 //! 交互层渲染器 - 负责绘制十字光标、提示框等交互元素
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartFont, ChartLayout};
+use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::utils::time;
@@ -95,13 +96,14 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         let layout = canvas_manager.layout.borrow();
 
         // 检查是否在整个图表区域内（包括主图和订单簿区域）
         if !layout.is_point_in_chart_area(x, y) {
             self.hover_candle_index = None;
-            self.handle_mouse_leave(canvas_manager, mode);
+            self.handle_mouse_leave(canvas_manager, mode, theme);
             return;
         }
 
@@ -137,11 +139,16 @@ impl OverlayRenderer {
         if distance < 1.0 {
             return;
         }
-        self.draw(canvas_manager, data_manager, mode);
+        self.draw(canvas_manager, data_manager, mode, theme);
     }
 
     /// 处理鼠标离开事件
-    pub fn handle_mouse_leave(&mut self, canvas_manager: &CanvasManager, mode: RenderMode) {
+    pub fn handle_mouse_leave(
+        &mut self,
+        canvas_manager: &CanvasManager,
+        mode: RenderMode,
+        theme: &ChartTheme,
+    ) {
         // 重置所有鼠标状态
         self.mouse_in_chart = false;
         self.hover_candle_index = None;
@@ -158,7 +165,7 @@ impl OverlayRenderer {
         let layout = canvas_manager.layout.borrow();
 
         // 只绘制切换按钮，使用传入的mode参数
-        self.draw_switch_button(ctx, &layout, mode);
+        self.draw_switch_button(ctx, &layout, mode, theme);
     }
 
     /// 绘制交互层
@@ -167,6 +174,7 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
@@ -181,7 +189,7 @@ impl OverlayRenderer {
         };
 
         // 绘制切换按钮 - 确保使用传入的mode参数
-        self.draw_switch_button(ctx, &layout, mode);
+        self.draw_switch_button(ctx, &layout, mode, theme);
 
         // 如果鼠标不在图表区域内，只显示切换按钮
         if !self.mouse_in_chart {
@@ -208,8 +216,12 @@ impl OverlayRenderer {
         // 根据鼠标位置执行相应的绘制逻辑
         match mouse_position {
             MousePosition::MainChart => {
-                self.draw_main_chart_elements(ctx, &layout, min_low, max_high, max_volume, items);
-                self.draw_main_chart_tooltip(ctx, &layout, items, mode, min_low, max_high, tick);
+                self.draw_main_chart_elements(
+                    ctx, &layout, min_low, max_high, max_volume, items, theme,
+                );
+                self.draw_main_chart_tooltip(
+                    ctx, &layout, items, mode, min_low, max_high, tick, theme,
+                );
             }
             MousePosition::BookArea => {
                 self.draw_book_area_elements(
@@ -220,6 +232,7 @@ impl OverlayRenderer {
                     min_low,
                     max_high,
                     tick,
+                    theme,
                 );
             }
             MousePosition::Outside => {
@@ -237,8 +250,9 @@ impl OverlayRenderer {
         max_high: f64,
         max_volume: f64,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
+        theme: &ChartTheme,
     ) {
-        self.draw_crosshair(ctx, layout);
+        self.draw_crosshair(ctx, layout, theme);
         self.draw_axis_labels(
             ctx,
             layout,
@@ -247,6 +261,7 @@ impl OverlayRenderer {
             max_volume,
             items,
             self.hover_candle_index,
+            theme,
         );
     }
 
@@ -260,6 +275,7 @@ impl OverlayRenderer {
         min_low: f64,
         max_high: f64,
         tick: f64,
+        theme: &ChartTheme,
     ) {
         let global_idx = match self.hover_candle_index {
             Some(idx) if idx < items.len() => idx,
@@ -275,10 +291,11 @@ impl OverlayRenderer {
                     min_low,
                     max_high,
                     tick,
+                    theme,
                 );
             }
             _ => {
-                self.draw_tooltip(ctx, layout, items.get(global_idx), mode);
+                self.draw_tooltip(ctx, layout, items.get(global_idx), mode, theme);
             }
         }
     }
@@ -292,6 +309,7 @@ impl OverlayRenderer {
         min_low: f64,
         max_high: f64,
         tick: f64,
+        theme: &ChartTheme,
     ) {
         let timestamp = kline.timestamp() as i64;
         let price = layout.map_y_to_price(self.mouse_y, min_low, max_high);
@@ -301,7 +319,7 @@ impl OverlayRenderer {
             .unwrap_or(0.0);
 
         if volume > 0.0 {
-            self.draw_heatmap_tooltip(ctx, layout, timestamp, price, volume);
+            self.draw_heatmap_tooltip(ctx, layout, timestamp, price, volume, theme);
         }
     }
 
@@ -315,6 +333,7 @@ impl OverlayRenderer {
         min_low: f64,
         max_high: f64,
         tick: f64,
+        theme: &ChartTheme,
     ) {
         let (_visible_start, _visible_count, visible_end) = data_manager_ref.get_visible();
         let latest_idx = self
@@ -332,17 +351,17 @@ impl OverlayRenderer {
         // 使用Option链式调用来简化逻辑
         kline
             .volumes()
-            .and_then(|volumes| self.calculate_tick_index(price, min_low, max_high, tick))
+            .and_then(|_volumes| self.calculate_tick_index(price, min_low, max_high, tick))
             .and_then(|tick_idx| {
                 let volume =
                     self.calculate_volume_for_tick_index(kline, tick_idx, min_low, tick)?;
 
                 // 绘制悬浮选中效果
-                self.draw_book_hover_effect(ctx, layout, tick_idx, min_low, max_high, tick);
+                self.draw_book_hover_effect(ctx, layout, tick_idx, min_low, max_high, tick, theme);
 
                 // 绘制tooltip（如果有成交量）
                 if volume > 0.0 {
-                    self.draw_book_tooltip(ctx, layout, timestamp, price, volume);
+                    self.draw_book_tooltip(ctx, layout, timestamp, price, volume, theme);
                 }
 
                 Some(())
@@ -403,9 +422,14 @@ impl OverlayRenderer {
     }
 
     /// 绘制十字光标
-    fn draw_crosshair(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
+    fn draw_crosshair(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        theme: &ChartTheme,
+    ) {
         // 设置十字光标样式
-        ctx.set_stroke_style_str(ChartColors::CROSSHAIR);
+        ctx.set_stroke_style_str(&theme.crosshair);
         ctx.set_line_width(layout.crosshair_width);
 
         // 设置虚线样式 - 使用set_line_dash替代set_dash_array
@@ -455,12 +479,13 @@ impl OverlayRenderer {
         max_volume: f64,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
         hover_candle_index: Option<usize>,
+        theme: &ChartTheme,
     ) {
         // 绘制Y轴标签
-        self.draw_y_axis_label(ctx, layout, min_low, max_high, max_volume);
+        self.draw_y_axis_label(ctx, layout, min_low, max_high, max_volume, theme);
 
         // 绘制X轴标签
-        self.draw_x_axis_label(ctx, layout, items, hover_candle_index);
+        self.draw_x_axis_label(ctx, layout, items, hover_candle_index, theme);
     }
 
     /// 绘制Y轴标签（价格/成交量）
@@ -471,6 +496,7 @@ impl OverlayRenderer {
         min_low: f64,
         max_high: f64,
         max_volume: f64,
+        theme: &ChartTheme,
     ) {
         let mouse_y_constrained = self
             .mouse_y
@@ -493,6 +519,7 @@ impl OverlayRenderer {
             adjusted_y_label_y,
             y_label_width,
             y_label_height,
+            theme,
         );
 
         // 根据鼠标位置确定显示内容
@@ -538,6 +565,7 @@ impl OverlayRenderer {
             y_label_x + y_label_width - 5.0,
             adjusted_y_label_y + y_label_height / 2.0,
             "right",
+            theme,
         );
     }
 
@@ -548,6 +576,7 @@ impl OverlayRenderer {
         layout: &ChartLayout,
         items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
         hover_candle_index: Option<usize>,
+        theme: &ChartTheme,
     ) {
         let x_label_width = 80.0;
         let x_label_height = 20.0;
@@ -571,6 +600,7 @@ impl OverlayRenderer {
             x_label_y,
             x_label_width,
             x_label_height,
+            theme,
         );
 
         // 绘制时间文本（如果有悬停的K线）
@@ -587,6 +617,7 @@ impl OverlayRenderer {
                 adjusted_x_label_x + x_label_width / 2.0,
                 x_label_y + x_label_height / 2.0,
                 "center",
+                theme,
             );
         }
     }
@@ -599,11 +630,12 @@ impl OverlayRenderer {
         y: f64,
         width: f64,
         height: f64,
+        theme: &ChartTheme,
     ) {
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.set_fill_style_str(&theme.tooltip_bg);
         ctx.fill_rect(x, y, width, height);
 
-        ctx.set_stroke_style_str(ChartColors::TOOLTIP_BORDER);
+        ctx.set_stroke_style_str(&theme.tooltip_border);
         ctx.set_line_width(1.0);
         ctx.stroke_rect(x, y, width, height);
     }
@@ -616,9 +648,10 @@ impl OverlayRenderer {
         x: f64,
         y: f64,
         align: &str,
+        theme: &ChartTheme,
     ) {
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font(ChartFont::AXIS);
+        ctx.set_fill_style_str(&theme.tooltip_text);
+        ctx.set_font(&theme.font_axis);
         ctx.set_text_align(align);
         ctx.set_text_baseline("middle");
         let _ = ctx.fill_text(text, x, y);
@@ -631,6 +664,7 @@ impl OverlayRenderer {
         layout: &ChartLayout,
         item: KlineItem,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         let timestamp = item.timestamp() as i64;
         let datetime_str = time::format_timestamp(timestamp, "%Y-%m-%d %H:%M");
@@ -640,8 +674,14 @@ impl OverlayRenderer {
         let position =
             self.calculate_tooltip_position(layout, tooltip_config.width, tooltip_config.height);
 
-        self.draw_tooltip_background(ctx, &position, tooltip_config.width, tooltip_config.height);
-        self.draw_tooltip_content(ctx, &position, &datetime_str, &tooltip_config);
+        self.draw_tooltip_background(
+            ctx,
+            &position,
+            tooltip_config.width,
+            tooltip_config.height,
+            theme,
+        );
+        self.draw_tooltip_content(ctx, &position, &datetime_str, &tooltip_config, theme);
     }
 
     /// 计算tooltip位置
@@ -683,17 +723,18 @@ impl OverlayRenderer {
         position: &TooltipPosition,
         width: f64,
         height: f64,
+        theme: &ChartTheme,
     ) {
         let corner_radius = 4.0;
 
         // 设置阴影
-        ctx.set_shadow_color(ChartColors::SHADOW);
+        ctx.set_shadow_color(&theme.shadow);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
 
         // 绘制圆角矩形背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.set_fill_style_str(&theme.tooltip_bg);
         self.draw_rounded_rect(ctx, position.x, position.y, width, height, corner_radius);
         ctx.fill();
 
@@ -734,9 +775,10 @@ impl OverlayRenderer {
         position: &TooltipPosition,
         datetime_str: &str,
         config: &TooltipConfig,
+        theme: &ChartTheme,
     ) {
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font(ChartFont::LEGEND);
+        ctx.set_fill_style_str(&theme.tooltip_text);
+        ctx.set_font(&theme.font_legend);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
 
@@ -814,6 +856,7 @@ impl OverlayRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         // 使用布局参数计算按钮位置和尺寸
         let button_width = layout.switch_btn_width * 2.0;
@@ -822,11 +865,11 @@ impl OverlayRenderer {
         let button_y = layout.padding;
 
         // 绘制按钮背景
-        ctx.set_fill_style_str(ChartColors::SWITCH_BG);
+        ctx.set_fill_style_str(&theme.switch_bg);
         ctx.fill_rect(button_x, button_y, button_width, button_height);
 
         // 绘制按钮边框
-        ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
+        ctx.set_stroke_style_str(&theme.switch_border);
         ctx.set_line_width(1.0);
         ctx.stroke_rect(button_x, button_y, button_width, button_height);
 
@@ -834,11 +877,11 @@ impl OverlayRenderer {
         ctx.begin_path();
         ctx.move_to(button_x + layout.switch_btn_width, button_y);
         ctx.line_to(button_x + layout.switch_btn_width, button_y + button_height);
-        ctx.set_stroke_style_str(ChartColors::SWITCH_BORDER);
+        ctx.set_stroke_style_str(&theme.switch_border);
         ctx.stroke();
 
         // 设置文本样式
-        ctx.set_font(ChartFont::SWITCH);
+        ctx.set_font(&theme.font_switch);
         ctx.set_text_align("center");
         ctx.set_text_baseline("middle");
 
@@ -851,26 +894,26 @@ impl OverlayRenderer {
 
         // K线按钮样式
         if mode == RenderMode::Kmap {
-            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
+            ctx.set_fill_style_str(&theme.switch_active_bg);
             ctx.fill_rect(button_x, button_y, layout.switch_btn_width, button_height);
-            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
+            ctx.set_fill_style_str(&theme.switch_active_text);
         } else {
-            ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
+            ctx.set_fill_style_str(&theme.switch_text);
         }
         ctx.fill_text("K线", kline_x, kline_y).unwrap();
 
         // 热力图按钮样式
         if mode == RenderMode::Heatmap {
-            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_BG);
+            ctx.set_fill_style_str(&theme.switch_active_bg);
             ctx.fill_rect(
                 button_x + layout.switch_btn_width,
                 button_y,
                 layout.switch_btn_width,
                 button_height,
             );
-            ctx.set_fill_style_str(ChartColors::SWITCH_ACTIVE_TEXT);
+            ctx.set_fill_style_str(&theme.switch_active_text);
         } else {
-            ctx.set_fill_style_str(ChartColors::SWITCH_TEXT);
+            ctx.set_fill_style_str(&theme.switch_text);
         }
         ctx.fill_text("热力图", heatmap_x, heatmap_y).unwrap();
     }
@@ -914,6 +957,7 @@ impl OverlayRenderer {
         timestamp: i64,
         price: f64,
         volume: f64,
+        theme: &ChartTheme,
     ) {
         let datetime_str = time::format_timestamp(timestamp, "%Y-%m-%d %H:%M");
         let tooltip_width = 150.0;
@@ -939,11 +983,11 @@ impl OverlayRenderer {
         }
         tooltip_y = tooltip_y.max(layout.header_height);
         let corner_radius = 4.0;
-        ctx.set_shadow_color(ChartColors::SHADOW);
+        ctx.set_shadow_color(&theme.shadow);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.set_fill_style_str(&theme.tooltip_bg);
         ctx.begin_path();
         ctx.move_to(tooltip_x + corner_radius, tooltip_y);
         ctx.line_to(tooltip_x + tooltip_width - corner_radius, tooltip_y);
@@ -978,8 +1022,8 @@ impl OverlayRenderer {
         ctx.set_shadow_blur(0.0);
         ctx.set_shadow_offset_x(0.0);
         ctx.set_shadow_offset_y(0.0);
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font(ChartFont::LEGEND);
+        ctx.set_fill_style_str(&theme.tooltip_text);
+        ctx.set_font(&theme.font_legend);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
         let text_x = tooltip_x + padding;
@@ -1017,8 +1061,9 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
-        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
+        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode, theme);
     }
 
     /// 处理鼠标滚轮事件（只在主图区域 main_chart 内响应）
@@ -1029,8 +1074,9 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
-        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode);
+        self.handle_mouse_move(x, y, canvas_manager, data_manager, mode, theme);
     }
 
     /// 获取当前鼠标位置的光标样式
@@ -1050,11 +1096,12 @@ impl OverlayRenderer {
         canvas_manager: &CanvasManager,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
+        theme: &ChartTheme,
     ) {
         // 清除交互层
         self.clear(canvas_manager);
         // 重新绘制交互层
-        self.draw(canvas_manager, data_manager, mode);
+        self.draw(canvas_manager, data_manager, mode, theme);
     }
 
     /// 获取当前悬停的K线索引
@@ -1070,6 +1117,7 @@ impl OverlayRenderer {
         timestamp: i64,
         price: f64,
         volume: f64,
+        theme: &ChartTheme,
     ) {
         let datetime_str = time::format_timestamp(timestamp, "%Y-%m-%d %H:%M");
         let tooltip_width = 150.0;
@@ -1102,13 +1150,13 @@ impl OverlayRenderer {
         let corner_radius = 4.0;
 
         // 绘制阴影
-        ctx.set_shadow_color(ChartColors::SHADOW);
+        ctx.set_shadow_color(&theme.shadow);
         ctx.set_shadow_blur(10.0);
         ctx.set_shadow_offset_x(3.0);
         ctx.set_shadow_offset_y(3.0);
 
         // 绘制tooltip背景
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_BG);
+        ctx.set_fill_style_str(&theme.tooltip_bg);
         ctx.begin_path();
         ctx.move_to(tooltip_x + corner_radius, tooltip_y);
         ctx.line_to(tooltip_x + tooltip_width - corner_radius, tooltip_y);
@@ -1147,8 +1195,8 @@ impl OverlayRenderer {
         ctx.set_shadow_offset_y(0.0);
 
         // 绘制文本
-        ctx.set_fill_style_str(ChartColors::TOOLTIP_TEXT);
-        ctx.set_font(ChartFont::LEGEND);
+        ctx.set_fill_style_str(&theme.tooltip_text);
+        ctx.set_font(&theme.font_legend);
         ctx.set_text_align("left");
         ctx.set_text_baseline("top");
 
@@ -1180,6 +1228,7 @@ impl OverlayRenderer {
         min_low: f64,
         max_high: f64,
         tick: f64,
+        theme: &ChartTheme,
     ) {
         // 计算订单簿区域
         let book_area_x = layout.chart_area_x + layout.main_chart_width;
@@ -1196,11 +1245,11 @@ impl OverlayRenderer {
         let bar_height = (y_low - y_high).abs().max(1.0);
 
         // 绘制半透明的选中背景
-        ctx.set_fill_style_str(ChartColors::BOOK_HOVER_BG);
+        ctx.set_fill_style_str(&theme.book_hover_bg);
         ctx.fill_rect(book_area_x, bar_y, book_area_width, bar_height);
 
         // 绘制选中边框，增加边框宽度使效果更明显
-        ctx.set_stroke_style_str(ChartColors::BOOK_HOVER_BORDER);
+        ctx.set_stroke_style_str(&theme.book_hover_border);
         ctx.set_line_width(2.0); // 增加边框宽度从1.0到2.0
         ctx.stroke_rect(book_area_x, bar_y, book_area_width, bar_height);
     }

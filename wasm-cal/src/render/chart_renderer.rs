@@ -11,6 +11,7 @@ use super::overlay_renderer::OverlayRenderer;
 use super::price_renderer::PriceRenderer;
 use super::volume_renderer::VolumeRenderer;
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::config::{ChartConfig, ConfigManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
 use crate::layout::ChartLayout;
@@ -53,6 +54,8 @@ pub struct ChartRenderer {
     data_manager: Rc<RefCell<DataManager>>,
     /// DataZoom渲染器
     datazoom_renderer: Rc<RefCell<DataZoomRenderer>>,
+    /// 配置管理器
+    config_manager: ConfigManager,
     // 采用哪种渲染引擎
     mode: RenderMode,
 }
@@ -93,6 +96,9 @@ impl ChartRenderer {
         let overlay_renderer = Rc::new(RefCell::new(OverlayRenderer::new()));
         let datazoom_renderer = Rc::new(RefCell::new(DataZoomRenderer::new()));
 
+        // 创建配置管理器
+        let config_manager = ConfigManager::new();
+
         Ok(Self {
             canvas_manager,
             axis_renderer,
@@ -104,8 +110,36 @@ impl ChartRenderer {
             overlay_renderer,
             data_manager,
             datazoom_renderer,
+            config_manager,
             mode: RenderMode::Kmap,
         })
+    }
+
+    /// 创建图表渲染器（带配置）
+    pub fn new_with_config(
+        base_canvas: &OffscreenCanvas,
+        main_canvas: &OffscreenCanvas,
+        overlay_canvas: &OffscreenCanvas,
+        layout: ChartLayout,
+        parsed_data: Option<KlineData<'static>>,
+        config: ChartConfig,
+    ) -> Result<Self, WasmError> {
+        let mut renderer = Self::new(
+            base_canvas,
+            main_canvas,
+            overlay_canvas,
+            layout,
+            parsed_data,
+        )?;
+        renderer.config_manager = ConfigManager::new();
+        renderer.config_manager.config.symbol = config.symbol;
+        renderer.config_manager.config.theme = config.theme;
+        renderer.config_manager.update_theme();
+        if let Some(custom_theme) = config.custom_theme {
+            renderer.config_manager.theme = custom_theme.clone();
+            renderer.config_manager.config.custom_theme = Some(custom_theme);
+        }
+        Ok(renderer)
     }
 
     /// 获取当前渲染模式
@@ -116,6 +150,24 @@ impl ChartRenderer {
     /// 设置渲染模式
     pub fn set_mode(&mut self, mode: RenderMode) {
         self.mode = mode;
+    }
+
+    /// 更新配置
+    pub fn update_config(&mut self, config: ChartConfig) {
+        self.config_manager.config.symbol = config.symbol;
+        self.config_manager.config.theme = config.theme;
+        self.config_manager.update_theme();
+        if let Some(custom_theme) = config.custom_theme {
+            self.config_manager.theme = custom_theme.clone();
+            self.config_manager.config.custom_theme = Some(custom_theme);
+        }
+    }
+
+    /// 从JSON字符串加载配置
+    pub fn load_config_from_json(&mut self, json: &str) -> Result<(), String> {
+        self.config_manager
+            .load_from_json(json)
+            .map_err(|e| e.to_string())
     }
 
     /// 渲染图表 (不包括交互层)
@@ -165,8 +217,13 @@ impl ChartRenderer {
 
         // 7. 首先通过AxisRenderer渲染背景和坐标轴
         // 这会先绘制Header, Y轴背景等
-        self.axis_renderer
-            .draw(&self.canvas_manager, &self.data_manager, self.mode);
+        self.axis_renderer.draw(
+            &self.canvas_manager,
+            &self.data_manager,
+            self.mode,
+            &self.config_manager.config,
+            &self.config_manager.theme,
+        );
 
         // 8. 根据模式渲染不同的图表
         match self.mode {
@@ -176,6 +233,7 @@ impl ChartRenderer {
                     self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                    &self.config_manager.theme,
                 );
 
                 // 渲染价格线
@@ -183,6 +241,7 @@ impl ChartRenderer {
                     self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                    &self.config_manager.theme,
                 );
 
                 // 渲染成交量图
@@ -190,6 +249,7 @@ impl ChartRenderer {
                     self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                    &self.config_manager.theme,
                 );
                 // 渲染订单簿可视化
                 self.book_renderer.draw(
@@ -198,6 +258,7 @@ impl ChartRenderer {
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
                     self.mode,
+                    &self.config_manager.theme,
                 );
             }
             RenderMode::Heatmap => {
@@ -212,12 +273,14 @@ impl ChartRenderer {
                     self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                    &self.config_manager.theme,
                 );
                 // 渲染成交量图
                 self.volume_renderer.draw(
                     self.canvas_manager.get_context(CanvasLayerType::Main),
                     &layout,
                     &self.data_manager,
+                    &self.config_manager.theme,
                 );
                 // 渲染订单簿可视化
                 self.book_renderer.draw(
@@ -226,6 +289,7 @@ impl ChartRenderer {
                     &self.data_manager,
                     self.overlay_renderer.borrow().get_hover_candle_index(),
                     self.mode,
+                    &self.config_manager.theme,
                 );
             }
         }
@@ -233,13 +297,22 @@ impl ChartRenderer {
         // 9. 渲染DataZoom - 确保它在任何情况下都被渲染
         {
             let datazoom_renderer = self.datazoom_renderer.borrow();
-            datazoom_renderer.draw(&self.canvas_manager, &self.data_manager);
+            datazoom_renderer.draw(
+                &self.canvas_manager,
+                &self.data_manager,
+                &self.config_manager.theme,
+            );
         } // 在这里释放 datazoom_renderer 的借用
 
         // 10. 最后渲染交互层的静态元素（如模式切换按钮）
         {
             let overlay_renderer = self.overlay_renderer.borrow();
-            overlay_renderer.draw(&self.canvas_manager, &self.data_manager, self.mode);
+            overlay_renderer.draw(
+                &self.canvas_manager,
+                &self.data_manager,
+                self.mode,
+                &self.config_manager.theme,
+            );
         } // 在这里释放 overlay_renderer 的借用
     }
 
@@ -278,8 +351,14 @@ impl ChartRenderer {
             overlay.get_hover_candle_index()
         };
         // 重绘订单簿
-        self.book_renderer
-            .draw(ctx, &layout, &self.data_manager, hover_index, self.mode);
+        self.book_renderer.draw(
+            ctx,
+            &layout,
+            &self.data_manager,
+            hover_index,
+            self.mode,
+            &self.config_manager.theme,
+        );
     }
 
     /// 处理鼠标移动事件
@@ -296,6 +375,7 @@ impl ChartRenderer {
                 &self.canvas_manager,
                 &self.data_manager,
                 self.mode,
+                &self.config_manager.theme,
             );
         } // 作用域结束，借用释放
         let curr_hover = {
@@ -357,6 +437,7 @@ impl ChartRenderer {
                 &self.canvas_manager,
                 &self.data_manager,
                 self.mode,
+                &self.config_manager.theme,
             );
         } // 在这里释放 overlay_renderer 的可变借用
 
@@ -397,7 +478,11 @@ impl ChartRenderer {
         // 2. 处理交互层的鼠标离开，传递当前模式
         {
             let mut overlay_renderer = self.overlay_renderer.borrow_mut();
-            overlay_renderer.handle_mouse_leave(&self.canvas_manager, self.mode);
+            overlay_renderer.handle_mouse_leave(
+                &self.canvas_manager,
+                self.mode,
+                &self.config_manager.theme,
+            );
         } // 在这里释放 overlay_renderer 的可变借用
 
         // 3. 如果之前在拖动，重绘图表并返回true表示已处理
@@ -439,6 +524,7 @@ impl ChartRenderer {
                 &self.canvas_manager,
                 &self.data_manager,
                 self.mode,
+                &self.config_manager.theme,
             );
         } // 在这里释放 overlay_renderer 的可变借用
 
@@ -466,7 +552,12 @@ impl ChartRenderer {
                 // 重新绘制交互元素
                 {
                     let overlay_renderer = self.overlay_renderer.borrow();
-                    overlay_renderer.redraw(&self.canvas_manager, &self.data_manager, self.mode);
+                    overlay_renderer.redraw(
+                        &self.canvas_manager,
+                        &self.data_manager,
+                        self.mode,
+                        &self.config_manager.theme,
+                    );
                 }
                 return true;
             }
