@@ -3,9 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as jose from 'jose';
 import logger from '@/utils/logger'; // Assuming logger is available
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_TOKEN_SECRET || 'super-secret-key-for-hs256-oauth-dev-env-32-chars'
-);
+let jwtSecretContent = process.env.JWT_ACCESS_TOKEN_SECRET;
+if (!jwtSecretContent) {
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('FATAL: JWT_ACCESS_TOKEN_SECRET is not set in production environment.');
+    throw new Error('JWT_ACCESS_TOKEN_SECRET is not set in production environment.');
+  } else {
+    logger.warn('Warning: JWT_ACCESS_TOKEN_SECRET is not set. Using a default, insecure key for development.');
+    jwtSecretContent = 'super-secret-key-for-hs256-oauth-dev-env-32-chars-for-dev-only'; // Ensure this key is also 32 chars if HS256
+  }
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretContent);
 const JWT_ISSUER = process.env.JWT_ISSUER; // Will be dynamically set if not provided by env
 const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'api_resource';
 const JWT_ALG = 'HS256';
@@ -35,7 +43,18 @@ export async function verifyAuthToken(
 
   try {
     // Dynamically determine issuer if not set by environment variable
-    const expectedIssuer = JWT_ISSUER || `https://${request.headers.get('host') || 'localhost:3000'}`;
+    let expectedIssuer = process.env.JWT_ISSUER;
+    if (!expectedIssuer) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('FATAL: JWT_ISSUER is not set in production environment.');
+        throw new Error('JWT_ISSUER is not set in production environment.');
+      } else {
+        logger.warn('Warning: JWT_ISSUER is not set. Using a default, potentially insecure issuer for development from request host.');
+        // The dynamic issuer might be okay for dev, but it's better to be explicit or use a fixed dev default.
+        // For simplicity here, let's ensure it must be set or defaults to a fixed dev value.
+        expectedIssuer = `http://localhost:${process.env.PORT || 3000}`; // Or some other fixed dev default
+      }
+    }
     
     const { payload } = await jose.jwtVerify(token, JWT_SECRET, {
       issuer: expectedIssuer,

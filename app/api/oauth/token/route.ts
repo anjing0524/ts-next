@@ -1,12 +1,13 @@
 // app/api/oauth/token/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, Client } from '@/lib/generated/prisma'; // Import Client type
+import { prisma } from '@/lib/prisma'; // Use Prisma singleton
+import type { Client } from '@prisma/client'; // Import Client type from @prisma/client
 import crypto from 'crypto';
 import { addHours, addDays, differenceInSeconds, isPast } from 'date-fns';
 import * as jose from 'jose';
 import logger from '@/utils/logger'; // Assuming logger is available
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient(); // Removed: Use imported singleton
 
 // Helper function to construct the token endpoint URL
 function getTokenEndpointUrl(request: NextRequest): string {
@@ -23,12 +24,10 @@ function verifyPkceChallenge(verifier: string, challenge: string): boolean {
     logger.debug("PKCE verifyPkceChallenge: called with empty verifier or challenge.");
     return false;
   }
-  // Using Node.js crypto.createHash and Buffer.toString('base64url')
-  // This correctly implements SHA256 followed by base64url encoding.
   const calculatedChallenge = crypto
     .createHash('sha256')
     .update(verifier)
-    .digest('base64url'); // Node.js v14.18.0+ for base64url digest
+    .digest('base64url'); 
 
   logger.debug(`PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`);
   return calculatedChallenge === challenge;
@@ -47,24 +46,21 @@ export async function POST(request: NextRequest) {
   const grant_type = body.get('grant_type') as string | null;
   const code = body.get('code') as string | null;
   const redirect_uri = body.get('redirect_uri') as string | null;
-  const code_verifier = body.get('code_verifier') as string | null; // PKCE: Get code_verifier
+  const code_verifier = body.get('code_verifier') as string | null; 
   
-  // Client Authentication parameters
-  const client_id_param = body.get('client_id') as string | null; // For client_secret_basic/post
-  const client_secret = body.get('client_secret') as string | null; // For client_secret_basic/post
+  const client_id_param = body.get('client_id') as string | null; 
+  const client_secret = body.get('client_secret') as string | null; 
   const client_assertion_type = body.get('client_assertion_type') as string | null;
   const client_assertion = body.get('client_assertion') as string | null;
 
   let authenticatedClient: Client | null = null;
   let clientIdForTokenProcessing: string | null = null;
 
-  // Validate grant_type first
   if (grant_type !== 'authorization_code') {
     logger.warn(`Token request failed: Unsupported grant_type: ${grant_type}`);
     return NextResponse.json({ error: 'unsupported_grant_type', error_description: 'Grant type must be "authorization_code"' }, { status: 400 });
   }
   
-  // Client Authentication Logic
   if (client_assertion_type === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' && client_assertion) {
     logger.info('Attempting client authentication with private_key_jwt');
     try {
@@ -165,9 +161,6 @@ export async function POST(request: NextRequest) {
 
     if (authCode.clientId !== clientIdForTokenProcessing) {
       logger.warn(`Invalid grant: Auth code client ID (${authCode.clientId}) does not match authenticated client ID (${clientIdForTokenProcessing}).`);
-      // Note: RFC 6749 suggests not deleting the code here if client IDs mismatch, as it might be a stolen code.
-      // However, if we're sure the client is who they say they are (authenticated above), this might indicate the code
-      // was not issued to *this authenticated client*. For simplicity, we'll keep current behavior.
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code was not issued to this client.' }, { status: 400 });
     }
 
@@ -176,8 +169,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid redirect_uri. It must match the one used in the authorization request.' }, { status: 400 });
     }
 
-    // --- PKCE Verification ---
-    if (authCode.codeChallenge && authCode.codeChallengeMethod) { // PKCE was used for this auth code
+    if (authCode.codeChallenge && authCode.codeChallengeMethod) { 
       logger.info(`PKCE challenge found for auth code: ${code}. Method: ${authCode.codeChallengeMethod}`);
       if (authCode.codeChallengeMethod !== 'S256') {
         logger.error(`PKCE Error: Unsupported code_challenge_method (${authCode.codeChallengeMethod}) stored for auth code ${code}. Only S256 is supported.`);
@@ -201,18 +193,50 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid code_verifier.' }, { status: 400 });
       }
       logger.info(`PKCE code_verifier validated successfully for auth code: ${code}`);
-    } else if (code_verifier) { // No challenge stored, but verifier sent by client
+    } else if (code_verifier) { 
       logger.warn(`PKCE Mismatch: code_verifier provided for auth code ${code}, but no PKCE challenge was recorded for this code.`);
-      // This is a client protocol violation (RFC 7636). Client should not send verifier if no challenge was used.
       return NextResponse.json({ error: 'invalid_request', error_description: 'code_verifier provided but no PKCE challenge was initiated for this code.' }, { status: 400 });
     }
-    // If no authCode.codeChallenge and no code_verifier, PKCE was not used, proceed.
     
     // --- JWT Access Token Generation ---
-    const jwtSecret = new TextEncoder().encode(process.env.JWT_ACCESS_TOKEN_SECRET || 'super-secret-key-for-hs256-oauth-dev-env-32-chars');
+    // Hardened JWT Parameter Handling
+    let jwtSecretContent = process.env.JWT_ACCESS_TOKEN_SECRET;
+    if (!jwtSecretContent) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('FATAL: JWT_ACCESS_TOKEN_SECRET is not set in production environment for token endpoint.');
+        throw new Error('JWT_ACCESS_TOKEN_SECRET is not set in production environment.'); 
+      } else {
+        logger.warn('Warning: JWT_ACCESS_TOKEN_SECRET is not set for token endpoint. Using a default, insecure key for development.');
+        jwtSecretContent = 'super-secret-key-for-hs256-oauth-dev-env-32-chars-for-dev-only';
+      }
+    }
+    const jwtSecret = new TextEncoder().encode(jwtSecretContent);
+
+    let expectedIssuer = process.env.JWT_ISSUER;
+    if (!expectedIssuer) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('FATAL: JWT_ISSUER is not set in production environment for token endpoint.');
+        throw new Error('JWT_ISSUER is not set in production environment.');
+      } else {
+        logger.warn('Warning: JWT_ISSUER is not set for token endpoint. Using a default development issuer.');
+        expectedIssuer = `http://localhost:${process.env.PORT || 3000}`; // Or consistent dev default
+      }
+    }
+    const jwtIssuer = expectedIssuer;
+
+    let expectedAudience = process.env.JWT_AUDIENCE;
+    if (!expectedAudience) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('FATAL: JWT_AUDIENCE is not set in production environment for token endpoint.');
+        throw new Error('JWT_AUDIENCE is not set in production environment.');
+      } else {
+        logger.warn('Warning: JWT_AUDIENCE is not set for token endpoint. Using a default development audience.');
+        expectedAudience = 'api_resource_dev'; // Or consistent dev default
+      }
+    }
+    const jwtAudience = expectedAudience;
+
     const jwtAlg = 'HS256';
-    const jwtIssuer = process.env.JWT_ISSUER || `https://${request.headers.get('host') || 'localhost:3000'}`;
-    const jwtAudience = process.env.JWT_AUDIENCE || 'api_resource';
     const accessTokenExpiresIn = '1h';
     const accessTokenExpiresAt = addHours(new Date(), 1);
 
@@ -279,7 +303,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    logger.error(`Error during token issuance for client ${clientIdForTokenProcessing || 'unknown'}:`, { error });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`Error during token issuance for client ${clientIdForTokenProcessing || 'unknown'}:`, { error: errorMessage, stack: (error instanceof Error ? error.stack : undefined) });
     return NextResponse.json({ error: 'server_error', error_description: 'An unexpected error occurred.' }, { status: 500 });
   }
 }

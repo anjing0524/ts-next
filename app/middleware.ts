@@ -6,26 +6,11 @@ import logger from '@/utils/logger'; // Import logger
 // 1. Define a matcher to specify which routes it should apply to.
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - / (root path, if you want to exclude it, otherwise remove or adjust)
-     * - /login (login page itself to avoid redirect loops)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|login).*)',
-    // Explicitly include /dashboard and /flow, though the above regex should cover them
-    // if they don't have special characters or extensions.
-    // For now, let's be more specific if needed, but the negative lookahead is powerful.
-    // We want to protect /dashboard and /flow
     '/dashboard/:path*',
     '/flow/:path*',
+    // Add other specific top-level UI routes that need protection here
+    // Example: '/settings/:path*'
   ],
-  // Refined matcher to specifically target /dashboard and /flow,
-  // while still excluding common static/API paths.
-  // matcher: ['/dashboard/:path*', '/flow/:path*'], // This is too simple and won't exclude /api etc.
 };
 
 export async function middleware(request: NextRequest) {
