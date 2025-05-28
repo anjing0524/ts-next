@@ -174,7 +174,11 @@ impl BookRenderer {
         let bar_x = *area_x;
 
         // 绘制柱状图
-        ctx.set_fill_style_str(&theme.bearish);
+        ctx.set_fill_style_str(if is_ask {
+            &theme.bearish // 卖单用绿色
+        } else {
+            &theme.bullish // 买单用红色
+        });
         ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0);
 
         // 绘制数量文本（右侧）

@@ -133,9 +133,102 @@ impl Default for ChartTheme {
     }
 }
 
+/// 可选主题配置结构体，用于部分字段合并
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PartialChartTheme {
+    pub background: Option<String>,
+    pub header_bg: Option<String>,
+    pub border: Option<String>,
+    pub grid: Option<String>,
+    pub text: Option<String>,
+    pub axis_text: Option<String>,
+    pub bullish: Option<String>,
+    pub bearish: Option<String>,
+    pub last_price_line: Option<String>,
+    pub bid_price_line: Option<String>,
+    pub ask_price_line: Option<String>,
+    pub navigator_bg: Option<String>,
+    pub navigator_handle: Option<String>,
+    pub navigator_active_handle: Option<String>,
+    pub navigator_mask: Option<String>,
+    pub navigator_border: Option<String>,
+    pub navigator_active_handle_shadow: Option<String>,
+    pub volume_line: Option<String>,
+    pub volume_area: Option<String>,
+    pub crosshair: Option<String>,
+    pub tooltip_bg: Option<String>,
+    pub tooltip_border: Option<String>,
+    pub tooltip_text: Option<String>,
+    pub switch_bg: Option<String>,
+    pub switch_active_bg: Option<String>,
+    pub switch_border: Option<String>,
+    pub switch_text: Option<String>,
+    pub switch_active_text: Option<String>,
+    pub shadow: Option<String>,
+    pub book_hover_bg: Option<String>,
+    pub book_hover_border: Option<String>,
+    pub font_axis: Option<String>,
+    pub font_header: Option<String>,
+    pub font_legend: Option<String>,
+    pub font_switch: Option<String>,
+}
+
 impl ChartTheme {
     /// 从JSON字符串加载主题
     pub fn from_json(json: &str) -> Result<ChartTheme, serde_json::Error> {
         serde_json::from_str(json)
+    }
+
+    /// 合并部分配置，未指定字段保持原值
+    pub fn merge(&mut self, partial: PartialChartTheme) {
+        macro_rules! merge_field {
+            ($field:ident) => {
+                if let Some(val) = partial.$field {
+                    self.$field = val;
+                }
+            };
+        }
+        merge_field!(background);
+        merge_field!(header_bg);
+        merge_field!(border);
+        merge_field!(grid);
+        merge_field!(text);
+        merge_field!(axis_text);
+        merge_field!(bullish);
+        merge_field!(bearish);
+        merge_field!(last_price_line);
+        merge_field!(bid_price_line);
+        merge_field!(ask_price_line);
+        merge_field!(navigator_bg);
+        merge_field!(navigator_handle);
+        merge_field!(navigator_active_handle);
+        merge_field!(navigator_mask);
+        merge_field!(navigator_border);
+        merge_field!(navigator_active_handle_shadow);
+        merge_field!(volume_line);
+        merge_field!(volume_area);
+        merge_field!(crosshair);
+        merge_field!(tooltip_bg);
+        merge_field!(tooltip_border);
+        merge_field!(tooltip_text);
+        merge_field!(switch_bg);
+        merge_field!(switch_active_bg);
+        merge_field!(switch_border);
+        merge_field!(switch_text);
+        merge_field!(switch_active_text);
+        merge_field!(shadow);
+        merge_field!(book_hover_bg);
+        merge_field!(book_hover_border);
+        merge_field!(font_axis);
+        merge_field!(font_header);
+        merge_field!(font_legend);
+        merge_field!(font_switch);
+    }
+
+    /// 从部分 JSON 合并
+    pub fn merge_from_json(&mut self, json: &str) -> Result<(), serde_json::Error> {
+        let partial: PartialChartTheme = serde_json::from_str(json)?;
+        self.merge(partial);
+        Ok(())
     }
 }

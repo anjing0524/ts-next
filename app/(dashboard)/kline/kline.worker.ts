@@ -278,6 +278,9 @@ async function handleDraw(message: DrawMessage) {
     processorRef.set_canvases(canvas, mainCanvas, overlayCanvas);
     console.timeEnd('[Worker] 设置 Canvas');
 
+    // 新增：设置标题
+    processorRef.set_config_json(JSON.stringify({ title: '期货/SR' }));
+
     // 绘制 K 线图
     console.time('[Worker] 绘制 K 线图');
     processorRef.draw_all();
