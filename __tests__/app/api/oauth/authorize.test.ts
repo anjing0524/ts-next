@@ -1,17 +1,30 @@
 // __tests__/app/api/oauth/authorize.test.ts
+import { describe, it, beforeEach, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/oauth/authorize/route'; // Adjust path as necessary
-import { PrismaClient } from '@/lib/generated/prisma';
-import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
 import { addMinutes } from 'date-fns';
 
-// Mock Prisma Client
-jest.mock('@/lib/generated/prisma', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => mockDeep<PrismaClient>()),
+// Mock Prisma Client using Vitest
+vi.mock('@/lib/generated/prisma', () => ({
+  PrismaClient: vi.fn(),
 }));
 
-// Instantiate the mock Prisma client to be used in tests
-const prismaMock = new PrismaClient() as unknown as DeepMockProxy<PrismaClient>;
+// Create a mock instance of PrismaClient
+const mockPrisma = {
+  client: {
+    findUnique: vi.fn(),
+  },
+  authorizationCode: {
+    create: vi.fn(),
+    delete: vi.fn(),
+  },
+} as any;
+
+// Import after mocking
+const { PrismaClient } = await import('@/lib/generated/prisma');
+
+// Mock the PrismaClient constructor to return our mock
+vi.mocked(PrismaClient).mockImplementation(() => mockPrisma);
 
 // Helper function to create a NextRequest
 function createMockRequest(queryParams: Record<string, string>, method: string = 'GET', body: any = null): NextRequest {
@@ -24,7 +37,7 @@ function createMockRequest(queryParams: Record<string, string>, method: string =
 
 describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
   beforeEach(() => {
-    mockReset(prismaMock);
+    vi.clearAllMocks();
   });
 
   describe('Successful Authorization Code Grant', () => {
@@ -37,7 +50,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient);
 
       const mockAuthCode = {
         id: 'new-auth-code-id',
@@ -50,7 +63,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.authorizationCode.create.mockResolvedValue(mockAuthCode);
+      mockPrisma.authorizationCode.create.mockResolvedValue(mockAuthCode);
 
       const request = createMockRequest({
         client_id: 'test-client-id',
@@ -69,10 +82,10 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
       expect(redirectUrl.searchParams.get('code')).toBeTruthy();
       expect(redirectUrl.searchParams.get('state')).toBe('xyz123');
 
-      expect(prismaMock.client.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.client.findUnique).toHaveBeenCalledWith({
         where: { id: 'test-client-id' },
       });
-      expect(prismaMock.authorizationCode.create).toHaveBeenCalledWith({
+      expect(mockPrisma.authorizationCode.create).toHaveBeenCalledWith({
         data: {
           code: expect.any(String),
           expiresAt: expect.any(Date),
@@ -83,7 +96,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         },
       });
       // Check if expiresAt is approximately 10 minutes from now
-      const createdAuthCodeData = prismaMock.authorizationCode.create.mock.calls[0][0].data;
+      const createdAuthCodeData = mockPrisma.authorizationCode.create.mock.calls[0][0].data;
       const expectedExpiresAt = addMinutes(new Date(), 10);
       expect(Math.abs(new Date(createdAuthCodeData.expiresAt).getTime() - expectedExpiresAt.getTime())).toBeLessThan(5000); // Allow 5s difference
     });
@@ -127,7 +140,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
     });
 
     it('should return 400 if client is not found', async () => {
-      prismaMock.client.findUnique.mockResolvedValue(null);
+      mockPrisma.client.findUnique.mockResolvedValue(null);
       const request = createMockRequest({
         client_id: 'unknown-client',
         redirect_uri: 'http://localhost:3000/callback',
@@ -148,7 +161,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient); // Client needs to be found first
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient); // Client needs to be found first
       const request = createMockRequest({
         client_id: 'test-client-id',
         response_type: 'code',
@@ -169,7 +182,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient);
       const request = createMockRequest({
         client_id: 'test-client-id',
         redirect_uri: 'http://unregistered.com/callback',
@@ -183,7 +196,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
     });
 
     it('should return 500 if Prisma throws an unexpected error', async () => {
-      prismaMock.client.findUnique.mockRejectedValue(new Error('Database connection error'));
+      mockPrisma.client.findUnique.mockRejectedValue(new Error('Database connection error'));
       const request = createMockRequest({
         client_id: 'test-client-id',
         redirect_uri: 'http://localhost:3000/callback',
@@ -209,8 +222,8 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient);
-      prismaMock.authorizationCode.create.mockResolvedValue({
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient);
+      mockPrisma.authorizationCode.create.mockResolvedValue({
         id: 'pkce-auth-code-id',
         code: 'mockCodeValue',
         expiresAt: addMinutes(new Date(), 10),
@@ -241,7 +254,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
       expect(redirectUrl.searchParams.get('code')).toBeTruthy();
       expect(redirectUrl.searchParams.get('state')).toBe('pkce123');
 
-      expect(prismaMock.authorizationCode.create).toHaveBeenCalledWith({
+      expect(mockPrisma.authorizationCode.create).toHaveBeenCalledWith({
         data: {
           code: expect.any(String),
           expiresAt: expect.any(Date),
@@ -257,7 +270,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge is provided without code_challenge_method', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
 
       const request = createMockRequest({
         client_id: 'client-id',
@@ -274,7 +287,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge_method is provided without code_challenge', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
        const request = createMockRequest({
         client_id: 'client-id',
         redirect_uri: 'http://localhost/cb',
@@ -291,7 +304,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge_method is not "S256"', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
 
       const request = createMockRequest({
         client_id: 'client-id',
@@ -309,7 +322,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge is too short (less than 43 chars)', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
 
       const request = createMockRequest({
         client_id: 'client-id',
@@ -327,7 +340,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge is too long (more than 128 chars)', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
       
       const request = createMockRequest({
         client_id: 'client-id',
@@ -345,7 +358,7 @@ describe('OAuth 2.0 Authorization Endpoint (/api/oauth/authorize)', () => {
 
     it('should return 400 if code_challenge contains invalid characters', async () => {
       const mockClient = { id: 'client-id', redirectUris: 'http://localhost/cb' };
-      prismaMock.client.findUnique.mockResolvedValue(mockClient as any);
+      mockPrisma.client.findUnique.mockResolvedValue(mockClient as any);
 
       const request = createMockRequest({
         client_id: 'client-id',

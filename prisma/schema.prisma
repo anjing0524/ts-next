@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../lib/generated/prisma"
 }
 
 datasource db {
@@ -21,9 +20,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  authorizationCodes AuthorizationCode[] @relation("UserAuthorizationCodes")
-  accessTokens       AccessToken[]       @relation("UserAccessTokens")
-  refreshTokens      RefreshToken[]      @relation("UserRefreshTokens")
+  authorizationCodes AuthorizationCode[]      @relation("UserAuthorizationCodes")
+  accessTokens       AccessToken[]            @relation("UserAccessTokens")
+  refreshTokens      RefreshToken[]           @relation("UserRefreshTokens")
   permissions        UserResourcePermission[] @relation("UserPermissions") // Added relation to UserResourcePermission
 }
 
@@ -33,7 +32,7 @@ model Client {
   clientSecret String
   redirectUris String // Changed from String[] to String
   name         String
-  jwksUri      String?  // New field for JWKS URI
+  jwksUri      String? // New field for JWKS URI
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -43,17 +42,17 @@ model Client {
 }
 
 model AuthorizationCode {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  clientId    String
-  redirectUri String
-  userId      String?
-  expiresAt   DateTime
-  scope       String?  // Ensure this field exists
+  id                  String   @id @default(uuid())
+  code                String   @unique
+  clientId            String
+  redirectUri         String
+  userId              String?
+  expiresAt           DateTime
+  scope               String? // Ensure this field exists
   codeChallenge       String? // For PKCE
   codeChallengeMethod String? // For PKCE, e.g., "S256"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   user   User?  @relation("UserAuthorizationCodes", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
   client Client @relation("ClientAuthorizationCodes", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
