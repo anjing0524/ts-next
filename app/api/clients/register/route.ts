@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma'; // Verified path
+import {prisma} from '@/lib/prisma';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { randomBytes } from 'crypto';
@@ -22,8 +22,6 @@ const clientRegisterSchema = z.object({
     ...data,
     jwksUri: data.jwksUri === '' ? undefined : data.jwksUri, // Convert empty string to undefined
 }));
-
-const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   let clientNameForLogging: string | undefined = undefined; // For logging in catch

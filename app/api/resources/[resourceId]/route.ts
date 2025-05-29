@@ -1,12 +1,11 @@
 // app/api/resources/[resourceId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma';
+import {prisma} from '@/lib/prisma';
 import { z } from 'zod';
 import logger from '@/utils/logger';
 import { withAuth, ApiHandler } from '@/lib/auth/token-validation'; // Adjust path as necessary
 import { JWTPayload } from 'jose';
 
-const prisma = new PrismaClient();
 
 // Zod schema for updating a Resource
 const updateResourceSchema = z.object({

@@ -1,32 +1,42 @@
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'path';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
+  plugins: [react()],
   test: {
+    globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)test.[jt]s?(x)'],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.next/**',
-      '**/e2e/**',
-      '**/coverage/**',
-    ],
-    globals: true,
+    include: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
+    exclude: ['**/__tests__/e2e/**', '**/node_modules/**', '**/dist/**'],
     coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: [
+        'app/**/*.{js,jsx,ts,tsx}',
+        'lib/**/*.{js,jsx,ts,tsx}',
+        'utils/**/*.{js,jsx,ts,tsx}'
+      ],
       exclude: [
         '**/*.d.ts',
         '**/node_modules/**',
-        '**/.next/**',
-        '**/coverage/**',
-        '**/e2e/**',
+        '**/__tests__/**',
+        '**/coverage/**'
       ],
-    },
+      thresholds: {
+        global: {
+          branches: 70,
+          functions: 70,
+          lines: 70,
+          statements: 70
+        }
+      }
+    }
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './'),
-    },
-  },
+      '@': path.resolve(__dirname, './')
+    }
+  }
 }); 

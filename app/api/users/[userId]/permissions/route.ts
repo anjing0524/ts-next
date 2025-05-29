@@ -1,10 +1,9 @@
 // app/api/users/[userId]/permissions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma';
+import {prisma} from '@/lib/prisma';
 import { z } from 'zod';
 import logger from '@/utils/logger';
 
-const prisma = new PrismaClient();
 
 // Zod schema for granting a permission
 const grantPermissionSchema = z.object({

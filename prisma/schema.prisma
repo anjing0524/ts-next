@@ -16,95 +16,171 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
+  email     String?  @unique // Added email field
   password  String
+  firstName String?
+  lastName  String?
+  isActive  Boolean  @default(true) // For user deactivation
+  lastLoginAt DateTime? // Track last login
+  passwordResetToken String? // For password reset
+  passwordResetTokenExpiresAt DateTime? // Token expiration
+  emailVerified Boolean @default(false) // Email verification status
+  emailVerificationToken String? // Email verification token
+  twoFactorSecret String? // For 2FA (base32 encoded)
+  twoFactorEnabled Boolean @default(false) // 2FA status
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   authorizationCodes AuthorizationCode[]      @relation("UserAuthorizationCodes")
   accessTokens       AccessToken[]            @relation("UserAccessTokens")
   refreshTokens      RefreshToken[]           @relation("UserRefreshTokens")
-  permissions        UserResourcePermission[] @relation("UserPermissions") // Added relation to UserResourcePermission
+  permissions        UserResourcePermission[] @relation("UserPermissions")
+  auditLogs          AuditLog[]               @relation("UserAuditLogs")
+  sessions           UserSession[]            @relation("UserSessions")
+
+  @@index([email])
+  @@index([username])
+  @@index([isActive])
 }
 
 model Client {
-  id           String   @id @default(uuid())
-  clientId     String   @unique
-  clientSecret String
-  redirectUris String // Changed from String[] to String
-  name         String
-  jwksUri      String? // New field for JWKS URI
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  clientId              String   @unique
+  clientSecret          String?  // Made optional for public clients
+  clientSecretExpiresAt DateTime? // Client secret expiration
+  redirectUris          String   @db.Text // JSON array stored as string
+  postLogoutRedirectUris String? @db.Text // For logout redirect
+  name                  String
+  description           String?  @db.Text
+  logoUri               String?  // Client logo
+  clientUri             String?  // Client homepage
+  policyUri             String?  // Privacy policy
+  tosUri                String?  // Terms of service
+  jwksUri               String?  // For JWT client authentication
+  tokenEndpointAuthMethod String @default("client_secret_basic") // client_secret_basic, client_secret_post, private_key_jwt, none
+  grantTypes            String   @db.Text // JSON array stored as string
+  responseTypes         String   @db.Text // JSON array stored as string
+  scope                 String?  @db.Text // Default scope for this client
+  isPublic              Boolean  @default(false) // Public client (no secret)
+  requirePkce           Boolean  @default(false) // Force PKCE for this client
+  requireConsent        Boolean  @default(true)  // Force user consent
+  isActive              Boolean  @default(true)  // For client deactivation
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   authorizationCodes AuthorizationCode[] @relation("ClientAuthorizationCodes")
   accessTokens       AccessToken[]       @relation("ClientAccessTokens")
   refreshTokens      RefreshToken[]      @relation("ClientRefreshTokens")
+  auditLogs          AuditLog[]          @relation("ClientAuditLogs")
+
+  @@index([clientId])
+  @@index([isActive])
 }
 
 model AuthorizationCode {
   id                  String   @id @default(uuid())
   code                String   @unique
   clientId            String
-  redirectUri         String
+  redirectUri         String   @db.Text
   userId              String?
   expiresAt           DateTime
-  scope               String? // Ensure this field exists
-  codeChallenge       String? // For PKCE
-  codeChallengeMethod String? // For PKCE, e.g., "S256"
+  scope               String?  @db.Text
+  state               String?  @db.Text // OAuth state parameter
+  nonce               String?  // OIDC nonce parameter
+  codeChallenge       String?  @db.Text // For PKCE
+  codeChallengeMethod String?  // For PKCE, e.g., "S256"
+  authTime            DateTime @default(now()) // Authentication time
+  maxAge              Int?     // Max authentication age in seconds
+  used                Boolean  @default(false) // Mark as used to prevent replay
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  user   User?  @relation("UserAuthorizationCodes", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
-  client Client @relation("ClientAuthorizationCodes", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   User?  @relation("UserAuthorizationCodes", fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation("ClientAuthorizationCodes", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AccessToken {
   id        String   @id @default(uuid())
-  token     String   @unique
+  token     String   @db.Text
+  tokenHash String   @unique // Hash of the token for faster lookups and uniqueness
   clientId  String
   userId    String?
   expiresAt DateTime
-  scope     String?
+  scope     String?  @db.Text
+  jti       String?  // JWT ID
+  revoked   Boolean  @default(false) // For token revocation
+  revokedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user   User?  @relation("UserAccessTokens", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
-  client Client @relation("ClientAccessTokens", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   User?  @relation("UserAccessTokens", fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation("ClientAccessTokens", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revoked])
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  clientId  String
-  userId    String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  token       String   @db.Text
+  tokenHash   String   @unique // Hash of the token for faster lookups and uniqueness
+  clientId    String
+  userId      String?
+  expiresAt   DateTime
+  scope       String?  @db.Text
+  revoked     Boolean  @default(false) // For token revocation
+  revokedAt   DateTime?
+  accessTokenId String? // Link to the access token
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user   User?  @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Changed to User?
-  client Client @relation("ClientRefreshTokens", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   User?  @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation("ClientRefreshTokens", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revoked])
 }
 
-// New Models for Resource Management and User Permissions
+// Enhanced Resource and Permission Models
 
 model Resource {
   id          String   @id @default(uuid())
   name        String   @unique // e.g., "user_profile", "account_balance", "article_creator"
   description String?
+  apiPath     String?  // API path pattern for this resource
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   userPermissions UserResourcePermission[] @relation("ResourcePermissions")
+
+  @@index([name])
+  @@index([isActive])
 }
 
 model Permission {
   id          String   @id @default(uuid())
-  name        String   @unique // e.g., "read", "write", "delete", "administer_users", "read_own_profile", "edit_any_article"
+  name        String   @unique // e.g., "read", "write", "delete", "administer_users"
   description String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   userPermissions UserResourcePermission[] @relation("ActionPermissions")
+
+  @@index([name])
+  @@index([isActive])
 }
 
 model UserResourcePermission {
@@ -112,6 +188,10 @@ model UserResourcePermission {
   userId       String
   resourceId   String
   permissionId String
+  grantedBy    String?  // Who granted this permission
+  grantedAt    DateTime @default(now())
+  expiresAt    DateTime? // Optional expiration
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -120,4 +200,84 @@ model UserResourcePermission {
   permission Permission @relation("ActionPermissions", fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, resourceId, permissionId])
+  @@index([userId])
+  @@index([resourceId])
+  @@index([permissionId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+// New Models for Enhanced Security and Auditing
+
+model UserSession {
+  id          String   @id @default(uuid())
+  userId      String
+  sessionId   String   @unique
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  lastActivity DateTime @default(now())
+  isActive    Boolean  @default(true)
+
+  user User @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  clientId    String?
+  action      String   // e.g., "login", "token_issued", "permission_granted"
+  resource    String?  // What was accessed
+  ipAddress   String?
+  userAgent   String?  @db.Text
+  success     Boolean
+  errorMessage String? @db.Text
+  metadata    String?  @db.Text // JSON string for additional data
+  createdAt   DateTime @default(now())
+
+  user   User?   @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  client Client? @relation("ClientAuditLogs", fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([success])
+}
+
+model Scope {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., "openid", "profile", "email", "read:user"
+  description String?
+  isDefault   Boolean  @default(false) // Whether this scope is granted by default
+  isPublic    Boolean  @default(true)  // Whether this scope can be requested by public clients
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+model ConsentGrant {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String
+  scope     String   // JSON array stored as string
+  grantedAt DateTime @default(now())
+  expiresAt DateTime?
+  revoked   Boolean  @default(false)
+  revokedAt DateTime?
+
+  @@unique([userId, clientId])
+  @@index([userId])
+  @@index([clientId])
+  @@index([revoked])
 }

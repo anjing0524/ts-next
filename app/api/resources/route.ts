@@ -1,10 +1,9 @@
 // app/api/resources/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma';
+import {prisma} from '@/lib/prisma';
 import { z } from 'zod';
 import logger from '@/utils/logger';
 
-const prisma = new PrismaClient();
 
 // Zod schema for creating a Resource
 const createResourceSchema = z.object({
