@@ -17,9 +17,9 @@ interface RouteContext {
   };
 }
 
-// GET /api/permissions/[permissionId] - Get a specific Permission by ID
+// GET /api/permissions/[permissionId] - Get a specific permission by ID
 export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { permissionId } = params;
+  const { permissionId } = await params;
   logger.info(`Attempting to fetch permission with ID: ${permissionId}`);
 
   try {
@@ -40,9 +40,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-// PUT /api/permissions/[permissionId] - Update a specific Permission by ID
+// PUT /api/permissions/[permissionId] - Update a specific permission by ID
 export async function PUT(request: NextRequest, { params }: RouteContext) {
-  const { permissionId } = params;
+  const { permissionId } = await params;
   let requestBody; // For logging in case of error
   logger.info(`Attempting to update permission with ID: ${permissionId}`);
 
@@ -93,9 +93,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-// DELETE /api/permissions/[permissionId] - Delete a specific Permission by ID
+// DELETE /api/permissions/[permissionId] - Delete a specific permission by ID
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
-  const { permissionId } = params;
+  const { permissionId } = await params;
   logger.info(`Attempting to delete permission with ID: ${permissionId}`);
 
   try {

@@ -25,7 +25,7 @@ const getResourceByIdHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, // Destructure params from the second argument
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params; // resourceId is directly from params
+  const { resourceId } = await params; // resourceId is directly from params
   logger.info(`Attempting to fetch resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
 
   try {
@@ -61,7 +61,7 @@ const updateResourceHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, 
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params;
+  const { resourceId } = await params;
   logger.info(`Attempting to update resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
   let body;
   try {
@@ -118,7 +118,7 @@ const deleteResourceHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, 
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params;
+  const { resourceId } = await params;
   logger.info(`Attempting to delete resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
 
   try {

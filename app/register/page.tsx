@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
 import { authApi } from '@/lib/api';
+import Link from 'next/link'; // Import Link from next/link
 
 // Define validation schema
 const registerSchema = z.object({
@@ -277,7 +278,7 @@ export default function RegisterPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-gray-600">
           <p>
-            Already have an account? <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">Sign in</a>
+            Already have an account? <Link href="/login"><a className="font-medium text-indigo-600 hover:text-indigo-500">Sign in</a></Link>
           </p>
         </CardFooter>
       </Card>

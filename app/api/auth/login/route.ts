@@ -1,27 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcrypt';
-import { AuthorizationUtils, RateLimitUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2';
-import { withCORS } from '@/lib/auth/middleware';
+import { withAuthEndpoint } from '@/lib/auth/middleware';
 import crypto from 'crypto';
 import { addHours } from 'date-fns';
 
 async function handleLogin(request: NextRequest): Promise<NextResponse> {
-  // Rate limiting for login attempts
-  const rateLimitKey = RateLimitUtils.getRateLimitKey(request, 'ip');
-  if (RateLimitUtils.isRateLimited(rateLimitKey, 10, 60000)) { // 10 attempts per minute
-    return NextResponse.json(
-      { 
-        error: 'rate_limit_exceeded',
-        error_description: 'Too many login attempts. Please try again later.' 
-      },
-      { status: 429 }
-    );
-  }
-
-  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
-  const userAgent = request.headers.get('user-agent') || undefined;
-
   try {
     const body = await request.json();
     const { username, password, returnUrl } = body;
@@ -48,15 +32,6 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!user) {
-      await AuthorizationUtils.logAuditEvent({
-        action: 'login_failed',
-        resource: 'auth/login',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: `User not found: ${username}`,
-      });
-
       return NextResponse.json(
         { 
           error: 'invalid_credentials',
@@ -70,16 +45,6 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: user.id,
-        action: 'login_failed',
-        resource: 'auth/login',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: 'Invalid password',
-      });
-
       return NextResponse.json(
         { 
           error: 'invalid_credentials',
@@ -92,6 +57,9 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
     // Create user session
     const sessionId = crypto.randomUUID();
     const sessionExpiresAt = addHours(new Date(), 24); // 24 hour session
+
+    const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+    const userAgent = request.headers.get('user-agent') || undefined;
 
     await prisma.userSession.create({
       data: {
@@ -107,16 +75,6 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
-    });
-
-    // Log successful login
-    await AuthorizationUtils.logAuditEvent({
-      userId: user.id,
-      action: 'login_successful',
-      resource: 'auth/login',
-      ipAddress,
-      userAgent,
-      success: true,
     });
 
     // Create response with session cookie
@@ -145,17 +103,6 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
     return response;
 
   } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    await AuthorizationUtils.logAuditEvent({
-      action: 'login_error',
-      resource: 'auth/login',
-      ipAddress,
-      userAgent,
-      success: false,
-      errorMessage,
-    });
-
     console.error('Error during login:', error);
     
     return NextResponse.json(
@@ -168,4 +115,5 @@ async function handleLogin(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export const POST = withCORS(handleLogin);
+// 使用新的认证端点中间件，自动处理速率限制和审计日志
+export const POST = withAuthEndpoint(handleLogin, 'user_login');

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
 import { authApi, getOAuthRedirectUri, getFullUrl } from '@/lib/api';
+import Link from 'next/link';
 
 // Define Zod schema
 const loginSchema = z.object({
@@ -208,7 +209,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-gray-600">
           <p>
-            Don't have an account? <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">Sign up</a>
+            Don't have an account? <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">Sign up</Link>
           </p>
         </CardFooter>
       </Card>

@@ -9,127 +9,25 @@ import {
   OAuth2ErrorTypes, 
   RateLimitUtils 
 } from '@/lib/auth/oauth2';
-import { withCORS } from '@/lib/auth/middleware';
+import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import { any, unknown } from 'zod';
 
-async function handleAuthorizeRequest(request: NextRequest): Promise<NextResponse> {
-  // Rate limiting
-  const rateLimitKey = RateLimitUtils.getRateLimitKey(request, 'ip');
-  if (RateLimitUtils.isRateLimited(rateLimitKey, 50, 60000)) { // 50 requests per minute
-    return NextResponse.json(
-      { 
-        error: OAuth2ErrorTypes.TEMPORARILY_UNAVAILABLE,
-        error_description: 'Rate limit exceeded' 
-      },
-      { status: 429 }
-    );
-  }
-
-  const { searchParams } = new URL(request.url);
+async function handleAuthorizeRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
+  const { client, ipAddress, userAgent, params } = context!;
   
-  // Extract parameters
-  const client_id = searchParams.get('client_id');
-  const redirect_uri = searchParams.get('redirect_uri');
-  const response_type = searchParams.get('response_type');
-  const scope = searchParams.get('scope') || '';
-  const state = searchParams.get('state');
-  const code_challenge = searchParams.get('code_challenge');
-  const code_challenge_method = searchParams.get('code_challenge_method');
-  const nonce = searchParams.get('nonce'); // For OIDC
-  const max_age = searchParams.get('max_age'); // Max authentication age
-  const prompt = searchParams.get('prompt'); // none, login, consent, select_account
-  
-  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
-  const userAgent = request.headers.get('user-agent') || undefined;
-
-  // Basic parameter validation
-  if (!client_id || !redirect_uri || !response_type) {
-    const error = {
-      error: OAuth2ErrorTypes.INVALID_REQUEST,
-      error_description: 'Missing required parameters: client_id, redirect_uri, response_type'
-    };
-    
-    await AuthorizationUtils.logAuditEvent({
-      clientId: "null", // No valid client yet
-      action: 'authorization_request_failed',
-      resource: 'oauth/authorize',
-      ipAddress,
-      userAgent,
-      success: false,
-      errorMessage: error.error_description,
-    });
-
-    return NextResponse.json(error, { status: 400 });
-  }
-
-  // Validate response_type
-  if (!AuthorizationUtils.validateResponseType(response_type)) {
-    const error = {
-      error: OAuth2ErrorTypes.UNSUPPORTED_RESPONSE_TYPE,
-      error_description: 'Response type must be "code"'
-    };
-
-    await AuthorizationUtils.logAuditEvent({
-      clientId: "null", // No valid client yet
-      action: 'invalid_response_type',
-      resource: 'oauth/authorize',
-      ipAddress,
-      userAgent,
-      success: false,
-      errorMessage: error.error_description,
-      metadata: { response_type },
-    });
-
-    return NextResponse.json(error, { status: 400 });
-  }
+  // Extract parameters (already validated by middleware)
+  const client_id = params!.client_id;
+  const redirect_uri = params!.redirect_uri;
+  const response_type = params!.response_type;
+  const scope = params!.scope || '';
+  const state = params!.state;
+  const code_challenge = params!.code_challenge;
+  const code_challenge_method = params!.code_challenge_method;
+  const nonce = params!.nonce; // For OIDC
+  const max_age = params!.max_age; // Max authentication age
+  const prompt = params!.prompt; // none, login, consent, select_account
 
   try {
-    // Find and validate client
-    const client = await prisma.client.findUnique({
-      where: { clientId: client_id, isActive: true },
-    });
-
-    if (!client) {
-      const error = {
-        error: OAuth2ErrorTypes.UNAUTHORIZED_CLIENT,
-        error_description: 'Invalid client_id'
-      };
-
-      await AuthorizationUtils.logAuditEvent({
-        clientId: "null", // Client is invalid
-        action: 'invalid_client',
-        resource: 'oauth/authorize',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: error.error_description,
-      });
-
-      return NextResponse.json(error, { status: 400 });
-    }
-
-    // Validate redirect_uri
-    const registeredRedirectUris = JSON.parse(client.redirectUris || '[]');
-    if (!AuthorizationUtils.validateRedirectUri(redirect_uri, registeredRedirectUris)) {
-      const error = {
-        error: OAuth2ErrorTypes.INVALID_REQUEST,
-        error_description: 'Invalid redirect_uri'
-      };
-
-      await AuthorizationUtils.logAuditEvent({
-        clientId: client.id,
-        action: 'invalid_redirect_uri',
-        resource: 'oauth/authorize',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: error.error_description,
-        metadata: { redirect_uri, registeredUris: registeredRedirectUris },
-      });
-
-      return NextResponse.json(error, { status: 400 });
-    }
-
     // Parse and validate scopes
     const requestedScopes = ScopeUtils.parseScopes(scope);
     const scopeValidation = await ScopeUtils.validateScopes(requestedScopes, client);
@@ -249,11 +147,11 @@ async function handleAuthorizeRequest(request: NextRequest): Promise<NextRespons
     
     const userId = await authenticateUser(request, {
       maxAge: max_age ? parseInt(max_age) : undefined,
-      prompt: `${prompt}`,
+      prompt: prompt ?? undefined,
       clientId: client_id,
       redirectUri: redirect_uri,
       scope,
-      state:`${state}`,
+      state: state ?? undefined,
     });
 
     if (!userId) {
@@ -357,7 +255,7 @@ async function handleAuthorizeRequest(request: NextRequest): Promise<NextRespons
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     await AuthorizationUtils.logAuditEvent({
-      clientId: "null", // Client may not be available in catch block
+      clientId: client?.id || "null", // Client may not be available in catch block
       action: 'authorization_server_error',
       resource: 'oauth/authorize',
       ipAddress,
@@ -480,4 +378,4 @@ async function checkConsentRequired(
   return hasNewScopes;
 }
 
-export const GET = withCORS(handleAuthorizeRequest);
+export const GET = withOAuthAuthorizeValidation(handleAuthorizeRequest);

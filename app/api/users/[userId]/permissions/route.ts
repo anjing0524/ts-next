@@ -19,11 +19,13 @@ interface RouteContext {
 
 // POST /api/users/[userId]/permissions - Grant a permission to a user
 export async function POST(request: NextRequest, { params }: RouteContext) {
-  const { userId } = params;
+  const { userId } = await params;
   logger.info(`Attempting to grant permission to user ID: ${userId}`);
 
+  let body: any = {}; // Declare body variable in broader scope
+
   try {
-    const body = await request.json();
+    body = await request.json();
     const validation = grantPermissionSchema.safeParse(body);
 
     if (!validation.success) {
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
 // DELETE /api/users/[userId]/permissions?resourceId=<resourceId>&permissionId=<permissionId> - Revoke a permission from a user
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
-  const { userId } = params;
+  const { userId } = await params;
   const { searchParams } = new URL(request.url);
   const resourceId = searchParams.get('resourceId');
   const permissionId = searchParams.get('permissionId');
@@ -142,7 +144,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
 // GET /api/users/[userId]/permissions - List all permissions for a user
 export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { userId } = params;
+  const { userId } = await params;
   logger.info(`Fetching permissions for user ID: ${userId}`);
 
   try {

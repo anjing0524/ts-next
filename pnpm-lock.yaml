@@ -131,6 +131,9 @@ importers:
       pg:
         specifier: ^8.16.0
         version: 8.16.0
+      rate-limiter-flexible:
+        specifier: ^7.1.1
+        version: 7.1.1
       react:
         specifier: ^19.1.0
         version: 19.1.0
@@ -4836,6 +4839,9 @@ packages:
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
+
+  rate-limiter-flexible@7.1.1:
+    resolution: {integrity: sha512-lsYRcqRSJrKBNt6pMzBJTiCJP5KnwsGWdObMZxd19JFUJRntM+yuHs4/2bs6NZweSLgpsDcykvzyQaumoslWQg==}
 
   react-contexify@6.0.0:
     resolution: {integrity: sha512-jMhz6yZI81Jv3UDj7TXqCkhdkCFEEmvwGCPXsQuA2ZUC8EbCuVQ6Cy8FzKMXa0y454XTDClBN2YFvvmoFlrFkg==}
@@ -10699,6 +10705,8 @@ snapshots:
   pure-rand@6.1.0: {}
 
   queue-microtask@1.2.3: {}
+
+  rate-limiter-flexible@7.1.1: {}
 
   react-contexify@6.0.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
