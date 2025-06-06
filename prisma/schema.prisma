@@ -25,7 +25,6 @@ model User {
   // 用户基础属性 (ABAC支持)
   department      String?   // 部门
   position        String?   // 岗位
-  organization    String?   // 单位/组织
   workLocation    String?   // 工作地点
   employeeId      String?   @unique // 工号
   
@@ -39,6 +38,13 @@ model User {
   passwordExpiresAt DateTime?
   passwordHistory   Json?     // 存储最近5次密码哈希
   
+  // 多因素认证 (MFA) - 内网环境暂不启用，保留字段以备扩展
+  // mfaEnabled       Boolean   @default(false)
+  // mfaType          String?   // totp, sms, email, app
+  // mfaSecret        String?   // 加密存储的MFA密钥
+  // backupCodes      Json?     // 备份恢复码列表
+  // lastMfaAt        DateTime? // 最后一次MFA验证时间
+  
   // 时间戳
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -50,13 +56,21 @@ model User {
   accessTokens      AccessToken[]
   refreshTokens     RefreshToken[]
   authorizationCodes AuthorizationCode[]
+  deviceCodes       DeviceCode[]      // 设备授权码
+  sessions          Session[]         // 用户会话
   auditLogs         AuditLog[]
+  organizations     Organization[]    @relation("UserOrganizations") // 用户所属组织
+  delegationsFrom   PermissionDelegation[] @relation("DelegationsFrom") // 作为委托人
+  delegationsTo     PermissionDelegation[] @relation("DelegationsTo") // 作为被委托人
+  revokedTokens     RevokedToken[]    // 用户撤销的令牌
+  ownedResources    Resource[]        // 用户拥有的资源
   
   @@map("users")
   @@index([username])
   @@index([email])
   @@index([isActive, department])
   @@index([employeeId])
+  // @@index([mfaEnabled]) // 内网环境暂不使用MFA
 }
 
 // ===== RBAC权限模型 =====
@@ -243,9 +257,9 @@ model Resource {
   name  String
   
   // 资源基本属性
-  owner       String?  // 所有者用户ID
-  department  String?  // 归属部门
-  organization String? // 归属单位
+  ownerId        String?  // 所有者用户ID
+  department     String?  // 归属部门
+  organizationId String?  // 归属组织ID
   
   // 状态
   isActive Boolean @default(true)
@@ -256,11 +270,14 @@ model Resource {
   
   // 关联关系
   resourceAttributes ResourceAttribute[]
+  owner             User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   
   @@map("resources")
   @@index([type, identifier])
-  @@index([owner])
-  @@index([department, organization])
+  @@index([ownerId])
+  @@index([organizationId])
+  @@index([department])
 }
 
 model ResourceAttribute {
@@ -303,6 +320,11 @@ model OAuthClient {
   allowedIPs      Json?                 // IP白名单
   rateLimit       Int? @default(1000)   // 每小时请求限制
   
+  // 设备授权流程设置
+  deviceCodeTTL   Int @default(1800)    // 设备码有效期(秒)
+  userCodeLength  Int @default(8)       // 用户码长度
+  verificationUri String?               // 验证URI
+  
   // 状态管理
   isActive  Boolean @default(true)
   isBlocked Boolean @default(false)
@@ -315,6 +337,8 @@ model OAuthClient {
   accessTokens       AccessToken[]
   refreshTokens      RefreshToken[]
   authorizationCodes AuthorizationCode[]
+  deviceCodes        DeviceCode[]
+  revokedTokens      RevokedToken[]
   
   @@map("oauth_clients")
   @@index([clientId])
@@ -330,23 +354,29 @@ model AccessToken {
   // 令牌信息
   scopes    Json     // 授权范围
   expiresAt DateTime
+  jti       String   @unique // JWT ID，用于令牌撤销
   
   // 令牌元数据
   userAgent String?
   ipAddress String?
+  deviceId  String?  // 设备标识符
+  sessionId String?  // 关联的会话ID
   
   // 时间戳
   createdAt DateTime @default(now())
   usedAt    DateTime?
   
   // 关联关系
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client  OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  session Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   
   @@map("access_tokens")
   @@index([token])
+  @@index([jti])
   @@index([userId, expiresAt])
   @@index([clientId, createdAt])
+  @@index([sessionId])
 }
 
 model RefreshToken {
@@ -359,19 +389,29 @@ model RefreshToken {
   // 令牌信息
   scopes    Json     // 授权范围
   expiresAt DateTime
+  jti       String   @unique // JWT ID，用于令牌撤销
+  family    String?  // 令牌家族ID，用于令牌轮换
+  
+  // 令牌元数据
+  deviceId  String?  // 设备标识符
+  sessionId String?  // 关联的会话ID
   
   // 时间戳
   createdAt DateTime @default(now())
   usedAt    DateTime?
   
   // 关联关系
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client  OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  session Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   
   @@map("refresh_tokens")
   @@index([token])
+  @@index([jti])
   @@index([userId, expiresAt])
   @@index([clientId])
+  @@index([family])
+  @@index([sessionId])
 }
 
 model AuthorizationCode {
@@ -470,6 +510,7 @@ model AuditLog {
   // 请求信息
   ipAddress   String?
   userAgent   String?
+  sessionId   String?  // 关联的会话ID
   
   // 结果信息
   success     Boolean
@@ -480,13 +521,172 @@ model AuditLog {
   createdAt DateTime @default(now())
   
   // 关联关系
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   
   @@map("audit_logs")
   @@index([userId, action, createdAt])
   @@index([action, createdAt])
   @@index([createdAt])
   @@index([riskLevel, createdAt])
+  @@index([sessionId])
+}
+
+// ===== 设备授权流程 =====
+model DeviceCode {
+  id           String @id @default(uuid())
+  deviceCode   String @unique // 设备码
+  userCode     String @unique // 用户码
+  clientId     String
+  userId       String?
+  
+  // 授权信息
+  scopes       Json     // 请求的作用域
+  expiresAt    DateTime
+  isAuthorized Boolean  @default(false)
+  isUsed       Boolean  @default(false)
+  
+  // 设备信息
+  deviceInfo   Json?    // 设备信息
+  ipAddress    String?
+  userAgent    String?
+  
+  // 时间戳
+  createdAt    DateTime @default(now())
+  authorizedAt DateTime?
+  usedAt       DateTime?
+  
+  // 关联关系
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("device_codes")
+  @@index([deviceCode])
+  @@index([userCode])
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([isAuthorized])
+}
+
+// ===== 会话管理 =====
+model Session {
+  id           String @id @default(uuid())
+  userId       String
+  
+  // 会话信息
+  sessionToken String   @unique
+  expiresAt    DateTime
+  isActive     Boolean  @default(true)
+  
+  // 设备信息
+  deviceId     String?  // 设备唯一标识
+  deviceType   String?  // mobile, desktop, tablet, etc.
+  deviceName   String?  // 设备名称
+  ipAddress    String?
+  userAgent    String?
+  location     String?  // 地理位置
+  
+  // 时间戳
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  
+  // 关联关系
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessTokens  AccessToken[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  
+  @@map("sessions")
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@index([isActive])
+  @@index([deviceId])
+}
+
+// ===== 令牌撤销 =====
+model RevokedToken {
+  id        String @id @default(uuid())
+  jti       String @unique // JWT ID
+  userId    String?
+  clientId  String?
+  reason    String? // 撤销原因
+  expiresAt DateTime // 原令牌过期时间
+  
+  // 时间戳
+  revokedAt DateTime @default(now())
+  
+  // 关联关系
+  user   User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  client OAuthClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  
+  @@map("revoked_tokens")
+  @@index([jti])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ===== 组织结构 =====
+model Organization {
+  id          String @id @default(uuid())
+  name        String
+  code        String @unique // 组织代码
+  description String?
+  
+  // 组织结构
+  parentId    String?
+  path        String  // 组织路径，例如 /1/2/3/
+  level       Int     // 组织层级
+  
+  // 状态管理
+  isActive    Boolean @default(true)
+  
+  // 时间戳
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联关系
+  parent      Organization?  @relation("OrganizationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Organization[] @relation("OrganizationHierarchy")
+  users       User[]         @relation("UserOrganizations")
+  resources   Resource[]     // 该组织拥有的资源
+  
+  @@map("organizations")
+  @@index([parentId])
+  @@index([path])
+  @@index([isActive])
+}
+
+// ===== 权限委托 =====
+model PermissionDelegation {
+  id              String   @id @default(uuid())
+  fromUserId      String   // 委托人
+  toUserId        String   // 被委托人
+  permissions     Json     // 委托的权限列表
+  resourceIds     Json?    // 特定资源ID列表
+  organizationId  String?  // 限定组织范围
+  
+  // 委托配置
+  startAt         DateTime
+  endAt           DateTime
+  isActive        Boolean  @default(true)
+  
+  // 时间戳
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // 关联关系
+  fromUser      User         @relation("DelegationsFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser        User         @relation("DelegationsTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  
+  @@map("permission_delegations")
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([organizationId])
+  @@index([startAt, endAt])
+  @@index([isActive])
 }
 
 // ===== 系统配置 =====
