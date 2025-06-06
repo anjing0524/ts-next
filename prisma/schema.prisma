@@ -13,754 +13,500 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ===== 用户基础模型 =====
+// ===== 用户管理 =====
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
   email     String?  @unique
-  password  String
+  password  String   // bcrypt哈希，rounds=12
   firstName String?
   lastName  String?
   
-  // 用户基础属性
-  department    String?   // 部门
-  position      String?   // 职位
-  employeeId    String?   @unique // 工号
-  phoneNumber   String?   // 电话
+  // 用户基础属性 (ABAC支持)
+  department      String?   // 部门
+  position        String?   // 岗位
+  organization    String?   // 单位/组织
+  workLocation    String?   // 工作地点
+  employeeId      String?   @unique // 工号
   
-  // 用户状态
+  // 状态管理
   isActive      Boolean   @default(true)
+  isLocked      Boolean   @default(false)
+  loginAttempts Int       @default(0)
   lastLoginAt   DateTime?
-  passwordResetToken String?
-  passwordResetTokenExpiresAt DateTime?
-  emailVerified Boolean   @default(false)
-  emailVerificationToken String?
-  twoFactorSecret String?
   
-  // 安全属性
-  securityLevel     Int       @default(1) // 安全等级 1-5
-  mfaEnabled        Boolean   @default(false)
-  trustedDevices    Json?     // 可信设备列表
-  lastPasswordChange DateTime @default(now())
+  // 密码策略
+  passwordExpiresAt DateTime?
+  passwordHistory   Json?     // 存储最近5次密码哈希
   
+  // 时间戳
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // === RBAC关系 ===
+  // 关联关系
   userRoles         UserRole[]
-  
-  // === OAuth关系 ===
-  clients           Client[]
+  userPermissions   UserPermission[]  // 直接分配的权限
+  userAttributes    UserAttribute[]   // ABAC用户属性
   accessTokens      AccessToken[]
   refreshTokens     RefreshToken[]
   authorizationCodes AuthorizationCode[]
-  consents          Consent[]
-  
-  // === 应用关系 ===
-  applicationUsers  ApplicationUser[]
-  
-  // === ABAC关系 ===
-  userAttributes    UserAttribute[]
-  
-  // === 审计关系 ===
   auditLogs         AuditLog[]
   
   @@map("users")
+  @@index([username])
+  @@index([email])
+  @@index([isActive, department])
+  @@index([employeeId])
 }
 
-// ===== RBAC角色模型 =====
+// ===== RBAC权限模型 =====
 model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayName String
+  id          String  @id @default(uuid())
+  name        String  @unique  // 角色标识符 如: "super_admin", "employee"
+  displayName String           // 显示名称 如: "超级管理员", "普通员工"
   description String?
   
-  // 角色属性
-  level       Int      @default(1) // 角色等级，用于权限继承
-  isSystem    Boolean  @default(false) // 系统内置角色
-  isActive    Boolean  @default(true)
+  // 角色层次
+  parentId String?
+  parent   Role?   @relation("RoleHierarchy", fields: [parentId], references: [id])
+  children Role[]  @relation("RoleHierarchy")
   
-  // OAuth作用域映射
-  defaultScopes Json?  // 角色默认可获得的OAuth作用域
-  maxScopes     Json?  // 角色最大可申请的OAuth作用域
+  // 状态管理
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false) // 系统角色不可删除
   
-  // 有效期设置
-  validFrom   DateTime @default(now())
-  validTo     DateTime?
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关系
+  // 关联关系
   userRoles       UserRole[]
   rolePermissions RolePermission[]
   
   @@map("roles")
+  @@index([name])
+  @@index([parentId])
+  @@index([isActive])
 }
 
-// 用户角色关联表
+model Permission {
+  id          String @id @default(uuid())
+  identifier  String @unique // 权限标识符: "category:resource:action"
+  name        String         // 权限名称
+  description String?
+  
+  // 权限分解
+  category String  // system, app, api, data, page
+  resource String  // 资源标识
+  action   String  // 操作类型
+  
+  // 状态管理
+  isActive Boolean @default(true)
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+  
+  @@map("permissions")
+  @@index([identifier])
+  @@index([category, resource, action])
+  @@index([isActive])
+}
+
 model UserRole {
   id     String @id @default(uuid())
   userId String
   roleId String
   
-  // 角色分配属性
-  assignedBy    String?   // 分配者ID
-  assignedAt    DateTime  @default(now())
-  validFrom     DateTime  @default(now())
-  validTo       DateTime? // 临时角色的过期时间
-  isActive      Boolean   @default(true)
+  // 分配信息
+  assignedBy String   // 分配者ID
+  assignedAt DateTime @default(now())
+  expiresAt  DateTime? // 角色过期时间
   
-  // 关系
+  // 状态
+  isActive Boolean @default(true)
+  
+  // 关联关系
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
   
   @@unique([userId, roleId])
   @@map("user_roles")
+  @@index([userId, isActive])
+  @@index([roleId])
+  @@index([assignedAt])
 }
 
-// ===== RBAC权限模型 =====
-model Permission {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  displayName String
-  description String?
-  
-  // 权限分类
-  category    String  // api, menu, data, function
-  resource    String  // 资源标识
-  action      String  // 操作类型
-  
-  // OAuth作用域要求
-  requiredScopes Json? // 执行此权限需要的OAuth作用域
-  
-  // 权限属性
-  isSystem    Boolean @default(false)
-  isActive    Boolean @default(true)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关系
-  rolePermissions RolePermission[]
-  
-  @@index([category, resource, action])
-  @@map("permissions")
-}
-
-// 角色权限关联表
 model RolePermission {
   id           String @id @default(uuid())
   roleId       String
   permissionId String
   
-  // 权限分配属性
-  grantedBy    String?   // 授权者ID
-  grantedAt    DateTime  @default(now())
-  isActive     Boolean   @default(true)
+  // 分配信息
+  assignedBy String   // 分配者ID
+  assignedAt DateTime @default(now())
   
-  // 关系
+  // 关联关系
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   
   @@unique([roleId, permissionId])
   @@map("role_permissions")
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserPermission {
+  id           String @id @default(uuid())
+  userId       String
+  permissionId String
+  
+  // 分配信息
+  assignedBy String   // 分配者ID
+  assignedAt DateTime @default(now())
+  expiresAt  DateTime? // 权限过期时间
+  
+  // 状态
+  isActive Boolean @default(true)
+  
+  // 关联关系
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, permissionId])
+  @@map("user_permissions")
+  @@index([userId, isActive])
+  @@index([permissionId])
 }
 
 // ===== ABAC策略模型 =====
 model Policy {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  displayName String
+  id          String @id @default(uuid())
+  name        String @unique
   description String?
   
-  // 策略内容
-  rule        String  @db.Text // 策略规则表达式
-  effect      String  // allow, deny
-  priority    Int     @default(100) // 优先级，数值越大优先级越高
+  // 基础策略规则
+  rule     String  // 基于基本属性的JavaScript表达式
+  effect   String  // ALLOW 或 DENY
+  priority Int     // 优先级，数值越大优先级越高
   
-  // 策略分类
-  category    String  // security, business, compliance, oauth
-  target      String  // api, menu, data, function, token
+  // 策略元数据
+  category   String?  // 策略分类: department, position, time, location, ip
+  version    String   @default("1.0")
+  isActive   Boolean  @default(true)
   
-  // OAuth集成
-  oauthScopes    Json?    // 策略适用的OAuth作用域
-  clientTypes    Json?    // 策略适用的客户端类型 
+  // 性能统计
+  executionCount Int @default(0)
+  avgExecutionMs Int @default(0)
   
-  // 策略状态
-  isActive    Boolean @default(true)
-  version     String  @default("1.0")
-  
-  // 有效期
-  validFrom   DateTime @default(now())
-  validTo     DateTime?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
   // 关联关系
-  versions    PolicyVersion[]
+  policyEvaluations PolicyEvaluation[]
   
-  @@index([category, target])
-  @@index([priority, isActive])
   @@map("policies")
+  @@index([name])
+  @@index([isActive, priority])
+  @@index([category])
 }
 
-// ===== 属性模型 (ABAC) =====
-model Attribute {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  displayName String
-  description String?
+model UserAttribute {
+  id         String @id @default(uuid())
+  userId     String
+  name       String // 基本属性名称: department, position, organization, workLocation
+  value      String // 属性值
+  dataType   String @default("string") // string类型即可
   
-  // 属性分类
-  category    String  // subject, object, environment, action, oauth
-  dataType    String  // string, number, boolean, datetime, json
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  // 属性配置
-  isRequired  Boolean @default(false)
-  isMultiple  Boolean @default(false) // 是否支持多值
-  defaultValue String?
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // 验证规则
-  validation  Json?   // 验证规则配置
+  @@unique([userId, name])
+  @@map("user_attributes")
+  @@index([userId])
+  @@index([name, value])
+}
+
+model Resource {
+  id    String @id @default(uuid())
+  type  String // 资源类型：document, project, system等
+  identifier String @unique // 资源标识符
+  name  String
   
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // 资源基本属性
+  owner       String?  // 所有者用户ID
+  department  String?  // 归属部门
+  organization String? // 归属单位
   
-  // 关系
-  userAttributes     UserAttribute[]
+  // 状态
+  isActive Boolean @default(true)
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
   resourceAttributes ResourceAttribute[]
   
-  @@index([category, dataType])
-  @@map("attributes")
-}
-
-// 用户属性值
-model UserAttribute {
-  id          String @id @default(uuid())
-  userId      String
-  attributeId String
-  value       String @db.Text
-  
-  // 属性元数据
-  source      String? // manual, system, import, oauth
-  validFrom   DateTime @default(now())
-  validTo     DateTime?
-  isActive    Boolean @default(true)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关系
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, attributeId])
-  @@map("user_attributes")
-}
-
-// 资源模型
-model Resource {
-  id          String  @id @default(uuid())
-  name        String
-  displayName String
-  description String?
-  
-  // 资源分类
-  type        String  // api, menu, data, file, function
-  category    String  // system, business, user
-  
-  // 资源标识
-  resourceId  String  // 具体资源的唯一标识
-  path        String? // 资源路径
-  
-  // OAuth集成
-  requiredScopes Json? // 访问此资源需要的OAuth作用域
-  allowedClients Json? // 允许访问的客户端类型
-  
-  // 资源属性
-  ownerId     String? // 资源所有者
-  visibility  String  @default("private") // public, private, protected
-  sensitivity Int     @default(1) // 敏感等级 1-5
-  
-  // 业务属性
-  departmentId String?
-  projectId    String?
-  
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关系
-  attributes  ResourceAttribute[]
-  
-  @@index([type, category])
-  @@index([resourceId])
   @@map("resources")
+  @@index([type, identifier])
+  @@index([owner])
+  @@index([department, organization])
 }
 
-// 资源属性值
 model ResourceAttribute {
   id         String @id @default(uuid())
   resourceId String
-  attributeId String
-  value      String @db.Text
+  name       String // 基本属性名称: owner, department, organization
+  value      String // 属性值
+  dataType   String @default("string")
   
-  isActive   Boolean @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  // 关系
-  resource  Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-  
-  @@unique([resourceId, attributeId])
-  @@map("resource_attributes")
-}
-
-// ===== OAuth2.1客户端模型 =====
-model Client {
-  id                String   @id @default(uuid())
-  clientId          String   @unique
-  clientSecret      String?
-  clientName        String
-  clientDescription String?
-  
-  // 客户端类型和配置
-  clientType        String   // public, confidential
-  grantTypes        Json     // 支持的授权类型数组
-  responseTypes     Json     // 支持的响应类型数组
-  scopes            Json     // 支持的作用域数组
-  redirectUris      Json     // 重定向URI数组
-  
-  // RBAC集成
-  requiredRoles     Json?    // 客户端访问要求的角色
-  maxScopes         Json?    // 客户端最大可申请作用域
-  
-  // ABAC集成
-  abacPolicies      Json?    // 适用的ABAC策略ID列表
-  
-  // PKCE配置
-  requirePkce       Boolean  @default(true)
-  
-  // 公钥认证
-  publicKey         String?  @db.Text
-  keyAlgorithm      String?  @default("RS256")
-  
-  // 令牌配置
-  accessTokenTtl    Int      @default(3600)    // 访问令牌有效期（秒）
-  refreshTokenTtl   Int      @default(86400)   // 刷新令牌有效期（秒）
-  
-  // 客户端属性
-  ownerId           String?  // 客户端所有者ID
-  isActive          Boolean  @default(true)
-  isTrusted         Boolean  @default(false)   // 可信客户端跳过授权确认
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  // 关系
-  owner             User?    @relation(fields: [ownerId], references: [id])
-  accessTokens      AccessToken[]
-  refreshTokens     RefreshToken[]
-  authorizationCodes AuthorizationCode[]
-  consents          Consent[]
-  
-  @@map("clients")
-}
-
-// ===== 令牌模型 =====
-model AccessToken {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
-  clientId  String
-  userId    String
-  scopes    Json     // 令牌作用域数组
-  
-  // RBAC上下文
-  userRoles Json?    // 令牌颁发时的用户角色
-  
-  // ABAC上下文
-  contextAttrs Json? // 令牌颁发时的上下文属性
-  
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-  revokedAt DateTime?
-  
+  // 时间戳
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  // 关系
-  client    Client   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 关联关系
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  
+  @@unique([resourceId, name])
+  @@map("resource_attributes")
+  @@index([resourceId])
+  @@index([name, value])
+}
+
+// ===== OAuth2.1模型 =====
+model OAuthClient {
+  id           String @id @default(uuid())
+  clientId     String @unique
+  clientSecret String? // 机密客户端才有Secret
+  name         String
+  description  String?
+  
+  // 客户端配置
+  clientType    String   // "public" (SPA/Mobile) 或 "confidential" (Server)
+  redirectUris  Json     // 重定向URI数组
+  grantTypes    Json     // 支持的授权类型
+  scopes        Json     // 允许的作用域
+  
+  // 安全设置
+  accessTokenTTL  Int @default(3600)    // 访问令牌有效期(秒)
+  refreshTokenTTL Int @default(604800)  // 刷新令牌有效期(秒)
+  allowedIPs      Json?                 // IP白名单
+  rateLimit       Int? @default(1000)   // 每小时请求限制
+  
+  // 状态管理
+  isActive  Boolean @default(true)
+  isBlocked Boolean @default(false)
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
+  accessTokens       AccessToken[]
+  refreshTokens      RefreshToken[]
+  authorizationCodes AuthorizationCode[]
+  
+  @@map("oauth_clients")
+  @@index([clientId])
+  @@index([isActive])
+}
+
+model AccessToken {
+  id       String @id @default(uuid())
+  token    String @unique
+  userId   String
+  clientId String
+  
+  // 令牌信息
+  scopes    Json     // 授权范围
+  expiresAt DateTime
+  
+  // 令牌元数据
+  userAgent String?
+  ipAddress String?
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  
+  // 关联关系
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   
   @@map("access_tokens")
+  @@index([token])
+  @@index([userId, expiresAt])
+  @@index([clientId, createdAt])
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
-  clientId  String
-  userId    String
-  scopes    Json     // 令牌作用域数组
+  id             String @id @default(uuid())
+  token          String @unique
+  userId         String
+  clientId       String
+  accessTokenId  String? // 关联的访问令牌
   
-  // RBAC上下文
-  userRoles Json?    // 令牌颁发时的用户角色
-  
+  // 令牌信息
+  scopes    Json     // 授权范围
   expiresAt DateTime
-  revoked   Boolean  @default(false)
-  revokedAt DateTime?
   
+  // 时间戳
   createdAt DateTime @default(now())
+  usedAt    DateTime?
   
-  // 关系
-  client    Client   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 关联关系
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   
   @@map("refresh_tokens")
+  @@index([token])
+  @@index([userId, expiresAt])
+  @@index([clientId])
 }
 
 model AuthorizationCode {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  clientId     String
-  userId       String
-  scopes       Json     // 授权作用域数组
-  redirectUri  String
-  codeChallenge String?  // PKCE code challenge
-  codeChallengeMethod String? // PKCE code challenge method
+  id       String @id @default(uuid())
+  code     String @unique
+  userId   String
+  clientId String
   
-  // RBAC上下文
-  userRoles    Json?    // 授权时的用户角色
+  // PKCE支持
+  codeChallenge       String
+  codeChallengeMethod String @default("S256")
   
-  expiresAt    DateTime
-  used         Boolean  @default(false)
-  usedAt       DateTime?
+  // 授权信息
+  redirectUri String
+  scopes      Json     // 授权范围
+  state       String?  // 客户端状态
   
-  createdAt    DateTime @default(now())
-  
-  // 关系
-  client       Client   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("authorization_codes")
-}
-
-// ===== 用户授权同意 =====
-model Consent {
-  id        String   @id @default(uuid())
-  clientId  String
-  userId    String
-  scopes    Json     // 用户同意的作用域数组
-  expiresAt DateTime?
-  revoked   Boolean  @default(false)
-  revokedAt DateTime?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // 关系
-  client    Client   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@unique([clientId, userId])
-  @@map("consents")
-}
-
-// ===== 应用管理模型 =====
-model Application {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  displayName String
-  description String?
-  
-  // 应用配置
-  url         String?
-  icon        String?
-  category    String? // business, system, tool
-  
-  // OAuth集成
-  clientId    String? @unique // 关联的OAuth客户端
-  requiredScopes Json? // 应用需要的OAuth作用域
-  
-  // 应用状态
-  isActive    Boolean @default(true)
-  isPublic    Boolean @default(false) // 是否公开应用
-  
-  // 排序和分组
-  sortOrder   Int     @default(0)
-  groupName   String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 关系
-  users       ApplicationUser[]
-  
-  @@map("applications")
-}
-
-// 用户应用访问权限
-model ApplicationUser {
-  id            String @id @default(uuid())
-  userId        String
-  applicationId String
-  
-  // 访问权限
-  canAccess     Boolean   @default(true)
-  assignedBy    String?   // 分配者ID
-  assignedAt    DateTime  @default(now())
-  
-  // 个性化配置
-  isBookmarked  Boolean   @default(false)
-  customName    String?   // 用户自定义应用名称
-  sortOrder     Int       @default(0)
-  
-  lastAccessAt  DateTime?
-  accessCount   Int       @default(0)
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // 关系
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, applicationId])
-  @@map("application_users")
-}
-
-// ===== 审计日志模型 =====
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  action    String   // 操作类型
-  resource  String   // 操作资源
-  details   Json?    // 操作详情
-  
-  // OAuth上下文
-  clientId  String?  // 客户端ID
-  scopes    Json?    // 操作时的作用域
-  
-  // 请求上下文
-  ipAddress String?
-  userAgent String?
-  sessionId String?
-  
-  // 结果
-  success   Boolean
-  errorMsg  String?
-  
-  createdAt DateTime @default(now())
-  
-  // 关系
-  user      User?    @relation(fields: [userId], references: [id])
-  
-  @@index([userId, createdAt])
-  @@index([action, resource])
-  @@index([clientId, createdAt])
-  @@map("audit_logs")
-}
-
-// ===== 会话管理模型 =====
-model Session {
-  id        String   @id @default(uuid())
-  sessionId String   @unique
-  userId    String
-  
-  // OAuth上下文
-  clientId  String?  // 当前会话的主要客户端
-  scopes    Json?    // 会话中的授权作用域
-  
-  // 会话信息
-  ipAddress String?
-  userAgent String?
-  location  String?
-  
-  // 会话状态
-  isActive  Boolean  @default(true)
+  // 有效性
   expiresAt DateTime
+  isUsed    Boolean  @default(false)
   
-  // 会话数据
-  data      Json?
-  
+  // 时间戳
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([userId, isActive])
-  @@index([expiresAt])
-  @@map("sessions")
-}
-
-// ===== 系统配置模型 =====
-model SystemConfig {
-  id          String  @id @default(uuid())
-  key         String  @unique
-  value       String  @db.Text
-  description String?
-  category    String? // security, oauth, rbac, abac, etc.
-  
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([category])
-  @@map("system_configs")
-}
-
-// ===== 现代化OAuth→RBAC→ABAC集成模型 =====
-
-// 动态作用域管理
-model DynamicScope {
-  id          String   @id @default(uuid())
-  template    String   // "data:department:{user.department}"
-  name        String   
-  description String?
-  category    String   // "hierarchical", "conditional", "constraint", "composite"
-  isActive    Boolean  @default(true)
-  
-  // 约束条件
-  constraints Json?    // 存储约束规则JSON
-  contextRules Json?   // 上下文规则JSON
-  
-  // 过期策略
-  expiryType  String?  // "absolute", "sliding", "usage_based"
-  expiryValue Int?     // 过期时间（秒）
-  maxUsage    Int?     // 最大使用次数
+  usedAt    DateTime?
   
   // 关联关系
-  scopeAssignments ScopeAssignment[]
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   
-  // 审计字段
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   String?
-  
-  @@map("dynamic_scopes")
-  @@index([category, isActive])
-  @@index([template])
+  @@map("authorization_codes")
+  @@index([code])
+  @@index([userId, expiresAt])
+  @@index([clientId])
+  @@index([expiresAt, isUsed])
 }
 
-model ScopeAssignment {
-  id            String      @id @default(uuid())
-  dynamicScope  DynamicScope @relation(fields: [scopeId], references: [id], onDelete: Cascade)
-  scopeId       String
-  
-  // 分配目标
-  targetType    String      // "role", "user", "client", "resource"
-  targetId      String
-  
-  // 分配条件
-  conditions    Json?       // 激活条件JSON
-  constraints   Json?       // 运行时约束JSON
-  
-  // 状态管理
-  isActive      Boolean     @default(true)
-  activatedAt   DateTime?
-  deactivatedAt DateTime?
-  
-  // 使用统计
-  usageCount    Int         @default(0)
-  lastUsedAt    DateTime?
-  
-  // 审计字段
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  assignedBy    String?
-  
-  @@map("scope_assignments")
-  @@index([targetType, targetId])
-  @@index([scopeId, isActive])
-}
-
-// 权限事件管理
-model PermissionEvent {
-  id          String   @id @default(uuid())
-  eventType   String   // "role_changed", "permission_granted", "policy_updated", "scope_modified"
-  eventData   Json
-  
-  // 事件源
-  sourceType  String   // "user", "admin", "system", "api"
-  sourceId    String?
-  
-  // 影响范围
-  affectedEntities Json // 受影响的实体列表
-  
-  // 处理状态
-  status      String   @default("pending") // "pending", "processing", "completed", "failed"
-  processedAt DateTime?
-  
-  // 同步状态
-  syncStatus  Json?    // 各系统同步状态
-  
-  // 审计字段
-  occurredAt  DateTime @default(now())
-  
-  @@map("permission_events")
-  @@index([eventType, status])
-  @@index([occurredAt])
-  @@index([sourceType, sourceId])
-}
-
-// 策略版本管理
-model PolicyVersion {
-  id              String   @id @default(uuid())
-  policy          Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  policyId        String
-  
-  // 版本信息
-  version         String
-  changeLog       String?
-  
-  // 策略内容快照
-  policySnapshot  Json     // 完整策略内容
-  
-  // 部署信息
-  isActive        Boolean  @default(false)
-  deployedAt      DateTime?
-  rollbackAt      DateTime?
-  
-  // 性能指标
-  performanceMetrics Json?
-  
-  // 审计字段
-  createdAt       DateTime @default(now())
-  createdBy       String?
-  
-  @@map("policy_versions")
-  @@index([policyId, version])
-  @@index([isActive, deployedAt])
-}
-
-// 智能缓存管理
+// ===== 权限缓存模型 =====
 model PermissionCache {
-  id              String   @id @default(uuid())
-  cacheKey        String   @unique
-  cacheType       String   // "permission", "role", "scope", "policy"
+  id          String @id @default(uuid())
+  userId      String
+  permission  String // 权限标识符
+  resourceId  String? // 资源ID，为空表示通用权限
+  contextHash String? // 上下文哈希，用于ABAC缓存
   
-  // 缓存内容
-  cacheData       Json
+  // 缓存结果
+  allowed  Boolean
+  reason   String  // RBAC_ALLOWED, ABAC_ALLOWED, DENIED等
+  ttl      Int     // 生存时间(秒)
   
   // 缓存元数据
-  dependsOn       Json     // 依赖的实体ID列表
-  invalidationTriggers Json // 失效触发器
+  hitCount  Int @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
   
-  // 有效期管理
-  expiresAt       DateTime
-  lastAccessed    DateTime @default(now())
-  accessCount     Int      @default(0)
-  
-  // 性能统计
-  hitCount        Int      @default(0)
-  missCount       Int      @default(0)
-  
-  // 审计字段
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  @@unique([userId, permission, resourceId, contextHash])
   @@map("permission_cache")
-  @@index([cacheType, expiresAt])
-  @@index([lastAccessed])
-  @@index([cacheKey])
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+// ===== 策略评估记录 =====
+model PolicyEvaluation {
+  id           String @id @default(uuid())
+  policyId     String
+  userId       String
+  permission   String
+  resourceId   String?
+  
+  // 评估结果
+  result       Boolean  // 策略评估结果
+  executionMs  Int      // 执行时间(毫秒)
+  context      Json?    // 基本评估上下文: IP、时间、地点等
+  
+  // 时间戳
+  evaluatedAt DateTime @default(now())
+  
+  // 关联关系
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  
+  @@map("policy_evaluations")
+  @@index([policyId, evaluatedAt])
+  @@index([userId, permission])
+  @@index([evaluatedAt])
+}
+
+// ===== 审计日志 =====
+model AuditLog {
+  id      String @id @default(uuid())
+  userId  String?
+  
+  // 操作信息
+  action      String   // LOGIN, LOGOUT, PERMISSION_CHECK, ROLE_ASSIGN等
+  resource    String?  // 操作的资源
+  details     Json?    // 详细信息
+  
+  // 请求信息
+  ipAddress   String?
+  userAgent   String?
+  
+  // 结果信息
+  success     Boolean
+  errorMsg    String?
+  riskLevel   String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  
+  // 关联关系
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("audit_logs")
+  @@index([userId, action, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@index([riskLevel, createdAt])
+}
+
+// ===== 系统配置 =====
+model SystemConfig {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+  description String?
+  
+  // 配置元数据
+  category    String  @default("general")
+  dataType    String  @default("string") // string, number, boolean, json
+  isEncrypted Boolean @default(false)
+  isReadonly  Boolean @default(false)
+  
+  // 时间戳
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_config")
+  @@index([key])
+  @@index([category])
 }
