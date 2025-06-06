@@ -49,71 +49,125 @@ async function main() {
     });
   }
 
-  // Create default resources
-  console.log('Creating default resources...');
-  const resources = [
-    {
-      name: 'user_profile',
-      description: 'User profile and personal information',
-      apiPath: '/api/users/*',
-    },
-    {
-      name: 'permissions',
-      description: 'User permissions and authorization management',
-      apiPath: '/api/permissions/*',
-    },
-    {
-      name: 'scopes',
-      description: 'OAuth 2.0 scope management',
-      apiPath: '/api/scopes/*',
-    },
-    {
-      name: 'clients',
-      description: 'OAuth 2.0 client management',
-      apiPath: '/api/clients/*',
-    },
-    {
-      name: 'audit_logs',
-      description: 'System audit logs and security monitoring',
-      apiPath: '/api/audit/*',
-    },
+  // Remove or comment out old resource and permission seeding
+  // console.log('Removing old default resources and permissions...');
+  // Old resource and generic permission seeding logic is removed.
+
+  // 1. Create PRD-compliant Permissions
+  console.log('Creating PRD-compliant permissions...');
+  const permissionsData = [
+    { identifier: 'system:user:create', name: 'Create System Users', description: 'Allows creating new system users.', category: 'system', resource: 'user', action: 'create' },
+    { identifier: 'system:user:read', name: 'Read System Users', description: 'Allows reading system user information.', category: 'system', resource: 'user', action: 'read' },
+    { identifier: 'system:user:update', name: 'Update System Users', description: 'Allows updating existing system users.', category: 'system', resource: 'user', action: 'update' },
+    { identifier: 'system:user:delete', name: 'Delete System Users', description: 'Allows deleting system users.', category: 'system', resource: 'user', action: 'delete' },
+    { identifier: 'system:role:manage', name: 'Manage Roles', description: 'Allows managing roles and their permissions.', category: 'system', resource: 'role', action: 'manage' },
+    { identifier: 'system:client:manage', name: 'Manage OAuth Clients', description: 'Allows managing OAuth clients.', category: 'system', resource: 'client', action: 'manage' },
+    { identifier: 'system:permission:manage', name: 'Manage Permissions', description: 'Allows managing permissions definitions.', category: 'system', resource: 'permission', action: 'manage' },
+    { identifier: 'system:audit:read', name: 'Read Audit Logs', description: 'Allows reading audit logs.', category: 'system', resource: 'audit', action: 'read' },
+    { identifier: 'app:dashboard:access', name: 'Access Admin Dashboard', description: 'Allows accessing the admin dashboard application.', category: 'app', resource: 'dashboard', action: 'access' },
   ];
 
-  for (const resource of resources) {
-    await prisma.resource.upsert({
-      where: { name: resource.name },
-      update: resource,
-      create: resource,
+  const createdPermissions = [];
+  for (const pData of permissionsData) {
+    const permission = await prisma.permission.upsert({
+      where: { identifier: pData.identifier },
+      update: { name: pData.name, description: pData.description, category: pData.category, resource: pData.resource, action: pData.action },
+      create: pData,
     });
+    createdPermissions.push(permission);
+    console.log(`Upserted permission: ${permission.identifier}`);
   }
 
-  // Create default permissions
-  console.log('Creating default permissions...');
-  const permissions = [
-    { name: 'read', description: 'Read access to resource' },
-    { name: 'write', description: 'Write/modify access to resource' },
-    { name: 'delete', description: 'Delete access to resource' },
-    { name: 'read_any', description: 'Read access to any instance of resource' },
-    { name: 'write_any', description: 'Write access to any instance of resource' },
-    { name: 'delete_any', description: 'Delete access to any instance of resource' },
-    { name: 'admin', description: 'Full administrative access to resource' },
+  // 2. Create Roles
+  console.log('Creating roles...');
+  const rolesData = [
+    { name: 'super_admin', displayName: 'Super Administrator', description: 'Has all system permissions.', isSystem: true, parentName: null },
+    { name: 'system_admin', displayName: 'System Administrator', description: 'Manages system configurations, users, and clients.', isSystem: false, parentName: 'super_admin' },
+    { name: 'app_admin', displayName: 'Application Administrator', description: 'Manages application-specific settings.', isSystem: false, parentName: 'super_admin' },
+    { name: 'employee', displayName: 'Employee', description: 'Standard employee role.', isSystem: false, parentName: null },
+    { name: 'department_manager', displayName: 'Department Manager', description: 'Manages a department.', isSystem: false, parentName: 'employee' },
+    { name: 'project_manager', displayName: 'Project Manager', description: 'Manages projects.', isSystem: false, parentName: 'employee' },
+    { name: 'senior_employee', displayName: 'Senior Employee', description: 'Senior employee with additional responsibilities.', isSystem: false, parentName: 'employee' },
   ];
 
-  for (const permission of permissions) {
-    await prisma.permission.upsert({
-      where: { name: permission.name },
-      update: permission,
-      create: permission,
+  const createdRoles: Record<string, any> = {}; // Store created roles by name for easy access
+
+  for (const rData of rolesData) {
+    let parentId: string | undefined = undefined;
+    if (rData.parentName && createdRoles[rData.parentName]) {
+      parentId = createdRoles[rData.parentName].id;
+    }
+    const role = await prisma.role.upsert({
+      where: { name: rData.name },
+      update: { displayName: rData.displayName, description: rData.description, isSystem: rData.isSystem, parentId: parentId },
+      create: { name: rData.name, displayName: rData.displayName, description: rData.description, isSystem: rData.isSystem, parentId: parentId },
     });
+    createdRoles[rData.name] = role;
+    console.log(`Upserted role: ${role.name}`);
   }
 
-  // Create admin user
+  // 3. Assign Permissions to Roles
+  console.log('Assigning permissions to roles...');
+
+  // Helper to find permission ID by identifier
+  const getPermissionId = (identifier: string) => {
+    const perm = createdPermissions.find(p => p.identifier === identifier);
+    if (!perm) throw new Error(`Permission ${identifier} not found`);
+    return perm.id;
+  };
+
+  // Super Admin gets all system permissions
+  const superAdminPermissions = createdPermissions.filter(p => p.category === 'system').map(p => p.id);
+  if (createdRoles['super_admin']) {
+    for (const permissionId of superAdminPermissions) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: createdRoles['super_admin'].id, permissionId } },
+        update: {},
+        create: { roleId: createdRoles['super_admin'].id, permissionId },
+      });
+    }
+    console.log(`Assigned ${superAdminPermissions.length} permissions to super_admin.`);
+  }
+
+  // System Admin permissions
+  if (createdRoles['system_admin']) {
+    const systemAdminPermIdentifiers = [
+      'system:user:create', 'system:user:read', 'system:user:update', 'system:user:delete',
+      'system:client:manage', 'system:audit:read', 'app:dashboard:access', 'system:role:manage', 'system:permission:manage' // Added role & perm manage
+    ];
+    for (const pIdentifier of systemAdminPermIdentifiers) {
+      try {
+        const permissionId = getPermissionId(pIdentifier);
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: createdRoles['system_admin'].id, permissionId } },
+          update: {},
+          create: { roleId: createdRoles['system_admin'].id, permissionId },
+        });
+      } catch (e) { console.error(`Error assigning ${pIdentifier} to system_admin: ${e}`); }
+    }
+    console.log(`Assigned permissions to system_admin.`);
+  }
+
+  // Employee basic access
+   if (createdRoles['employee']) {
+    try {
+        const permId = getPermissionId('app:dashboard:access');
+        await prisma.rolePermission.upsert({
+            where: { roleId_permissionId: { roleId: createdRoles['employee'].id, permissionId: permId } },
+            update: {},
+            create: { roleId: createdRoles['employee'].id, permissionId: permId },
+        });
+        console.log('Assigned app:dashboard:access to employee.');
+    } catch(e) { console.error(`Error assigning app:dashboard:access to employee: ${e}`); }
+  }
+
+
+  // Create admin user (ensure this is after role creation if assigning role immediately)
   console.log('Creating admin user...');
   const hashedPassword = await bcrypt.hash('admin123456', 12);
-  
   const adminUser = await prisma.user.upsert({
     where: { username: 'admin' },
-    update: {},
+    update: {}, // No changes to user data itself if it exists
     create: {
       username: 'admin',
       email: 'admin@example.com',
@@ -125,33 +179,26 @@ async function main() {
     },
   });
 
-  // Grant admin permissions to admin user
-  console.log('Granting admin permissions...');
-  const allResources = await prisma.resource.findMany();
-  const adminPermission = await prisma.permission.findUnique({
-    where: { name: 'admin' },
-  });
-
-  if (adminPermission) {
-    for (const resource of allResources) {
-      await prisma.userResourcePermission.upsert({
-        where: {
-          userId_resourceId_permissionId: {
-            userId: adminUser.id,
-            resourceId: resource.id,
-            permissionId: adminPermission.id,
-          },
-        },
-        update: {},
-        create: {
-          userId: adminUser.id,
-          resourceId: resource.id,
-          permissionId: adminPermission.id,
-          grantedBy: adminUser.id,
-        },
-      });
-    }
+  // 4. Assign 'super_admin' Role to Admin User
+  console.log('Assigning super_admin role to admin user...');
+  if (adminUser && createdRoles['super_admin']) {
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: adminUser.id, roleId: createdRoles['super_admin'].id } },
+      update: { assignedBy: adminUser.id }, // Update who assigned it if entry exists
+      create: {
+        userId: adminUser.id,
+        roleId: createdRoles['super_admin'].id,
+        assignedBy: adminUser.id, // Self-assigned or by a system process
+      },
+    });
+    console.log('Assigned super_admin role to admin user.');
+  } else {
+    console.error('Admin user or super_admin role not found for assignment.');
   }
+
+  // Comment out or remove old admin permission grant loop
+  // console.log('Removing old admin permission grants...');
+  // Old direct permission grant logic for adminUser is removed.
 
   // Create test OAuth client
   console.log('Creating test OAuth client...');
@@ -213,20 +260,25 @@ async function main() {
   });
 
   // Create admin OAuth client for the management center itself
-  console.log('Creating admin management center client...');
+  console.log('Creating auth center client...');
   await prisma.client.upsert({
-    where: { clientId: 'admin-center' },
-    update: {},
+    where: { clientId: 'auth-center-self' },
+    update: {
+      name: 'Authentication Center Self Client',
+      clientSecret: 'auth-center-secret',
+      redirectUris: JSON.stringify([
+        'http://localhost:3000/auth/callback',
+      ]),
+      scope: 'profile:read users:manage clients:manage permissions:manage audit:read openid email',
+      // Retain other existing values or update as per full requirements if they changed
+    },
     create: {
-      clientId: 'admin-center',
-      clientSecret: 'admin-center-secret',
-      name: 'OAuth 2.0 Admin Center',
+      clientId: 'auth-center-self',
+      clientSecret: 'auth-center-secret',
+      name: 'Authentication Center Self Client',
       description: 'Internal OAuth 2.0 client for the admin management center',
       redirectUris: JSON.stringify([
-        'http://localhost:3000/datamgr_flow/auth/callback',
-        'http://localhost:3001/datamgr_flow/auth/callback',
-        'http://localhost:3002/datamgr_flow/auth/callback',
-        'https://your-domain.com/datamgr_flow/auth/callback',
+        'http://localhost:3000/auth/callback',
       ]),
       postLogoutRedirectUris: JSON.stringify([
         'http://localhost:3000/datamgr_flow',
@@ -234,7 +286,7 @@ async function main() {
         'http://localhost:3002/datamgr_flow',
         'https://your-domain.com/datamgr_flow',
       ]),
-      scope: 'openid profile email admin',
+      scope: 'profile:read users:manage clients:manage permissions:manage audit:read openid email',
       isPublic: false,
       requirePkce: true,
       requireConsent: false, // Skip consent for internal admin client
@@ -246,12 +298,15 @@ async function main() {
 
   console.log('✅ Database seeding completed successfully!');
   console.log('\n📋 Summary:');
-  console.log('- Created default scopes, resources, and permissions');
-  console.log('- Created admin user (username: admin, password: admin123456)');
+  console.log('- Created default scopes.');
+  console.log('- Created PRD-compliant permissions.');
+  console.log('- Created PRD-compliant roles.');
+  console.log('- Assigned permissions to roles.');
+  console.log('- Created admin user (username: admin, password: admin123456) and assigned super_admin role.');
   console.log('- Created test OAuth clients:');
   console.log('  • test-client (confidential client)');
   console.log('  • spa-client (public client for SPAs)');
-  console.log('  • admin-center (internal admin client)');
+  console.log('  • auth-center-self (internal admin client)');
   console.log('\n⚠️  Remember to change the admin password in production!');
 }
 
