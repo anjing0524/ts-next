@@ -2,119 +2,118 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { authApi, getOAuthRedirectUri } from '@/lib/api';
+import { authApi, getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Terminal } from 'lucide-react';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Processing authorization...');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const handleCallback = async () => {
+    const exchangeCodeForToken = async () => {
+      const code = searchParams.get('code');
+      const state = searchParams.get('state'); // You might want to validate state if you generated one
+
+      if (!code) {
+        setError('Authorization code not found in callback.');
+        setIsLoading(false);
+        return;
+      }
+
+      const codeVerifier = sessionStorage.getItem('code_verifier');
+      if (!codeVerifier) {
+        setError('Code verifier not found. Please try logging in again.');
+        setIsLoading(false);
+        return;
+      }
+      // Remove code verifier from session storage after retrieving it
+      sessionStorage.removeItem('code_verifier');
+
       try {
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
-        const error = searchParams.get('error');
-
-        if (error) {
-          setStatus('error');
-          setMessage(`Authorization failed: ${error}`);
-          return;
-        }
-
-        if (!code) {
-          setStatus('error');
-          setMessage('No authorization code received');
-          return;
-        }
-
-        // Exchange authorization code for tokens
-        const tokenResponse = await authApi.exchangeToken({
+        const params = new URLSearchParams({
           grant_type: 'authorization_code',
           code: code,
-          redirect_uri: getOAuthRedirectUri(),
-          client_id: 'admin-center',
-          client_secret: 'admin-center-secret',
-          code_verifier: sessionStorage.getItem('code_verifier') || '',
+          redirect_uri: getOAuthRedirectUri(), // Make sure this matches the one used in /authorize
+          client_id: 'auth-center-self', // As configured in seed and login page
+          code_verifier: codeVerifier,
         });
 
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json();
-          throw new Error(errorData.error_description || 'Token exchange failed');
+        const response = await fetch('/api/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(data.error_description || data.error || 'Failed to exchange token.');
+          setIsLoading(false);
+          return;
         }
 
-        const tokenData = await tokenResponse.json();
-        
-        // Store tokens securely (consider using secure HTTP-only cookies in production)
-        sessionStorage.setItem('access_token', tokenData.access_token);
-        if (tokenData.refresh_token) {
-          sessionStorage.setItem('refresh_token', tokenData.refresh_token);
+        if (data.access_token) {
+          document.cookie = `auth_token=${data.access_token}; path=/; SameSite=Lax`; // Add Secure in production
+        }
+        if (data.refresh_token) {
+          sessionStorage.setItem('refresh_token', data.refresh_token);
         }
 
-        // Clean up PKCE code verifier
-        sessionStorage.removeItem('code_verifier');
+        // Redirect to dashboard or intended page
+        // For now, redirecting to /dashboard
+        const redirectTo = searchParams.get('redirect_uri_after_login') || '/dashboard';
+        router.push(redirectTo);
 
-        setStatus('success');
-        setMessage('Authorization successful! Redirecting...');
-
-        // Redirect to dashboard
-        setTimeout(() => {
-          router.push('/admin');
-        }, 1000);
-
-      } catch (error) {
-        console.error('Callback error:', error);
-        setStatus('error');
-        setMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+      } catch (err) {
+        console.error('Token exchange error:', err);
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred during token exchange.');
+        setIsLoading(false);
       }
     };
 
-    handleCallback();
-  }, [searchParams, router]);
+    exchangeCodeForToken();
+  }, [router, searchParams]);
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-center">
+          <p className="text-lg font-semibold">Processing authentication...</p>
+          {/* You can add a spinner or loading animation here */}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-red-50 p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Authentication Error</AlertTitle>
+          <AlertDescription>
+            {error}
+            <button
+              onClick={() => router.push('/login')}
+              className="mt-4 block w-full text-center px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Return to Login
+            </button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Should not be reached if loading or error is handled, but as a fallback:
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 p-4">
-      <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">
-            {status === 'loading' && 'Processing...'}
-            {status === 'success' && 'Success!'}
-            {status === 'error' && 'Error'}
-          </CardTitle>
-          <CardDescription className="text-gray-600">
-            OAuth 2.0 Authorization
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          {status === 'loading' && (
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{message}</span>
-            </div>
-          )}
-          {status === 'success' && (
-            <div className="text-green-600 space-y-2">
-              <div className="text-lg">✓</div>
-              <div>{message}</div>
-            </div>
-          )}
-          {status === 'error' && (
-            <div className="text-red-600 space-y-2">
-              <div className="text-lg">✗</div>
-              <div>{message}</div>
-              <button 
-                onClick={() => router.push('/login')}
-                className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <p>Redirecting...</p>
     </div>
   );
-} 
+}

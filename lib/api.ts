@@ -1,5 +1,14 @@
 import { toast } from '@/components/ui/use-toast';
 
+// Helper function to get a cookie value
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
 // Get the base path from Next.js config
 // In development, basePath is empty, in production it's '/datamgr_flow'
 const getBasePath = () => {
@@ -33,7 +42,14 @@ export async function apiFetch(
   };
 
   // Get access token if available for authenticated requests
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
+  let token: string | null = null;
+  if (typeof window !== 'undefined') {
+    token = getCookie('auth_token'); // Prioritize cookie
+    if (!token) {
+      token = sessionStorage.getItem('access_token'); // Fallback to sessionStorage
+    }
+  }
+
   if (token && !options.headers) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   } else if (token && options.headers && !(options.headers as Record<string, string>)['Authorization']) {

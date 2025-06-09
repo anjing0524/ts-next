@@ -1,173 +1,155 @@
-// app/api/users/[userId]/permissions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import {prisma} from '@/lib/prisma';
-import { z } from 'zod';
-import logger from '@/utils/logger';
+import { prisma } from '@/lib/prisma';
+import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { AuthorizationUtils } from '@/lib/auth/oauth2';
+// Assuming a Redis client setup, e.g., import { redis } from '@/lib/redis';
+// For now, we'll simulate cache logic and focus on permission calculation.
 
-
-// Zod schema for granting a permission
-const grantPermissionSchema = z.object({
-  resourceId: z.string().uuid({ message: "Invalid Resource ID format" }),
-  permissionId: z.string().uuid({ message: "Invalid Permission ID format" }),
-});
-
-interface RouteContext {
+interface UserPermissionsRouteParams {
   params: {
     userId: string;
   };
 }
 
-// POST /api/users/[userId]/permissions - Grant a permission to a user
-export async function POST(request: NextRequest, { params }: RouteContext) {
-  const { userId } = await params;
-  logger.info(`Attempting to grant permission to user ID: ${userId}`);
+// Helper function to get all parent roles for a given roleId
+async function getRoleHierarchy(roleId: string, allRolesMap: Map<string, { id: string; parentId: string | null }>): Promise<string[]> {
+  const hierarchy = new Set<string>();
+  let currentRoleId: string | null = roleId;
+  while (currentRoleId && !hierarchy.has(currentRoleId)) {
+    hierarchy.add(currentRoleId);
+    const role = allRolesMap.get(currentRoleId);
+    currentRoleId = role?.parentId || null;
+  }
+  return Array.from(hierarchy);
+}
 
-  let body: any = {}; // Declare body variable in broader scope
 
+// GET /api/users/{userId}/permissions - List all effective permissions for a user
+async function getUserEffectivePermissions(request: NextRequest, { params }: UserPermissionsRouteParams, authContext: AuthContext) {
   try {
-    body = await request.json();
-    const validation = grantPermissionSchema.safeParse(body);
-
-    if (!validation.success) {
-      logger.warn(`Grant permission validation failed for user ID ${userId}`, { errors: validation.error.flatten().fieldErrors });
-      return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
+    const userId = params.userId;
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)) {
+        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
     }
 
-    const { resourceId, permissionId } = validation.data;
-
-    // Check if User, Resource, and Permission entities exist
-    const userExists = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userExists) {
-      logger.warn(`Grant permission failed: User with ID ${userId} not found.`);
-      return NextResponse.json({ message: `User with ID ${userId} not found.` }, { status: 404 });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const resourceExists = await prisma.resource.findUnique({ where: { id: resourceId } });
-    if (!resourceExists) {
-      logger.warn(`Grant permission failed: Resource with ID ${resourceId} not found.`);
-      return NextResponse.json({ message: `Resource with ID ${resourceId} not found.` }, { status: 404 });
-    }
+    // --- Placeholder for Cache Read ---
+    // const cacheKey = `user_permissions:${userId}`;
+    // const cachedPermissions = await redis.get(cacheKey);
+    // if (cachedPermissions) {
+    //   return NextResponse.json(JSON.parse(cachedPermissions), { status: 200 });
+    // }
+    // --- End Placeholder ---
 
-    const permissionExists = await prisma.permission.findUnique({ where: { id: permissionId } });
-    if (!permissionExists) {
-      logger.warn(`Grant permission failed: Permission with ID ${permissionId} not found.`);
-      return NextResponse.json({ message: `Permission with ID ${permissionId} not found.` }, { status: 404 });
-    }
+    const effectivePermissions = new Map<string, { identifier: string; name: string; description: string | null; source: string; sourceDetail: string }>();
 
-    // Create the UserResourcePermission entry
-    const newUserResourcePermission = await prisma.userResourcePermission.create({
-      data: {
-        userId,
-        resourceId,
-        permissionId,
+    // 1. Get directly assigned active permissions
+    const directUserPermissions = await prisma.userPermission.findMany({
+      where: {
+        userId: userId,
+        isActive: true,
+        permission: { isActive: true },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
       },
-      include: { // Include related details for a more informative response
-        resource: true,
-        permission: true,
+      include: { permission: true },
+    });
+
+    directUserPermissions.forEach(up => {
+      if (up.permission) {
+        effectivePermissions.set(up.permission.identifier, {
+            identifier: up.permission.identifier,
+            name: up.permission.name,
+            description: up.permission.description,
+            source: 'direct',
+            sourceDetail: 'Directly Assigned'
+        });
       }
     });
 
-    logger.info(`Permission granted successfully for user ID ${userId}: Resource "${resourceExists.name}", Permission "${permissionExists.name}"`);
-    return NextResponse.json(newUserResourcePermission, { status: 201 });
-
-  } catch (error: any) {
-    logger.error(`Error granting permission to user ID ${userId}:`, { error });
-    if (error.code === 'P2002') { // Unique constraint violation
-      logger.warn(`Grant permission conflict for user ID ${userId}: Permission likely already exists.`);
-      // Optionally, fetch and return the existing permission
-      const existingPermission = await prisma.userResourcePermission.findUnique({
-        where: { 
-            userId_resourceId_permissionId: {
-                userId: userId,
-                resourceId: (error.meta?.target as string[])?.includes('resourceId') ? body.resourceId : undefined, // These might not be reliable for P2002 on compound key
-                permissionId: (error.meta?.target as string[])?.includes('permissionId') ? body.permissionId : undefined,
-            }
-        },
-        include: { resource: true, permission: true }
-      });
-       if(existingPermission) {
-         return NextResponse.json(existingPermission, { status: 200 }); // Return 200 if already exists
-       }
-      return NextResponse.json({ message: 'This permission is already granted to the user.' }, { status: 409 });
-    }
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
-  }
-}
-
-// DELETE /api/users/[userId]/permissions?resourceId=<resourceId>&permissionId=<permissionId> - Revoke a permission from a user
-export async function DELETE(request: NextRequest, { params }: RouteContext) {
-  const { userId } = await params;
-  const { searchParams } = new URL(request.url);
-  const resourceId = searchParams.get('resourceId');
-  const permissionId = searchParams.get('permissionId');
-
-  logger.info(`Attempting to revoke permission for user ID: ${userId}, Resource ID: ${resourceId}, Permission ID: ${permissionId}`);
-
-  if (!resourceId || !permissionId) {
-    logger.warn(`Revoke permission validation failed for user ID ${userId}: Missing resourceId or permissionId in query params.`);
-    return NextResponse.json({ message: 'Missing resourceId or permissionId in query parameters' }, { status: 400 });
-  }
-
-  // Optional: Validate UUID format for resourceId and permissionId from query if needed
-  // const uuidSchema = z.string().uuid();
-  // if (!uuidSchema.safeParse(resourceId).success || !uuidSchema.safeParse(permissionId).success) {
-  //   return NextResponse.json({ message: 'Invalid resourceId or permissionId format in query parameters' }, { status: 400 });
-  // }
-  
-  try {
-    // Find the specific UserResourcePermission entry to get its ID for deletion,
-    // or use Prisma's deleteMany with the compound key if preferred (though deleting by ID is often safer).
-    // Here, using delete with the unique compound key.
-    const result = await prisma.userResourcePermission.delete({
+    // 2. Get permissions from active roles, considering hierarchy
+    const userRoles = await prisma.userRole.findMany({
       where: {
-        userId_resourceId_permissionId: {
-          userId: userId,
-          resourceId: resourceId,
-          permissionId: permissionId,
+        userId: userId,
+        isActive: true,
+        role: { isActive: true },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+      },
+      include: { role: true },
+    });
+
+    if (userRoles.length > 0) {
+      // Fetch all active roles once to build hierarchy map efficiently
+      const allActiveRoles = await prisma.role.findMany({ where: { isActive: true }, select: { id: true, parentId: true, name: true } });
+      const allRolesMap = new Map(allActiveRoles.map(r => [r.id, r]));
+
+      const allRelevantRoleIds = new Set<string>();
+      for (const ur of userRoles) {
+        if (ur.role) {
+          const roleHierarchyIds = await getRoleHierarchy(ur.role.id, allRolesMap);
+          roleHierarchyIds.forEach(id => allRelevantRoleIds.add(id));
         }
-      },
-    });
+      }
 
-    logger.info(`Permission revoked successfully for user ID ${userId}: Resource ID ${resourceId}, Permission ID ${permissionId}`);
-    return NextResponse.json({ message: "Permission revoked successfully" }, { status: 200 });
-    // return new NextResponse(null, { status: 204 }); // No content response
+      if (allRelevantRoleIds.size > 0) {
+        const rolePermissions = await prisma.rolePermission.findMany({
+          where: {
+            roleId: { in: Array.from(allRelevantRoleIds) },
+            permission: { isActive: true },
+          },
+          include: { permission: true, role: { select: { name: true, displayName: true } } },
+        });
 
-  } catch (error: any) {
-    logger.error(`Error revoking permission for user ID ${userId}, Resource ID ${resourceId}, Permission ID ${permissionId}:`, { error });
-    if (error.code === 'P2025') { // Record to delete not found (thrown by `delete` if `where` condition not met)
-      logger.warn(`Revoke permission failed: No matching permission found for user ID ${userId}, Resource ID ${resourceId}, Permission ID ${permissionId}.`);
-      return NextResponse.json({ message: 'Permission assignment not found' }, { status: 404 });
+        rolePermissions.forEach(rp => {
+          if (rp.permission && !effectivePermissions.has(rp.permission.identifier)) { // Add only if not already present from direct assignment or higher precedence
+            effectivePermissions.set(rp.permission.identifier, {
+                identifier: rp.permission.identifier,
+                name: rp.permission.name,
+                description: rp.permission.description,
+                source: 'role',
+                sourceDetail: `${rp.role.displayName} (${rp.role.name})`
+            });
+          }
+        });
+      }
     }
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+
+    const permissionsArray = Array.from(effectivePermissions.values());
+
+    // --- Placeholder for Cache Write ---
+    // await redis.set(cacheKey, JSON.stringify(permissionsArray), { EX: 15 * 60 }); // 15 minutes
+    // --- End Placeholder ---
+
+    // Log audit event for permission query if needed, e.g., for sensitive users or frequent checks.
+    // For now, this is treated as a normal data read.
+    // Consider if authContext.user_id (current admin) is different from params.userId (target user)
+    // to log who is querying whose permissions.
+
+    return NextResponse.json({
+        userId: userId,
+        permissions: permissionsArray,
+        retrievedAt: new Date().toISOString(),
+        // cached: false // Add cache status if implementing cache
+    }, { status: 200 });
+
+  } catch (error) {
+    console.error(`Error fetching effective permissions for user ${params.userId}:`, error);
+    // Add audit log for failure if necessary
+    return NextResponse.json({ error: 'Failed to fetch effective permissions' }, { status: 500 });
   }
 }
 
-// GET /api/users/[userId]/permissions - List all permissions for a user
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { userId } = await params;
-  logger.info(`Fetching permissions for user ID: ${userId}`);
-
-  try {
-    // Check if user exists first
-    const userExists = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userExists) {
-        logger.warn(`Cannot fetch permissions: User with ID ${userId} not found.`);
-        return NextResponse.json({ message: `User with ID ${userId} not found.` }, { status: 404 });
-    }
-      
-    const permissions = await prisma.userResourcePermission.findMany({
-      where: { userId: userId },
-      include: {
-        resource: true,   // Include details of the related Resource
-        permission: true, // Include details of the related Permission
-      },
-    });
-
-    logger.info(`Successfully fetched ${permissions.length} permissions for user ID ${userId}.`);
-    return NextResponse.json(permissions, { status: 200 });
-
-  } catch (error: any) {
-    logger.error(`Error fetching permissions for user ID ${userId}:`, { error });
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
-  }
-}
+// Permission for this endpoint:
+// Could be 'system:user:read_permissions' or part of 'system:user:manage' or even 'system:role:manage'
+// For now, let's use 'system:role:manage' as it's already used for role-related APIs.
+// A more specific permission like 'system:user:read_effective_permissions' would be better.
+export const GET = withAuth(getUserEffectivePermissions, { requiredPermissions: ['system:role:manage'] });

@@ -100,10 +100,10 @@ export default function LoginPage() {
         const state = Array.from(stateArray, byte => byte.toString(16).padStart(2, '0')).join('');
 
         const authUrl = new URL(getFullUrl('/api/oauth/authorize'));
-        authUrl.searchParams.set('client_id', 'admin-center');
+        authUrl.searchParams.set('client_id', 'auth-center-self');
         authUrl.searchParams.set('redirect_uri', getOAuthRedirectUri());
         authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('scope', 'openid profile email admin');
+        authUrl.searchParams.set('scope', 'profile:read users:manage clients:manage permissions:manage audit:read openid email');
         authUrl.searchParams.set('code_challenge', codeChallenge);
         authUrl.searchParams.set('code_challenge_method', 'S256');
         authUrl.searchParams.set('state', state);
