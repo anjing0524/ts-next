@@ -1,65 +1,119 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma'; // Verified path
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcrypt';
-import { z } from 'zod';
-import logger from '@/utils/logger'; // Import logger
+import { withAuthEndpoint } from '@/lib/auth/middleware';
+import crypto from 'crypto';
+import { addHours } from 'date-fns';
 
-const loginSchema = z.object({
-  username: z.string().min(1, { message: "Username is required" }),
-  password: z.string().min(1, { message: "Password is required" }),
-});
-
-export async function POST(request: Request) {
-  const prisma = new PrismaClient(); // Instantiate client inside the handler
-  let usernameForLogging: string | undefined = undefined; // For logging in catch/finally
-
+async function handleLogin(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const validation = loginSchema.safeParse(body);
+    const { username, password, returnUrl } = body;
 
-    if (!validation.success) {
-      // Note: Username is not available here if parsing/validation fails early for username itself
-      logger.warn('Login attempt failed due to invalid request body', { errors: validation.error.flatten().fieldErrors });
-      return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
+    if (!username || !password) {
+      return NextResponse.json(
+        { 
+          error: 'invalid_request',
+          error_description: 'Username and password are required' 
+        },
+        { status: 400 }
+      );
     }
 
-    const { username, password } = validation.data;
-    usernameForLogging = username; // Set for logging
-    logger.info(`Login attempt received for username: ${username}`);
-
-    const user = await prisma.user.findUnique({
-      where: { username },
+    // Find user by username or email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: username },
+          { email: username },
+        ],
+        isActive: true,
+      },
     });
 
     if (!user) {
-      logger.warn(`Login failure - user not found for username: ${username}`);
-      return NextResponse.json({ message: "Invalid username or password" }, { status: 401 });
+      return NextResponse.json(
+        { 
+          error: 'invalid_credentials',
+          error_description: 'Invalid username or password' 
+        },
+        { status: 401 }
+      );
     }
 
-    if (user.password == null) {
-        logger.error(`Authentication error - password not set for username: ${username}`);
-        return NextResponse.json({ message: "Authentication error" }, { status: 500 });
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { 
+          error: 'invalid_credentials',
+          error_description: 'Invalid username or password' 
+        },
+        { status: 401 }
+      );
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    // Create user session
+    const sessionId = crypto.randomUUID();
+    const sessionExpiresAt = addHours(new Date(), 24); // 24 hour session
 
-    if (!passwordMatch) {
-      logger.warn(`Login failure - password mismatch for username: ${username}`);
-      return NextResponse.json({ message: "Invalid username or password" }, { status: 401 });
-    }
+    const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+    const userAgent = request.headers.get('user-agent') || undefined;
 
-    logger.info(`Login success for userId: ${user.id}, username: ${username}`);
-    return NextResponse.json({ message: "Login successful", userId: user.id }, { status: 200 });
+    await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        sessionId,
+        ipAddress,
+        userAgent,
+        expiresAt: sessionExpiresAt,
+      },
+    });
 
-  } catch (error) {
-    logger.error(`Internal server error during login for username: ${usernameForLogging || 'unknown'}`, { error });
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
-  } finally {
-    await prisma.$disconnect(); 
-    if (usernameForLogging) {
-        logger.debug(`Login request processing finished for username: ${usernameForLogging}`);
-    } else {
-        logger.debug(`Login request processing finished for an attempt with missing/invalid username.`);
-    }
+    // Update user last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Create response with session cookie
+    const response = NextResponse.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      returnUrl,
+    });
+
+    // Set secure session cookie
+    response.cookies.set('session_id', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: '/',
+    });
+
+    return response;
+
+  } catch (error: any) {
+    console.error('Error during login:', error);
+    
+    return NextResponse.json(
+      { 
+        error: 'server_error',
+        error_description: 'An unexpected error occurred' 
+      },
+      { status: 500 }
+    );
   }
 }
+
+// 使用新的认证端点中间件，自动处理速率限制和审计日志
+export const POST = withAuthEndpoint(handleLogin, 'user_login');

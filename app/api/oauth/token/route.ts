@@ -1,285 +1,696 @@
 // app/api/oauth/token/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, Client } from '@/lib/generated/prisma'; // Import Client type
-import crypto from 'crypto';
-import { addHours, addDays, differenceInSeconds, isPast } from 'date-fns';
-import * as jose from 'jose';
-import logger from '@/utils/logger'; // Assuming logger is available
-
-const prisma = new PrismaClient();
-
-// Helper function to construct the token endpoint URL
-function getTokenEndpointUrl(request: NextRequest): string {
-  const requestUrl = new URL(request.url);
-  // Prefer X-Forwarded-Proto and X-Forwarded-Host if behind a proxy
-  const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.slice(0, -1);
-  const host = request.headers.get('x-forwarded-host') || requestUrl.host;
-  return `${protocol}://${host}/api/oauth/token`;
-}
+import { prisma } from '@/lib/prisma';
+import * as crypto from 'crypto';
+import { addHours, addDays, isPast } from 'date-fns';
+import { 
+  JWTUtils, 
+  AuthorizationUtils, 
+  OAuth2ErrorTypes,
+  ScopeUtils
+} from '@/lib/auth/oauth2';
+import { withOAuthTokenValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 
 // PKCE S256 Verification Helper
 function verifyPkceChallenge(verifier: string, challenge: string): boolean {
   if (!verifier || !challenge) {
-    logger.debug("PKCE verifyPkceChallenge: called with empty verifier or challenge.");
+    console.debug("PKCE verifyPkceChallenge: called with empty verifier or challenge.");
     return false;
   }
-  // Using Node.js crypto.createHash and Buffer.toString('base64url')
-  // This correctly implements SHA256 followed by base64url encoding.
   const calculatedChallenge = crypto
     .createHash('sha256')
     .update(verifier)
-    .digest('base64url'); // Node.js v14.18.0+ for base64url digest
+    .digest('base64url'); 
 
-  logger.debug(`PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`);
+  console.debug(`PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`);
   return calculatedChallenge === challenge;
 }
 
+async function handleTokenRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
+  const { body, client, ipAddress, userAgent, params } = context!;
+  const grant_type = params!.grant_type;
 
-export async function POST(request: NextRequest) {
-  let body;
   try {
-    body = await request.formData();
-  } catch (error) {
-    logger.error("Error parsing form data:", { error });
-    return NextResponse.json({ error: 'invalid_request', error_description: 'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.' }, { status: 400 });
-  }
-
-  const grant_type = body.get('grant_type') as string | null;
-  const code = body.get('code') as string | null;
-  const redirect_uri = body.get('redirect_uri') as string | null;
-  const code_verifier = body.get('code_verifier') as string | null; // PKCE: Get code_verifier
-  
-  // Client Authentication parameters
-  const client_id_param = body.get('client_id') as string | null; // For client_secret_basic/post
-  const client_secret = body.get('client_secret') as string | null; // For client_secret_basic/post
-  const client_assertion_type = body.get('client_assertion_type') as string | null;
-  const client_assertion = body.get('client_assertion') as string | null;
-
-  let authenticatedClient: Client | null = null;
-  let clientIdForTokenProcessing: string | null = null;
-
-  // Validate grant_type first
-  if (grant_type !== 'authorization_code') {
-    logger.warn(`Token request failed: Unsupported grant_type: ${grant_type}`);
-    return NextResponse.json({ error: 'unsupported_grant_type', error_description: 'Grant type must be "authorization_code"' }, { status: 400 });
-  }
-  
-  // Client Authentication Logic
-  if (client_assertion_type === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' && client_assertion) {
-    logger.info('Attempting client authentication with private_key_jwt');
-    try {
-      const decodedJwt = jose.decodeJwt(client_assertion);
-      if (!decodedJwt.iss || !decodedJwt.sub || decodedJwt.iss !== decodedJwt.sub) {
-        logger.warn('private_key_jwt: iss or sub claim missing or mismatched.', { iss: decodedJwt.iss, sub: decodedJwt.sub });
-        return NextResponse.json({ error: 'invalid_client', error_description: 'Invalid JWT: iss and sub claims are required and must match.' }, { status: 401 });
-      }
-      const clientIdFromJwt = decodedJwt.iss;
-      clientIdForTokenProcessing = clientIdFromJwt;
-
-      const client = await prisma.client.findUnique({ where: { id: clientIdFromJwt } });
-      if (!client) {
-        logger.warn(`private_key_jwt: Client ${clientIdFromJwt} not found.`);
-        return NextResponse.json({ error: 'invalid_client', error_description: 'Client not found.' }, { status: 401 });
-      }
-      if (!client.jwksUri) {
-        logger.warn(`private_key_jwt: Client ${clientIdFromJwt} does not have a jwksUri configured.`);
-        return NextResponse.json({ error: 'invalid_client', error_description: 'Client not configured for JWT assertion: Missing jwksUri.' }, { status: 401 });
-      }
-
-      const tokenEndpointUrl = getTokenEndpointUrl(request);
-      const JWKS = jose.createRemoteJWKSet(new URL(client.jwksUri));
-
-      const { payload } = await jose.jwtVerify(client_assertion, JWKS, {
-        issuer: clientIdFromJwt,
-        audience: tokenEndpointUrl,
-        algorithms: ['RS256', 'ES256', 'PS256'], 
-      });
-
-      if (payload.sub !== clientIdFromJwt) {
-        logger.warn(`private_key_jwt: sub claim (${payload.sub}) does not match issuer/client_id (${clientIdFromJwt}).`);
-        return NextResponse.json({ error: 'invalid_client', error_description: 'Invalid JWT: sub claim does not match client_id.' }, { status: 401 });
-      }
+    // Handle different grant types
+    switch (grant_type) {
+      case 'authorization_code':
+        return await handleAuthorizationCodeGrant(request, body!, client, ipAddress, userAgent);
       
-      authenticatedClient = client;
-      logger.info(`Client ${clientIdFromJwt} authenticated successfully using private_key_jwt.`);
-
-    } catch (error: any) {
-      logger.error('private_key_jwt: JWT validation failed.', { errorName: error.name, errorMessage: error.message, code: error.code });
-      if (error instanceof jose.errors.JOSEError) {
-         if (error.code === 'ERR_JWKS_NO_MATCHING_KEY' || error.code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED') {
-            return NextResponse.json({ error: 'invalid_client', error_description: 'Invalid signature or no matching key found for client assertion.' }, { status: 401 });
-         }
-         if (error.code === 'ERR_JWT_EXPIRED') {
-            return NextResponse.json({ error: 'invalid_client', error_description: 'Client assertion has expired.' }, { status: 401 });
-         }
-         if (error.code === 'ERR_JWT_INVALID_AUDIENCE' || error.code === 'ERR_JWT_INVALID_ISSUER') {
-             return NextResponse.json({ error: 'invalid_client', error_description: `Invalid JWT: ${error.message}` }, { status: 401 });
-         }
-      }
-      return NextResponse.json({ error: 'invalid_client', error_description: 'Client assertion validation failed.' }, { status: 401 });
+      case 'refresh_token':
+        return await handleRefreshTokenGrant(request, body!, client, ipAddress, userAgent);
+      
+      case 'client_credentials':
+        return await handleClientCredentialsGrant(request, body!, client, ipAddress, userAgent);
+      
+      default:
+        return NextResponse.json(
+          { 
+            error: OAuth2ErrorTypes.UNSUPPORTED_GRANT_TYPE,
+            error_description: 'Grant type not implemented' 
+          },
+          { status: 400 }
+        );
     }
-  } else if (client_id_param && client_secret) {
-    logger.info(`Attempting client authentication with client_secret for client_id: ${client_id_param}`);
-    clientIdForTokenProcessing = client_id_param;
-    const client = await prisma.client.findUnique({
-      where: { id: client_id_param },
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id,
+      action: 'token_issuance_error',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage,
     });
 
-    if (!client || client.secret !== client_secret) {
-      logger.warn(`Client secret authentication failed for client_id: ${client_id_param}.`);
-      return NextResponse.json({ error: 'invalid_client', error_description: 'Invalid client_id or client_secret' }, { status: 401 });
-    }
-    authenticatedClient = client;
-    logger.info(`Client ${client_id_param} authenticated successfully using client_secret.`);
-  } else {
-    logger.warn('Token request failed: Missing client authentication credentials.');
-    return NextResponse.json({ error: 'invalid_client', error_description: 'Client authentication required.' }, { status: 401 });
+    console.error('Error during token issuance:', error);
+    
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.SERVER_ERROR,
+        error_description: 'An unexpected error occurred' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleAuthorizationCodeGrant(
+  request: NextRequest,
+  body: FormData,
+  client: Record<string, unknown>,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<NextResponse> {
+  const code = (body.get('code') ?? undefined) as string | undefined;
+  const redirect_uri = (body.get('redirect_uri') ?? undefined) as string | undefined;
+  const code_verifier = (body.get('code_verifier') ?? undefined) as string | undefined;
+
+  if (!code || !redirect_uri) {
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_REQUEST,
+        error_description: 'Missing required parameters: code, redirect_uri' 
+      },
+      { status: 400 }
+    );
   }
 
-  if (!code || !redirect_uri || !clientIdForTokenProcessing) {
-    logger.warn('Token request failed: Missing required parameters after client auth.', { code: !!code, redirect_uri: !!redirect_uri, clientId: !!clientIdForTokenProcessing });
-    return NextResponse.json({ error: 'invalid_request', error_description: 'Missing required parameters: code, redirect_uri, client_id (derived from auth)' }, { status: 400 });
+  // Find authorization code
+  const authCode = await prisma.authorizationCode.findUnique({
+    where: { code },
+    include: { user: true },
+  });
+
+  if (!authCode) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'invalid_authorization_code',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Authorization code not found',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_GRANT,
+        error_description: 'Invalid authorization code' 
+      },
+      { status: 400 }
+    );
   }
+
+  // Validate authorization code expiry
+  if (isPast(authCode.expiresAt)) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'expired_authorization_code',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Authorization code expired',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_GRANT,
+        error_description: 'Authorization code has expired' 
+      },
+      { status: 400 }
+    );
+  }
+
+  // Validate client match
+  if (authCode.clientId !== (client.id as string)) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'authorization_code_client_mismatch',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Authorization code was issued to a different client',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_GRANT,
+        error_description: 'Authorization code was issued to a different client' 
+      },
+      { status: 400 }
+    );
+  }
+
+  // Validate redirect URI match
+  if (authCode.redirectUri !== redirect_uri) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      userId: authCode.userId ?? undefined,
+      action: 'redirect_uri_mismatch',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Redirect URI does not match',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_GRANT,
+        error_description: 'Redirect URI does not match' 
+      },
+      { status: 400 }
+    );
+  }
+
+  // PKCE verification (if used)
+  if (authCode.codeChallenge) {
+    if (!code_verifier) {
+      return NextResponse.json(
+        { 
+          error: OAuth2ErrorTypes.INVALID_REQUEST,
+          error_description: 'Code verifier required for PKCE' 
+        },
+        { status: 400 }
+      );
+    }
+
+    const isValidPkce = verifyPkceChallenge(code_verifier, authCode.codeChallenge);
+    if (!isValidPkce) {
+      await AuthorizationUtils.logAuditEvent({
+        clientId: client.id as string,
+        userId: authCode.userId ?? undefined,
+        action: 'pkce_verification_failed',
+        resource: 'oauth/token',
+        ipAddress,
+        userAgent,
+        success: false,
+        errorMessage: 'PKCE verification failed',
+      });
+
+      return NextResponse.json(
+        { 
+          error: OAuth2ErrorTypes.INVALID_GRANT,
+          error_description: 'PKCE verification failed' 
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Mark authorization code as used to prevent replay
+  await prisma.authorizationCode.update({
+    where: { id: authCode.id },
+    data: { used: true },
+  });
 
   try {
-    if (!authenticatedClient) {
-        logger.error("Critical: authenticatedClient is null after client auth block.");
-        return NextResponse.json({ error: 'server_error', error_description: 'Client authentication failed unexpectedly.' }, { status: 500 });
+    // Generate tokens
+    const expiresIn = 3600; // 1 hour
+
+    // Get permissions if user is involved
+    let permissions: string[] = [];
+    if (authCode.userId) {
+      permissions = await AuthorizationUtils.getUserPermissions(authCode.userId);
     }
 
-    const authCode = await prisma.authorizationCode.findUnique({
-      where: { code: code },
+    // Create JWT payload
+    const accessToken = await JWTUtils.createAccessToken({
+      client_id: client.clientId as string,
+      user_id: authCode.userId ?? undefined,
+      scope: authCode.scope ?? undefined,
+      permissions,
     });
 
-    if (!authCode) {
-      logger.warn(`Invalid grant: Authorization code not found for code: ${code}`);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code not found.' }, { status: 400 });
-    }
+    const refreshToken = await JWTUtils.createRefreshToken({
+      client_id: client.clientId as string,
+      user_id: authCode.userId ?? undefined,
+      scope: authCode.scope ?? undefined,
+    });
 
-    if (isPast(new Date(authCode.expiresAt))) {
-      logger.warn(`Invalid grant: Expired authorization code used: ${code}`);
-      await prisma.authorizationCode.delete({ where: { id: authCode.id }});
-      logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to expiry.`);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code has expired.' }, { status: 400 });
-    }
+    const accessTokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
-    if (authCode.clientId !== clientIdForTokenProcessing) {
-      logger.warn(`Invalid grant: Auth code client ID (${authCode.clientId}) does not match authenticated client ID (${clientIdForTokenProcessing}).`);
-      // Note: RFC 6749 suggests not deleting the code here if client IDs mismatch, as it might be a stolen code.
-      // However, if we're sure the client is who they say they are (authenticated above), this might indicate the code
-      // was not issued to *this authenticated client*. For simplicity, we'll keep current behavior.
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code was not issued to this client.' }, { status: 400 });
-    }
-
-    if (authCode.redirectUri !== redirect_uri) {
-      logger.warn(`Invalid grant: Auth code redirect URI (${authCode.redirectUri}) does not match request redirect_uri (${redirect_uri}).`);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid redirect_uri. It must match the one used in the authorization request.' }, { status: 400 });
-    }
-
-    // --- PKCE Verification ---
-    if (authCode.codeChallenge && authCode.codeChallengeMethod) { // PKCE was used for this auth code
-      logger.info(`PKCE challenge found for auth code: ${code}. Method: ${authCode.codeChallengeMethod}`);
-      if (authCode.codeChallengeMethod !== 'S256') {
-        logger.error(`PKCE Error: Unsupported code_challenge_method (${authCode.codeChallengeMethod}) stored for auth code ${code}. Only S256 is supported.`);
-        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
-        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to unsupported stored PKCE challenge method.`);
-        return NextResponse.json({ error: 'server_error', error_description: 'Internal server error: Unsupported PKCE method stored.' }, { status: 500 });
-      }
-
-      if (!code_verifier) {
-        logger.warn(`PKCE Error: Missing code_verifier for auth code ${code}.`);
-        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
-        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to missing code_verifier in PKCE flow.`);
-        return NextResponse.json({ error: 'invalid_grant', error_description: 'Missing code_verifier for PKCE flow.' }, { status: 400 });
-      }
-
-      logger.info(`Verifying code_verifier for auth code: ${code}`);
-      if (!verifyPkceChallenge(code_verifier, authCode.codeChallenge)) {
-        logger.warn(`PKCE Error: Invalid code_verifier for auth code ${code}.`);
-        await prisma.authorizationCode.delete({ where: { id: authCode.id } });
-        logger.info(`Auth code ${code} (DB ID: ${authCode.id}) deleted due to invalid code_verifier in PKCE flow.`);
-        return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid code_verifier.' }, { status: 400 });
-      }
-      logger.info(`PKCE code_verifier validated successfully for auth code: ${code}`);
-    } else if (code_verifier) { // No challenge stored, but verifier sent by client
-      logger.warn(`PKCE Mismatch: code_verifier provided for auth code ${code}, but no PKCE challenge was recorded for this code.`);
-      // This is a client protocol violation (RFC 7636). Client should not send verifier if no challenge was used.
-      return NextResponse.json({ error: 'invalid_request', error_description: 'code_verifier provided but no PKCE challenge was initiated for this code.' }, { status: 400 });
-    }
-    // If no authCode.codeChallenge and no code_verifier, PKCE was not used, proceed.
-    
-    // --- JWT Access Token Generation ---
-    const jwtSecret = new TextEncoder().encode(process.env.JWT_ACCESS_TOKEN_SECRET || 'super-secret-key-for-hs256-oauth-dev-env-32-chars');
-    const jwtAlg = 'HS256';
-    const jwtIssuer = process.env.JWT_ISSUER || `https://${request.headers.get('host') || 'localhost:3000'}`;
-    const jwtAudience = process.env.JWT_AUDIENCE || 'api_resource';
-    const accessTokenExpiresIn = '1h';
-    const accessTokenExpiresAt = addHours(new Date(), 1);
-
-    let permissionsClaim: string[] = [];
-    if (authCode.userId) {
-      const userPermissions = await prisma.userResourcePermission.findMany({
-        where: { userId: authCode.userId },
-        include: { resource: true, permission: true },
-      });
-      permissionsClaim = userPermissions.map(urp => `${urp.resource.name}:${urp.permission.name}`);
-      logger.info(`Fetched ${permissionsClaim.length} permissions for user ${authCode.userId} for JWT.`);
-    } else {
-      logger.info(`No userId found on authCode ${authCode.id}, no permissions to fetch for JWT.`);
-    }
-
-    const accessTokenJwt = await new jose.SignJWT({
-        client_id: authenticatedClient.id,
-        scope: authCode.scope,
-        permissions: permissionsClaim,
-      })
-      .setProtectedHeader({ alg: jwtAlg })
-      .setIssuedAt()
-      .setIssuer(jwtIssuer)
-      .setSubject(authCode.userId || authenticatedClient.id)
-      .setAudience(jwtAudience)
-      .setExpirationTime(accessTokenExpiresIn)
-      .setJti(crypto.randomUUID())
-      .sign(jwtSecret);
-
-    const refreshToken = crypto.randomBytes(32).toString('hex');
-    const refreshTokenExpiresAt = addDays(new Date(), 30);
-
+    // Store tokens in database
     await prisma.accessToken.create({
       data: {
-        token: accessTokenJwt,
-        expiresAt: accessTokenExpiresAt,
-        userId: authCode.userId,
-        clientId: authenticatedClient.id,
-        scope: authCode.scope,
+        token: accessToken,
+        tokenHash: accessTokenHash,
+        clientId: client.id as string,
+        userId: authCode.userId ?? undefined,
+        scope: authCode.scope ?? undefined,
+        expiresAt: addHours(new Date(), 1),
+        revoked: false,
       },
     });
 
     await prisma.refreshToken.create({
       data: {
         token: refreshToken,
-        expiresAt: refreshTokenExpiresAt,
-        userId: authCode.userId,
-        clientId: authenticatedClient.id,
+        tokenHash: refreshTokenHash,
+        clientId: client.id as string,
+        userId: authCode.userId ?? undefined,
+        scope: authCode.scope ?? undefined,
+        expiresAt: addDays(new Date(), 30),
+        revoked: false,
       },
     });
 
-    await prisma.authorizationCode.delete({
-      where: { id: authCode.id },
+    // Log successful token issuance
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      userId: authCode.userId ?? undefined,
+      action: 'token_issued',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: true,
+      metadata: {
+        grantType: 'authorization_code',
+        scope: authCode.scope,
+        hasRefreshToken: true,
+      },
     });
-    logger.info(`Authorization code ${code} (DB ID: ${authCode.id}) successfully deleted after use for token generation.`);
 
-    logger.info(`JWT Access Token and Refresh Token issued successfully for client ${clientIdForTokenProcessing}.`);
-    return NextResponse.json({
-      access_token: accessTokenJwt,
+    const response: Record<string, unknown> = {
+      access_token: accessToken,
       token_type: 'Bearer',
-      expires_in: differenceInSeconds(accessTokenExpiresAt, new Date()),
+      expires_in: expiresIn,
       refresh_token: refreshToken,
-      scope: authCode.scope,
+    };
+
+    if (authCode.scope) {
+      response.scope = authCode.scope;
+    }
+
+    return NextResponse.json(response, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache',
+      },
     });
 
-  } catch (error: any) {
-    logger.error(`Error during token issuance for client ${clientIdForTokenProcessing || 'unknown'}:`, { error });
-    return NextResponse.json({ error: 'server_error', error_description: 'An unexpected error occurred.' }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('Token generation/storage error:', error);
+    
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      userId: authCode.userId ?? undefined,
+      action: 'token_generation_error',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.SERVER_ERROR,
+        error_description: 'Token generation failed' 
+      },
+      { status: 500 }
+    );
   }
 }
+
+async function handleRefreshTokenGrant(
+  request: NextRequest,
+  body: FormData,
+  client: Record<string, unknown>,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<NextResponse> {
+  const refresh_token = (body.get('refresh_token') ?? undefined) as string | undefined;
+  const scope = (body.get('scope') ?? undefined) as string | undefined;
+
+  if (!refresh_token) {
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.INVALID_REQUEST,
+        error_description: 'Missing required parameter: refresh_token' 
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Verify refresh token
+    const verification = await JWTUtils.verifyRefreshToken(refresh_token);
+    
+    if (!verification.valid) {
+      await AuthorizationUtils.logAuditEvent({
+        clientId: client.id as string,
+        action: 'invalid_refresh_token',
+        resource: 'oauth/token',
+        ipAddress,
+        userAgent,
+        success: false,
+        errorMessage: verification.error,
+      });
+
+      return NextResponse.json(
+        { 
+          error: OAuth2ErrorTypes.INVALID_GRANT,
+          error_description: verification.error || 'Invalid refresh token' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if refresh token exists in database and is not revoked
+    const refreshTokenHashVerify = crypto.createHash('sha256').update(refresh_token).digest('hex');
+    const storedRefreshToken = await prisma.refreshToken.findFirst({
+      where: {
+        tokenHash: refreshTokenHashVerify,
+        revoked: false,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!storedRefreshToken) {
+      await AuthorizationUtils.logAuditEvent({
+        clientId: client.id as string,
+        action: 'revoked_refresh_token_used',
+        resource: 'oauth/token',
+        ipAddress,
+        userAgent,
+        success: false,
+        errorMessage: 'Refresh token not found or revoked',
+      });
+
+      return NextResponse.json(
+        { 
+          error: OAuth2ErrorTypes.INVALID_GRANT,
+          error_description: 'Refresh token has been revoked or is invalid' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate client match
+    if (storedRefreshToken.clientId !== (client.id as string)) {
+      await AuthorizationUtils.logAuditEvent({
+        clientId: client.id as string,
+        action: 'refresh_token_client_mismatch',
+        resource: 'oauth/token',
+        ipAddress,
+        userAgent,
+        success: false,
+        errorMessage: 'Refresh token was issued to a different client',
+      });
+
+      return NextResponse.json(
+        { 
+          error: OAuth2ErrorTypes.INVALID_GRANT,
+          error_description: 'Refresh token was issued to a different client' 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Handle scope parameter for refresh token
+    const originalScopes = ScopeUtils.parseScopes(storedRefreshToken.scope ?? '');
+    let finalScope = storedRefreshToken.scope ?? undefined;
+    
+    if (scope) {
+      const requestedScopes = ScopeUtils.parseScopes(scope);
+      
+      // Ensure all requested scopes are within the original scope
+      const scopeValidation = ScopeUtils.validateScopes(requestedScopes, originalScopes);
+      if (!scopeValidation.valid) {
+        return NextResponse.json(
+          { 
+            error: OAuth2ErrorTypes.INVALID_SCOPE,
+            error_description: 'Requested scope is invalid or exceeds originally granted scope' 
+          },
+          { status: 400 }
+        );
+      }
+      
+      finalScope = scope;
+    }
+
+    // Get permissions if user is involved
+    let permissions: string[] = [];
+    if (storedRefreshToken.userId) {
+      permissions = await AuthorizationUtils.getUserPermissions(storedRefreshToken.userId);
+    }
+
+    // Generate new access token
+    const newAccessToken = await JWTUtils.createAccessToken({
+      client_id: client.clientId as string,
+      user_id: storedRefreshToken.userId ?? undefined,
+      scope: finalScope,
+      permissions,
+    });
+
+    const accessTokenHash = crypto.createHash('sha256').update(newAccessToken).digest('hex');
+
+    // Store new access token in database
+    await prisma.accessToken.create({
+      data: {
+        token: newAccessToken,
+        tokenHash: accessTokenHash,
+        clientId: client.id as string,
+        userId: storedRefreshToken.userId ?? undefined,
+        scope: finalScope ?? undefined,
+        expiresAt: addHours(new Date(), 1),
+        revoked: false,
+      },
+    });
+
+    // Optionally create new refresh token (recommended for security)
+    const newRefreshToken = await JWTUtils.createRefreshToken({
+      client_id: client.clientId as string,
+      user_id: storedRefreshToken.userId ?? undefined,
+      scope: finalScope,
+    });
+
+    const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+
+    // Revoke old refresh token
+    await prisma.refreshToken.update({
+      where: { id: storedRefreshToken.id },
+      data: { revoked: true, revokedAt: new Date() },
+    });
+
+    // Store new refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: newRefreshToken,
+        tokenHash: newRefreshTokenHash,
+        clientId: client.id as string,
+        userId: storedRefreshToken.userId ?? undefined,
+        scope: finalScope ?? undefined,
+        expiresAt: addDays(new Date(), 30),
+        revoked: false,
+      },
+    });
+
+    // Log successful token refresh
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      userId: storedRefreshToken.userId ?? undefined,
+      action: 'token_refreshed',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: true,
+      metadata: {
+        grantType: 'refresh_token',
+        scope: finalScope,
+      },
+    });
+
+    const response: Record<string, unknown> = {
+      access_token: newAccessToken,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      refresh_token: newRefreshToken,
+    };
+
+    if (finalScope) {
+      response.scope = finalScope;
+    }
+
+    return NextResponse.json(response, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache',
+      },
+    });
+
+  } catch (error: unknown) {
+    console.error('Refresh token processing error:', error);
+    
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'refresh_token_error',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.SERVER_ERROR,
+        error_description: 'Refresh token processing failed' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleClientCredentialsGrant(
+  request: NextRequest,
+  body: FormData,
+  client: Record<string, unknown>,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<NextResponse> {
+  const scope = (body.get('scope') ?? undefined) as string | undefined;
+
+  try {
+    // For client credentials, there's no user context
+    const permissions: string[] = []; // Client permissions would be handled differently
+
+    // Validate requested scopes against client's allowed scopes
+    const finalScope = scope;
+    if (scope) {
+      const requestedScopes = ScopeUtils.parseScopes(scope);
+      const clientScopes = ScopeUtils.parseScopes(client.scope as string || '');
+      
+      const scopeValidation = ScopeUtils.validateScopes(requestedScopes, clientScopes);
+      if (!scopeValidation.valid) {
+        await AuthorizationUtils.logAuditEvent({
+          clientId: client.id as string,
+          action: 'invalid_client_scope',
+          resource: 'oauth/token',
+          ipAddress,
+          userAgent,
+          success: false,
+          errorMessage: 'Requested scope exceeds client allowed scope',
+        });
+
+        return NextResponse.json(
+          { 
+            error: OAuth2ErrorTypes.INVALID_SCOPE,
+            error_description: 'Requested scope is invalid or exceeds client allowed scope' 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Generate access token for client credentials
+    const accessToken = await JWTUtils.createAccessToken({
+      client_id: client.clientId as string,
+      user_id: undefined, // No user for client credentials
+      scope: finalScope,
+      permissions,
+    });
+
+    const accessTokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+
+    // Store access token in database
+    await prisma.accessToken.create({
+      data: {
+        token: accessToken,
+        tokenHash: accessTokenHash,
+        clientId: client.id as string,
+        userId: undefined,
+        scope: finalScope ?? undefined,
+        expiresAt: addHours(new Date(), 1),
+        revoked: false,
+      },
+    });
+
+    // Log successful token issuance
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'client_credentials_token_issued',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: true,
+      metadata: {
+        grantType: 'client_credentials',
+        scope: finalScope,
+      },
+    });
+
+    const response: Record<string, unknown> = {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: 3600,
+    };
+
+    if (finalScope) {
+      response.scope = finalScope;
+    }
+
+    return NextResponse.json(response, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache',
+      },
+    });
+
+  } catch (error: unknown) {
+    console.error('Client credentials token generation error:', error);
+    
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id as string,
+      action: 'client_credentials_error',
+      resource: 'oauth/token',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return NextResponse.json(
+      { 
+        error: OAuth2ErrorTypes.SERVER_ERROR,
+        error_description: 'Client credentials token generation failed' 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Apply OAuth 2.0 token validation middleware
+export const POST = withOAuthTokenValidation(handleTokenRequest);

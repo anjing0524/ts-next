@@ -1,12 +1,11 @@
 // app/api/resources/[resourceId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/lib/generated/prisma';
+import {prisma} from '@/lib/prisma';
 import { z } from 'zod';
 import logger from '@/utils/logger';
 import { withAuth, ApiHandler } from '@/lib/auth/token-validation'; // Adjust path as necessary
 import { JWTPayload } from 'jose';
 
-const prisma = new PrismaClient();
 
 // Zod schema for updating a Resource
 const updateResourceSchema = z.object({
@@ -26,7 +25,7 @@ const getResourceByIdHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, // Destructure params from the second argument
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params; // resourceId is directly from params
+  const { resourceId } = await params; // resourceId is directly from params
   logger.info(`Attempting to fetch resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
 
   try {
@@ -62,7 +61,7 @@ const updateResourceHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, 
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params;
+  const { resourceId } = await params;
   logger.info(`Attempting to update resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
   let body;
   try {
@@ -119,7 +118,7 @@ const deleteResourceHandler: ApiHandler = async (
   { params }: { params: { resourceId: string } }, 
   validatedClaims: JWTPayload
 ) => {
-  const { resourceId } = params;
+  const { resourceId } = await params;
   logger.info(`Attempting to delete resource with ID: ${resourceId} by user ${validatedClaims.sub}`);
 
   try {

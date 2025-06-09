@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'; // Using Input instead of Textare
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { z } from 'zod';
+import { adminApi } from '@/lib/api';
 
 // Zod schema for client registration (matches backend)
 const clientRegisterSchema = z.object({
@@ -47,31 +48,20 @@ export default function ClientRegisterPage() {
     }
 
     try {
-      // 4. Update handleSubmit Function (fetch body)
-      const response = await fetch('/api/clients/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validation.data), // jwksUri is now included from validation.data
+      const result = await adminApi.registerClient(validation.data);
+
+      setApiResponse({
+        type: 'success',
+        message: result.message || 'Client registered successfully!',
+        data: { clientId: result.clientId, clientSecret: result.clientSecret },
       });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setApiResponse({
-          type: 'success',
-          message: result.message || 'Client registered successfully!',
-          data: { clientId: result.clientId, clientSecret: result.clientSecret },
-        });
-        // Optionally clear form: setName(''); setRedirectUris('');
-      } else {
-        setApiResponse({ type: 'error', message: result.message || `Error: ${response.statusText}` });
-        if (result.errors) { // Handle Zod errors from backend if any (though unlikely if client-side passes)
-            setErrors(result.errors);
-        }
-      }
+      // Optionally clear form: setName(''); setRedirectUris('');
     } catch (error) {
       console.error("Client registration request failed:", error);
-      setApiResponse({ type: 'error', message: 'An unexpected error occurred. Please try again.' });
+      setApiResponse({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' 
+      });
     }
   };
 

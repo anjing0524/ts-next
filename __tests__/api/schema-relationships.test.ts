@@ -1,0 +1,766 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcrypt'
+import crypto from 'crypto'
+import { addMinutes, addDays } from 'date-fns'
+
+describe('Database Schema Relationships Integrity Tests', () => {
+  let testUser: any = null
+  let testUser2: any = null
+  let testClient: any = null
+  let testResource: any = null
+  let testPermission: any = null
+  let testScope: any = null
+  let testDataSuffix: string
+
+  beforeAll(async () => {
+    // Generate unique suffix for this test run to avoid conflicts
+    testDataSuffix = Date.now().toString() + '-' + crypto.randomBytes(4).toString('hex')
+    console.log('🚀 Setting up Schema Relationships test data...')
+    await setupTestData()
+  })
+
+  afterAll(async () => {
+    console.log('🧹 Cleaning up Schema Relationships test data...')
+    await cleanupTestData()
+  })
+
+  async function setupTestData(): Promise<void> {
+    try {
+      // First, clean up any potentially existing test data with our naming pattern
+      await cleanupExistingTestData()
+      
+      const password = await bcrypt.hash('SchemaTest123!', 12)
+      
+      // Create test users
+      testUser = await prisma.user.create({
+        data: {
+          username: 'schema-user1-' + testDataSuffix,
+          email: `schema-user1-${testDataSuffix}@example.com`,
+          password,
+          emailVerified: true,
+          isActive: true,
+          firstName: 'Schema',
+          lastName: 'User1',
+        }
+      })
+
+      testUser2 = await prisma.user.create({
+        data: {
+          username: 'schema-user2-' + testDataSuffix,
+          email: `schema-user2-${testDataSuffix}@example.com`,
+          password,
+          emailVerified: true,
+          isActive: true,
+          firstName: 'Schema',
+          lastName: 'User2',
+        }
+      })
+
+      // Create test client
+      testClient = await prisma.client.create({
+        data: {
+          clientId: 'schema-client-' + testDataSuffix,
+          clientSecret: await bcrypt.hash('schema-secret', 12),
+          name: `Schema Test Client ${testDataSuffix}`,
+          redirectUris: JSON.stringify(['http://localhost:3000/callback']),
+          grantTypes: JSON.stringify(['authorization_code', 'client_credentials', 'refresh_token']),
+          responseTypes: JSON.stringify(['code']),
+          scope: 'openid profile email test:read test:write',
+          isPublic: false,
+          isActive: true,
+        }
+      })
+
+      // Create test resource with unique name
+      testResource = await prisma.resource.create({
+        data: {
+          name: `SCHEMA_TEST_RESOURCE_${testDataSuffix}`,
+          description: 'Test resource for schema validation',
+          apiPath: '/api/test/*',
+          isActive: true,
+        }
+      })
+
+      // Create test permission with unique name
+      testPermission = await prisma.permission.create({
+        data: {
+          name: `SCHEMA_TEST_PERMISSION_${testDataSuffix}`,
+          description: 'Test permission for schema validation',
+          isActive: true,
+        }
+      })
+
+      // Create test scope with unique name
+      testScope = await prisma.scope.create({
+        data: {
+          name: `schema:test:${testDataSuffix}`,
+          description: 'Test scope for schema validation',
+          isActive: true,
+          isPublic: false,
+        }
+      })
+
+      console.log('✅ Schema Relationships test data setup complete')
+    } catch (error) {
+      console.error('❌ Failed to setup Schema test data:', error)
+      throw error
+    }
+  }
+
+  async function cleanupExistingTestData(): Promise<void> {
+    try {
+      // Clean up any leftover test data from previous runs
+      await prisma.resource.deleteMany({
+        where: {
+          name: {
+            startsWith: 'SCHEMA_TEST_RESOURCE'
+          }
+        }
+      }).catch(() => {})
+
+      await prisma.permission.deleteMany({
+        where: {
+          name: {
+            startsWith: 'SCHEMA_TEST_PERMISSION'
+          }
+        }
+      }).catch(() => {})
+
+      await prisma.scope.deleteMany({
+        where: {
+          name: {
+            startsWith: 'schema:test'
+          }
+        }
+      }).catch(() => {})
+
+      await prisma.client.deleteMany({
+        where: {
+          clientId: {
+            startsWith: 'schema-client-'
+          }
+        }
+      }).catch(() => {})
+
+      await prisma.user.deleteMany({
+        where: {
+          username: {
+            startsWith: 'schema-user'
+          }
+        }
+      }).catch(() => {})
+
+    } catch (error) {
+      console.error('Warning: Failed to cleanup existing test data:', error)
+    }
+  }
+
+  async function cleanupTestData(): Promise<void> {
+    try {
+      // Clean up in reverse order to respect foreign key constraints
+      await prisma.userResourcePermission.deleteMany({
+        where: {
+          OR: [
+            { userId: testUser?.id },
+            { userId: testUser2?.id }
+          ]
+        }
+      }).catch(() => {})
+
+      await prisma.accessToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
+      await prisma.refreshToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
+      await prisma.authorizationCode.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
+      await prisma.userSession.deleteMany({
+        where: {
+          OR: [
+            { userId: testUser?.id },
+            { userId: testUser2?.id }
+          ]
+        }
+      }).catch(() => {})
+      await prisma.auditLog.deleteMany({
+        where: {
+          OR: [
+            { userId: testUser?.id },
+            { userId: testUser2?.id },
+            { clientId: testClient?.id }
+          ]
+        }
+      }).catch(() => {})
+
+      if (testScope?.id) await prisma.scope.delete({ where: { id: testScope.id } }).catch(() => {})
+      if (testPermission?.id) await prisma.permission.delete({ where: { id: testPermission.id } }).catch(() => {})
+      if (testResource?.id) await prisma.resource.delete({ where: { id: testResource.id } }).catch(() => {})
+      if (testClient?.id) await prisma.client.delete({ where: { id: testClient.id } }).catch(() => {})
+      if (testUser?.id) await prisma.user.delete({ where: { id: testUser.id } }).catch(() => {})
+      if (testUser2?.id) await prisma.user.delete({ where: { id: testUser2.id } }).catch(() => {})
+
+      // Additional cleanup for any remaining test data from this run
+      await cleanupExistingTestData()
+
+      console.log('✅ Schema Relationships test data cleanup complete')
+    } catch (error) {
+      console.error('❌ Failed to cleanup Schema test data:', error)
+    }
+  }
+
+  describe('1. User Entity Relationships', () => {
+    it('should create and validate User → AccessToken relationship', async () => {
+      const accessToken = await prisma.accessToken.create({
+        data: {
+          token: 'user_access_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('test_token').digest('hex'),
+          expiresAt: addMinutes(new Date(), 60),
+          userId: testUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile',
+        }
+      })
+
+      // Verify relationship
+      const userWithTokens = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { accessTokens: true }
+      })
+
+      expect(userWithTokens).toBeTruthy()
+      expect(userWithTokens!.accessTokens.length).toBeGreaterThan(0)
+      expect(userWithTokens!.accessTokens[0].id).toBe(accessToken.id)
+
+      // Cleanup
+      await prisma.accessToken.delete({ where: { id: accessToken.id } })
+      console.log('✅ User → AccessToken relationship validated')
+    })
+
+    it('should create and validate User → RefreshToken relationship', async () => {
+      const refreshToken = await prisma.refreshToken.create({
+        data: {
+          token: 'user_refresh_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('test_refresh').digest('hex'),
+          expiresAt: addDays(new Date(), 30),
+          userId: testUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile offline_access',
+        }
+      })
+
+      // Verify relationship
+      const userWithRefreshTokens = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { refreshTokens: true }
+      })
+
+      expect(userWithRefreshTokens).toBeTruthy()
+      expect(userWithRefreshTokens!.refreshTokens.length).toBeGreaterThan(0)
+      expect(userWithRefreshTokens!.refreshTokens[0].id).toBe(refreshToken.id)
+
+      // Cleanup
+      await prisma.refreshToken.delete({ where: { id: refreshToken.id } })
+      console.log('✅ User → RefreshToken relationship validated')
+    })
+
+    it('should create and validate User → AuthorizationCode relationship', async () => {
+      const authCode = await prisma.authorizationCode.create({
+        data: {
+          code: 'user_auth_code_' + crypto.randomBytes(16).toString('hex'),
+          expiresAt: addMinutes(new Date(), 10),
+          redirectUri: 'http://localhost:3000/callback',
+          userId: testUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile',
+          state: 'test-state',
+        }
+      })
+
+      // Verify relationship
+      const userWithAuthCodes = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { authorizationCodes: true }
+      })
+
+      expect(userWithAuthCodes).toBeTruthy()
+      expect(userWithAuthCodes!.authorizationCodes.length).toBeGreaterThan(0)
+      expect(userWithAuthCodes!.authorizationCodes[0].id).toBe(authCode.id)
+
+      // Cleanup
+      await prisma.authorizationCode.delete({ where: { id: authCode.id } })
+      console.log('✅ User → AuthorizationCode relationship validated')
+    })
+
+    it('should create and validate User → UserSession relationship', async () => {
+      const session = await prisma.userSession.create({
+        data: {
+          userId: testUser.id,
+          sessionId: 'session_' + crypto.randomBytes(16).toString('hex'),
+          ipAddress: '127.0.0.1',
+          userAgent: 'Test Agent',
+          expiresAt: addDays(new Date(), 1),
+          isActive: true,
+        }
+      })
+
+      // Verify relationship
+      const userWithSessions = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { sessions: true }
+      })
+
+      expect(userWithSessions).toBeTruthy()
+      expect(userWithSessions!.sessions.length).toBeGreaterThan(0)
+      expect(userWithSessions!.sessions[0].id).toBe(session.id)
+
+      // Cleanup
+      await prisma.userSession.delete({ where: { id: session.id } })
+      console.log('✅ User → UserSession relationship validated')
+    })
+  })
+
+  describe('2. Client Entity Relationships', () => {
+    it('should validate Client → AccessToken relationship', async () => {
+      const accessToken = await prisma.accessToken.create({
+        data: {
+          token: 'client_access_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('test_client_token').digest('hex'),
+          expiresAt: addMinutes(new Date(), 60),
+          clientId: testClient.id,
+          scope: 'client_credentials',
+        }
+      })
+
+      // Verify relationship
+      const clientWithTokens = await prisma.client.findUnique({
+        where: { id: testClient.id },
+        include: { accessTokens: true }
+      })
+
+      expect(clientWithTokens).toBeTruthy()
+      expect(clientWithTokens!.accessTokens.length).toBeGreaterThan(0)
+      expect(clientWithTokens!.accessTokens.some(token => token.id === accessToken.id)).toBe(true)
+
+      // Cleanup
+      await prisma.accessToken.delete({ where: { id: accessToken.id } })
+      console.log('✅ Client → AccessToken relationship validated')
+    })
+
+    it('should validate Client → RefreshToken relationship', async () => {
+      const refreshToken = await prisma.refreshToken.create({
+        data: {
+          token: 'client_refresh_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('test_client_refresh').digest('hex'),
+          expiresAt: addDays(new Date(), 30),
+          userId: testUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile offline_access',
+        }
+      })
+
+      // Verify relationship
+      const clientWithRefreshTokens = await prisma.client.findUnique({
+        where: { id: testClient.id },
+        include: { refreshTokens: true }
+      })
+
+      expect(clientWithRefreshTokens).toBeTruthy()
+      expect(clientWithRefreshTokens!.refreshTokens.length).toBeGreaterThan(0)
+      expect(clientWithRefreshTokens!.refreshTokens.some(token => token.id === refreshToken.id)).toBe(true)
+
+      // Cleanup
+      await prisma.refreshToken.delete({ where: { id: refreshToken.id } })
+      console.log('✅ Client → RefreshToken relationship validated')
+    })
+
+    it('should validate Client → AuthorizationCode relationship', async () => {
+      const authCode = await prisma.authorizationCode.create({
+        data: {
+          code: 'client_auth_code_' + crypto.randomBytes(16).toString('hex'),
+          expiresAt: addMinutes(new Date(), 10),
+          redirectUri: 'http://localhost:3000/callback',
+          userId: testUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile',
+          state: 'test-state',
+        }
+      })
+
+      // Verify relationship
+      const clientWithAuthCodes = await prisma.client.findUnique({
+        where: { id: testClient.id },
+        include: { authorizationCodes: true }
+      })
+
+      expect(clientWithAuthCodes).toBeTruthy()
+      expect(clientWithAuthCodes!.authorizationCodes.length).toBeGreaterThan(0)
+      expect(clientWithAuthCodes!.authorizationCodes.some(code => code.id === authCode.id)).toBe(true)
+
+      // Cleanup
+      await prisma.authorizationCode.delete({ where: { id: authCode.id } })
+      console.log('✅ Client → AuthorizationCode relationship validated')
+    })
+  })
+
+  describe('3. UserResourcePermission Complex Relationships', () => {
+    it('should validate User ↔ Resource ↔ Permission relationship', async () => {
+      // Create UserResourcePermission
+      const userResourcePermission = await prisma.userResourcePermission.create({
+        data: {
+          userId: testUser.id,
+          resourceId: testResource.id,
+          permissionId: testPermission.id,
+          grantedBy: testUser2.id,
+          isActive: true,
+        }
+      })
+
+      // Verify relationship through User
+      const userWithPermissions = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: {
+          permissions: {
+            include: {
+              resource: true,
+              permission: true,
+            }
+          }
+        }
+      })
+
+      expect(userWithPermissions).toBeTruthy()
+      expect(userWithPermissions!.permissions.length).toBeGreaterThan(0)
+      expect(userWithPermissions!.permissions[0].resource.id).toBe(testResource.id)
+      expect(userWithPermissions!.permissions[0].permission.id).toBe(testPermission.id)
+
+      // Verify relationship through Resource
+      const resourceWithPermissions = await prisma.resource.findUnique({
+        where: { id: testResource.id },
+        include: {
+          userPermissions: {
+            include: {
+              user: true,
+              permission: true,
+            }
+          }
+        }
+      })
+
+      expect(resourceWithPermissions).toBeTruthy()
+      expect(resourceWithPermissions!.userPermissions.length).toBeGreaterThan(0)
+      expect(resourceWithPermissions!.userPermissions[0].user.id).toBe(testUser.id)
+
+      // Verify relationship through Permission
+      const permissionWithUsers = await prisma.permission.findUnique({
+        where: { id: testPermission.id },
+        include: {
+          userPermissions: {
+            include: {
+              user: true,
+              resource: true,
+            }
+          }
+        }
+      })
+
+      expect(permissionWithUsers).toBeTruthy()
+      expect(permissionWithUsers!.userPermissions.length).toBeGreaterThan(0)
+      expect(permissionWithUsers!.userPermissions[0].user.id).toBe(testUser.id)
+
+      // Cleanup
+      await prisma.userResourcePermission.delete({ where: { id: userResourcePermission.id } })
+      console.log('✅ User ↔ Resource ↔ Permission complex relationship validated')
+    })
+
+    it('should validate permission expiration handling', async () => {
+      // Create expired permission
+      const expiredPermission = await prisma.userResourcePermission.create({
+        data: {
+          userId: testUser.id,
+          resourceId: testResource.id,
+          permissionId: testPermission.id,
+          grantedBy: testUser2.id,
+          expiresAt: new Date(Date.now() - 3600000), // Expired 1 hour ago
+          isActive: true,
+        }
+      })
+
+      // Create active permission
+      const activePermission = await prisma.userResourcePermission.create({
+        data: {
+          userId: testUser2.id,
+          resourceId: testResource.id,
+          permissionId: testPermission.id,
+          grantedBy: testUser.id,
+          expiresAt: addDays(new Date(), 1), // Expires in 1 day
+          isActive: true,
+        }
+      })
+
+      // Query for active permissions only
+      const activePermissions = await prisma.userResourcePermission.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } }
+          ]
+        },
+        include: {
+          user: true,
+          resource: true,
+          permission: true,
+        }
+      })
+
+      // Should only find the active permission
+      expect(activePermissions.length).toBeGreaterThanOrEqual(1)
+      expect(activePermissions.some(p => p.id === activePermission.id)).toBe(true)
+      expect(activePermissions.some(p => p.id === expiredPermission.id)).toBe(false)
+
+      // Cleanup
+      await prisma.userResourcePermission.deleteMany({
+        where: { id: { in: [expiredPermission.id, activePermission.id] } }
+      })
+      console.log('✅ Permission expiration handling validated')
+    })
+  })
+
+  describe('4. Audit Log Relationships', () => {
+    it('should validate AuditLog → User → Client relationships', async () => {
+      const auditLog = await prisma.auditLog.create({
+        data: {
+          userId: testUser.id,
+          clientId: testClient.id,
+          action: 'test_action',
+          resource: 'test_resource',
+          ipAddress: '127.0.0.1',
+          userAgent: 'Test Agent',
+          success: true,
+          metadata: JSON.stringify({ test: 'data' }),
+        }
+      })
+
+      // Verify relationships
+      const logWithRelations = await prisma.auditLog.findUnique({
+        where: { id: auditLog.id },
+        include: {
+          user: true,
+          client: true,
+        }
+      })
+
+      expect(logWithRelations).toBeTruthy()
+      expect(logWithRelations!.user!.id).toBe(testUser.id)
+      expect(logWithRelations!.client!.id).toBe(testClient.id)
+
+      // Verify reverse relationship
+      const userWithAuditLogs = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { auditLogs: true }
+      })
+
+      expect(userWithAuditLogs).toBeTruthy()
+      expect(userWithAuditLogs!.auditLogs.some(log => log.id === auditLog.id)).toBe(true)
+
+      // Cleanup
+      await prisma.auditLog.delete({ where: { id: auditLog.id } })
+      console.log('✅ AuditLog relationships validated')
+    })
+  })
+
+  describe('5. Cascade Deletion Behavior', () => {
+    it('should handle User deletion cascade', async () => {
+      // Create a temporary user with related data
+      const tempUser = await prisma.user.create({
+        data: {
+          username: 'temp-user-' + Date.now(),
+          email: `temp-user-${Date.now()}@example.com`,
+          password: await bcrypt.hash('temp123', 12),
+          emailVerified: true,
+          isActive: true,
+        }
+      })
+
+      // Create related data
+      const tempAccessToken = await prisma.accessToken.create({
+        data: {
+          token: 'temp_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('temp_token').digest('hex'),
+          expiresAt: addMinutes(new Date(), 60),
+          userId: tempUser.id,
+          clientId: testClient.id,
+          scope: 'openid profile',
+        }
+      })
+
+      const tempSession = await prisma.userSession.create({
+        data: {
+          userId: tempUser.id,
+          sessionId: 'temp_session_' + crypto.randomBytes(16).toString('hex'),
+          ipAddress: '127.0.0.1',
+          userAgent: 'Test Agent',
+          expiresAt: addDays(new Date(), 1),
+          isActive: true,
+        }
+      })
+
+      // Delete user - should cascade
+      await prisma.user.delete({ where: { id: tempUser.id } })
+
+      // Verify cascaded deletions
+      const remainingToken = await prisma.accessToken.findUnique({
+        where: { id: tempAccessToken.id }
+      })
+      const remainingSession = await prisma.userSession.findUnique({
+        where: { id: tempSession.id }
+      })
+
+      expect(remainingToken).toBeNull()
+      expect(remainingSession).toBeNull()
+
+      console.log('✅ User deletion cascade behavior validated')
+    })
+
+    it('should handle Client deletion cascade', async () => {
+      // Create a temporary client with related data
+      const tempClient = await prisma.client.create({
+        data: {
+          clientId: 'temp-client-' + crypto.randomBytes(8).toString('hex'),
+          clientSecret: await bcrypt.hash('temp-secret', 12),
+          name: 'Temp Client',
+          redirectUris: JSON.stringify(['http://localhost:3000/callback']),
+          grantTypes: JSON.stringify(['client_credentials']),
+          responseTypes: JSON.stringify([]),
+          scope: 'test:read',
+          isPublic: false,
+          isActive: true,
+        }
+      })
+
+      // Create related data
+      const tempAccessToken = await prisma.accessToken.create({
+        data: {
+          token: 'temp_client_token_' + crypto.randomBytes(16).toString('hex'),
+          tokenHash: crypto.createHash('sha256').update('temp_client_token').digest('hex'),
+          expiresAt: addMinutes(new Date(), 60),
+          clientId: tempClient.id,
+          scope: 'test:read',
+        }
+      })
+
+      // Delete client - should cascade
+      await prisma.client.delete({ where: { id: tempClient.id } })
+
+      // Verify cascaded deletion
+      const remainingToken = await prisma.accessToken.findUnique({
+        where: { id: tempAccessToken.id }
+      })
+
+      expect(remainingToken).toBeNull()
+
+      console.log('✅ Client deletion cascade behavior validated')
+    })
+  })
+
+  describe('6. Unique Constraints Validation', () => {
+    it('should enforce UserResourcePermission unique constraint', async () => {
+      // Create first permission
+      const permission1 = await prisma.userResourcePermission.create({
+        data: {
+          userId: testUser.id,
+          resourceId: testResource.id,
+          permissionId: testPermission.id,
+          grantedBy: testUser2.id,
+          isActive: true,
+        }
+      })
+
+      // Attempt to create duplicate - should fail
+      await expect(
+        prisma.userResourcePermission.create({
+          data: {
+            userId: testUser.id,
+            resourceId: testResource.id,
+            permissionId: testPermission.id,
+            grantedBy: testUser2.id,
+            isActive: true,
+          }
+        })
+      ).rejects.toThrow()
+
+      // Cleanup
+      await prisma.userResourcePermission.delete({ where: { id: permission1.id } })
+      console.log('✅ UserResourcePermission unique constraint validated')
+    })
+
+    it('should enforce User email uniqueness', async () => {
+      const email = `unique-test-${Date.now()}@example.com`
+      
+      // Create first user
+      const user1 = await prisma.user.create({
+        data: {
+          username: 'unique-user1-' + Date.now(),
+          email,
+          password: await bcrypt.hash('test123', 12),
+          emailVerified: true,
+          isActive: true,
+        }
+      })
+
+      // Attempt to create user with same email - should fail
+      await expect(
+        prisma.user.create({
+          data: {
+            username: 'unique-user2-' + Date.now(),
+            email, // Same email
+            password: await bcrypt.hash('test123', 12),
+            emailVerified: true,
+            isActive: true,
+          }
+        })
+      ).rejects.toThrow()
+
+      // Cleanup
+      await prisma.user.delete({ where: { id: user1.id } })
+      console.log('✅ User email uniqueness constraint validated')
+    })
+
+    it('should enforce Client clientId uniqueness', async () => {
+      const clientId = 'unique-client-' + Date.now()
+      
+      // Create first client
+      const client1 = await prisma.client.create({
+        data: {
+          clientId,
+          clientSecret: await bcrypt.hash('secret', 12),
+          name: 'Unique Client 1',
+          redirectUris: JSON.stringify(['http://localhost:3000/callback']),
+          grantTypes: JSON.stringify(['client_credentials']),
+          responseTypes: JSON.stringify([]),
+          scope: 'test:read',
+          isPublic: false,
+          isActive: true,
+        }
+      })
+
+      // Attempt to create client with same clientId - should fail
+      await expect(
+        prisma.client.create({
+          data: {
+            clientId, // Same clientId
+            clientSecret: await bcrypt.hash('secret', 12),
+            name: 'Unique Client 2',
+            redirectUris: JSON.stringify(['http://localhost:3000/callback']),
+            grantTypes: JSON.stringify(['client_credentials']),
+            responseTypes: JSON.stringify([]),
+            scope: 'test:read',
+            isPublic: false,
+            isActive: true,
+          }
+        })
+      ).rejects.toThrow()
+
+      // Cleanup
+      await prisma.client.delete({ where: { id: client1.id } })
+      console.log('✅ Client clientId uniqueness constraint validated')
+    })
+  })
+}) 

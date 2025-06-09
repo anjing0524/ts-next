@@ -1,4 +1,4 @@
-import { setImmediate, setTimeout, clearTimeout } from 'node:timers';
+// import { setImmediate, setTimeout, clearTimeout } from 'node:timers';
 import { v4 as uuidv4 } from 'uuid';
 import logger from './logger';
 
@@ -51,7 +51,15 @@ class TimeWheel {
     logger.debug(
       `添加任务: ${id}, 延迟: ${options.delay}ms, 槽位: ${slotIndex}, 重复: ${options.repeat}${maxExecutionsInfo}`
     );
-    this.ensureRunning();
+    
+    // 延迟启动时间轮，避免影响槽位计算
+    // 使用setImmediate确保所有同步的addTask调用完成后再启动
+    if (!this.isRunning) {
+      setImmediate(() => {
+        this.ensureRunning();
+      });
+    }
+    
     return id;
   }
 
@@ -124,14 +132,25 @@ class TimeWheel {
    * 执行当前槽位的所有任务
    */
   private executeTasks(tasks: Map<string, Task>): void {
-    for (const task of tasks.values()) {
+    // 先收集所有任务到数组，避免在迭代过程中修改Map
+    const tasksToExecute = Array.from(tasks.values());
+    
+    for (const task of tasksToExecute) {
+      // 增加执行次数计数，无论任务是否成功执行
+      const newExecutionCount = task.executionCount + 1;
+      
       try {
-        logger.debug(`执行任务: ${task.id}, 执行次数: ${task.executionCount + 1}`);
+        logger.debug(`执行任务: ${task.id}, 执行次数: ${newExecutionCount}`);
         task.callback();
-        // 增加执行次数计数
-        const newExecutionCount = task.executionCount + 1;
-        // 检查是否达到最大执行次数
-        if (task.repeat && (!task.maxExecutions || newExecutionCount < task.maxExecutions)) {
+      } catch (error) {
+        logger.error(
+          `执行任务 ${task.id} 时发生错误: ${error instanceof Error ? error.message : error}`
+        );
+      }
+      
+      // 处理重复任务的重新添加，无论任务是否成功执行
+      if (task.repeat) {
+        if (!task.maxExecutions || newExecutionCount < task.maxExecutions) {
           logger.debug(
             `重复任务: ${task.id}, 延迟: ${task.delay}ms, 执行次数: ${newExecutionCount}${
               task.maxExecutions ? `/${task.maxExecutions}` : ''
@@ -148,13 +167,9 @@ class TimeWheel {
             task.id,
             newExecutionCount
           );
-        } else if (task.repeat && task.maxExecutions && newExecutionCount >= task.maxExecutions) {
+        } else if (task.maxExecutions && newExecutionCount >= task.maxExecutions) {
           logger.info(`任务 ${task.id} 已达到最大执行次数 ${task.maxExecutions}，停止重复执行`);
         }
-      } catch (error) {
-        logger.error(
-          `执行任务 ${task.id} 时发生错误: ${error instanceof Error ? error.message : String(error)}`
-        );
       }
     }
   }
