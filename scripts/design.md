@@ -1,4 +1,4 @@
-# OAuth2.1 + RBAC + ABAC 认证授权中心技术设计文档
+# OAuth2.1 + RBAC 认证授权中心技术设计文档
 
 ## 项目定位
 
@@ -33,8 +33,8 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                     认证授权服务层                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
-│  │ OAuth2.1    │  │ RBAC权限    │  │ ABAC策略    │           │
-│  │ 认证服务     │  │ 管理服务     │  │ 引擎服务     │           │
+│  │ OAuth2.1    │  │ RBAC权限    │  │ 统一权限    │           │
+│  │ 认证服务     │  │ 管理服务     │  │ 验证服务     │           │
 │  └─────────────┘  └─────────────┘  └─────────────┘           │
 │                         │                                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
@@ -181,37 +181,9 @@ interface RBACManagementService {
 }
 ```
 
-#### 1.3.4 ABAC策略引擎服务 (ABAC Policy Engine Service)
+#### 1.3.4 统一权限验证服务 (Unified Authorization Verification Service)
 
-**职责**: 基于属性的访问控制，提供动态策略评估能力。
-
-- **策略定义与管理 (UC-2.6.2-001)**: 支持创建、读取、更新、删除ABAC策略，策略语言基于JSON或类似DSL。
-- **策略评估**: 根据用户属性、资源属性、环境属性动态评估访问请求。
-- **属性管理集成**: 与用户属性、资源属性来源集成。
-
-**核心API (示例)**:
-
-```typescript
-interface ABACPolicyEngineService {
-  // 策略管理
-  createPolicy(policy: ABACPolicy): Promise<PolicyDefinition>;
-  getPolicy(policyId: string): Promise<PolicyDefinition>;
-  updatePolicy(policyId: string, policy: ABACPolicy): Promise<PolicyDefinition>;
-  deletePolicy(policyId: string): Promise<void>;
-  listPolicies(params: ListParams): Promise<PolicyDefinition[]>;
-
-  // 策略评估
-  evaluatePolicy(requestContext: ABACEvaluationContext): Promise<PolicyEvaluationResult>; // 包含用户属性、资源属性、操作、环境属性
-
-  // 属性管理 (可能需要与外部服务或用户服务集成)
-  // getUserAttributes(userId: string, attributeNames?: string[]): Promise<Record<string, any>>;
-  // getResourceAttributes(resourceId: string, resourceType: string, attributeNames?: string[]): Promise<Record<string, any>>;
-}
-```
-
-#### 1.3.5 统一权限验证服务 (Unified Authorization Verification Service)
-
-**职责**: 提供统一的权限验证入口，整合RBAC和ABAC的验证逻辑。
+**职责**: 提供统一的权限验证入口，基于RBAC的验证逻辑。
 
 - **单项API权限验证 (UC-2.7-001)**: 验证用户对特定API或资源的访问权限。
 - **批量API权限验证 (UC-2.7-002)**: 批量验证多个权限点。
@@ -234,11 +206,8 @@ interface AccessVerificationRequest {
   userId?: string; // 用户ID，可选，匿名访问或服务间调用时可能为空
   serviceClientId?: string; // 服务客户端ID，用于服务间调用
   roles?: string[]; // 用户角色，可选，如果提供则优先使用
-  userAttributes?: Record<string, any>; // 用户属性，用于ABAC
   resource: string; // 目标资源标识 (e.g., 'api:/users/{id}', 'data:orders')
   action: string; // 操作 (e.g., 'read', 'write', 'delete')
-  resourceAttributes?: Record<string, any>; // 资源属性，用于ABAC
-  environmentAttributes?: Record<string, any>; // 环境属性 (e.g., IP, time)，用于ABAC
 }
 ```
 
@@ -249,12 +218,12 @@ interface AccessVerificationRequest {
 - **用户管理界面 (UC-2.8.1-001 to UC-2.8.1-005)**: 查看用户列表、详情、创建、编辑、删除用户，管理用户状态。
 - **角色与权限管理界面 (UC-2.8.2-001 to UC-2.8.2-004)**: 管理角色、权限定义，分配权限给角色，分配用户到角色。
 - **OAuth客户端管理界面 (UC-2.8.3-001 to UC-2.8.3-003)**: 管理OAuth客户端的注册、配置、密钥等。
-- **ABAC策略管理界面 (UC-2.8.4-001 to UC-2.8.4-003)**: 创建、编辑、查看ABAC策略。
+
 - **监控与审计界面 (UC-2.8.5-001, UC-2.8.5-002)**: 查看系统日志、审计跟踪、监控系统状态。
 
 **核心功能 (通过API暴露给前端)**:
 
-- 上述各管理服务 (UserAuthenticationManagementService, RBACManagementService, OAuth2AuthorizationService, ABACPolicyEngineService) 的API的组合调用。
+- 上述各管理服务 (UserAuthenticationManagementService, RBACManagementService, OAuth2AuthorizationService) 的API的组合调用。
 - 审计日志查询API。
 - 系统监控指标API。
 
@@ -362,20 +331,7 @@ entity RefreshToken {
   createdAt : DateTime
 }
 
-entity ABACPolicy {
-  +id : UUID <<PK>>
-  name : String
-  description : String
-  effect : String // "Allow" or "Deny"
-  subjects : JSONB // e.g., [{ "attribute": "department", "operator": "equals", "value": "Sales" }]
-  resources : JSONB // e.g., [{ "attribute": "type", "operator": "equals", "value": "report" }]
-  actions : String[] // e.g., ["read", "write"]
-  conditions : JSONB // e.g., { "timeOfDay": { "gte": "09:00", "lte": "17:00" } }
-  priority : Integer // For conflict resolution
-  --
-  createdAt : DateTime
-  updatedAt : DateTime
-}
+
 
 ' Relationships
 User ||--|{ UserProfile : "has one (optional)"
@@ -395,17 +351,15 @@ User }o--o{ Role : UserRole
 Role }o--o{ Permission : RolePermission
 (Role, Permission) . RolePermission
 
-' ABAC policies are evaluated against context, not directly linked in ERD this way
-' UserProfile attributes are used in ABAC subject conditions
+
 
 @enduml
 ```
 
 **说明**:
 - 上述ERD为概念模型，具体数据库表结构可能因Prisma或其他ORM的实现而略有不同。
-- `UserProfile` 存储了用于ABAC决策的用户属性，如部门、组织、工作地点。
+- `UserProfile` 存储了用户的基本属性信息，如部门、组织、工作地点。
 - `Permission` 实体现在更具体，包含了资源模式和操作。
-- `ABACPolicy` 实体用于存储ABAC策略规则，其`subjects`, `resources`, `actions`, `conditions` 字段将存储结构化数据 (如JSONB) 以定义策略逻辑。
 - 多对多关系 (如 `UserRole`, `RolePermission`) 会通过联结表实现。
 
 ### 2.2 权限模型详细设计
@@ -473,28 +427,7 @@ interface PermissionIdentifier {
   action: string; // 操作, e.g., "create", "read", "update", "delete", "approve"
 }
 
-// ABAC评估上下文 (用于向ABAC策略引擎传递信息)
-interface ABACEvaluationContext {
-  subject: {
-    userId?: string;
-    roles?: string[];
-    attributes: Record<string, any>; // e.g., { department: 'Sales', organization: 'HQ', workLocation: 'New York' }
-  };
-  resource: {
-    type: string; // e.g., "document", "api_endpoint"
-    identifier: string; // e.g., "doc123", "/api/v1/data"
-    attributes: Record<string, any>; // e.g., { sensitivity: 'high', owner: 'user_abc' }
-  };
-  action: {
-    name: string; // e.g., "read", "write"
-    attributes?: Record<string, any>;
-  };
-  environment: {
-    ipAddress?: string;
-    timestamp?: Date;
-    attributes: Record<string, any>; // e.g., { deviceId: 'xyz' }
-  };
-}
+
 ```
   action: string; // 操作类型
 }
@@ -524,75 +457,7 @@ const PERMISSIONS = {
 };
 ```
 
-#### 2.2.2 ABAC基础策略语法设计
 
-```typescript
-interface BasicPolicyRule {
-  name: string;
-  description?: string;
-  rule: string; // 基于基本属性的JavaScript表达式
-  effect: 'ALLOW' | 'DENY';
-  priority: number; // 数值越大优先级越高
-  isActive: boolean;
-}
-
-// 基础策略上下文结构
-interface BasicPolicyContext {
-  user: {
-    id: string;
-    department: string; // 部门
-    position: string; // 岗位
-    organization: string; // 单位
-    workLocation: string; // 工作地点
-  };
-  resource?: {
-    id: string;
-    owner?: string;
-    department?: string;
-    organization?: string;
-  };
-  environment: {
-    sourceIP: string; // 来源IP
-    accessTime: Date; // 访问时间
-    workingHours: boolean; // 是否工作时间
-    location: string; // 地理位置
-  };
-  action: string;
-}
-
-// 基础策略示例
-const BASIC_POLICY_EXAMPLES = [
-  {
-    name: 'department_isolation',
-    rule: 'user.department === resource.department',
-    effect: 'ALLOW',
-    priority: 100,
-  },
-  {
-    name: 'working_hours_only',
-    rule: 'environment.workingHours === true',
-    effect: 'ALLOW',
-    priority: 200,
-  },
-  {
-    name: 'office_ip_restriction',
-    rule: 'environment.sourceIP.startsWith("192.168.") || environment.sourceIP.startsWith("10.0.")',
-    effect: 'ALLOW',
-    priority: 300,
-  },
-  {
-    name: 'manager_access',
-    rule: 'user.position === "经理" || user.position === "主管"',
-    effect: 'ALLOW',
-    priority: 400,
-  },
-  {
-    name: 'headquarters_bypass',
-    rule: 'user.organization === "总部"',
-    effect: 'ALLOW',
-    priority: 500,
-  },
-];
 ```
 
 ---
@@ -707,23 +572,9 @@ const BASIC_POLICY_EXAMPLES = [
   - `GET /users/{userId}/roles`: 查看用户的角色列表
   - `GET /users/{userId}/permissions`: 查看用户合并后的总权限列表 (直接和间接通过角色获得)
 
-### 3.4 ABAC 策略引擎服务 API (对应 PRD 2.6, UC-2.8.4)
 
-**基础路径**: `/api/v1/admin/abac`
 
-- **策略管理** (UC-2.6.2-001, UC-2.8.4-001 to UC-2.8.4-003)
-  - `POST /policies`: 创建ABAC策略
-    - 请求体: `{ name, description, effect, subjects, resources, actions, conditions, priority }` (结构参考 `ABACPolicy` 实体)
-  - `GET /policies`: 获取策略列表
-  - `GET /policies/{policyId}`: 获取策略详情
-  - `PUT /policies/{policyId}`: 更新策略
-  - `DELETE /policies/{policyId}`: 删除策略
-- **策略评估 (测试/调试用)**
-  - `POST /evaluate`: 评估一个模拟的访问请求
-    - 请求体: `ABACEvaluationContext` (参考2.2.3节定义)
-    - 响应: `PolicyEvaluationResult` (e.g., `{ decision: "Allow"/"Deny"/"NotApplicable", matchedPolicies: [], obligations: [] }`)
-
-### 3.5 统一权限验证服务 API (对应 PRD 2.7)
+### 3.4 统一权限验证服务 API (对应 PRD 2.7)
 
 **基础路径**: `/api/v1/authorize`
 
@@ -734,18 +585,15 @@ const BASIC_POLICY_EXAMPLES = [
     // Example
     {
       "userId": "user-uuid-123",
-      "userAttributes": { "department": "Engineering", "workLocation": "Remote" },
       "resource": "document:confidential-specs",
-      "action": "read",
-      "resourceAttributes": { "sensitivity": "high" },
-      "environmentAttributes": { "ipAddress": "10.0.1.5" }
+      "action": "read"
     }
     ```
-  - 响应: `{ allowed: boolean, reason?: string, obligations?: any[] }`
+  - 响应: `{ allowed: boolean, reason?: string }`
 - **批量权限验证** (UC-2.7-002)
   - `POST /batch-check`
   - 请求体: `AccessVerificationRequest[]` (数组，每个元素结构同上)
-  - 响应: `Array<{ requestIndex: number, allowed: boolean, reason?: string, obligations?: any[] }>`
+  - 响应: `Array<{ requestIndex: number, allowed: boolean, reason?: string }>`
 
 ### 3.6 审计与监控 API (对应 PRD 2.8.5)
 
@@ -819,7 +667,7 @@ const BASIC_POLICY_EXAMPLES = [
 
 - **传输层安全 (TLS)**: 所有API接口和Web页面强制使用HTTPS (TLS 1.2+)，使用强加密套件。
 - **存储加密**: 
-    - 敏感数据（如用户密码哈希、OAuth客户端密钥、ABAC策略中的敏感属性值）在数据库中加密存储。
+    - 敏感数据（如用户密码哈希、OAuth客户端密钥）在数据库中加密存储。
     - 数据库连接加密。
 - **数据校验与过滤**: 
     - 对所有外部输入（API请求参数、请求体、HTTP头部）进行严格的格式、类型、长度和内容校验。
@@ -829,7 +677,7 @@ const BASIC_POLICY_EXAMPLES = [
 
 ### 4.4 应用安全 (OWASP Top 10)
 
-- **A01:2021-Broken Access Control**: 通过RBAC和ABAC的正确实施来解决。确保权限检查在服务端强制执行，覆盖所有功能和数据访问点。
+- **A01:2021-Broken Access Control**: 通过RBAC的正确实施来解决。确保权限检查在服务端强制执行，覆盖所有功能和数据访问点。
 - **A02:2021-Cryptographic Failures**: 遵循上述数据安全和令牌安全措施。
 - **A03:2021-Injection**: 通过输入验证、参数化查询、输出编码等方式防止注入攻击。
 - **A04:2021-Insecure Design**: 本设计文档旨在通过分层设计、模块化、最小权限等原则来规避不安全设计。
@@ -890,7 +738,6 @@ package "基础设施 (云平台 - 例如 AWS, Azure, GCP)" {
     component "用户认证管理服务" as AuthService
     component "OAuth2.1认证服务" as OAuthService
     component "RBAC权限管理服务" as RBACService
-    component "ABAC策略引擎服务" as ABACService
     component "统一权限验证服务" as UnifiedPermissionService
     component "管理界面服务" as AdminUIService
   }
@@ -915,7 +762,6 @@ APIGateway --> LoadBalancer
 LoadBalancer --> AuthService
 LoadBalancer --> OAuthService
 LoadBalancer --> RBACService
-LoadBalancer --> ABACService
 LoadBalancer --> UnifiedPermissionService
 LoadBalancer --> AdminUIService
 
@@ -924,7 +770,6 @@ AuthService <--> CacheDB
 OAuthService <--> MainDB
 OAuthService <--> CacheDB
 RBACService <--> MainDB
-ABACService <--> MainDB
 UnifiedPermissionService <--> MainDB
 UnifiedPermissionService <--> CacheDB
 AdminUIService <--> MainDB
@@ -932,7 +777,6 @@ AdminUIService <--> MainDB
 AuthService --> LogAggregator
 OAuthService --> LogAggregator
 RBACService --> LogAggregator
-ABACService --> LogAggregator
 UnifiedPermissionService --> LogAggregator
 AdminUIService --> LogAggregator
 
@@ -940,7 +784,6 @@ LogAggregator --> AuditLogDB
 MonitoringService --> AuthService
 MonitoringService --> OAuthService
 MonitoringService --> RBACService
-MonitoringService --> ABACService
 MonitoringService --> UnifiedPermissionService
 MonitoringService --> AdminUIService
 MonitoringService --> MainDB
@@ -958,10 +801,9 @@ MonitoringService --> AlertingService
     - **用户认证管理服务**: 处理用户注册、登录、密码管理、MFA等。
     - **OAuth2.1认证服务**: 实现OAuth 2.1授权服务器功能。
     - **RBAC权限管理服务**: 管理角色、权限及其分配。
-    - **ABAC策略引擎服务**: 管理和评估ABAC策略。
     - **统一权限验证服务**: 提供统一的权限校验接口。
     - **管理界面服务**: 提供系统管理后台功能。
-- **主数据库 (PostgreSQL)**: 存储核心业务数据，如用户信息、角色、权限、OAuth客户端、ABAC策略等。
+- **主数据库 (PostgreSQL)**: 存储核心业务数据，如用户信息、角色、权限、OAuth客户端等。
 - **缓存数据库 (Redis)**: 缓存热点数据，如会话信息、权限数据、访问令牌等，提升性能。
 - **审计日志存储**: 存储审计日志，用于安全分析和合规性检查。
 - **监控与告警系统**: 收集系统指标、日志，并提供告警功能。
@@ -1022,7 +864,6 @@ MonitoringService --> AlertingService
     - OAuth授权请求数
     - 令牌颁发/刷新/吊销次数
     - 权限校验通过/拒绝次数
-    - ABAC策略评估次数
 
 ### 7.2 日志收集
 
@@ -1378,7 +1219,6 @@ interface Metrics {
   // 业务指标
   activeUsers: Gauge; // 活跃用户数
   tokenIssuanceRate: Counter; // 令牌颁发频率
-  policyEvaluations: Counter; // 策略评估次数
 }
 ```
 
