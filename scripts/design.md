@@ -80,124 +80,422 @@
 
 ### 1.3 服务模块设计
 
-#### 1.3.1 认证服务 (Authentication Service)
+#### 1.3.1 用户认证管理服务 (User Authentication Management Service)
 
-**职责**: OAuth2.1标准认证流程实现
+**职责**: 负责用户的全生命周期管理、身份认证、会话管理以及账户安全策略。
 
-- 用户身份验证 (用户名/密码)
-- 授权码生成和验证 (PKCE支持)
-- 访问令牌和刷新令牌管理
-- 客户端身份验证
+- **用户注册与登录 (UC-2.1.1-001, UC-2.1.1-002)**: 提供用户名/密码注册和登录功能，支持SSO。
+- **密码策略管理 (UC-2.1.2-001, UC-2.1.2-002)**: 实现密码复杂度、有效期、历史密码限制等策略。
+- **账户安全 (UC-2.1.3-001, UC-2.1.3-002, UC-2.1.3-003)**: 支持账户锁定、解锁、二次验证（MFA）配置。
+- **会话管理**: 用户登录状态的维持、校验与登出。
 
-**核心API**:
+**核心API (示例)**:
 
 ```typescript
-interface AuthenticationService {
-  // OAuth2.1 端点
-  authorize(params: AuthorizeParams): Promise<AuthorizeResult>;
-  token(params: TokenParams): Promise<TokenResult>;
-  userinfo(token: string): Promise<UserInfo>;
-  revoke(params: RevokeParams): Promise<void>;
+interface UserAuthenticationManagementService {
+  // 用户管理
+  registerUser(params: RegisterUserParams): Promise<User>;
+  getUserProfile(userId: string): Promise<UserProfile>;
+  updateUserProfile(userId: string, profile: UserProfileUpdateParams): Promise<UserProfile>;
+  changePassword(userId: string, params: ChangePasswordParams): Promise<void>;
+  resetPasswordRequest(email: string): Promise<void>; // 密码重置请求
+  resetPasswordConfirm(token: string, newPassword: string): Promise<void>; // 密码重置确认
 
-  // 用户认证
-  login(credentials: LoginCredentials): Promise<LoginResult>;
+  // 认证与会话
+  login(credentials: LoginCredentials): Promise<LoginResult>; // 包含访问令牌、刷新令牌、会话信息
   logout(sessionId: string): Promise<void>;
   validateSession(sessionId: string): Promise<SessionInfo>;
+  refreshAccessToken(refreshToken: string): Promise<TokenResult>;
+
+  // 账户安全
+  setupMFA(userId: string, mfaType: string): Promise<MFAConfigResult>;
+  verifyMFA(userId: string, code: string): Promise<boolean>;
+  lockAccount(userId: string): Promise<void>;
+  unlockAccount(userId: string): Promise<void>;
 }
 ```
 
-#### 1.3.2 权限服务 (Authorization Service)
+#### 1.3.2 OAuth2.1认证服务 (OAuth2.1 Authorization Service)
 
-**职责**: RBAC+ABAC权限验证和管理
+**职责**: 实现OAuth2.1协议的核心授权流程，管理客户端和令牌。
 
-- 权限检查和决策
-- 角色权限管理
-- 策略规则评估
-- 权限缓存管理
+- **客户端注册与管理 (UC-2.3-001)**: 支持动态客户端注册和管理，包括客户端ID、密钥、回调地址等。
+- **授权码模式 (UC-2.2-001)**: 实现Authorization Code Grant，支持PKCE。
+- **客户端凭据模式 (UC-2.2-002)**: 实现Client Credentials Grant，用于服务间认证。
+- **令牌管理 (UC-2.4-001, UC-2.4-002)**: 访问令牌和刷新令牌的生成、验证、吊销和刷新。
+- **令牌自省 (UC-2.2-003)**: 提供令牌校验端点。
 
-**核心API**:
+**核心API (示例)**:
 
 ```typescript
-interface AuthorizationService {
+interface OAuth2AuthorizationService {
+  // OAuth2.1 标准端点
+  authorize(params: OAuthAuthorizeParams): Promise<OAuthAuthorizeResult>; // 处理授权请求，返回授权码或错误
+  token(params: OAuthTokenParams): Promise<OAuthTokenResult>; // 处理令牌请求，发放访问令牌和刷新令牌
+  introspectToken(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<TokenIntrospectionResult>; // 令牌自省
+  revokeToken(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void>; // 令牌吊销
+  userinfo(accessToken: string): Promise<UserInfo>; // 获取用户信息
+
+  // 客户端管理 (对应 UC-2.3-001)
+  registerClient(clientDetails: ClientRegistrationParams): Promise<ClientInfo>;
+  getClientDetails(clientId: string): Promise<ClientInfo>;
+  updateClient(clientId: string, updates: ClientUpdateParams): Promise<ClientInfo>;
+  deleteClient(clientId: string): Promise<void>;
+}
+```
+
+#### 1.3.3 RBAC权限管理服务 (RBAC Permission Management Service)
+
+**职责**: 基于角色的访问控制管理，包括角色、权限的定义、分配和查询。
+
+- **角色管理 (UC-2.5.2-001)**: 创建、读取、更新、删除角色。
+- **权限管理 (UC-2.5.2-002)**: 定义和管理系统中的细粒度权限。
+- **角色权限分配 (UC-2.5.2-003)**: 将权限分配给角色，将用户分配给角色。
+
+**核心API (示例)**:
+
+```typescript
+interface RBACManagementService {
+  // 角色管理
+  createRole(roleData: CreateRoleParams): Promise<Role>;
+  getRole(roleId: string): Promise<Role>;
+  updateRole(roleId: string, updates: UpdateRoleParams): Promise<Role>;
+  deleteRole(roleId: string): Promise<void>;
+  listRoles(params: ListParams): Promise<Role[]>;
+
+  // 权限管理
+  createPermission(permissionData: CreatePermissionParams): Promise<Permission>;
+  getPermission(permissionId: string): Promise<Permission>;
+  updatePermission(permissionId: string, updates: UpdatePermissionParams): Promise<Permission>;
+  deletePermission(permissionId: string): Promise<void>;
+  listPermissions(params: ListParams): Promise<Permission[]>;
+
+  // 分配与查询
+  assignPermissionToRole(roleId: string, permissionId: string): Promise<void>;
+  removePermissionFromRole(roleId: string, permissionId: string): Promise<void>;
+  getRolePermissions(roleId: string): Promise<Permission[]>;
+  assignUserToRole(userId: string, roleId: string): Promise<void>;
+  removeUserFromRole(userId: string, roleId: string): Promise<void>;
+  getUserRoles(userId: string): Promise<Role[]>;
+  checkUserPermission(userId: string, permissionIdentifier: string): Promise<boolean>; // 结合用户角色检查权限
+}
+```
+
+#### 1.3.4 ABAC策略引擎服务 (ABAC Policy Engine Service)
+
+**职责**: 基于属性的访问控制，提供动态策略评估能力。
+
+- **策略定义与管理 (UC-2.6.2-001)**: 支持创建、读取、更新、删除ABAC策略，策略语言基于JSON或类似DSL。
+- **策略评估**: 根据用户属性、资源属性、环境属性动态评估访问请求。
+- **属性管理集成**: 与用户属性、资源属性来源集成。
+
+**核心API (示例)**:
+
+```typescript
+interface ABACPolicyEngineService {
+  // 策略管理
+  createPolicy(policy: ABACPolicy): Promise<PolicyDefinition>;
+  getPolicy(policyId: string): Promise<PolicyDefinition>;
+  updatePolicy(policyId: string, policy: ABACPolicy): Promise<PolicyDefinition>;
+  deletePolicy(policyId: string): Promise<void>;
+  listPolicies(params: ListParams): Promise<PolicyDefinition[]>;
+
+  // 策略评估
+  evaluatePolicy(requestContext: ABACEvaluationContext): Promise<PolicyEvaluationResult>; // 包含用户属性、资源属性、操作、环境属性
+
+  // 属性管理 (可能需要与外部服务或用户服务集成)
+  // getUserAttributes(userId: string, attributeNames?: string[]): Promise<Record<string, any>>;
+  // getResourceAttributes(resourceId: string, resourceType: string, attributeNames?: string[]): Promise<Record<string, any>>;
+}
+```
+
+#### 1.3.5 统一权限验证服务 (Unified Authorization Verification Service)
+
+**职责**: 提供统一的权限验证入口，整合RBAC和ABAC的验证逻辑。
+
+- **单项API权限验证 (UC-2.7-001)**: 验证用户对特定API或资源的访问权限。
+- **批量API权限验证 (UC-2.7-002)**: 批量验证多个权限点。
+- **SDK与中间件集成 (UC-2.7-003)**: 提供客户端SDK和服务器端中间件，简化应用集成。
+
+**核心API (示例)**:
+
+```typescript
+interface UnifiedAuthorizationVerificationService {
   // 权限验证
-  checkPermission(request: PermissionRequest): Promise<PermissionResult>;
-  getUserPermissions(userId: string): Promise<Permission[]>;
+  verifyAccess(request: AccessVerificationRequest): Promise<AccessVerificationResult>; // 包含用户信息、资源信息、操作、环境上下文
+  batchVerifyAccess(requests: AccessVerificationRequest[]): Promise<BatchAccessVerificationResult[]>;
 
-  // RBAC管理
-  assignRole(userId: string, roleId: string): Promise<void>;
-  revokeRole(userId: string, roleId: string): Promise<void>;
+  // SDK/中间件支持 (概念性，具体实现可能在SDK中)
+  // getVerificationMiddleware(options: MiddlewareOptions): MiddlewareFunction;
+}
 
-  // ABAC基础策略
-  evaluateBasicPolicy(context: BasicPolicyContext): Promise<PolicyResult>;
-  createBasicPolicy(policy: BasicPolicyRule): Promise<string>;
+// AccessVerificationRequest 结构示例
+interface AccessVerificationRequest {
+  userId?: string; // 用户ID，可选，匿名访问或服务间调用时可能为空
+  serviceClientId?: string; // 服务客户端ID，用于服务间调用
+  roles?: string[]; // 用户角色，可选，如果提供则优先使用
+  userAttributes?: Record<string, any>; // 用户属性，用于ABAC
+  resource: string; // 目标资源标识 (e.g., 'api:/users/{id}', 'data:orders')
+  action: string; // 操作 (e.g., 'read', 'write', 'delete')
+  resourceAttributes?: Record<string, any>; // 资源属性，用于ABAC
+  environmentAttributes?: Record<string, any>; // 环境属性 (e.g., IP, time)，用于ABAC
 }
 ```
 
-#### 1.3.3 服务间认证服务 (Service-to-Service Authentication)
+#### 1.3.6 管理界面服务 (Admin Interface Service)
 
-**职责**: 微服务间的身份认证和授权
+**职责**: 为管理员提供可视化管理界面，用于配置和监控认证授权系统。
 
-- 服务身份验证和注册
-- Client Credentials Grant流程
-- 服务权限管理
-- 服务调用审计
+- **用户管理界面 (UC-2.8.1-001 to UC-2.8.1-005)**: 查看用户列表、详情、创建、编辑、删除用户，管理用户状态。
+- **角色与权限管理界面 (UC-2.8.2-001 to UC-2.8.2-004)**: 管理角色、权限定义，分配权限给角色，分配用户到角色。
+- **OAuth客户端管理界面 (UC-2.8.3-001 to UC-2.8.3-003)**: 管理OAuth客户端的注册、配置、密钥等。
+- **ABAC策略管理界面 (UC-2.8.4-001 to UC-2.8.4-003)**: 创建、编辑、查看ABAC策略。
+- **监控与审计界面 (UC-2.8.5-001, UC-2.8.5-002)**: 查看系统日志、审计跟踪、监控系统状态。
 
-**核心API**:
+**核心功能 (通过API暴露给前端)**:
 
-```typescript
-interface ServiceAuthService {
-  // 服务认证
-  authenticateService(clientId: string, clientSecret: string): Promise<ServiceToken>;
-  validateServiceToken(token: string): Promise<ServiceInfo>;
-
-  // 服务管理
-  registerService(service: ServiceRegistration): Promise<ServiceCredentials>;
-  updateServicePermissions(serviceId: string, permissions: string[]): Promise<void>;
-
-  // 服务调用验证
-  checkServicePermission(serviceId: string, permission: string): Promise<boolean>;
-}
-```
-
-#### 1.3.4 用户管理服务 (User Management Service)
-
-**职责**: 用户生命周期管理
-
-- 用户CRUD操作
-- 密码策略管理（内网简化版）
-- 用户属性管理
-- 账户状态控制
+- 上述各管理服务 (UserAuthenticationManagementService, RBACManagementService, OAuth2AuthorizationService, ABACPolicyEngineService) 的API的组合调用。
+- 审计日志查询API。
+- 系统监控指标API。
 
 ---
 
 ## 2. 数据模型设计
 
-### 2.1 核心实体关系图
+### 2.1 核心实体与关联 (Conceptual ERD - PlantUML syntax)
 
+```plantuml
+@startuml
+entity User {
+  +id : UUID <<PK>>
+  username : String
+  passwordHash : String
+  email : String
+  isActive : Boolean
+  isLocked : Boolean
+  mfaEnabled : Boolean
+  --
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+entity UserProfile {
+  +userId : UUID <<FK>>
+  firstName : String
+  lastName : String
+  department : String
+  organization : String
+  workLocation : String
+  --
+  customAttributes : JSONB
+}
+
+entity Role {
+  +id : UUID <<PK>>
+  name : String
+  description : String
+  --
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+entity Permission {
+  +id : UUID <<PK>>
+  name : String  // e.g., "user:create", "order:read"
+  description : String
+  category: String // e.g., 'system', 'app', 'api', 'data', 'page'
+  resource_pattern: String // e.g., "/users/*", "/orders/{id}"
+  action: String // e.g., "CREATE", "READ", "UPDATE", "DELETE"
+  --
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+entity OAuthClient {
+  +id : UUID <<PK>>
+  clientId : String <<Unique>>
+  clientSecretHash : String
+  redirectUris : String[]
+  grantTypes : String[] // e.g., "authorization_code", "client_credentials", "refresh_token"
+  responseTypes : String[] // e.g., "code", "token"
+  scope : String // Space-separated list of scopes
+  clientName : String
+  logoUri : String
+  --
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+entity AuthorizationCode {
+  +code : String <<PK>>
+  userId : UUID <<FK>>
+  oauthClientId : UUID <<FK>>
+  redirectUri : String
+  scope : String
+  expiresAt : DateTime
+  isUsed : Boolean
+  pkceChallenge: String
+  pkceMethod: String // "S256" or "plain"
+  --
+  createdAt : DateTime
+}
+
+entity AccessToken {
+  +token : String <<PK>>
+  userId : UUID <<FK>>
+  oauthClientId : UUID <<FK>>
+  scope : String
+  expiresAt : DateTime
+  --
+  createdAt : DateTime
+}
+
+entity RefreshToken {
+  +token : String <<PK>>
+  userId : UUID <<FK>>
+  oauthClientId : UUID <<FK>>
+  scope : String
+  expiresAt : DateTime
+  isRevoked : Boolean
+  --
+  accessTokenJti : String // JTI of the associated access token
+  createdAt : DateTime
+}
+
+entity ABACPolicy {
+  +id : UUID <<PK>>
+  name : String
+  description : String
+  effect : String // "Allow" or "Deny"
+  subjects : JSONB // e.g., [{ "attribute": "department", "operator": "equals", "value": "Sales" }]
+  resources : JSONB // e.g., [{ "attribute": "type", "operator": "equals", "value": "report" }]
+  actions : String[] // e.g., ["read", "write"]
+  conditions : JSONB // e.g., { "timeOfDay": { "gte": "09:00", "lte": "17:00" } }
+  priority : Integer // For conflict resolution
+  --
+  createdAt : DateTime
+  updatedAt : DateTime
+}
+
+' Relationships
+User ||--|{ UserProfile : "has one (optional)"
+User ||--o{ AuthorizationCode : "grants"
+User ||--o{ AccessToken : "owns"
+User ||--o{ RefreshToken : "owns"
+
+OAuthClient ||--o{ AuthorizationCode : "generates for"
+OAuthClient ||--o{ AccessToken : "issues for"
+OAuthClient ||--o{ RefreshToken : "issues for"
+
+' RBAC Many-to-Many through join table UserRole
+User }o--o{ Role : UserRole
+(User, Role) . UserRole
+
+' RBAC Many-to-Many through join table RolePermission
+Role }o--o{ Permission : RolePermission
+(Role, Permission) . RolePermission
+
+' ABAC policies are evaluated against context, not directly linked in ERD this way
+' UserProfile attributes are used in ABAC subject conditions
+
+@enduml
 ```
-User ||--o{ UserRole : has
-Role ||--o{ RolePermission : contains
-Permission ||--o{ RolePermission : belongs_to
 
-User ||--o{ UserAttribute : has
-User ||--o{ AccessToken : owns
-User ||--o{ AuthorizationCode : grants
-
-OAuthClient ||--o{ AccessToken : issues
-OAuthClient ||--o{ AuthorizationCode : generates
-
-Resource ||--o{ ResourceAttribute : has
-Policy ||--o{ PolicyEvaluation : triggers
-```
+**说明**:
+- 上述ERD为概念模型，具体数据库表结构可能因Prisma或其他ORM的实现而略有不同。
+- `UserProfile` 存储了用于ABAC决策的用户属性，如部门、组织、工作地点。
+- `Permission` 实体现在更具体，包含了资源模式和操作。
+- `ABACPolicy` 实体用于存储ABAC策略规则，其`subjects`, `resources`, `actions`, `conditions` 字段将存储结构化数据 (如JSONB) 以定义策略逻辑。
+- 多对多关系 (如 `UserRole`, `RolePermission`) 会通过联结表实现。
 
 ### 2.2 权限模型详细设计
 
-#### 2.2.1 权限标识符设计
+#### 2.2.1 RBAC (Role-Based Access Control)
+
+- **用户 (User)**: 系统中的操作主体。
+- **角色 (Role)**: 一组权限的集合，代表了系统中的一种职责或身份 (如 `admin`, `editor`, `viewer`)。
+- **权限 (Permission)**: 对特定资源执行特定操作的许可 (如 `CREATE_USER`, `READ_ORDER`, `UPDATE_DOCUMENT:sectionA`)。
+    - **权限定义**: 权限应具有清晰的命名规范，例如 `resource:action` 或 `resource:sub_resource:action`。
+    - **权限粒度**: 根据业务需求设计合适的权限粒度，避免过于粗糙或过于细致。
+- **关系**:
+    - 用户可以被分配一个或多个角色。
+    - 角色可以包含一个或多个权限。
+    - 用户的有效权限是其所有角色的权限总和。
+
+#### 2.2.2 ABAC (Attribute-Based Access Control)
+
+- **主体属性 (Subject Attributes)**: 描述发起访问请求的用户或服务的特征。
+    - 示例: `user.department = 'Sales'`, `user.organization = 'HQ'`, `user.workLocation = 'New York'`, `user.securityClearance = 'Level2'`。
+    - 这些属性主要存储在 `UserProfile` 表中，或在运行时从其他来源获取。
+- **资源属性 (Resource Attributes)**: 描述被访问对象的特征。
+    - 示例: `document.sensitivity = 'Confidential'`, `report.region = 'APAC'`, `data.owner = 'user_xyz'`。
+- **操作属性 (Action Attributes)**: 描述主体试图对资源执行的操作。
+    - 示例: `action.type = 'read'`, `action.type = 'write'`, `action.criticality = 'high'`。
+- **环境属性 (Environment Attributes)**: 描述访问发生时的上下文条件。
+    - 示例: `timeOfDay = '10:00'`, `ipAddress = '192.168.1.100'`, `device.securityPatchLevel = 'latest'`。
+- **策略 (Policy)**: 一组规则，规定了在特定属性条件下是否允许或拒绝访问。
+    - **策略结构**: 通常包含目标（Target - 哪些请求适用此策略）、条件（Condition - 属性之间的逻辑关系）和效果（Effect - Allow/Deny）。
+    - **策略语言**: 可以使用JSON、YAML或自定义DSL来定义策略，如 `ABACPolicy` 实体所示。
+    - **策略示例 (概念)**:
+        ```json
+        {
+          "name": "AllowSalesReportsInWorkHours",
+          "effect": "Allow",
+          "target": {
+            "subject": { "department": "Sales" },
+            "resource": { "type": "Sales Report" },
+            "action": ["read"]
+          },
+          "condition": {
+            "operator": "AND",
+            "operands": [
+              { "attribute": "environment.timeOfDay", "operator": ">=", "value": "09:00" },
+              { "attribute": "environment.timeOfDay", "operator": "<=", "value": "17:00" }
+            ]
+          }
+        }
+        ```
+- **策略决策点 (PDP - Policy Decision Point)**: 评估适用策略并做出访问决策。
+- **策略执行点 (PEP - Policy Enforcement Point)**: 拦截访问请求，向PDP查询决策，并执行该决策。
+
+#### 2.2.3 权限标识符与组合
+
+- **RBAC权限标识**: 如 `Permission` 实体中的 `name` (e.g., `user:create`, `order:read:{orderId}`).
+- **ABAC策略**: 通过 `ABACPolicy` 实体定义，不直接使用单一标识符，而是通过属性匹配和条件评估。
+- **组合决策**: 系统将首先基于RBAC检查用户是否拥有基础权限。如果RBAC允许，再通过ABAC引擎评估相关策略，以实现更细粒度的动态控制。
+    - 例如，用户可能通过角色拥有 `document:read` 权限，但ABAC策略可能进一步限制其只能在特定时间、特定地点或针对特定敏感级别的文档执行此操作。
 
 ```typescript
+// 概念性权限标识符 (主要用于RBAC)
 interface PermissionIdentifier {
-  category: 'system' | 'app' | 'api' | 'data' | 'page';
-  resource: string; // 资源标识
+  category: 'system' | 'app' | 'api' | 'data' | 'page'; // 权限分类
+  resource: string; // 资源标识, e.g., "users", "orders/{orderId}", "reports/financial"
+  action: string; // 操作, e.g., "create", "read", "update", "delete", "approve"
+}
+
+// ABAC评估上下文 (用于向ABAC策略引擎传递信息)
+interface ABACEvaluationContext {
+  subject: {
+    userId?: string;
+    roles?: string[];
+    attributes: Record<string, any>; // e.g., { department: 'Sales', organization: 'HQ', workLocation: 'New York' }
+  };
+  resource: {
+    type: string; // e.g., "document", "api_endpoint"
+    identifier: string; // e.g., "doc123", "/api/v1/data"
+    attributes: Record<string, any>; // e.g., { sensitivity: 'high', owner: 'user_abc' }
+  };
+  action: {
+    name: string; // e.g., "read", "write"
+    attributes?: Record<string, any>;
+  };
+  environment: {
+    ipAddress?: string;
+    timestamp?: Date;
+    attributes: Record<string, any>; // e.g., { deviceId: 'xyz' }
+  };
+}
+```
   action: string; // 操作类型
 }
 
@@ -301,461 +599,452 @@ const BASIC_POLICY_EXAMPLES = [
 
 ## 3. API接口设计
 
-### 3.1 OAuth2.1标准端点
+本节详细描述核心服务的API端点，与PRD中的用例编号对应。
 
-#### 3.1.1 授权端点
+### 3.1 用户认证管理服务 API (对应 PRD 2.1)
 
-```http
-GET /oauth/authorize
-Parameters:
-  - response_type: "code" (必需)
-  - client_id: string (必需)
-  - redirect_uri: string (必需)
-  - scope: string[] (可选)
-  - state: string (推荐)
-  - code_challenge: string (必需, PKCE)
-  - code_challenge_method: "S256" (必需, PKCE)
+**基础路径**: `/api/v1/users` (管理端), `/api/v1/account` (用户自助)
 
-Success Response (302 Redirect):
-Location: {redirect_uri}?code={authorization_code}&state={state}
+- **用户注册** (UC-2.1.1-001)
+  - `POST /api/v1/account/register`
+  - 请求体: `{ username, email, password, profile?: { firstName, lastName, department, organization, workLocation, customAttributes } }`
+  - 响应: `201 Created` 用户信息 (不含密码)
+- **用户登录** (UC-2.1.1-002)
+  - `POST /api/v1/account/login`
+  - 请求体: `{ username, password }`
+  - 响应: `{ accessToken, refreshToken, expiresIn, user, sessionId }`
+- **用户登出**
+  - `POST /api/v1/account/logout`
+  - Header: `Authorization: Bearer {accessToken}` 或 `Cookie: sessionId={sessionId}`
+  - 响应: `200 OK`
+- **获取当前用户信息**
+  - `GET /api/v1/account/me`
+  - Header: `Authorization: Bearer {accessToken}`
+  - 响应: 用户详细信息及权限
+- **修改密码** (UC-2.1.1-004)
+  - `PUT /api/v1/account/password`
+  - Header: `Authorization: Bearer {accessToken}`
+  - 请求体: `{ currentPassword, newPassword }`
+  - 响应: `200 OK`
+- **请求密码重置**
+  - `POST /api/v1/account/password-reset-request`
+  - 请求体: `{ email }`
+  - 响应: `200 OK` (即使邮箱不存在也返回成功，防止用户枚举)
+- **确认密码重置**
+  - `POST /api/v1/account/password-reset-confirm`
+  - 请求体: `{ token, newPassword }`
+  - 响应: `200 OK`
+- **MFA设置** (UC-2.1.3-003)
+  - `POST /api/v1/account/mfa/setup` (启用/配置新的MFA)
+  - `GET /api/v1/account/mfa/status` (查看MFA状态)
+  - `DELETE /api/v1/account/mfa/disable` (禁用MFA，可能需要额外验证)
+- **管理端用户操作** (UC-2.8.1-001 to UC-2.8.1-005)
+  - `GET /api/v1/admin/users`: 获取用户列表 (支持分页、过滤、排序)
+  - `POST /api/v1/admin/users`: 创建新用户
+  - `GET /api/v1/admin/users/{userId}`: 获取特定用户详情
+  - `PUT /api/v1/admin/users/{userId}`: 更新用户信息 (包括profile, 状态等)
+  - `DELETE /api/v1/admin/users/{userId}`: 删除用户
+  - `POST /api/v1/admin/users/{userId}/lock`: 锁定用户 (UC-2.1.3-001)
+  - `POST /api/v1/admin/users/{userId}/unlock`: 解锁用户 (UC-2.1.3-001)
 
-Error Response (302 Redirect):
-Location: {redirect_uri}?error={error_code}&error_description={description}&state={state}
-```
+### 3.2 OAuth2.1 认证服务 API (对应 PRD 2.2, 2.3, 2.4)
 
-#### 3.1.2 令牌端点
+**基础路径**: `/oauth2`
 
-```http
-POST /oauth/token
-Content-Type: application/x-www-form-urlencoded
+- **授权端点** (UC-2.2-001 Authorization Code Grant)
+  - `GET /oauth2/authorize`
+  - 参数: `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `code_challenge`, `code_challenge_method=S256`
+  - 响应: 登录和授权页面，成功后重定向到 `redirect_uri` 附带 `code` 和 `state`。
+- **令牌端点** (UC-2.2-001 Authorization Code Grant, UC-2.2-002 Client Credentials Grant, UC-2.4-002 Refresh Token)
+  - `POST /oauth2/token`
+  - Content-Type: `application/x-www-form-urlencoded`
+  - 参数 (Authorization Code): `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `client_secret` (for confidential clients), `code_verifier`
+  - 参数 (Client Credentials): `grant_type=client_credentials`, `scope` (optional), `client_id`, `client_secret`
+  - 参数 (Refresh Token): `grant_type=refresh_token`, `refresh_token`, `scope` (optional), `client_id`, `client_secret` (if applicable)
+  - 响应 (JSON): `{ access_token, token_type="Bearer", expires_in, refresh_token?, scope?, id_token? }`
+- **令牌吊销端点** (UC-2.4-001)
+  - `POST /oauth2/revoke`
+  - 参数: `token`, `token_type_hint` (optional: `access_token` or `refresh_token`), `client_id`, `client_secret` (for confidential clients)
+  - 响应: `200 OK`
+- **令牌自省端点** (UC-2.2-003, RFC 7662)
+  - `POST /oauth2/introspect`
+  - 参数: `token`, `token_type_hint` (optional), `client_id`, `client_secret` (if endpoint is protected for specific clients)
+  - 响应 (JSON): `{ active: boolean, scope?, client_id?, username?, token_type?, exp?, iat?, sub?, iss?, jti?, ... }`
+- **用户信息端点** (OpenID Connect)
+  - `GET /oauth2/userinfo` or `POST /oauth2/userinfo`
+  - Header: `Authorization: Bearer {accessToken}`
+  - 响应 (JSON): User claims (e.g., `sub`, `name`, `email`, `profile`, `department`, `organization`, `workLocation`)
 
-Request Body:
-  - grant_type: "authorization_code" (必需)
-  - code: string (必需)
-  - client_id: string (必需)
-  - redirect_uri: string (必需)
-  - code_verifier: string (必需, PKCE)
-  - client_secret: string (机密客户端必需)
+- **OAuth客户端管理 API** (UC-2.3-001, UC-2.8.3-001 to UC-2.8.3-003)
+  - `POST /api/v1/admin/oauth/clients`: 注册新客户端
+  - `GET /api/v1/admin/oauth/clients`: 获取客户端列表
+  - `GET /api/v1/admin/oauth/clients/{clientId}`: 获取客户端详情
+  - `PUT /api/v1/admin/oauth/clients/{clientId}`: 更新客户端配置
+  - `DELETE /api/v1/admin/oauth/clients/{clientId}`: 删除客户端
 
-Success Response (200):
-{
-  "access_token": "eyJhbGciOiJSUzI1NiIs...",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "refresh_token": "def502003ca4f66ee...",
-  "scope": ["user:read", "user:write"]
-}
+### 3.3 RBAC 权限管理服务 API (对应 PRD 2.5, UC-2.8.2)
 
-Error Response (400):
-{
-  "error": "invalid_grant",
-  "error_description": "The provided authorization grant is invalid"
-}
-```
+**基础路径**: `/api/v1/admin/rbac`
 
-#### 3.1.3 用户信息端点
+- **角色管理** (UC-2.5.2-001, UC-2.8.2-001)
+  - `POST /roles`: 创建角色
+  - `GET /roles`: 获取角色列表
+  - `GET /roles/{roleId}`: 获取角色详情
+  - `PUT /roles/{roleId}`: 更新角色
+  - `DELETE /roles/{roleId}`: 删除角色
+- **权限管理** (UC-2.5.2-002, UC-2.8.2-002)
+  - `POST /permissions`: 创建权限定义
+  - `GET /permissions`: 获取权限列表
+  - `GET /permissions/{permissionId}`: 获取权限详情
+  - `PUT /permissions/{permissionId}`: 更新权限定义
+  - `DELETE /permissions/{permissionId}`: 删除权限定义
+- **分配管理** (UC-2.5.2-003, UC-2.8.2-003, UC-2.8.2-004)
+  - `POST /roles/{roleId}/permissions`: 为角色分配权限 (请求体: `{ permissionId }` or `[permissionId1, permissionId2]`) 
+  - `DELETE /roles/{roleId}/permissions/{permissionId}`: 从角色移除权限
+  - `GET /roles/{roleId}/permissions`: 查看角色的权限列表
+  - `POST /users/{userId}/roles`: 为用户分配角色 (请求体: `{ roleId }` or `[roleId1, roleId2]`) 
+  - `DELETE /users/{userId}/roles/{roleId}`: 从用户移除角色
+  - `GET /users/{userId}/roles`: 查看用户的角色列表
+  - `GET /users/{userId}/permissions`: 查看用户合并后的总权限列表 (直接和间接通过角色获得)
 
-```http
-GET /oauth/userinfo
-Authorization: Bearer {access_token}
+### 3.4 ABAC 策略引擎服务 API (对应 PRD 2.6, UC-2.8.4)
 
-Success Response (200):
-{
-  "sub": "user123",
-  "name": "张三",
-  "username": "zhangsan",
-  "department": "技术部",
-  "position": "高级工程师",
-  "organization": "总部",
-  "clearance_level": 3
-}
-```
+**基础路径**: `/api/v1/admin/abac`
 
-### 3.2 权限管理API
+- **策略管理** (UC-2.6.2-001, UC-2.8.4-001 to UC-2.8.4-003)
+  - `POST /policies`: 创建ABAC策略
+    - 请求体: `{ name, description, effect, subjects, resources, actions, conditions, priority }` (结构参考 `ABACPolicy` 实体)
+  - `GET /policies`: 获取策略列表
+  - `GET /policies/{policyId}`: 获取策略详情
+  - `PUT /policies/{policyId}`: 更新策略
+  - `DELETE /policies/{policyId}`: 删除策略
+- **策略评估 (测试/调试用)**
+  - `POST /evaluate`: 评估一个模拟的访问请求
+    - 请求体: `ABACEvaluationContext` (参考2.2.3节定义)
+    - 响应: `PolicyEvaluationResult` (e.g., `{ decision: "Allow"/"Deny"/"NotApplicable", matchedPolicies: [], obligations: [] }`)
 
-#### 3.2.1 权限验证API
+### 3.5 统一权限验证服务 API (对应 PRD 2.7)
 
-```http
-POST /api/permissions/check
-Authorization: Bearer {access_token}
-Content-Type: application/json
+**基础路径**: `/api/v1/authorize`
 
-Request Body:
-{
-  "permission": "data:document:read",
-  "resourceId": "doc123",
-  "context": {
-    "department": "技术部",
-    "sensitivity": "internal"
-  }
-}
-
-Success Response (200):
-{
-  "allowed": true,
-  "reason": "RBAC_ALLOWED",
-  "decision_id": "req_123456",
-  "ttl": 900,
-  "details": {
-    "oauth_validation": {
-      "valid": true,
-      "scope_check": true
-    },
-    "rbac_result": {
-      "allowed": true,
-      "matched_roles": ["employee", "tech_staff"]
-    },
-    "abac_result": {
-      "allowed": false,
-      "evaluated_policies": ["department_isolation"]
-    },
-    "execution_time_ms": 45
-  }
-}
-```
-
-#### 3.2.2 用户权限查询API
-
-```http
-GET /api/users/{userId}/permissions
-Authorization: Bearer {access_token}
-
-Query Parameters:
-  - include_roles: boolean (是否包含角色信息)
-  - permission_filter: string (权限过滤器)
-
-Success Response (200):
-{
-  "user_id": "user123",
-  "permissions": [
+- **单项权限验证** (UC-2.7-001)
+  - `POST /check`
+  - 请求体: `AccessVerificationRequest` (参考1.3.5节定义)
+    ```json
+    // Example
     {
-      "identifier": "api:user:read",
-      "name": "用户信息读取",
-      "source": "role",
-      "source_detail": "employee"
-    },
-    {
-      "identifier": "data:document:read",
-      "name": "文档读取",
-      "source": "direct",
-      "source_detail": "direct_assignment"
+      "userId": "user-uuid-123",
+      "userAttributes": { "department": "Engineering", "workLocation": "Remote" },
+      "resource": "document:confidential-specs",
+      "action": "read",
+      "resourceAttributes": { "sensitivity": "high" },
+      "environmentAttributes": { "ipAddress": "10.0.1.5" }
     }
-  ],
-  "roles": [
-    {
-      "id": "role123",
-      "name": "employee",
-      "display_name": "普通员工"
-    }
-  ],
-  "cached_until": "2024-01-20T10:30:00Z"
-}
+    ```
+  - 响应: `{ allowed: boolean, reason?: string, obligations?: any[] }`
+- **批量权限验证** (UC-2.7-002)
+  - `POST /batch-check`
+  - 请求体: `AccessVerificationRequest[]` (数组，每个元素结构同上)
+  - 响应: `Array<{ requestIndex: number, allowed: boolean, reason?: string, obligations?: any[] }>`
+
+### 3.6 审计与监控 API (对应 PRD 2.8.5)
+
+**基础路径**: `/api/v1/admin/audit`, `/api/v1/admin/monitoring`
+
+- **获取审计日志** (UC-2.8.5-001)
+  - `GET /audit/logs`
+  - 参数: `startDate`, `endDate`, `userId`, `eventType`, `page`, `pageSize`
+  - 响应: 审计日志列表
+- **获取系统监控数据** (UC-2.8.5-002)
+  - `GET /monitoring/status` (e.g., QPS, latency, error rates for auth services)
+  - `GET /monitoring/metrics` (Prometheus compatible metrics endpoint, optional)
+
+---
+
 ```
+## 4. 安全性考虑
 
-### 3.3 管理API
+系统的安全性是设计的核心要素之一，需要从多个层面进行保障，确保数据和服务的机密性、完整性和可用性。
 
-#### 3.3.1 客户端管理API
+### 4.1 认证安全 (PRD 2.1.3)
 
-```http
-POST /api/admin/clients
-Authorization: Bearer {admin_token}
-Content-Type: application/json
+- **强密码策略** (UC-2.1.3-002): 
+    - 强制用户设置复杂密码（长度、字符类型组合）。
+    - 密码存储使用强哈希算法（如Argon2id或bcrypt）加盐处理，防止彩虹表攻击。
+    - 定期提醒或强制用户更新密码。
+- **多因素认证 (MFA)** (UC-2.1.3-003):
+    - 支持TOTP (Time-based One-Time Password) 作为第二因素认证。
+    - 支持备用恢复码。
+    - 用户可自行启用和管理MFA设备。
+- **账户锁定与防暴力破解** (UC-2.1.3-001):
+    - 登录尝试失败次数达到阈值后，账户临时锁定。
+    - 对敏感操作（如登录、密码重置）实施速率限制。
+    - 验证码机制防止机器人攻击。
+- **会话管理**:
+    - 会话ID应具有足够的随机性和长度。
+    - 会话超时机制，长时间不活动自动登出。
+    - 用户登出时，服务端会话应立即失效。
+    - 防止会话固定攻击。
 
-Request Body:
-{
-  "name": "OA系统",
-  "description": "企业办公自动化系统",
-  "client_type": "confidential",
-  "redirect_uris": ["https://oa.company.com/auth/callback"],
-  "grant_types": ["authorization_code", "refresh_token"],
-  "scopes": ["user:read", "user:write"]
-}
+### 4.2 OAuth2.1 安全 (PRD 2.2, 2.4)
 
-Success Response (201):
-{
-  "client_id": "oa_system_client",
-  "client_secret": "secret_abc123...",
-  "name": "OA系统",
-  "redirect_uris": ["https://oa.company.com/auth/callback"],
-  "created_at": "2024-01-20T09:00:00Z"
-}
-```
+- **遵循OAuth 2.1规范**: 淘汰不安全的授权类型（如Implicit Grant和Resource Owner Password Credentials Grant）。
+- **PKCE (Proof Key for Code Exchange)** (RFC 7636): 对所有使用授权码流程的客户端（包括公共客户端和机密客户端）强制使用PKCE，防止授权码注入攻击。
+- **客户端认证**: 
+    - 机密客户端 (Confidential Clients) 使用客户端密钥 (`client_secret`) 或其他强认证机制（如mTLS）进行认证。
+    - 公共客户端 (Public Clients) 不应存储密钥，依赖PKCE。
+- **重定向URI验证**: 严格匹配已注册的重定向URI，防止开放重定向漏洞。
+- **Scope控制**: 遵循最小权限原则，客户端仅请求必要的scope。
+- **State参数**: 在授权请求中使用`state`参数防止CSRF攻击，并确保授权响应与请求对应。
+- **令牌安全**:
+    - **Access Token** (UC-2.2-003):
+        - 建议使用不透明令牌或结构化令牌（如JWT）的混合模式。若为JWT，需使用强签名算法（如RS256, ES256）。
+        - 短有效期（例如5-60分钟）。
+        - 存储在客户端内存中，避免持久化存储在不安全的地方（如localStorage）。
+        - 通过HTTPS传输。
+    - **Refresh Token** (UC-2.4-002):
+        - 必须是不透明的随机字符串。
+        - 较长有效期（例如数天或数月）。
+        - 安全存储：对于Web应用，存储在`HttpOnly`, `Secure`, `SameSite=Strict` (或 `Lax` 根据需求) 的Cookie中；对于原生应用，存储在系统提供的安全存储中。
+        - 实施刷新令牌轮换 (Refresh Token Rotation) 机制，提高安全性。
+        - 具备吊销机制 (UC-2.4-001)。
+    - **ID Token** (OpenID Connect):
+        - JWT格式，包含用户身份信息。
+        - 必须进行签名验证和声明验证（`iss`, `aud`, `exp`, `nonce`）。
+- **令牌泄露防护**: 
+    - 令牌自省端点 (`/oauth2/introspect`) (UC-2.2-003) 允许资源服务器验证令牌有效性。
+    - 令牌吊销端点 (`/oauth2/revoke`) (UC-2.4-001) 允许客户端或用户吊销令牌。
 
-#### 3.3.2 角色管理API
+### 4.3 数据安全
 
-```http
-POST /api/admin/roles
-Authorization: Bearer {admin_token}
-Content-Type: application/json
+- **传输层安全 (TLS)**: 所有API接口和Web页面强制使用HTTPS (TLS 1.2+)，使用强加密套件。
+- **存储加密**: 
+    - 敏感数据（如用户密码哈希、OAuth客户端密钥、ABAC策略中的敏感属性值）在数据库中加密存储。
+    - 数据库连接加密。
+- **数据校验与过滤**: 
+    - 对所有外部输入（API请求参数、请求体、HTTP头部）进行严格的格式、类型、长度和内容校验。
+    - 输出编码，防止XSS攻击。
+    - 使用参数化查询或ORM，防止SQL注入。
+- **备份与恢复**: 定期备份数据，并有经过测试的恢复流程。
 
-Request Body:
-{
-  "name": "project_manager",
-  "display_name": "项目经理",
-  "description": "负责项目管理和团队协调",
-  "parent_id": "employee",
-  "permissions": [
-    "data:project:read",
-    "data:project:write",
-    "api:team:manage"
-  ]
-}
+### 4.4 应用安全 (OWASP Top 10)
 
-Success Response (201):
-{
-  "id": "role456",
-  "name": "project_manager",
-  "display_name": "项目经理",
-  "effective_permissions": [
-    "data:project:read",
-    "data:project:write",
-    "api:team:manage",
-    "api:user:read"  // 继承自parent
-  ],
-  "created_at": "2024-01-20T09:00:00Z"
-}
+- **A01:2021-Broken Access Control**: 通过RBAC和ABAC的正确实施来解决。确保权限检查在服务端强制执行，覆盖所有功能和数据访问点。
+- **A02:2021-Cryptographic Failures**: 遵循上述数据安全和令牌安全措施。
+- **A03:2021-Injection**: 通过输入验证、参数化查询、输出编码等方式防止注入攻击。
+- **A04:2021-Insecure Design**: 本设计文档旨在通过分层设计、模块化、最小权限等原则来规避不安全设计。
+- **A05:2021-Security Misconfiguration**: 严格管理服务器、框架、依赖库的配置，禁用不必要的功能，及时打补丁。
+- **A06:2021-Vulnerable and Outdated Components**: 定期进行依赖库安全扫描（如NPM Audit, Snyk），及时更新。
+- **A07:2021-Identification and Authentication Failures**: 遵循上述认证安全和OAuth2.1安全措施。
+- **A08:2021-Software and Data Integrity Failures**: 确保软件更新来源可信，对数据进行完整性校验（如使用签名）。
+- **A09:2021-Security Logging and Monitoring Failures**: (PRD 2.8.5) 实施全面的审计日志和安全监控。
+- **A10:2021-Server-Side Request Forgery (SSRF)**: 如果系统需要代表用户向其他内部或外部服务发出请求，需要严格校验目标URL，限制可访问的协议和端口。
+
+### 4.5 API安全
+
+- **认证与授权**: 所有API端点都必须经过认证和授权检查。
+- **速率限制**: 对API请求实施速率限制，防止滥用和DoS攻击。
+- **输入验证**: 严格验证所有API输入参数。
+- **敏感数据暴露**: API响应中避免返回不必要的敏感数据。
+- **HTTP安全头部**: 
+    - `Strict-Transport-Security (HSTS)`: 强制浏览器使用HTTPS。
+    - `Content-Security-Policy (CSP)`: 防止XSS攻击。
+    - `X-Content-Type-Options: nosniff`: 防止浏览器MIME类型嗅探。
+    - `X-Frame-Options: DENY` 或 `SAMEORIGIN`: 防止点击劫持。
+    - `Referrer-Policy`: 控制Referer头的发送。
+
+### 4.6 基础设施安全
+
+- **网络隔离**: 使用VPC、子网、安全组/防火墙规则限制网络访问。
+- **操作系统和服务器硬化**: 最小化安装，及时更新补丁，禁用不必要的服务。
+- **密钥管理**: 使用专门的密钥管理服务（如AWS KMS, HashiCorp Vault）管理加密密钥和敏感配置。
+
+### 4.7 审计与监控 (PRD 2.8.5)
+
+- **审计日志** (UC-2.8.5-001): 记录所有关键操作，包括用户登录、权限变更、策略修改、敏感数据访问等。日志应包含时间戳、用户身份、操作类型、目标资源、结果等信息。
+- **安全监控与告警** (UC-2.8.5-002): 监控系统异常行为、安全事件（如多次登录失败、权限提升尝试），并设置实时告警机制。
 ```
 
 ---
 
-## 4. 安全设计
+## 5. 部署架构 (PRD 3.2)
 
-### 4.1 OAuth2.1安全实现
+本节描述系统的部署架构，旨在满足高可用、可伸缩和可维护性的要求。
 
-#### 4.1.1 PKCE实现
+### 5.1 逻辑部署图
 
-```typescript
-// 客户端PKCE参数生成
-function generatePKCEParams(): PKCEParams {
-  const codeVerifier = generateRandomString(128);
-  const codeChallenge = base64url(sha256(codeVerifier));
+```plantuml
+@startuml Logic_Deployment_Diagram
+!theme materia
 
-  return {
-    codeVerifier,
-    codeChallenge,
-    codeChallengeMethod: 'S256',
-  };
+package "用户端" {
+  actor "用户" as User
+  actor "第三方应用" as ThirdPartyApp
 }
 
-// 服务端PKCE验证
-function validatePKCE(challenge: string, verifier: string): boolean {
-  const expectedChallenge = base64url(sha256(verifier));
-  return timingSafeEqual(challenge, expectedChallenge);
+package "基础设施 (云平台 - 例如 AWS, Azure, GCP)" {
+  node "API网关" as APIGateway
+  node "负载均衡器" as LoadBalancer
+
+  package "应用服务集群 (Kubernetes / ECS / Serverless)" {
+    component "用户认证管理服务" as AuthService
+    component "OAuth2.1认证服务" as OAuthService
+    component "RBAC权限管理服务" as RBACService
+    component "ABAC策略引擎服务" as ABACService
+    component "统一权限验证服务" as UnifiedPermissionService
+    component "管理界面服务" as AdminUIService
+  }
+
+  package "数据存储层" {
+    database "主数据库 (PostgreSQL)" as MainDB
+    database "缓存数据库 (Redis)" as CacheDB
+    database "审计日志存储 (Elasticsearch / Loki)" as AuditLogDB
+  }
+
+  package "监控与告警系统" {
+    component "监控服务 (Prometheus)" as MonitoringService
+    component "日志聚合 (Fluentd / Logstash)" as LogAggregator
+    component "告警服务 (Alertmanager)" as AlertingService
+  }
 }
+
+User --> APIGateway : HTTPS
+ThirdPartyApp --> APIGateway : HTTPS (OAuth2.1)
+
+APIGateway --> LoadBalancer
+LoadBalancer --> AuthService
+LoadBalancer --> OAuthService
+LoadBalancer --> RBACService
+LoadBalancer --> ABACService
+LoadBalancer --> UnifiedPermissionService
+LoadBalancer --> AdminUIService
+
+AuthService <--> MainDB
+AuthService <--> CacheDB
+OAuthService <--> MainDB
+OAuthService <--> CacheDB
+RBACService <--> MainDB
+ABACService <--> MainDB
+UnifiedPermissionService <--> MainDB
+UnifiedPermissionService <--> CacheDB
+AdminUIService <--> MainDB
+
+AuthService --> LogAggregator
+OAuthService --> LogAggregator
+RBACService --> LogAggregator
+ABACService --> LogAggregator
+UnifiedPermissionService --> LogAggregator
+AdminUIService --> LogAggregator
+
+LogAggregator --> AuditLogDB
+MonitoringService --> AuthService
+MonitoringService --> OAuthService
+MonitoringService --> RBACService
+MonitoringService --> ABACService
+MonitoringService --> UnifiedPermissionService
+MonitoringService --> AdminUIService
+MonitoringService --> MainDB
+MonitoringService --> CacheDB
+MonitoringService --> AlertingService
+
+@enduml
 ```
 
-#### 4.1.2 JWT令牌安全
+### 5.2 关键组件说明
 
-```typescript
-interface JWTPayload {
-  // 标准声明
-  iss: string; // 颁发者
-  sub: string; // 用户ID
-  aud: string; // 客户端ID
-  exp: number; // 过期时间
-  iat: number; // 颁发时间
-  jti: string; // 令牌ID
+- **API网关**: 统一的请求入口，负责请求路由、认证、限流、日志记录等。
+- **负载均衡器**: 将流量分发到后端的应用服务实例，实现高可用和水平扩展。
+- **应用服务集群**: 运行核心业务逻辑的微服务，可以根据需求独立部署和扩展。
+    - **用户认证管理服务**: 处理用户注册、登录、密码管理、MFA等。
+    - **OAuth2.1认证服务**: 实现OAuth 2.1授权服务器功能。
+    - **RBAC权限管理服务**: 管理角色、权限及其分配。
+    - **ABAC策略引擎服务**: 管理和评估ABAC策略。
+    - **统一权限验证服务**: 提供统一的权限校验接口。
+    - **管理界面服务**: 提供系统管理后台功能。
+- **主数据库 (PostgreSQL)**: 存储核心业务数据，如用户信息、角色、权限、OAuth客户端、ABAC策略等。
+- **缓存数据库 (Redis)**: 缓存热点数据，如会话信息、权限数据、访问令牌等，提升性能。
+- **审计日志存储**: 存储审计日志，用于安全分析和合规性检查。
+- **监控与告警系统**: 收集系统指标、日志，并提供告警功能。
 
-  // 自定义声明
-  scope: string[]; // 授权范围
-  roles: string[]; // 用户角色
-  department: string; // 部门
-  position: string; // 岗位
-}
+### 5.3 部署环境 (PRD 3.2.1)
 
-// 令牌签名和验证
-class JWTService {
-  async signToken(payload: JWTPayload): Promise<string> {
-    return await new jose.SignJWT(payload)
-      .setProtectedHeader({ alg: 'RS256' })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .sign(this.privateKey);
-  }
+- **开发环境**: 用于开发和单元测试，可使用Docker Compose或本地Kubernetes (Minikube, Kind)。
+- **测试环境**: 独立的测试环境，用于集成测试、UAT测试，数据与生产隔离。
+- **预生产环境 (Staging)**: 与生产环境配置尽可能一致，用于上线前的最后验证。
+- **生产环境**: 部署在云平台上，具备高可用、灾备和弹性伸缩能力。
 
-  async verifyToken(token: string): Promise<JWTPayload> {
-    const { payload } = await jose.jwtVerify(token, this.publicKey);
-    return payload as JWTPayload;
-  }
-}
-```
+### 5.4 可伸缩性与高可用性 (PRD 3.1.1, 3.1.4)
 
-### 4.2 权限验证安全
-
-#### 4.2.1 权限检查流程
-
-```typescript
-class PermissionValidator {
-  async checkPermission(request: PermissionRequest): Promise<PermissionResult> {
-    try {
-      // 1. OAuth令牌验证
-      const tokenInfo = await this.validateAccessToken(request.token);
-      if (!tokenInfo.valid) {
-        return { allowed: false, reason: 'INVALID_TOKEN' };
-      }
-
-      // 2. 作用域检查
-      if (!this.checkScope(tokenInfo.scope, request.permission)) {
-        return { allowed: false, reason: 'INSUFFICIENT_SCOPE' };
-      }
-
-      // 3. RBAC权限检查
-      const rbacResult = await this.checkRBACPermission(tokenInfo.userId, request.permission);
-
-      // 4. ABAC基础策略评估
-      const abacResult = await this.evaluateBasicABACPolicies(
-        tokenInfo.userId,
-        request.permission,
-        request.context
-      );
-
-      // 5. 决策融合
-      const allowed = rbacResult.allowed || abacResult.allowed;
-
-      // 6. 审计日志
-      await this.logPermissionCheck({
-        userId: tokenInfo.userId,
-        permission: request.permission,
-        result: allowed,
-        reason: allowed ? (rbacResult.allowed ? 'RBAC' : 'ABAC') : 'DENIED',
-      });
-
-      return {
-        allowed,
-        reason: allowed ? (rbacResult.allowed ? 'RBAC_ALLOWED' : 'ABAC_ALLOWED') : 'DENIED',
-        decisionId: generateId(),
-        ttl: 900,
-        details: { rbacResult, abacResult },
-      };
-    } catch (error) {
-      await this.logError(error);
-      return { allowed: false, reason: 'SYSTEM_ERROR' };
-    }
-  }
-}
-```
-
-### 4.3 数据安全保护
-
-#### 4.3.1 敏感数据加密
-
-```typescript
-class DataProtection {
-  // 密码哈希
-  async hashPassword(password: string): Promise<string> {
-    return await bcrypt.hash(password, 12);
-  }
-
-  async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return await bcrypt.compare(password, hash);
-  }
-
-  // 敏感字段加密
-  async encryptSensitiveData(data: string): Promise<string> {
-    const cipher = crypto.createCipher('aes-256-gcm', this.encryptionKey);
-    let encrypted = cipher.update(data, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag();
-
-    return encrypted + ':' + authTag.toString('hex');
-  }
-
-  async decryptSensitiveData(encryptedData: string): Promise<string> {
-    const [encrypted, authTag] = encryptedData.split(':');
-    const decipher = crypto.createDecipher('aes-256-gcm', this.encryptionKey);
-    decipher.setAuthTag(Buffer.from(authTag, 'hex'));
-
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
-  }
-}
-```
+- **水平扩展**: 应用服务设计为无状态或状态分离，易于通过增加实例数量进行水平扩展。
+- **数据库扩展**: 主数据库可采用读写分离、分片等策略；缓存数据库可集群化。
+- **冗余设计**: 关键组件（如负载均衡器、数据库、应用服务实例）采用冗余部署，避免单点故障。
+- **故障切换**: 自动化故障检测和切换机制。
+- **数据备份与恢复**: 定期备份数据，并有经过验证的灾难恢复计划 (PRD 4.3)。
 
 ---
 
-## 5. 性能优化设计
+## 6. 技术选型 (PRD 3.3)
 
-### 5.1 缓存架构设计
+| 类别             | 技术/框架/服务        | 理由                                                                 |
+| ---------------- | --------------------- | -------------------------------------------------------------------- |
+| **后端语言**     | Node.js (TypeScript)  | 高性能I/O, 异步非阻塞, 庞大的NPM生态, TypeScript提供类型安全。         |
+| **Web框架**      | NestJS / Express.js   | NestJS提供模块化、可测试的架构；Express.js轻量灵活。根据团队熟悉度选择。 |
+| **数据库**       | PostgreSQL            | 功能强大, ACID兼容, 扩展性好, 开源, 社区活跃。                         |
+| **缓存**         | Redis                 | 高性能键值存储, 支持多种数据结构, 广泛用于缓存、会话管理。             |
+| **ORM/查询构建器**| Prisma / TypeORM      | Prisma提供类型安全的数据库访问；TypeORM功能全面。                      |
+| **API网关**      | AWS API Gateway / Nginx / Kong | 成熟的API管理方案。                                                  |
+| **容器化**       | Docker                | 标准化的应用打包和部署方式。                                           |
+| **容器编排**     | Kubernetes (EKS/GKE/AKS) | 强大的容器编排平台, 实现自动化部署、扩展和管理。                     |
+| **前端框架**     | React / Next.js       | React生态成熟, Next.js提供SSR/SSG, 优化SEO和首屏加载。               |
+| **状态管理(前端)**| Redux / Zustand / Jotai | 根据应用复杂度选择。                                                 |
+| **代码版本控制** | Git / GitHub          | 分布式版本控制系统, 广泛使用。                                         |
+| **CI/CD**        | GitHub Actions / Jenkins / GitLab CI | 自动化构建、测试和部署流程。                                       |
+| **日志管理**     | ELK Stack (Elasticsearch, Logstash, Kibana) / Loki & Grafana | 集中式日志收集、存储、查询和可视化。                                 |
+| **监控与告警**   | Prometheus & Grafana & Alertmanager | 开源监控解决方案, 强大的数据模型和查询语言。                         |
+| **消息队列 (可选)**| RabbitMQ / Kafka      | 用于异步任务处理、服务间解耦 (如果需要)。                            |
+| **安全库**       | `bcrypt`, `jsonwebtoken`, `helmet`, `csurf` 等NPM包 | 提供密码哈希、JWT处理、HTTP安全头部等功能。                          |
 
-#### 5.1.1 多级缓存策略
+---
 
-```typescript
-interface CacheStrategy {
-  // L1: 应用内存缓存 (最快)
-  l1Cache: Map<string, CacheEntry>;
+## 7. 监控、日志与告警 (PRD 3.1.1, 3.1.2, 3.1.5, 4.7)
 
-  // L2: Redis分布式缓存 (快)
-  l2Cache: RedisClient;
+### 7.1 监控指标
 
-  // L3: 数据库 (较慢)
-  database: PrismaClient;
-}
+- **系统层面**: CPU使用率, 内存使用率,磁盘I/O, 网络流量。
+- **应用层面**: 
+    - QPS (每秒查询率), RPS (每秒请求数)
+    - 请求延迟 (平均值, P95, P99)
+    - 错误率 (HTTP 4xx, 5xx)
+    - 数据库连接池状态
+    - 缓存命中率
+- **业务层面**:
+    - 用户登录成功/失败次数
+    - OAuth授权请求数
+    - 令牌颁发/刷新/吊销次数
+    - 权限校验通过/拒绝次数
+    - ABAC策略评估次数
 
-class PermissionCache {
-  private cacheStrategy: CacheStrategy;
+### 7.2 日志收集
 
-  async getPermissions(userId: string): Promise<Permission[]> {
-    const cacheKey = `user:permissions:${userId}`;
+- **应用日志**: 记录应用运行过程中的关键信息、错误、警告。采用结构化日志格式 (如JSON)。
+- **访问日志**: 记录API网关或Web服务器接收到的所有HTTP请求。
+- **审计日志**: (PRD 2.8.5, 4.7) 记录安全相关的关键操作，详见安全性考虑部分。
+- **收集方式**: 使用Fluentd或Logstash等工具将各服务产生的日志统一收集到中央日志存储系统。
 
-    // L1缓存查询 (内存)
-    let permissions = this.cacheStrategy.l1Cache.get(cacheKey)?.value;
-    if (permissions) {
-      return permissions;
-    }
+### 7.3 告警机制
 
-    // L2缓存查询 (Redis)
-    const cachedData = await this.cacheStrategy.l2Cache.get(cacheKey);
-    if (cachedData) {
-      permissions = JSON.parse(cachedData);
-      // 回填L1缓存
-      this.cacheStrategy.l1Cache.set(cacheKey, {
-        value: permissions,
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5分钟
-      });
-      return permissions;
-    }
+- **告警阈值**: 针对关键监控指标设置合理的告警阈值。
+- **告警渠道**: 支持邮件、短信、Slack/Teams等多种通知方式。
+- **告警级别**: 定义不同级别的告警（如P1严重, P2警告, P3通知）。
+- **告警处理流程**: 建立清晰的告警响应和处理流程。
 
-    // L3数据库查询
-    permissions = await this.loadPermissionsFromDB(userId);
+**示例告警场景**:
+- 生产环境API接口错误率超过5%持续5分钟。
+- 数据库CPU使用率超过80%持续10分钟。
+- 关键服务实例宕机。
+- 检测到可疑的登录尝试或权限提升行为。
 
-    // 回填缓存
-    await this.cacheStrategy.l2Cache.setex(
-      cacheKey,
-      15 * 60, // 15分钟
-      JSON.stringify(permissions)
-    );
-
-    this.cacheStrategy.l1Cache.set(cacheKey, {
-      value: permissions,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
-
-    return permissions;
-  }
-
-  // 缓存失效
-  async invalidateUserPermissions(userId: string): Promise<void> {
-    const cacheKey = `user:permissions:${userId}`;
-
-    // 清除L1缓存
-    this.cacheStrategy.l1Cache.delete(cacheKey);
-
-    // 清除L2缓存
-    await this.cacheStrategy.l2Cache.del(cacheKey);
-  }
-}
-```
-
-#### 5.1.2 权限结果缓存
-
-```typescript
-interface PermissionCacheEntry {
-  userId: string;
-  permission: string;
-  resourceHash: string;
-  result: boolean;
+---
   reason: string;
   expiresAt: Date;
 }
