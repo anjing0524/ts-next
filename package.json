@@ -10,7 +10,6 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky",
     "commit": "cz",
     "test": "vitest",
     "test:run": "vitest run",
