@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 // Validation schemas
 const GetClientsSchema = z.object({
@@ -18,7 +19,7 @@ const CreateClientSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(500).optional(),
   redirectUris: z.array(z.string().url()).min(1),
-  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token', 'password'])).min(1),
+  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token'])).min(1),
   responseTypes: z.array(z.enum(['code', 'token', 'id_token'])).default(['code']),
   scope: z.string().optional(),
   isPublic: z.boolean().default(false),
@@ -31,7 +32,7 @@ const UpdateClientSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(500).optional(),
   redirectUris: z.array(z.string().url()).optional(),
-  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token', 'password'])).optional(),
+  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token'])).optional(),
   responseTypes: z.array(z.enum(['code', 'token', 'id_token'])).optional(),
   scope: z.string().optional(),
   isPublic: z.boolean().optional(),
@@ -182,13 +183,19 @@ async function handleCreateClient(request: NextRequest, context: AuthContext): P
 
     // Generate client ID and secret
     const clientId = `client_${crypto.randomBytes(16).toString('hex')}`;
-    const clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('hex');
+    let clientSecret: string | null = null;
+    let hashedSecret: string | null = null;
+
+    if (!validatedData.isPublic) {
+      clientSecret = crypto.randomBytes(32).toString('hex');
+      const saltRounds = 10; // Or a configurable value
+      hashedSecret = await bcrypt.hash(clientSecret, saltRounds);
+    }
 
     // Create client in database
-    const client = await prisma.client.create({
-      data: {
-        clientId,
-        clientSecret,
+    const clientData = {
+      clientId,
+      clientSecret: hashedSecret,
         name: validatedData.name,
         description: validatedData.description,
         redirectUris: JSON.stringify(validatedData.redirectUris),
@@ -219,6 +226,12 @@ async function handleCreateClient(request: NextRequest, context: AuthContext): P
         createdAt: true,
       },
     });
+
+    // IMPORTANT: Return the raw secret to the admin ONCE on creation
+    // It will not be stored in raw format.
+    if (clientSecret) {
+      (client as any).clientSecret = clientSecret;
+    }
 
     // Log creation
     await AuthorizationUtils.logAuditEvent({

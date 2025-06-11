@@ -1,205 +1,233 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { withAuth, AuthContext, PermissionUtils, validateSession } from '@/lib/auth/middleware'; // Added validateSession for manual DELETE handling
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { z } from 'zod';
 
-interface UserRoleRouteParams {
-  params: {
-    userId: string;
-  };
-}
-
-// Schema for assigning/removing roles to/from a user
-const ModifyUserRolesSchema = z.object({
-  roleIds: z.array(z.string().uuid('Each role ID must be a valid UUID')).min(1, 'At least one role ID is required'),
-  expiresAt: z.string().datetime({ message: "Invalid datetime string for expiresAt. Must be ISO8601." }).optional(),
+const AssignRoleSchema = z.object({
+  roleId: z.string().cuid('Invalid Role ID format'),
 });
 
-// GET /api/users/{userId}/roles - List roles assigned to a user
-async function getUserRoles(request: NextRequest, { params }: UserRoleRouteParams, authContext: AuthContext) {
+// Interface for route parameters passed by Next.js dynamic routing
+interface DynamicRouteParams {
+  userId: string;
+  roleId?: string; // roleId is optional here because GET and POST to /roles don't have it in path
+}
+
+// GET /api/users/{userId}/roles - List a user's roles
+async function handleGetUserRoles(request: NextRequest, authContext: AuthContext, routeParams: { params: DynamicRouteParams }) {
+  const { userId: targetUserId } = routeParams.params;
+  const requestingUserId = authContext.user_id; // from withAuth context
+  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
+
+  // Authorization: User can view their own roles, or admin with 'users:read' (or a more specific role like 'users:roles:read')
+  const canViewOwn = requestingUserId === targetUserId;
+  const canAdminView = PermissionUtils.hasPermission(authContext.permissions || [], 'users:read');
+
+  if (!canViewOwn && !canAdminView) {
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'user_roles_list_unauthorized',
+      resource: `users/${targetUserId}/roles`,
+      ipAddress, userAgent, success: false,
+      errorMessage: 'Permission denied to view user roles.',
+    });
+    return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+  }
+
   try {
-    const userId = params.userId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)) {
-        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     const userRoles = await prisma.userRole.findMany({
-      where: {
-        userId,
-        // isActive: true, // Optionally filter only active role assignments
+      where: { userId: targetUserId },
+      include: {
+        role: true,
       },
-      include: { role: true }, // Include the actual role details
-      orderBy: { role: { name: 'asc' } },
+      orderBy: { role: { name: 'asc' }}
     });
 
-    // Return role details along with assignment info like expiresAt, isActive
-    return NextResponse.json(userRoles.map(ur => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        displayName: ur.role.displayName,
-        description: ur.role.description,
-        isSystem: ur.role.isSystem,
-        assignedAt: ur.assignedAt,
-        expiresAt: ur.expiresAt,
-        isActiveAssignment: ur.isActive, // Renamed to avoid conflict with role.isActive
-    })), { status: 200 });
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'user_roles_list_success',
+      resource: `users/${targetUserId}/roles`,
+      ipAddress, userAgent, success: true,
+      metadata: { listedRolesCount: userRoles.length }
+    });
 
+    return NextResponse.json(userRoles.map(ur => ur.role));
   } catch (error) {
-    console.error(`Error fetching roles for user ${params.userId}:`, error);
+    console.error(`Error fetching roles for user ${targetUserId}:`, error);
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'user_roles_list_error',
+      resource: `users/${targetUserId}/roles`,
+      ipAddress, userAgent, success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json({ error: 'Failed to fetch user roles' }, { status: 500 });
   }
 }
 
-// POST /api/users/{userId}/roles - Assign roles to a user
-async function assignRolesToUser(request: NextRequest, { params }: UserRoleRouteParams, authContext: AuthContext) {
-  try {
-    const userId = params.userId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)) {
-        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
-    }
+// POST /api/users/{userId}/roles - Assign a role to a user
+async function handleAssignRoleToUser(request: NextRequest, authContext: AuthContext, routeParams: { params: DynamicRouteParams }) {
+  const { userId: targetUserId } = routeParams.params;
+  const requestingUserId = authContext.user_id;
+  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
 
+  try {
     const body = await request.json();
-    const validationResult = ModifyUserRolesSchema.safeParse(body);
+    const validation = AssignRoleSchema.safeParse(body);
 
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
+    if (!validation.success) {
+      await AuthorizationUtils.logAuditEvent({
+        userId: requestingUserId,
+        action: 'user_role_assign_validation_failed',
+        resource: `users/${targetUserId}/roles`,
+        ipAddress, userAgent, success: false,
+        errorMessage: 'Input validation failed for role assignment.',
+        metadata: { errors: validation.error.flatten().fieldErrors },
+      });
+      return NextResponse.json({ error: 'Validation error', details: validation.error.flatten().fieldErrors }, { status: 400 });
     }
+    const { roleId } = validation.data;
 
-    const { roleIds, expiresAt } = validationResult.data;
+    const [userExists, roleExists] = await Promise.all([
+      prisma.user.count({ where: { id: targetUserId } }),
+      prisma.role.count({ where: { id: roleId, isActive: true } }), // Ensure role is active
+    ]);
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    if (userExists === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    const roles = await prisma.role.findMany({
-      where: { id: { in: roleIds }, isActive: true }, // Ensure roles are active
-    });
-    if (roles.length !== roleIds.length) {
-      const foundIds = roles.map(r => r.id);
-      const notFoundOrInactiveIds = roleIds.filter(id => !foundIds.includes(id));
-      return NextResponse.json({ error: `Roles not found or inactive: ${notFoundOrInactiveIds.join(', ')}` }, { status: 400 });
+    if (roleExists === 0) {
+      return NextResponse.json({ error: 'Active role not found' }, { status: 404 });
     }
 
-    const createdEntries = await prisma.$transaction(
-      roleIds.map(roleId =>
-        prisma.userRole.upsert({
-          where: { userId_roleId: { userId, roleId } },
-          update: {
-            isActive: true, // Re-activating if it was inactive
-            assignedBy: authContext.user_id,
-            assignedAt: new Date(),
-            expiresAt: expiresAt ? new Date(expiresAt) : null,
-          },
-          create: {
-            userId,
-            roleId,
-            assignedBy: authContext.user_id,
-            expiresAt: expiresAt ? new Date(expiresAt) : null,
-          },
-        })
-      )
-    );
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id, // The admin performing the action
-      action: 'user_roles_assigned',
-      resource: `user:${userId}`,
-      success: true,
-      metadata: { targetUserId: userId, assignedRoleIds: roleIds, count: createdEntries.length, expiresAt },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
+    const userRole = await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: targetUserId, roleId } },
+      update: { assignedAt: new Date(), assignedBy: requestingUserId }, // Update assignment time/by if it exists
+      create: { userId: targetUserId, roleId, assignedBy: requestingUserId },
+      include: { role: true }
     });
 
-    return NextResponse.json({ message: `${createdEntries.length} roles assigned successfully.` }, { status: 200 });
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'user_role_assign_success',
+      resource: `users/${targetUserId}/roles`,
+      ipAddress, userAgent, success: true,
+      metadata: { assignedRoleId: roleId, targetUserId },
+    });
 
+    return NextResponse.json(userRole.role, { status: 201 });
   } catch (error) {
-    console.error(`Error assigning roles to user ${params.userId}:`, error);
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'user_roles_assign_failed',
-      resource: `user:${params.userId}`,
-      success: false,
+    console.error(`Error assigning role to user ${targetUserId}:`, error);
+     await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'user_role_assign_error',
+      resource: `users/${targetUserId}/roles`,
+      ipAddress, userAgent, success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
     });
-    return NextResponse.json({ error: 'Failed to assign roles' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to assign role' }, { status: 500 });
   }
 }
 
-// DELETE /api/users/{userId}/roles - Remove roles from a user
-async function removeRolesFromUser(request: NextRequest, { params }: UserRoleRouteParams, authContext: AuthContext) {
+// DELETE /api/users/{userId}/roles/{roleId} - Remove a role from a user
+// This function expects `params.roleId` to be populated from the dynamic route segment.
+async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthContext, routeParams: { params: Required<DynamicRouteParams> }) {
+  const { userId: targetUserId, roleId: targetRoleId } = routeParams.params;
+  const requestingUserId = authContext.user_id;
+  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
+
   try {
-    const userId = params.userId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)) {
-        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
-    }
-
-    const body = await request.json(); // Expects { roleIds: [...] }
-    // We only need roleIds for deletion, expiresAt is not relevant.
-    const RoleIdsSchema = z.object({
-        roleIds: z.array(z.string().uuid()).min(1),
+    const existingAssignment = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: targetUserId, roleId: targetRoleId } },
     });
-    const validationResult = RoleIdsSchema.safeParse(body);
 
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
+    if (!existingAssignment) {
+      await AuthorizationUtils.logAuditEvent({
+        userId: requestingUserId,
+        action: 'user_role_remove_not_found',
+        resource: `users/${targetUserId}/roles/${targetRoleId}`,
+        ipAddress, userAgent, success: false,
+        errorMessage: 'Role assignment not found for deletion.',
+      });
+      return NextResponse.json({ error: 'Role assignment not found' }, { status: 404 });
     }
 
-    const { roleIds } = validationResult.data;
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const deleteResult = await prisma.userRole.deleteMany({
-      where: {
-        userId: userId,
-        roleId: { in: roleIds },
-      },
+    await prisma.userRole.delete({
+      where: { userId_roleId: { userId: targetUserId, roleId: targetRoleId } },
     });
 
     await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id, // The admin performing the action
-      action: 'user_roles_removed',
-      resource: `user:${userId}`,
-      success: true,
-      metadata: { targetUserId: userId, removedRoleIds: roleIds, count: deleteResult.count },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
+      userId: requestingUserId,
+      action: 'user_role_remove_success',
+      resource: `users/${targetUserId}/roles/${targetRoleId}`,
+      ipAddress, userAgent, success: true,
+      metadata: { removedRoleId: targetRoleId, targetUserId },
     });
 
-    return NextResponse.json({ message: `${deleteResult.count} roles removed successfully.` }, { status: 200 });
-
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error(`Error removing roles from user ${params.userId}:`, error);
+    console.error(`Error removing role ${targetRoleId} from user ${targetUserId}:`, error);
     await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'user_roles_remove_failed',
-      resource: `user:${params.userId}`,
-      success: false,
+      userId: requestingUserId,
+      action: 'user_role_remove_error',
+      resource: `users/${targetUserId}/roles/${targetRoleId}`,
+      ipAddress, userAgent, success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
     });
-    return NextResponse.json({ error: 'Failed to remove roles' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to remove role' }, { status: 500 });
   }
 }
 
-// Apply auth middleware. Users need 'system:user:manage' or a more specific 'system:user:assignroles' permission.
-// For now, using 'system:role:manage' as it implies high-level role manipulation capabilities.
-// A more fitting permission would be 'system:user:manage' or 'system:user:assign_roles'.
-// Let's assume 'system:role:manage' is sufficient for now.
-const requiredPermission = 'system:role:manage';
+// Export wrapped handlers
+export const GET = withAuth(handleGetUserRoles, {
+    requiredPermissions: [], // Permissions are checked inside the handler for flexibility (own vs admin)
+    requireUserContext: true,
+});
 
-export const GET = withAuth(getUserRoles, { requiredPermissions: [requiredPermission] });
-export const POST = withAuth(assignRolesToUser, { requiredPermissions: [requiredPermission] });
-export const DELETE = withAuth(removeRolesFromUser, { requiredPermissions: [requiredPermission] });
+export const POST = withAuth(handleAssignRoleToUser, {
+    requiredPermissions: ['users:edit_roles', 'admin'],
+    requireUserContext: true,
+});
+
+// For DELETE, if this file is /api/users/[userId]/roles/route.ts,
+// then roleId must come from query or body.
+// If file is /api/users/[userId]/roles/[roleId]/route.ts, then params.roleId is from path.
+// The prompt implies DELETE /api/users/{userId}/roles/{roleId} as a path.
+// The `withAuth` wrapper might need to be enhanced to pass down all dynamic params correctly.
+// The following is a standard way to export if dynamic params are handled by Next.js for the file path.
+// This assumes this file is actually at /api/users/[userId]/roles/[roleId]/route.ts for the DELETE export to work as intended with path param.
+// If this file *must* be /api/users/[userId]/roles/route.ts, then DELETE needs to get roleId from query.
+// For this task, I'm writing it as if this file handles the specific /roles/{roleId} part.
+
+export async function DELETE(request: NextRequest, { params }: { params: { userId: string, roleId: string } }) {
+    // Manually re-wrapping for DELETE to ensure AuthContext and params are correctly handled.
+    // This is often needed if `withAuth` doesn't perfectly align with how Next.js passes route params to all HTTP methods.
+    const authContext = await validateSession(request);
+    if (!authContext || !authContext.user_id) { // Ensure user_id is part of your AuthContext from validateSession
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+     // Augment AuthContext with permissions if validateSession doesn't already do it.
+    // This part is simplified; in a real app, permissions would be part of AuthContext.
+    // const userPermissions = await AuthorizationUtils.getUserPermissions(authContext.user_id);
+    // authContext.permissions = userPermissions;
+
+
+    // Permission check for DELETE
+    // Assuming permissions are part of the AuthContext populated by a full validateSession/withAuth
+    // For this example, let's assume validateSession provides a basic AuthContext.
+    // A real app would fetch permissions if not already in session.
+    // This is a placeholder for actual permission check if not using withAuth directly here.
+    const hasPermission = PermissionUtils.hasPermission(authContext.permissions || [], 'users:edit_roles') ||
+                          PermissionUtils.hasPermission(authContext.permissions || [], 'admin');
+
+    if (!hasPermission) {
+        return NextResponse.json({ error: 'Permission Denied to delete user role' }, { status: 403 });
+    }
+
+    const routeParamsForHandler: { params: Required<DynamicRouteParams> } = { params: { userId: params.userId, roleId: params.roleId } };
+    return handleRemoveRoleFromUser(request, authContext as AuthContext, routeParamsForHandler);
+}

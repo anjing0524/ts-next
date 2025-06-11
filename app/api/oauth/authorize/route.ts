@@ -342,40 +342,56 @@ async function authenticateUser(
 // Check if user consent is required
 async function checkConsentRequired(
   userId: string,
-  clientId: string,
+  clientIdFromRequest: string, // Renamed to avoid conflict with OAuthClient.id
   requestedScopes: string[],
-  clientRequiresConsent: boolean
+  clientRequiresConsent: boolean // This comes from OAuthClient.requireConsent
 ): Promise<boolean> {
-  // If client doesn't require consent, skip consent entirely
+  // If client doesn't require consent (e.g., first-party app or specific setting), skip consent.
   if (!clientRequiresConsent) {
     return false;
   }
 
-  // Check if user has already granted consent for these scopes
+  // Find the OAuthClient to get its actual ID if we only have clientId string
+  // This step might be redundant if 'client' object passed to authorize handler already has the DB ID.
+  // For now, assuming clientIdFromRequest is the actual client's unique ID string from DB.
+  // If not, it should be fetched:
+  // const oauthClient = await prisma.oAuthClient.findUnique({ where: { clientId: clientIdFromRequest }});
+  // if (!oauthClient) return true; // Or handle as error: client not found
+  // const actualClientId = oauthClient.id;
+
   const existingConsent = await prisma.consentGrant.findUnique({
     where: {
-      userId_clientId: {
-        userId,
-        clientId,
+      userId_clientId: { // This is the @@unique constraint name
+        userId: userId,
+        clientId: clientIdFromRequest, // Use the ID of the client model
       },
-      revoked: false,
+      revokedAt: null, // Check if consent has not been revoked
     },
   });
 
   if (!existingConsent) {
-    return true;
+    return true; // No existing valid consent
   }
 
-  // Check if consent has expired
+  // Check if consent has expired (if expiresAt is set)
   if (existingConsent.expiresAt && existingConsent.expiresAt < new Date()) {
-    return true;
+    return true; // Consent has expired
   }
 
-  // Check if new scopes are being requested
-  const grantedScopes = JSON.parse(existingConsent.scope || '[]');
-  const hasNewScopes = requestedScopes.some(scope => !grantedScopes.includes(scope));
+  // Check if all requested scopes are covered by the existing grant
+  let grantedScopes: string[] = [];
+  try {
+    grantedScopes = JSON.parse(existingConsent.scopes);
+    if (!Array.isArray(grantedScopes)) grantedScopes = [];
+  } catch (e) {
+    // Invalid JSON in DB, treat as no scopes granted or log error
+    console.error("Invalid JSON in ConsentGrant.scopes for grant ID:", existingConsent.id);
+    return true; // Requires re-consent if scopes are malformed
+  }
+
+  const allRequestedScopesCovered = requestedScopes.every(scope => grantedScopes.includes(scope));
   
-  return hasNewScopes;
+  return !allRequestedScopesCovered; // True if not all scopes are covered (i.e., consent is required)
 }
 
 export const GET = withOAuthAuthorizeValidation(handleAuthorizeRequest);

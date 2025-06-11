@@ -4,6 +4,7 @@ import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import logger from '@/utils/logger';
 
 // Validation schema for client updates
@@ -11,7 +12,7 @@ const UpdateClientSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(500).optional(),
   redirectUris: z.array(z.string().url()).optional(),
-  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token', 'password'])).optional(),
+  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token'])).optional(),
   responseTypes: z.array(z.enum(['code', 'token', 'id_token'])).optional(),
   scope: z.string().optional(),
   isPublic: z.boolean().optional(),
@@ -167,10 +168,20 @@ async function handleUpdateClient(
     }
 
     // Handle secret regeneration
-    let newClientSecret = existingClient.clientSecret;
+    let rawNewClientSecret: string | null = null;
+    let hashedNewClientSecret: string | null = existingClient.clientSecret; // Keep old if not regenerating
+
     if (validatedData.regenerateSecret && !existingClient.isPublic) {
-      newClientSecret = crypto.randomBytes(32).toString('base64url');
+      rawNewClientSecret = crypto.randomBytes(32).toString('hex');
+      const saltRounds = 10; // Or a configurable value
+      hashedNewClientSecret = await bcrypt.hash(rawNewClientSecret, saltRounds);
+    } else if (validatedData.regenerateSecret && existingClient.isPublic) {
+      // Cannot regenerate secret for public client if it somehow becomes non-public then public again
+      // Or if isPublic is being changed in the same request.
+      // In this case, clientSecret should be null.
+      hashedNewClientSecret = null;
     }
+
 
     // Build update data
     const updateData: any = {};
@@ -198,9 +209,18 @@ async function handleUpdateClient(
     if (validatedData.logoUri !== undefined) updateData.logoUri = validatedData.logoUri;
     if (validatedData.policyUri !== undefined) updateData.policyUri = validatedData.policyUri;
     if (validatedData.tosUri !== undefined) updateData.tosUri = validatedData.tosUri;
-    if (newClientSecret !== existingClient.clientSecret) {
-      updateData.clientSecret = newClientSecret;
+    // Only update clientSecret in DB if it was actually changed/regenerated
+    if (hashedNewClientSecret !== existingClient.clientSecret) {
+      updateData.clientSecret = hashedNewClientSecret;
     }
+
+    // If client is being made public, clientSecret must be null
+    if (validatedData.isPublic === true) {
+      updateData.clientSecret = null;
+      // Also, ensure rawNewClientSecret is not returned for public clients
+      rawNewClientSecret = null;
+    }
+
 
     // Update client
     const updatedClient = await prisma.client.update({
@@ -259,9 +279,20 @@ async function handleUpdateClient(
     };
 
     // Include new secret if it was regenerated
-    if (validatedData.regenerateSecret && newClientSecret) {
-      response.clientSecret = newClientSecret;
+    if (rawNewClientSecret) { // This implies it was regenerated and not for a public client
+      response.clientSecret = rawNewClientSecret;
+    } else if (validatedData.regenerateSecret && existingClient.isPublic && updateData.clientSecret === null) {
+      // If a public client had 'regenerateSecret' somehow set to true,
+      // and it's becoming non-public in the same request,
+      // we should not return a secret as one wasn't generated.
+      // However, the current logic already sets clientSecret to null for public clients.
+      // This case is more of a safeguard.
+      delete response.clientSecret; // Ensure no old secret is present if it became public.
+    } else if (response.clientSecret && validatedData.isPublic === true) {
+        // If client is updated to be public, don't return any secret
+        delete response.clientSecret;
     }
+
 
     return NextResponse.json(response);
 

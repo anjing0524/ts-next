@@ -603,25 +603,49 @@ export class AuthorizationUtils {
   }
 
   static async getUserPermissions(userId: string): Promise<string[]> {
-    const permissions = await prisma.userResourcePermission.findMany({
+    if (!userId) {
+      return [];
+    }
+
+    const userRoles = await prisma.userRole.findMany({
       where: {
-        userId,
-        isActive: true,
-        permission: {
-          isActive: true,
-        },
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } },
-        ],
+        userId: userId,
+        // Optional: Check if the UserRole assignment itself is active if such a field exists
+        // user: { isActive: true }, // Ensure user is active (usually checked before calling this)
+        role: { isActive: true }, // Ensure the role itself is active
+        // Optional: Check UserRole.expiresAt if that feature is actively used
+        // AND: [
+        //   { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }
+        // ],
       },
       include: {
-        permission: true,
-        resource: true,
+        role: {
+          include: {
+            rolePermissions: {
+              where: {
+                // Optional: Check RolePermission.conditions if ABAC is used
+                permission: { isActive: true }, // Ensure the permission itself is active
+              },
+              include: {
+                permission: true, // Select the actual permission details
+              },
+            },
+          },
+        },
       },
     });
 
-    return permissions.map(p => `${p.resource.name}:${p.permission.name}`);
+    const permissionsSet = new Set<string>();
+    userRoles.forEach(userRole => {
+      userRole.role.rolePermissions.forEach(rolePermission => {
+        if (rolePermission.permission && rolePermission.permission.isActive) {
+          // The permission name should be the canonical string like "order:read"
+          permissionsSet.add(rolePermission.permission.name);
+        }
+      });
+    });
+
+    return Array.from(permissionsSet);
   }
 }
 

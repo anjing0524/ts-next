@@ -3,13 +3,16 @@ import { prisma } from '@/lib/prisma';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
+// Remove direct crypto import for password generation, use new util
+// import crypto from 'crypto';
+import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
 
 // Validation schemas
 const CreateUserSchema = z.object({
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens and underscores'),
   email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  // Password will be generated, not taken from input
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
   // Note: role field not supported in current schema
@@ -31,7 +34,7 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')));
   const search = searchParams.get('search') || '';
-  const role = searchParams.get('role') || '';
+  const roleId = searchParams.get('roleId') || ''; // Changed from 'role' to 'roleId'
   const active = searchParams.get('active');
 
   try {
@@ -47,9 +50,12 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
       ];
     }
     
-    if (role) {
-      // Note: role filtering not supported in current schema
-      // where.role = role;
+    if (roleId) {
+      where.userRoles = {
+        some: {
+          roleId: roleId,
+        },
+      };
     }
     
     if (active !== null) {
@@ -92,7 +98,7 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
         limit,
         total,
         search: search || undefined,
-        role: role || undefined,
+        roleId: roleId || undefined, // Updated metadata key
         active: active || undefined,
       },
     });
@@ -156,16 +162,21 @@ async function handleCreateUser(request: NextRequest, context: AuthContext): Pro
       );
     }
 
+    // Generate a secure random password using the new utility
+    const generatedPassword = generateSecurePassword();
+    const hashedPassword = await bcrypt.hash(generatedPassword, SALT_ROUNDS);
+
     // Create user
     const user = await prisma.user.create({
       data: {
         username: validatedData.username,
         email: validatedData.email,
-        password: await bcrypt.hash(validatedData.password, 12),
+        passwordHash: hashedPassword,
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
         isActive: true,
-        emailVerified: false,
+        // emailVerified: false, // Assuming default is false or handled elsewhere
+        mustChangePassword: true, // New field
       },
       select: {
         id: true,
@@ -174,10 +185,21 @@ async function handleCreateUser(request: NextRequest, context: AuthContext): Pro
         firstName: true,
         lastName: true,
         isActive: true,
-        emailVerified: true,
+        // emailVerified: true, // Assuming default is false or handled elsewhere
+        mustChangePassword: true, // Include new field in selection
         createdAt: true,
       },
     });
+
+    // Add initial password to history
+    if (user) {
+      await prisma.passwordHistory.create({
+        data: {
+          userId: user.id,
+          passwordHash: hashedPassword,
+        },
+      });
+    }
 
     // Log creation
     await AuthorizationUtils.logAuditEvent({
@@ -195,7 +217,8 @@ async function handleCreateUser(request: NextRequest, context: AuthContext): Pro
       },
     });
 
-    return NextResponse.json(user, { status: 201 });
+    // Return the created user AND the generated password for the admin
+    return NextResponse.json({ ...user, initialPassword: generatedPassword }, { status: 201 });
 
   } catch (error) {
     console.error('Error creating user:', error);
@@ -236,7 +259,7 @@ export const GET = withAuth(handleGetUsers, {
 });
 
 export const POST = withAuth(handleCreateUser, {
-  requiredScopes: ['users:write', 'admin'], 
+  requiredScopes: ['users:write', 'admin'],
   requiredPermissions: ['users:create'],
   requireUserContext: true,
 }); 
