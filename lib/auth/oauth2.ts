@@ -75,7 +75,7 @@ export class ScopeUtils {
       return { valid: true, invalidScopes: [] };
     }
 
-    // If second parameter is a string array, it's the simple validation
+    // If second parameter is a string array, it's the simple validation (used by client_credentials)
     if (Array.isArray(clientOrAllowedScopes)) {
       const invalidScopes = scopes.filter(scope => !clientOrAllowedScopes.includes(scope));
       return {
@@ -84,36 +84,64 @@ export class ScopeUtils {
       };
     }
 
-    // Otherwise, it's a Client object and we need async validation
-    const client = clientOrAllowedScopes;
+    // Otherwise, it's a Client object and we need async validation (used by /authorize)
+    const client = clientOrAllowedScopes as Client; // Type assertion
     
     // Return a Promise for the async case
     return (async () => {
-      // Check if scopes exist in database
+      // Step 1: Check against client.allowedScopes
+      let clientAllowedScopes: string[] = [];
+      if (client.allowedScopes) {
+        try {
+          clientAllowedScopes = JSON.parse(client.allowedScopes as string);
+          if (!Array.isArray(clientAllowedScopes)) clientAllowedScopes = [];
+        } catch (e) {
+          console.error("Failed to parse client.allowedScopes for client ID:", client.id, e);
+          // If allowedScopes is malformed, treat as if no scopes are allowed for safety.
+          clientAllowedScopes = [];
+        }
+      }
+
+      const invalidAgainstClientAllowed = scopes.filter(scope => !clientAllowedScopes.includes(scope));
+      if (invalidAgainstClientAllowed.length > 0) {
+        return {
+          valid: false,
+          invalidScopes: invalidAgainstClientAllowed,
+          error_description: `Requested scope(s) not allowed for this client: ${invalidAgainstClientAllowed.join(', ')}`
+        };
+      }
+
+      // Step 2: Check if scopes exist globally and are active in the Scope table
       const validDbScopes = await prisma.scope.findMany({
         where: {
-          name: { in: scopes },
+          name: { in: scopes }, // Only check scopes that were already allowed for the client
           isActive: true,
         },
       });
+      const validScopeNamesFromDb = validDbScopes.map(s => s.name);
+      const invalidOrInactiveScopes = scopes.filter(scope => !validScopeNamesFromDb.includes(scope));
 
-      const validScopeNames = validDbScopes.map(s => s.name);
-      const invalidScopes = scopes.filter(scope => !validScopeNames.includes(scope));
-
-      // Check if client is allowed to use these scopes
-      if (!client.isPublic) {
-        // Private clients can use any valid scope
-        return { valid: invalidScopes.length === 0, invalidScopes };
-      } else {
-        // Public clients can only use public scopes
-        const publicScopes = validDbScopes.filter(s => s.isPublic).map(s => s.name);
-        const restrictedScopes = scopes.filter(scope => !publicScopes.includes(scope));
-        
-        return { 
-          valid: invalidScopes.length === 0 && restrictedScopes.length === 0, 
-          invalidScopes: [...invalidScopes, ...restrictedScopes] 
+      if (invalidOrInactiveScopes.length > 0) {
+        return {
+          valid: false,
+          invalidScopes: invalidOrInactiveScopes,
+          error_description: `Requested scope(s) are invalid or inactive: ${invalidOrInactiveScopes.join(', ')}`
         };
       }
+
+      // Step 3: For public clients, ensure all requested (and now validated) scopes are also public
+      if (client.isPublic) {
+        const nonPublicScopes = validDbScopes.filter(dbScope => !dbScope.isPublic).map(s => s.name);
+        if (nonPublicScopes.length > 0) {
+          return {
+            valid: false,
+            invalidScopes: nonPublicScopes,
+            error_description: `Public client requested non-public scope(s): ${nonPublicScopes.join(', ')}`
+          };
+        }
+      }
+
+      return { valid: true, invalidScopes: [] };
     })();
   }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
 
 const PASSWORD_MIN_LENGTH = 8;

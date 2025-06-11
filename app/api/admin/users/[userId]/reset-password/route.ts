@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 
 interface RouteParams {
   params: {

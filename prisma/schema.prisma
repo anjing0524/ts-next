@@ -25,6 +25,9 @@ model User {
   lastLoginAt  DateTime?
 
   // 用户基本信息
+  email        String    @unique // Added: Email address
+  firstName    String? // Added: First name
+  lastName     String? // Added: Last name
   displayName  String? // 显示名称
   avatar       String? // 头像URL
   phone        String? // 手机号
@@ -63,6 +66,14 @@ model OAuthClient {
   clientName        String? // 客户端名称
   clientDescription String? // 客户端描述
   clientType        ClientType @default(PUBLIC) // 客户端类型
+  logoUri           String? // Added: URL of the client's logo
+  policyUri         String? // Added: URL of the client's policy
+  tosUri            String? // Added: URL of the client's terms of service
+  jwksUri           String? // Added: URL of the client's JSON Web Key Set
+  tokenEndpointAuthMethod String @default("client_secret_basic") // Added: Client authentication method for the token endpoint
+  requirePkce       Boolean    @default(true) // Added: Whether PKCE is required for this client
+  requireConsent    Boolean    @default(true) // Added: Whether user consent is required for this client
+  ipWhitelist       String? // Added: IP whitelist (e.g., JSON string of IPs/ranges)
   isActive          Boolean    @default(true)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -114,6 +125,7 @@ model AuthorizationCode {
 model AccessToken {
   id        String   @id @default(cuid())
   token     String   @unique
+  tokenHash String?  @unique // Added: Hash of the token for secure lookup
   userId    String
   clientId  String
   scope     String   @db.Text // JSON字符串存储权限范围
@@ -137,6 +149,7 @@ model AccessToken {
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
+  tokenHash String?  @unique // Added: Hash of the token for secure lookup
   userId    String
   clientId  String
   scope     String   @db.Text // JSON字符串存储权限范围

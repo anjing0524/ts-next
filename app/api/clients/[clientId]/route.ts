@@ -4,7 +4,7 @@ import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import logger from '@/utils/logger';
 
 // Validation schema for client updates

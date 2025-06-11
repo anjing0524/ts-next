@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For logging
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import {
   PasswordComplexitySchema,
   checkPasswordHistory,
