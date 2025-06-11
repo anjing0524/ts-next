@@ -4,6 +4,8 @@ import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
 import crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
+import { SALT_ROUNDS } from '@/lib/auth/passwordUtils';
 import logger from '@/utils/logger';
 
 // Enhanced validation schema for OAuth 2.0 client registration
@@ -66,7 +68,14 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
 
     // Generate OAuth 2.0 compliant client credentials
     const clientId = `oauth2_${crypto.randomBytes(16).toString('hex')}`;
-    const clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('base64url');
+    let clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('base64url');
+    let plainTextSecret: string | null = null;
+    let hashedSecret: string | null = null;
+
+    if (clientSecret) {
+      plainTextSecret = clientSecret;
+      hashedSecret = await bcrypt.hash(plainTextSecret, SALT_ROUNDS);
+    }
 
     // Validate grant types and response types compatibility
     if (validatedData.grantTypes.includes('authorization_code') && !validatedData.responseTypes.includes('code')) {
@@ -89,7 +98,7 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
     const newClient = await prisma.client.create({
       data: {
         clientId,
-        clientSecret,
+        clientSecret: hashedSecret, // Store hashed secret or null
         name: validatedData.name,
         description: validatedData.description,
         redirectUris: JSON.stringify(validatedData.redirectUris),
@@ -158,7 +167,7 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
     // Return registration response according to OAuth 2.0 Dynamic Client Registration spec
     const response = {
       client_id: newClient.clientId,
-      client_secret: newClient.clientSecret, // Only returned on registration
+      client_secret: plainTextSecret, // Return plain text secret here
       client_name: newClient.name,
       client_description: newClient.description,
       redirect_uris: JSON.parse(newClient.redirectUris),

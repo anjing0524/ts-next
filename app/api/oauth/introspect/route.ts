@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { JWTUtils, ClientAuthUtils, AuthorizationUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2';
 import { User, Client, AccessToken, RefreshToken } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 10; // Should be consistent if used, though not directly for token introspection logic itself
 
