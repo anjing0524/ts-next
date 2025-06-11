@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming this middleware handles auth and permissions
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Schema for creating a new role (角色创建的校验 Schema)
 const CreateRoleSchema = z.object({
@@ -21,37 +22,21 @@ const CreateRoleSchema = z.object({
 
 // POST /api/roles - 创建新角色
 async function createRole(request: NextRequest, authContext: AuthContext) {
-  try {
-    const body = await request.json();
-    // 使用 Zod Schema 校验请求体
-    const validationResult = CreateRoleSchema.safeParse(body);
+  const body = await request.json();
+  // 使用 Zod Schema 校验请求体. .parse will throw ZodError if validation fails.
+  const { name, displayName, description, isActive } = CreateRoleSchema.parse(body);
 
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
-    }
+  // 检查角色名称是否已存在 (name 是唯一标识符)
+  const existingRole = await prisma.role.findUnique({
+    where: { name },
+  });
+  if (existingRole) {
+    // 审计日志 for "role_create_failed_duplicate" is removed.
+    // handleApiError will log the ApiError.
+    throw new ApiError(409, 'Role name already exists', 'ROLE_NAME_CONFLICT', { name });
+  }
 
-    // 从校验结果中获取数据
-    const { name, displayName, description, isActive } = validationResult.data;
-
-    // 检查角色名称是否已存在 (name 是唯一标识符)
-    const existingRole = await prisma.role.findUnique({
-      where: { name },
-    });
-    if (existingRole) {
-      // 记录审计日志：角色创建失败（名称重复）
-      await AuthorizationUtils.logAuditEvent({
-        userId: authContext.user_id,
-        action: 'role_create_failed_duplicate',
-        resource: `role:${name}`,
-        success: false,
-        errorMessage: 'Role name already exists',
-        ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent'),
-      });
-      return NextResponse.json({ error: 'Role name already exists' }, { status: 409 });
-    }
-
-    // parentId 和 isSystem 字段已从 Schema 和 Role 模型中移除，相关逻辑不再需要
+  // parentId 和 isSystem 字段已从 Schema 和 Role 模型中移除，相关逻辑不再需要
 
     // 创建角色
     const newRole = await prisma.role.create({
@@ -76,60 +61,29 @@ async function createRole(request: NextRequest, authContext: AuthContext) {
     });
 
     return NextResponse.json(newRole, { status: 201 });
-
-  } catch (error) {
-    console.error('Error creating role:', error);
-    // 确保在异常情况下记录审计日志
-    const userIdForAudit = authContext && authContext.user_id ? authContext.user_id : 'system';
-    await AuthorizationUtils.logAuditEvent({
-      userId: userIdForAudit,
-      action: 'role_create_failed_exception',
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while creating role',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
-    return NextResponse.json({ error: 'Failed to create role' }, { status: 500 });
-  }
 }
 
 // GET /api/roles - 列出所有角色
 async function listRoles(request: NextRequest, authContext: AuthContext) {
-  try {
-    // TODO: 实现分页、筛选、排序功能
-    // 例如: /api/roles?page=1&limit=10&sortBy=name&sortOrder=asc&isActive=true&search=admin
-    const roles = await prisma.role.findMany({
-      // where: { isActive: true }, // 示例：可以添加基于 isActive 的筛选
-      include: {
-        // _count: { select: { userRoles: true, rolePermissions: true } }, // 示例：包含用户和权限计数
-      },
-      orderBy: {
-        name: 'asc', // 默认按名称升序排序
-      },
-    });
+  // TODO: 实现分页、筛选、排序功能
+  // 例如: /api/roles?page=1&limit=10&sortBy=name&sortOrder=asc&isActive=true&search=admin
+  const roles = await prisma.role.findMany({
+    // where: { isActive: true }, // 示例：可以添加基于 isActive 的筛选
+    include: {
+      // _count: { select: { userRoles: true, rolePermissions: true } }, // 示例：包含用户和权限计数
+    },
+    orderBy: {
+      name: 'asc', // 默认按名称升序排序
+    },
+  });
 
-    // 列表操作通常不记录单独的成功审计日志，除非有特殊需求。
-    // 访问控制应由中间件和路由权限配置保证。
+  // 列表操作通常不记录单独的成功审计日志，除非有特殊需求。
+  // 访问控制应由中间件和路由权限配置保证。
 
-    return NextResponse.json(roles, { status: 200 });
-
-  } catch (error) {
-    console.error('Error listing roles:', error);
-    // 异常情况下的审计日志 (可选)
-    const userIdForAudit = authContext && authContext.user_id ? authContext.user_id : 'system';
-    await AuthorizationUtils.logAuditEvent({
-      userId: userIdForAudit,
-      action: 'role_list_failed_exception',
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while listing roles',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
-    return NextResponse.json({ error: 'Failed to list roles' }, { status: 500 });
-  }
+  return NextResponse.json(roles, { status: 200 });
 }
 
 // 应用认证中间件。用户需要 'system:role:manage' 权限 (示例，具体权限标识符应更新为新格式)
 // 注意: 这里的 'system:role:manage' 权限标识符可能需要根据新的权限命名规范进行调整
-export const POST = withAuth(createRole, { requiredPermissions: ['system:role:manage'] });
-export const GET = withAuth(listRoles, { requiredPermissions: ['system:role:manage'] }); // 或更细粒度的读取权限 'system:role:read'
+export const POST = withErrorHandler(withAuth(createRole, { requiredPermissions: ['system:role:manage'] }));
+export const GET = withErrorHandler(withAuth(listRoles, { requiredPermissions: ['system:role:manage'] })); // 或更细粒度的读取权限 'system:role:read'

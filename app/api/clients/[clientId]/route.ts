@@ -9,6 +9,7 @@ import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 import logger from '@/utils/logger';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Validation schema for client updates
 const UpdateClientSchema = z.object({
@@ -35,9 +36,8 @@ async function handleGetClient(
   request: NextRequest, 
   context: AuthContext
 ): Promise<NextResponse> {
-  try {
-    // Extract clientId from URL path
-    const url = new URL(request.url);
+  // Extract clientId from URL path
+  const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
     const clientId = pathParts[pathParts.length - 1];
 
@@ -69,22 +69,9 @@ async function handleGetClient(
     });
 
     if (!client) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: context.user_id,
-        clientId: context.client_id,
-        action: 'client_not_found',
-        resource: `clients/${clientId}`,
-        ipAddress: request.headers.get('x-forwarded-for') || undefined,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: 'Client not found',
-        metadata: { requestedClientId: clientId },
-      });
-
-      return NextResponse.json(
-        { error: 'Client not found' },
-        { status: 404 }
-      );
+      // Note: The audit log for "client_not_found" is removed as handleApiError will log the error.
+      // If specific audit for this case is still needed, it should be re-evaluated.
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
     }
 
     // Log access
@@ -108,26 +95,6 @@ async function handleGetClient(
       grantTypes: JSON.parse(client.grantTypes),
       responseTypes: JSON.parse(client.responseTypes),
     });
-
-  } catch (error) {
-    console.error('Error fetching client:', error);
-    
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'client_view_error',
-      resource: `clients/unknown`,
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // PUT /api/clients/[clientId] - Update specific client (admin only)
@@ -135,42 +102,32 @@ async function handleUpdateClient(
   request: NextRequest,
   context: AuthContext
 ): Promise<NextResponse> {
-  try {
-    // Extract clientId from URL path
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const clientId = pathParts[pathParts.length - 1];
+  // Extract clientId from URL path
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const clientId = pathParts[pathParts.length - 1];
     
-    const body = await request.json();
-    const validatedData = UpdateClientSchema.parse(body);
+  const body = await request.json();
+  const validatedData = UpdateClientSchema.parse(body);
 
-    // Find existing client
-    const existingClient = await prisma.client.findFirst({
-      where: { clientId },
-    });
+  // Find existing client
+  const existingClient = await prisma.client.findFirst({
+    where: { clientId },
+  });
 
-    if (!existingClient) {
-      return NextResponse.json(
-        { error: 'Client not found' },
-        { status: 404 }
-      );
+  if (!existingClient) {
+    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+  }
+
+  // Validate business rules
+  if (validatedData.grantTypes && validatedData.responseTypes) {
+    if (validatedData.grantTypes.includes('authorization_code') &&
+        !validatedData.responseTypes.includes('code')) {
+      throw new ApiError(400, 'authorization_code grant type requires code response type', 'INVALID_CLIENT_METADATA');
     }
+  }
 
-    // Validate business rules
-    if (validatedData.grantTypes && validatedData.responseTypes) {
-      if (validatedData.grantTypes.includes('authorization_code') && 
-          !validatedData.responseTypes.includes('code')) {
-        return NextResponse.json(
-          {
-            error: 'invalid_client_metadata',
-            error_description: 'authorization_code grant type requires code response type',
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Handle secret regeneration
+  // Handle secret regeneration
     let rawNewClientSecret: string | null = null;
     let hashedNewClientSecret: string | null = existingClient.clientSecret; // Keep old if not regenerating
 
@@ -298,42 +255,6 @@ async function handleUpdateClient(
 
 
     return NextResponse.json(response);
-
-  } catch (error) {
-    console.error('Error updating client:', error);
-
-    // Extract clientId from URL for error logging
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const clientId = pathParts[pathParts.length - 1];
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          error: 'validation_error',
-          error_description: 'Invalid update data',
-          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
-        },
-        { status: 400 }
-      );
-    }
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'client_update_error',
-      resource: `clients/${clientId}`,
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // DELETE /api/clients/[clientId] - Delete specific client (admin only)
@@ -341,25 +262,21 @@ async function handleDeleteClient(
   request: NextRequest,
   context: AuthContext
 ): Promise<NextResponse> {
-  try {
-    // Extract clientId from URL path
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const clientId = pathParts[pathParts.length - 1];
+  // Extract clientId from URL path
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const clientId = pathParts[pathParts.length - 1];
 
-    // Find existing client
-    const existingClient = await prisma.client.findFirst({
-      where: { clientId },
-    });
+  // Find existing client
+  const existingClient = await prisma.client.findFirst({
+    where: { clientId },
+  });
 
-    if (!existingClient) {
-      return NextResponse.json(
-        { error: 'Client not found' },
-        { status: 404 }
-      );
-    }
+  if (!existingClient) {
+    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+  }
 
-    // Revoke all tokens for this client first
+  // Revoke all tokens for this client first
     await Promise.all([
       prisma.accessToken.updateMany({
         where: { clientId: existingClient.id },
@@ -400,48 +317,23 @@ async function handleDeleteClient(
       message: 'Client deleted successfully',
       clientId: existingClient.clientId,
     });
-
-  } catch (error) {
-    console.error('Error deleting client:', error);
-    
-    // Extract clientId from URL for error logging
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const clientId = pathParts[pathParts.length - 1];
-    
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'client_deletion_error',
-      resource: `clients/${clientId}`,
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // Apply OAuth 2.0 authentication with admin-level permissions
-export const GET = withAuth(handleGetClient, {
+export const GET = withErrorHandler(withAuth(handleGetClient, {
   requiredScopes: ['clients:read', 'admin'],
   requiredPermissions: ['clients:view'],
   requireUserContext: true,
-});
+}));
 
-export const PUT = withAuth(handleUpdateClient, {
+export const PUT = withErrorHandler(withAuth(handleUpdateClient, {
   requiredScopes: ['clients:write', 'admin'],
   requiredPermissions: ['clients:update'],
   requireUserContext: true,
-});
+}));
 
-export const DELETE = withAuth(handleDeleteClient, {
+export const DELETE = withErrorHandler(withAuth(handleDeleteClient, {
   requiredScopes: ['clients:write', 'admin'],
   requiredPermissions: ['clients:delete'],
   requireUserContext: true,
-}); 
+}));
