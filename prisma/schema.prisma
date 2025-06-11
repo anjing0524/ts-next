@@ -31,6 +31,9 @@ model User {
   organization String? // 用户所属组织
   department   String? // 用户所属部门
   workLocation String? // 用户工作地点
+  mustChangePassword Boolean @default(true) // 是否需要在下次登录时强制修改密码
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
 
   // 关联关系
   userRoles          UserRole[]
@@ -38,6 +41,8 @@ model User {
   accessTokens       AccessToken[]
   refreshTokens      RefreshToken[]
   auditLogs          AuditLog[]
+  passwordHistories  PasswordHistory[]
+  consentGrants      ConsentGrant[] // Added relation to ConsentGrant
 
   @@index([username])
   @@index([isActive])
@@ -66,6 +71,7 @@ model OAuthClient {
   authorizationCodes AuthorizationCode[]
   accessTokens       AccessToken[]
   refreshTokens      RefreshToken[]
+  consentGrants      ConsentGrant[] // Added relation to ConsentGrant
 
   @@index([clientId])
   @@index([isActive])
@@ -339,4 +345,56 @@ model AuditLog {
   @@index([resourceType, resourceId])
   @@index([status])
   @@map("audit_logs")
+}
+
+// ================================
+// 密码历史 (Password History)
+// ================================
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_histories")
+}
+
+// ================================
+// OAuth Scopes
+// ================================
+model Scope {
+  id          String  @id @default(cuid())
+  name        String  @unique // e.g., "openid", "profile", "order:read"
+  description String?
+  isPublic    Boolean @default(false) // Can public clients request this scope?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Optional: Relation to clients if scopes are restricted per client (advanced)
+  // clientScopes ClientScope[]
+
+  @@map("scopes")
+}
+
+// ================================
+// User Consent Grants
+// ================================
+model ConsentGrant {
+  id        String   @id @default(cuid())
+  userId    String
+  clientId  String
+  scopes    String   // JSON array of granted scope strings e.g., ["openid", "profile", "order:read"]
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime? // Optional: if consents can expire
+  revokedAt DateTime? // If consent is explicitly revoked
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId]) // A user typically has one active consent grant per client
+  @@map("consent_grants")
 }

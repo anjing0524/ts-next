@@ -1,180 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { z } from 'zod';
 
-interface RolePermissionRouteParams {
-  params: {
-    roleId: string;
-  };
-}
-
-// Schema for assigning/removing permissions to/from a role
-const ModifyRolePermissionsSchema = z.object({
-  permissionIds: z.array(z.string().uuid('Each permission ID must be a valid UUID')).min(1, 'At least one permission ID is required'),
+const AssignPermissionSchema = z.object({
+  permissionId: z.string().cuid('Invalid Permission ID format'),
 });
 
-// GET /api/roles/{roleId}/permissions - List permissions assigned to a role
-async function getRolePermissions(request: NextRequest, { params }: RolePermissionRouteParams, authContext: AuthContext) {
-  try {
-    const roleId = params.roleId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(roleId)) {
-        return NextResponse.json({ error: 'Invalid role ID format' }, { status: 400 });
-    }
+// Interface for route parameters passed by Next.js dynamic routing
+interface DynamicRouteParams {
+  params: {
+    roleId: string;
+  }
+}
 
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
-    if (!role) {
+// GET /api/roles/{roleId}/permissions - List permissions for a role
+async function handleGetRolePermissions(request: NextRequest, authContext: AuthContext, routeParams: DynamicRouteParams) {
+  const { roleId } = routeParams.params;
+  const requestingUserId = authContext.user_id;
+  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
+
+  try {
+    // First, check if the role itself exists to provide a clear 404 if not
+    const roleExists = await prisma.role.findUnique({ where: { id: roleId } });
+    if (!roleExists) {
       return NextResponse.json({ error: 'Role not found' }, { status: 404 });
     }
 
     const rolePermissions = await prisma.rolePermission.findMany({
-      where: { roleId },
-      include: { permission: true }, // Include the actual permission details
-      orderBy: { permission: { identifier: 'asc' } },
+      where: { roleId: roleId },
+      include: {
+        permission: true,
+      },
+      orderBy: { permission: { name: 'asc' } }
     });
 
-    return NextResponse.json(rolePermissions.map(rp => rp.permission), { status: 200 });
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'role_permissions_list_success',
+      resource: `roles/${roleId}/permissions`,
+      ipAddress, userAgent, success: true,
+      metadata: { roleId, listedPermissionsCount: rolePermissions.length }
+    });
+
+    return NextResponse.json(rolePermissions.map(rp => rp.permission));
   } catch (error) {
-    console.error(`Error fetching permissions for role ${params.roleId}:`, error);
+    console.error(`Error fetching permissions for role ${roleId}:`, error);
+    await AuthorizationUtils.logAuditEvent({
+      userId: requestingUserId,
+      action: 'role_permissions_list_error',
+      resource: `roles/${roleId}/permissions`,
+      ipAddress, userAgent, success: false,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      metadata: { roleId }
+    });
     return NextResponse.json({ error: 'Failed to fetch role permissions' }, { status: 500 });
   }
 }
 
-// POST /api/roles/{roleId}/permissions - Assign permissions to a role
-async function assignPermissionsToRole(request: NextRequest, { params }: RolePermissionRouteParams, authContext: AuthContext) {
-  try {
-    const roleId = params.roleId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(roleId)) {
-        return NextResponse.json({ error: 'Invalid role ID format' }, { status: 400 });
-    }
+// POST /api/roles/{roleId}/permissions - Assign a permission to a role
+async function handleAssignPermissionToRole(request: NextRequest, authContext: AuthContext, routeParams: DynamicRouteParams) {
+  const { roleId } = routeParams.params;
+  const requestingUserId = authContext.user_id;
+  const ipAddress = request.headers.get('x-forwarded-for') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
 
+  try {
     const body = await request.json();
-    const validationResult = ModifyRolePermissionsSchema.safeParse(body);
+    const validation = AssignPermissionSchema.safeParse(body);
 
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
+    if (!validation.success) {
+      await AuthorizationUtils.logAuditEvent({
+        userId: requestingUserId,
+        action: 'role_permission_assign_validation_failed',
+        resource: `roles/${roleId}/permissions`,
+        ipAddress, userAgent, success: false,
+        errorMessage: 'Input validation failed for permission assignment.',
+        metadata: { roleId, errors: validation.error.flatten().fieldErrors },
+      });
+      return NextResponse.json({ error: 'Validation error', details: validation.error.flatten().fieldErrors }, { status: 400 });
     }
+    const { permissionId } = validation.data;
 
-    const { permissionIds } = validationResult.data;
+    const [role, permission] = await Promise.all([
+      prisma.role.findUnique({ where: { id: roleId, isActive: true } }),
+      prisma.permission.findUnique({ where: { id: permissionId, isActive: true } }),
+    ]);
 
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
     if (!role) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Active role not found or specified roleId is invalid.' }, { status: 404 });
+    }
+    if (!permission) {
+      return NextResponse.json({ error: 'Active permission not found or specified permissionId is invalid.' }, { status: 404 });
     }
 
-    // Validate that all permissions exist
-    const permissions = await prisma.permission.findMany({
-      where: { id: { in: permissionIds } },
+    const rolePermission = await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId, permissionId } },
+      update: { assignedAt: new Date() },
+      create: { roleId, permissionId, assignedAt: new Date() },
+      include: { permission: true }
     });
-    if (permissions.length !== permissionIds.length) {
-      const foundIds = permissions.map(p => p.id);
-      const notFoundIds = permissionIds.filter(id => !foundIds.includes(id));
-      return NextResponse.json({ error: `Permissions not found: ${notFoundIds.join(', ')}` }, { status: 400 });
-    }
-
-    // Create new RolePermission entries
-    // Use transaction for atomicity if assigning multiple
-    const createdEntries = await prisma.$transaction(
-      permissionIds.map(permissionId =>
-        prisma.rolePermission.upsert({ // Use upsert to avoid duplicates if re-assigning
-          where: { roleId_permissionId: { roleId, permissionId } },
-          update: { assignedBy: authContext.user_id, assignedAt: new Date() },
-          create: {
-            roleId,
-            permissionId,
-            assignedBy: authContext.user_id, // Assuming assignedBy is user ID from auth context
-          },
-        })
-      )
-    );
 
     await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_permissions_assigned',
-      resource: `role:${roleId}`,
-      success: true,
-      metadata: { roleName: role.name, assignedPermissionIds: permissionIds, count: createdEntries.length },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
+      userId: requestingUserId,
+      action: 'role_permission_assign_success',
+      resource: `roles/${roleId}/permissions`,
+      ipAddress, userAgent, success: true,
+      metadata: { roleId, assignedPermissionId: permissionId },
     });
 
-    return NextResponse.json({ message: `${createdEntries.length} permissions assigned successfully.` }, { status: 200 });
-
+    return NextResponse.json(rolePermission.permission, { status: 201 });
   } catch (error) {
-    console.error(`Error assigning permissions to role ${params.roleId}:`, error);
+    console.error(`Error assigning permission ${body?.permissionId} to role ${roleId}:`, error);
      await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_permissions_assign_failed',
-      resource: `role:${params.roleId}`,
-      success: false,
+      userId: requestingUserId,
+      action: 'role_permission_assign_error',
+      resource: `roles/${roleId}/permissions`,
+      ipAddress, userAgent, success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
+      metadata: { roleId, attemptedPermissionId: body?.permissionId }
     });
-    return NextResponse.json({ error: 'Failed to assign permissions' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to assign permission' }, { status: 500 });
   }
 }
 
-// DELETE /api/roles/{roleId}/permissions - Remove permissions from a role
-async function removePermissionsFromRole(request: NextRequest, { params }: RolePermissionRouteParams, authContext: AuthContext) {
-  try {
-    const roleId = params.roleId;
-     if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(roleId)) {
-        return NextResponse.json({ error: 'Invalid role ID format' }, { status: 400 });
-    }
+export const GET = withAuth(handleGetRolePermissions, {
+    requiredPermissions: ['roles:read', 'admin'],
+    requireUserContext: true,
+});
 
-    const body = await request.json(); // Expects { permissionIds: [...] }
-    const validationResult = ModifyRolePermissionsSchema.safeParse(body);
-
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
-    }
-
-    const { permissionIds } = validationResult.data;
-
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
-    if (!role) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
-    }
-
-    // No need to check if permissions exist, deleteMany will just ignore non-existent ones in the join table.
-    const deleteResult = await prisma.rolePermission.deleteMany({
-      where: {
-        roleId: roleId,
-        permissionId: { in: permissionIds },
-      },
-    });
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_permissions_removed',
-      resource: `role:${roleId}`,
-      success: true,
-      metadata: { roleName: role.name, removedPermissionIds: permissionIds, count: deleteResult.count },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
-
-    return NextResponse.json({ message: `${deleteResult.count} permissions removed successfully.` }, { status: 200 });
-
-  } catch (error) {
-    console.error(`Error removing permissions from role ${params.roleId}:`, error);
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_permissions_remove_failed',
-      resource: `role:${params.roleId}`,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
-    return NextResponse.json({ error: 'Failed to remove permissions' }, { status: 500 });
-  }
-}
-
-
-// Apply auth middleware. Users need 'system:role:manage' permission for all these actions.
-export const GET = withAuth(getRolePermissions, { requiredPermissions: ['system:role:manage'] });
-export const POST = withAuth(assignPermissionsToRole, { requiredPermissions: ['system:role:manage'] });
-export const DELETE = withAuth(removePermissionsFromRole, { requiredPermissions: ['system:role:manage'] });
+export const POST = withAuth(handleAssignPermissionToRole, {
+    requiredPermissions: ['roles:edit_permissions', 'admin'],
+    requireUserContext: true,
+});

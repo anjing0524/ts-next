@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { User, UserSession } from '@prisma/client';
 import crypto from 'crypto';
 
+// Define session inactivity duration: e.g., 30 minutes
+export const SESSION_INACTIVITY_DURATION_MS = 30 * 60 * 1000;
+
 export interface SessionContext {
   user: User;
   session: UserSession;
@@ -36,10 +39,13 @@ export async function validateSession(request: NextRequest): Promise<SessionCont
       return null;
     }
 
-    // Update last activity
+    // Update last activity and extend session expiration (sliding window)
     await prisma.userSession.update({
       where: { id: session.id },
-      data: { lastActivity: new Date() },
+      data: {
+        lastActivity: new Date(),
+        expiresAt: new Date(Date.now() + SESSION_INACTIVITY_DURATION_MS),
+      },
     });
 
     return {
@@ -61,7 +67,8 @@ export async function createSession(
   userAgent?: string
 ): Promise<string> {
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  // Set initial expiration based on inactivity duration
+  const expiresAt = new Date(Date.now() + SESSION_INACTIVITY_DURATION_MS);
 
   await prisma.userSession.create({
     data: {
