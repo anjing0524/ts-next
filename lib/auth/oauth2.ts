@@ -6,6 +6,10 @@ import { User, Client, Scope } from '@prisma/client';
 import * as jose from 'jose';
 
 import { prisma } from '@/lib/prisma';
+import { PermissionService } from '@/lib/services/permissionService'; // Import new service
+
+// Instantiate the service
+const permissionService = new PermissionService();
 
 
 // OAuth 2.0 Error Types
@@ -716,47 +720,13 @@ export class AuthorizationUtils {
 
   static async getUserPermissions(userId: string): Promise<string[]> {
     if (!userId) {
+      // Optional: Log a warning if userId is unexpectedly missing
+      // console.warn('AuthorizationUtils.getUserPermissions called with no userId');
       return [];
     }
-
-    const userRoles = await prisma.userRole.findMany({
-      where: {
-        userId: userId,
-        // Optional: Check if the UserRole assignment itself is active if such a field exists
-        // user: { isActive: true }, // Ensure user is active (usually checked before calling this)
-        role: { isActive: true }, // Ensure the role itself is active
-        // Optional: Check UserRole.expiresAt if that feature is actively used
-        // AND: [
-        //   { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }
-        // ],
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              where: {
-                // Optional: Check RolePermission.conditions if ABAC is used
-                permission: { isActive: true }, // Ensure the permission itself is active
-              },
-              include: {
-                permission: true, // Select the actual permission details
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const permissionsSet = new Set<string>();
-    userRoles.forEach(userRole => {
-      userRole.role.rolePermissions.forEach(rolePermission => {
-        if (rolePermission.permission && rolePermission.permission.isActive) {
-          // The permission name should be the canonical string like "order:read"
-          permissionsSet.add(rolePermission.permission.name);
-        }
-      });
-    });
-
+    // Delegate to the PermissionService
+    const permissionsSet = await permissionService.getUserEffectivePermissions(userId);
+    // Convert the Set<string> back to string[] to match the original method signature
     return Array.from(permissionsSet);
   }
 }
