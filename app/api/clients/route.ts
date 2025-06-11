@@ -5,6 +5,7 @@ import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { z } from 'zod';
 import crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Validation schemas
 const GetClientsSchema = z.object({
@@ -46,30 +47,17 @@ const UpdateClientSchema = z.object({
 async function handleGetClients(request: NextRequest, context: AuthContext): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   
-  try {
-    // Validate query parameters
-    const validation = GetClientsSchema.safeParse({
-      limit: searchParams.get('limit'),
-      offset: searchParams.get('offset'),
-      search: searchParams.get('search'),
-      isActive: searchParams.get('isActive'),
-      isPublic: searchParams.get('isPublic'),
-    });
+  // Validate query parameters
+  // .parse will throw a ZodError if validation fails, caught by withErrorHandler
+  const { limit, offset, search, isActive, isPublic } = GetClientsSchema.parse({
+    limit: searchParams.get('limit'),
+    offset: searchParams.get('offset'),
+    search: searchParams.get('search'),
+    isActive: searchParams.get('isActive'),
+    isPublic: searchParams.get('isPublic'),
+  });
 
-    if (!validation.success) {
-      return NextResponse.json(
-        { 
-          error: 'invalid_request',
-          error_description: 'Invalid query parameters',
-          validation_errors: validation.error.flatten().fieldErrors
-        },
-        { status: 400 }
-      );
-    }
-
-    const { limit, offset, search, isActive, isPublic } = validation.data;
-
-    // Build where clause
+  // Build where clause
     const where: any = {};
     
     if (isActive !== undefined) {
@@ -153,33 +141,12 @@ async function handleGetClients(request: NextRequest, context: AuthContext): Pro
         hasMore: offset + limit < totalCount,
       },
     });
-
-  } catch (error) {
-    console.error('Error fetching clients:', error);
-    
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'clients_list_error',
-      resource: 'clients',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // POST /api/clients - Create new OAuth client (admin only)
 async function handleCreateClient(request: NextRequest, context: AuthContext): Promise<NextResponse> {
-  try {
-    const body = await request.json();
-    const validatedData = CreateClientSchema.parse(body);
+  const body = await request.json();
+  const validatedData = CreateClientSchema.parse(body);
 
     // Generate client ID and secret
     const clientId = `client_${crypto.randomBytes(16).toString('hex')}`;
@@ -257,48 +224,17 @@ async function handleCreateClient(request: NextRequest, context: AuthContext): P
       grantTypes: JSON.parse(client.grantTypes),
       responseTypes: JSON.parse(client.responseTypes),
     }, { status: 201 });
-
-  } catch (error) {
-    console.error('Error creating client:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          error: 'validation_error',
-          error_description: 'Invalid request data',
-          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
-        },
-        { status: 400 }
-      );
-    }
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'client_creation_error',
-      resource: 'clients',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // Apply OAuth 2.0 authentication with admin-level permissions
-export const GET = withAuth(handleGetClients, {
+export const GET = withErrorHandler(withAuth(handleGetClients, {
   requiredScopes: ['clients:read', 'admin'],
   requiredPermissions: ['clients:list'],
   requireUserContext: true,
-});
+}));
 
-export const POST = withAuth(handleCreateClient, {
+export const POST = withErrorHandler(withAuth(handleCreateClient, {
   requiredScopes: ['clients:write', 'admin'],
   requiredPermissions: ['clients:create'],
   requireUserContext: true,
-}); 
+}));

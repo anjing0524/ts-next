@@ -1,59 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-
 import * as jose from 'jose';
+import logger from '@/utils/logger'; // Assuming logger exists
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    // For HS256 (symmetric key), we don't expose the key in JWKS
-    // This endpoint is mainly for asymmetric algorithms like RS256, ES256
-    // In a production setup with asymmetric keys, you would:
-    // 1. Load your public key from environment or key management service
-    // 2. Convert it to JWK format
-    // 3. Return it in the JWKS response
+    const publicKeyPem = process.env.JWT_PUBLIC_KEY_PEM;
+    const keyId = process.env.JWT_KEY_ID || 'default-kid'; // Default KID if not set
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256'; // Default to RS256
 
-    // For now, we return an empty key set since we're using HS256 (symmetric)
-    // If you switch to RS256/ES256, uncomment and modify the code below:
-
-    /*
-    // Example for RS256 public key:
-    const publicKeyPem = process.env.JWT_PUBLIC_KEY;
-    if (!publicKeyPem) {
-      throw new Error('JWT_PUBLIC_KEY not configured');
+    if (algorithm.startsWith('HS')) {
+      logger.warn('[JWKS] Symmetric algorithm configured. JWKS endpoint will serve an empty key set.');
+      return NextResponse.json({ keys: [] }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=3600, must-revalidate',
+        }
+      });
     }
 
-    const publicKey = await jose.importSPKI(publicKeyPem, 'RS256');
-    const jwk = await jose.exportJWK(publicKey);
+    if (!publicKeyPem) {
+      logger.error('[JWKS] JWT_PUBLIC_KEY_PEM is not configured for asymmetric algorithm.');
+      return NextResponse.json(
+        { error: 'Service misconfiguration: Public key not available.', code: 'JWKS_NOT_CONFIGURED' },
+        { status: 503 }
+      );
+    }
+
+    let jwk: jose.JWK;
+    try {
+      // For SPKI, the algorithm in the key itself is usually not needed for import,
+      // but jose might use the provided alg for validation or context.
+      // The actual algorithm used for signing should match what's specified in JWT_ALGORITHM.
+      const publicKey = await jose.importSPKI(publicKeyPem, algorithm as string); // alg is required by importSPKI
+      jwk = await jose.exportJWK(publicKey);
+    } catch (importError: any) {
+      logger.error('[JWKS] Failed to import or export public key:', {
+        message: importError.message,
+        stack: importError.stack,
+        code: importError.code, // jose errors often have a code property
+      });
+      return NextResponse.json(
+        { error: 'Service misconfiguration: Invalid public key format or algorithm mismatch.', code: 'JWKS_KEY_PROCESSING_ERROR' },
+        { status: 503 }
+      );
+    }
     
     const jwks = {
       keys: [
         {
-          ...jwk,
-          kid: 'main-signing-key', // Key ID
-          alg: 'RS256',
-          use: 'sig',
+          ...jwk, // Spread the exported JWK (contains kty, n, e for RSA)
+          kid: keyId,
+          alg: algorithm, // Algorithm used for the JWT signature
+          use: 'sig', // Key usage: signature
         }
       ]
-    };
-    */
-
-    // Empty JWKS for HS256 (symmetric key algorithm)
-    const jwks = {
-      keys: []
     };
 
     return NextResponse.json(jwks, {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'Cache-Control': 'public, max-age=3600, must-revalidate', // Cache for 1 hour
       },
     });
 
-  } catch (error) {
-    console.error('Error generating JWKS:', error);
-    
+  } catch (error: any) {
+    logger.error('[JWKS] Unexpected error generating JWKS:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+    });
     return NextResponse.json(
-      { error: 'Failed to generate JWKS' },
+      { error: 'Failed to generate JWKS due to an unexpected server error.', code: 'INTERNAL_SERVER_ERROR' },
       { status: 500 }
     );
   }
-} 
+}

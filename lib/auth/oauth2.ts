@@ -183,51 +183,52 @@ export class JWTUtils {
 
   // 内部方法，用于获取RSA私钥进行签名 (Internal method to get RSA private key for signing)
   private static async getRSAPrivateKeyForSigning(): Promise<jose.KeyLike> {
-    const pem = process.env.JWT_RSA_PRIVATE_KEY;
+    const pem = process.env.JWT_PRIVATE_KEY_PEM; // Changed variable name
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256'; // Read algorithm
+
     if (!pem) {
+      const errorMessage = 'JWT_PRIVATE_KEY_PEM is not set. Please configure it via environment variables.';
       if (process.env.NODE_ENV === 'production') {
-        console.error('JWT_RSA_PRIVATE_KEY is not set in production environment!'); // 服务端日志 (Server-side log)
-        throw new Error('JWT_RSA_PRIVATE_KEY is not set in production environment!');
+        console.error(`${errorMessage} (Production)`);
+        throw new Error(errorMessage);
       }
-      // 开发环境下，如果未设置，抛出错误。不应在开发中使用硬编码密钥。
-      // (In development, if not set, throw error. Hardcoded keys should not be used in development.)
-      console.error('JWT_RSA_PRIVATE_KEY is not set for development. Please configure it via environment variables.'); // 服务端日志 (Server-side log)
-      throw new Error('JWT_RSA_PRIVATE_KEY is not set for development. Please configure it.');
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
     try {
-      return await jose.importPKCS8(pem, 'RS256'); // 指定 alg RS256 (Specify alg RS256)
+      return await jose.importPKCS8(pem, algorithm as string); // Use algorithm
     } catch (error) {
-      console.error("Failed to import RSA private key (PKCS8):", error); // 服务端日志 (Server-side log)
-      throw new Error("Invalid RSA private key format or configuration.");
+      console.error("Failed to import RSA private key (PKCS8):", error);
+      throw new Error("Invalid RSA private key (JWT_PRIVATE_KEY_PEM) format or configuration.");
     }
   }
 
   // 内部方法，用于获取RSA公钥进行验证 (Internal method to get RSA public key for verification)
   // 注意: 资源服务器通常通过JWKS端点获取公钥 (Note: Resource servers usually get public key via JWKS endpoint)
   private static async getRSAPublicKeyForVerification(): Promise<jose.KeyLike> {
-    const pem = process.env.JWT_RSA_PUBLIC_KEY;
+    const pem = process.env.JWT_PUBLIC_KEY_PEM; // Changed variable name
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256'; // Read algorithm
+
     if (!pem) {
+      const errorMessage = 'JWT_PUBLIC_KEY_PEM is not set. Please configure it via environment variables.';
       if (process.env.NODE_ENV === 'production') {
-        console.error('JWT_RSA_PUBLIC_KEY is not set in production environment!'); // 服务端日志 (Server-side log)
-        throw new Error('JWT_RSA_PUBLIC_KEY is not set in production environment!');
+        console.error(`${errorMessage} (Production)`);
+        throw new Error(errorMessage);
       }
-      // 开发环境下，如果未设置，抛出错误。
-      // (In development, if not set, throw error.)
-      console.error('JWT_RSA_PUBLIC_KEY is not set for development. Please configure it via environment variables.'); // 服务端日志 (Server-side log)
-      throw new Error('JWT_RSA_PUBLIC_KEY is not set for development. Please configure it.');
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
     try {
       // 尝试以SPKI格式导入，这是常见的公钥PEM格式
-      // (Try importing in SPKI format, which is a common public key PEM format)
-      return await jose.importSPKI(pem, 'RS256'); // 指定 alg RS256 (Specify alg RS256)
+      return await jose.importSPKI(pem, algorithm as string); // Use algorithm
     } catch (spkiError) {
-      console.warn("Failed to import RSA public key as SPKI, trying as X.509 certificate...", spkiError); // 服务端日志 (Server-side log)
+      console.warn("Failed to import RSA public key as SPKI, trying as X.509 certificate...", spkiError);
       try {
-        // 如果SPKI失败，尝试作为X.509证书导入 (If SPKI fails, try importing as X.509 certificate)
-        return await jose.importX509(pem, 'RS256');
+        // 如果SPKI失败，尝试作为X.509证书导入
+        return await jose.importX509(pem, algorithm as string); // Use algorithm
       } catch (x509Error) {
-        console.error("Failed to import RSA public key (SPKI or X.509):", x509Error); // 服务端日志 (Server-side log)
-        throw new Error("Invalid RSA public key format or configuration. Supported formats: SPKI PEM, X.509 PEM.");
+        console.error("Failed to import RSA public key (SPKI or X.509):", x509Error);
+        throw new Error("Invalid RSA public key (JWT_PUBLIC_KEY_PEM) format or configuration. Supported formats: SPKI PEM, X.509 PEM.");
       }
     }
   }
@@ -263,6 +264,9 @@ export class JWTUtils {
     // roles?: string[]; // 可选：用户角色 (Optional: user roles)
     exp?: string; // 过期时间，例如 '1h', '30d' (Expiration time, e.g., '1h', '30d')
   }): Promise<string> {
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256';
+    const keyId = process.env.JWT_KEY_ID || 'default-kid';
+
     const jwtPayload: jose.JWTPayload = {
       client_id: payload.client_id,
       // 如果user_id存在，则sub为user_id，否则为client_id (If user_id exists, sub is user_id, else client_id)
@@ -283,7 +287,7 @@ export class JWTUtils {
     Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
     return await new jose.SignJWT(jwtPayload)
-      .setProtectedHeader({ alg: 'RS256' }) // 改为RS256 (Changed to RS256)
+      .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
       // .setIssuedAt() // iat 已在 payload 中设置 (iat already set in payload)
       // .setIssuer(this.getIssuer()) // iss 已在 payload 中设置 (iss already set in payload)
       // .setSubject(payload.user_id || payload.client_id) // sub 已在 payload 中设置 (sub already set in payload)
@@ -298,12 +302,13 @@ export class JWTUtils {
     payload?: jose.JWTPayload;
     error?: string;
   }> {
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256';
     try {
       // 使用RSA公钥验证 (Verify with RSA public key)
       const { payload } = await jose.jwtVerify(token, await this.getRSAPublicKeyForVerification(), {
         issuer: this.getIssuer(),
         audience: this.getAudience(),
-        algorithms: ['RS256'], // 指定允许的算法 (Specify allowed algorithms)
+        algorithms: [algorithm as string], // Use algorithm
       });
 
       return { valid: true, payload };
@@ -329,6 +334,9 @@ export class JWTUtils {
     scope?: string; // 可选的作用域 (Optional scope)
     exp?: string; // 过期时间 (Expiration time)
   }): Promise<string> {
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256';
+    const keyId = process.env.JWT_KEY_ID || 'default-kid';
+
     const jwtPayload: jose.JWTPayload = {
       client_id: payload.client_id,
       sub: payload.user_id || payload.client_id,
@@ -342,7 +350,7 @@ export class JWTUtils {
     Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
     return await new jose.SignJWT(jwtPayload)
-      .setProtectedHeader({ alg: 'RS256' }) // 改为RS256 (Changed to RS256)
+      .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
       .setExpirationTime(payload.exp || '30d') // 刷新令牌通常有更长的有效期 (Refresh tokens usually have longer validity)
       .sign(await this.getRSAPrivateKeyForSigning()); // 使用RSA私钥签名 (Sign with RSA private key)
   }
@@ -352,12 +360,13 @@ export class JWTUtils {
     payload?: jose.JWTPayload;
     error?: string;
   }> {
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256';
     try {
       // 使用RSA公钥验证 (Verify with RSA public key)
       const { payload } = await jose.jwtVerify(token, await this.getRSAPublicKeyForVerification(), {
         issuer: this.getIssuer(),
         audience: this.getAudience(),
-        algorithms: ['RS256'], // 指定允许的算法 (Specify allowed algorithms)
+        algorithms: [algorithm as string], // Use algorithm
       });
 
       // 检查这是否确实是一个刷新令牌 (Check if this is actually a refresh token)
@@ -384,6 +393,9 @@ export class JWTUtils {
 
   // 创建ID令牌 (Create ID Token)
   static async createIdToken(user: User, client: Client, nonce?: string): Promise<string> {
+    const algorithm = process.env.JWT_ALGORITHM || 'RS256';
+    const keyId = process.env.JWT_KEY_ID || 'default-kid';
+
     const jwtPayload: jose.JWTPayload = {
       iss: this.getIssuer(), // 签发者 (Issuer)
       sub: user.id, // 用户ID作为主题 (User ID as subject)
@@ -408,7 +420,7 @@ export class JWTUtils {
     Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
     return await new jose.SignJWT(jwtPayload)
-      .setProtectedHeader({ alg: 'RS256' }) // 改为RS256 (Changed to RS256)
+      .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
       .sign(await this.getRSAPrivateKeyForSigning()); // 使用RSA私钥签名 (Sign with RSA private key)
   }
 }

@@ -10,6 +10,7 @@ import { AuthorizationUtils } from '@/lib/auth/oauth2';
 // import crypto from 'crypto';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
 import { prisma } from '@/lib/prisma';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Validation schemas
 const CreateUserSchema = z.object({
@@ -40,9 +41,8 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
   const roleId = searchParams.get('roleId') || ''; // Changed from 'role' to 'roleId'
   const active = searchParams.get('active');
 
-  try {
-    // Build filter conditions
-    const where: any = {};
+  // Build filter conditions
+  const where: any = {};
     
     if (search) {
       where.OR = [
@@ -69,16 +69,19 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          isActive: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
+        include: { // Changed from select to include
+          userRoles: {
+            select: {
+              assignedAt: true,
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  displayName: true,
+                },
+              },
+            },
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -86,6 +89,20 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
       }),
       prisma.user.count({ where }),
     ]);
+
+    // Transform the users to include a cleaner roles array
+    const transformedUsers = users.map(user => {
+      const { userRoles, ...restOfUser } = user;
+      return {
+        ...restOfUser,
+        roles: userRoles.map(ur => ({
+          id: ur.role.id,
+          name: ur.role.name,
+          displayName: ur.role.displayName,
+          assignedAt: ur.assignedAt
+        }))
+      };
+    });
 
     // Log access
     await AuthorizationUtils.logAuditEvent({
@@ -107,7 +124,7 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
     });
 
     return NextResponse.json({
-      users,
+      users: transformedUsers, // Use the transformed users
       pagination: {
         page,
         limit,
@@ -115,33 +132,12 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
         pages: Math.ceil(total / limit),
       },
     });
-
-  } catch (error) {
-    console.error('Error listing users:', error);
-    
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'users_list_error',
-      resource: 'users',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // POST /api/users - Create user (admin only)
 async function handleCreateUser(request: NextRequest, context: AuthContext): Promise<NextResponse> {
-  try {
-    const body = await request.json();
-    const validatedData = CreateUserSchema.parse(body);
+  const body = await request.json();
+  const validatedData = CreateUserSchema.parse(body);
 
     // Check if user with username or email already exists
     const existingUser = await prisma.user.findFirst({
@@ -154,14 +150,11 @@ async function handleCreateUser(request: NextRequest, context: AuthContext): Pro
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { 
-          error: 'User already exists',
-          details: existingUser.username === validatedData.username 
-            ? 'Username already taken' 
-            : 'Email already registered'
-        },
-        { status: 409 }
+      throw new ApiError(
+        409,
+        existingUser.username === validatedData.username ? 'Username already taken' : 'Email already registered',
+        'USER_CONFLICT',
+        { field: existingUser.username === validatedData.username ? 'username' : 'email' }
       );
     }
 
@@ -222,47 +215,17 @@ async function handleCreateUser(request: NextRequest, context: AuthContext): Pro
 
     // Return the created user AND the generated password for the admin
     return NextResponse.json({ ...user, initialPassword: generatedPassword }, { status: 201 });
-
-  } catch (error) {
-    console.error('Error creating user:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          error: 'Validation error',
-          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
-        },
-        { status: 400 }
-      );
-    }
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: context.user_id,
-      clientId: context.client_id,
-      action: 'user_creation_error',
-      resource: 'users',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
 
 // Apply OAuth 2.0 authentication with admin-level permissions
-export const GET = withAuth(handleGetUsers, {
+export const GET = withErrorHandler(withAuth(handleGetUsers, {
   requiredScopes: ['users:read', 'admin'],
   requiredPermissions: ['users:list'],
   requireUserContext: true,
-});
+}));
 
-export const POST = withAuth(handleCreateUser, {
+export const POST = withErrorHandler(withAuth(handleCreateUser, {
   requiredScopes: ['users:write', 'admin'],
   requiredPermissions: ['users:create'],
   requireUserContext: true,
-}); 
+}));

@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // ================================
@@ -59,10 +59,10 @@ model OAuthClient {
   id                String     @id @default(cuid())
   clientId          String     @unique
   clientSecret      String? // 机密客户端的密钥 (BCrypt哈希存储)
-  redirectUris      String     @db.Text // JSON字符串存储重定向URI列表
-  grantTypes        String     @db.Text // JSON字符串存储授权类型
-  responseTypes     String     @db.Text // JSON字符串存储响应类型
-  allowedScopes     String     @db.Text // JSON字符串存储权限范围
+  redirectUris      String     // JSON字符串存储重定向URI列表
+  grantTypes        String     // JSON字符串存储授权类型
+  responseTypes     String     // JSON字符串存储响应类型
+  allowedScopes     String     // JSON字符串存储权限范围
   clientName        String? // 客户端名称
   clientDescription String? // 客户端描述
   clientType        ClientType @default(PUBLIC) // 客户端类型
@@ -87,6 +87,7 @@ model OAuthClient {
   @@index([clientId])
   @@index([isActive])
   @@index([clientType])
+  @@index([clientId, isActive])
   @@map("oauth_clients")
 }
 
@@ -102,7 +103,7 @@ model AuthorizationCode {
   userId              String
   clientId            String
   redirectUri         String
-  scope               String   @db.Text // JSON字符串存储权限范围
+  scope               String   // JSON字符串存储权限范围
   expiresAt           DateTime
   codeChallenge       String? // PKCE code challenge
   codeChallengeMethod String? // PKCE code challenge method
@@ -128,7 +129,7 @@ model AccessToken {
   tokenHash String?  @unique // Added: Hash of the token for secure lookup
   userId    String
   clientId  String
-  scope     String   @db.Text // JSON字符串存储权限范围
+  scope     String   // JSON字符串存储权限范围
   expiresAt DateTime
   isRevoked Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -152,7 +153,7 @@ model RefreshToken {
   tokenHash String?  @unique // Added: Hash of the token for secure lookup
   userId    String
   clientId  String
-  scope     String   @db.Text // JSON字符串存储权限范围
+  scope     String   // JSON字符串存储权限范围
   expiresAt DateTime
   isRevoked Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -261,7 +262,7 @@ model DataPermission {
   permissionId String  @unique
   tableName    String // 数据表名
   columnName   String? // 列名 (可选，用于列级权限)
-  conditions   String? @db.Text // 数据过滤条件 (JSON格式)
+  conditions   String? // 数据过滤条件 (JSON格式)
 
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
@@ -308,7 +309,7 @@ model UserRole {
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   // ABAC 扩展属性
-  context    Json?     @default("{}") // 上下文条件，如时间、地点等
+  context    String?     // 上下文条件，如时间、地点等
   expiresAt  DateTime? // 角色分配过期时间
   assignedBy String? // 分配者ID
   assignedAt DateTime  @default(now())
@@ -326,7 +327,7 @@ model RolePermission {
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   // ABAC 扩展属性
-  conditions Json?    @default("{}") // 权限生效条件
+  conditions String?    // 权限生效条件
   assignedAt DateTime @default(now())
 
   @@id([roleId, permissionId])
@@ -344,7 +345,7 @@ model AuditLog {
   action       String // 执行的操作
   resourceType String? // 操作的资源类型
   resourceId   String? // 操作的资源ID
-  details      Json? // 操作详情
+  details      String? // 操作详情
   status       String // 操作状态
   ipAddress    String? // IP地址
   userAgent    String? // 用户代理
@@ -357,6 +358,7 @@ model AuditLog {
   @@index([action])
   @@index([resourceType, resourceId])
   @@index([status])
+  @@index([userId, timestamp])
   @@map("audit_logs")
 }
 
