@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+import { PermissionType, HttpMethod } from '@prisma/client'; // 引入 Prisma 生成的枚举类型
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { PermissionType, HttpMethod } from '@prisma/client'; // 引入 Prisma 生成的枚举类型
+import { prisma } from '@/lib/prisma';
 
 // 定义权限类型枚举 (和 Prisma schema 中的 PermissionType 保持一致)
 const PermissionTypeEnum = z.nativeEnum(PermissionType);

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { withAuth } from '@/lib/auth/middleware';
+
 import { z } from 'zod';
+
+import { withAuth } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
 
 const createScopeSchema = z.object({
   name: z.string()

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { AuthorizationUtils, OAuth2ErrorTypes, ScopeUtils } from '@/lib/auth/oauth2';
 import { validateSession } from '@/lib/auth/session'; // To validate user's current session
+import { prisma } from '@/lib/prisma';
 
 interface ConsentFormData {
   decision?: 'approve' | 'deny';

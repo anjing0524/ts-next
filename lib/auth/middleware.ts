@@ -1,8 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { JWTUtils, ScopeUtils, AuthorizationUtils, RateLimitUtils, ClientAuthUtils, OAuth2ErrorTypes, PKCEUtils } from './oauth2';
-import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+
+import { NextRequest, NextResponse } from 'next/server';
+
 import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
+
+import { prisma } from '@/lib/prisma';
+
+import { JWTUtils, ScopeUtils, AuthorizationUtils, RateLimitUtils, ClientAuthUtils, OAuth2ErrorTypes, PKCEUtils } from './oauth2';
 
 export interface AuthContext {
   user_id?: string;

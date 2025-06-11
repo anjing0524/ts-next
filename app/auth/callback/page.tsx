@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authApi, getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useEffect, useState } from 'react';
+
 import { Terminal } from 'lucide-react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { authApi, getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
+
 
 export default function AuthCallbackPage() {
   const router = useRouter();

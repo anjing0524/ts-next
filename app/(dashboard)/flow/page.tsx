@@ -1,13 +1,15 @@
 export const dynamic = 'force-dynamic';
 import '@xyflow/react/dist/style.css';
-import { DagFlow } from './components/dag-flow';
-import { Query } from './components/query';
+import { Suspense } from 'react';
+
 import { getAllPlanConf, handleSearch } from '@/app/actions/flow-actions';
 import { PlanConf } from '@/types/db-types';
+
+import { BackToTop } from './components/back-to-top';
+import { DagFlow } from './components/dag-flow';
+import { Query } from './components/query';
 import { StatsTable } from './components/stats-table';
 import { TaskDetailsDialog } from './components/task-state-list-dialog';
-import { Suspense } from 'react';
-import { BackToTop } from './components/back-to-top';
 
 export default async function Flow() {
   const planConfs: PlanConf[] = await getAllPlanConf();

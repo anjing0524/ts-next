@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 
 // 定义路径参数的校验 Schema (用于校验 roleId)
 const RolePermissionParamsSchema = z.object({

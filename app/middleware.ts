@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+
 import { jwtVerify, JWTPayload } from 'jose'; // Import JWTPayload for type hinting
-import logger from '@/utils/logger'; // Import logger
+
 import { AuthorizationUtils } from '@/lib/auth/oauth2'; // Import AuthorizationUtils
+import logger from '@/utils/logger'; // Import logger
+
+import type { NextRequest } from 'next/server';
 
 // 1. Define a matcher to specify which routes it should apply to.
 export const config = {

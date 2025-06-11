@@ -1,10 +1,12 @@
 'use client';
 
+import React from 'react';
+
 import { ColumnDef } from '@tanstack/react-table';
+import { v4 as uuidv4 } from 'uuid';
+
 import { DataTable } from '@/components/data-table/data-table';
 import { Badge } from '@/components/ui/badge';
-import { v4 as uuidv4 } from 'uuid';
-import React from 'react';
 
 interface User {
   id: string;

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import { withOAuthRevokeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import { 
   ClientAuthUtils, 
   AuthorizationUtils, 
   OAuth2ErrorTypes,
   RateLimitUtils 
 } from '@/lib/auth/oauth2';
-import { withOAuthRevokeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
 
 async function handleRevokeRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
   const { body, client, ipAddress, userAgent, params } = context!;

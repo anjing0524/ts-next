@@ -1,6 +1,8 @@
 'use client';
 import { useState, useCallback } from 'react';
+
 import { Handle, NodeProps, Position } from '@xyflow/react';
+import { format } from 'date-fns';
 import {
   CheckCircle,
   XCircle,
@@ -11,15 +13,16 @@ import {
   Info,
   StopCircle,
 } from 'lucide-react';
-import { PlanStateWithStatus } from '../types/type';
-import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
-import { useFlowStore } from '../store/flow-store';
 import { useShallow } from 'zustand/react/shallow';
+
 import { rerunPlan, rerunFailedTasks, stopPlan, handleSearch } from '@/app/actions/flow-actions';
-import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
+
+import { useFlowStore } from '../store/flow-store';
+import { PlanStateWithStatus } from '../types/type';
 
 export const CustomNode = ({ data, isConnectable }: NodeProps) => {
   // 获取 openTaskDetail 方法和 refreshData 方法

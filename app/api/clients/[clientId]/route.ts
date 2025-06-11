@@ -1,10 +1,13 @@
+import crypto from 'crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import * as bcrypt from 'bcrypt';
+import { z } from 'zod';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { z } from 'zod';
-import crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
+import { prisma } from '@/lib/prisma';
 import logger from '@/utils/logger';
 
 // Validation schema for client updates

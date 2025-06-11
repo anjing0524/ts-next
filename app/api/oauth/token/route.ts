@@ -1,15 +1,18 @@
 // app/api/oauth/token/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import * as crypto from 'crypto';
+
+import { NextRequest, NextResponse } from 'next/server';
+
 import { addHours, addDays, isPast } from 'date-fns';
+
+import { withOAuthTokenValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import { 
   JWTUtils, 
   AuthorizationUtils, 
   OAuth2ErrorTypes,
   ScopeUtils
 } from '@/lib/auth/oauth2';
-import { withOAuthTokenValidation, OAuthValidationResult } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
 
 // PKCE S256 Verification Helper
 function verifyPkceChallenge(verifier: string, challenge: string): boolean {

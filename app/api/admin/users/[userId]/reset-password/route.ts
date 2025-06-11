@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import * as bcrypt from 'bcrypt';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
-import * as bcrypt from 'bcrypt';
+import { prisma } from '@/lib/prisma';
+
 
 interface RouteParams {
   params: {

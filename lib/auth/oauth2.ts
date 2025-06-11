@@ -1,8 +1,12 @@
-import { NextRequest } from 'next/server';
-import * as jose from 'jose';
 import crypto from 'crypto';
-import { prisma } from '@/lib/prisma';
+
+import { NextRequest } from 'next/server';
+
 import { User, Client, Scope } from '@prisma/client';
+import * as jose from 'jose';
+
+import { prisma } from '@/lib/prisma';
+
 
 // OAuth 2.0 Error Types
 export interface OAuth2Error {

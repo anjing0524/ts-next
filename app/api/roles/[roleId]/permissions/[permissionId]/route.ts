@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 
 // Interface for route parameters passed by Next.js dynamic routing
 interface DynamicRouteParamsDelete {

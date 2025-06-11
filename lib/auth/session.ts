@@ -1,7 +1,10 @@
-import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { User, UserSession } from '@prisma/client';
 import crypto from 'crypto';
+
+import { NextRequest } from 'next/server';
+
+import { User, UserSession } from '@prisma/client';
+
+import { prisma } from '@/lib/prisma';
 
 // Define session inactivity duration: e.g., 30 minutes
 export const SESSION_INACTIVITY_DURATION_MS = 30 * 60 * 1000;

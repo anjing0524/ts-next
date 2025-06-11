@@ -1,7 +1,10 @@
 // app/api/oauth/authorize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { addMinutes } from 'date-fns';
+import { any, unknown } from 'zod';
+
+import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import { 
   PKCEUtils, 
   ScopeUtils, 
@@ -9,8 +12,7 @@ import {
   OAuth2ErrorTypes, 
   RateLimitUtils 
 } from '@/lib/auth/oauth2';
-import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
-import { any, unknown } from 'zod';
+import { prisma } from '@/lib/prisma';
 
 async function handleAuthorizeRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
   const { client, ipAddress, userAgent, params } = context!;

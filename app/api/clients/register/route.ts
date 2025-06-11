@@ -1,11 +1,14 @@
+import crypto from 'crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import * as bcrypt from 'bcrypt';
+import { z } from 'zod';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { z } from 'zod';
-import crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
 import { SALT_ROUNDS } from '@/lib/auth/passwordUtils';
+import { prisma } from '@/lib/prisma';
 import logger from '@/utils/logger';
 
 // Enhanced validation schema for OAuth 2.0 client registration
@@ -68,7 +71,7 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
 
     // Generate OAuth 2.0 compliant client credentials
     const clientId = `oauth2_${crypto.randomBytes(16).toString('hex')}`;
-    let clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('base64url');
+    const clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('base64url');
     let plainTextSecret: string | null = null;
     let hashedSecret: string | null = null;
 

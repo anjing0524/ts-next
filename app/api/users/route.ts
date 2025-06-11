@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import * as bcrypt from 'bcrypt';
+import { z } from 'zod';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { z } from 'zod';
-import * as bcrypt from 'bcrypt';
+
 // Remove direct crypto import for password generation, use new util
 // import crypto from 'crypto';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
+import { prisma } from '@/lib/prisma';
 
 // Validation schemas
 const CreateUserSchema = z.object({

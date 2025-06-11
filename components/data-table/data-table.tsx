@@ -1,6 +1,7 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import * as React from 'react';
+
 import {
   DndContext,
   DragEndEvent,
@@ -25,7 +26,11 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { GripVertical } from 'lucide-react';
-import * as React from 'react';
+
+import { cn } from '@/lib/utils';
+
+import { DataTablePagination } from './table-pagination';
+import { DataTableBodyProps, DataTableProps, PaginationState, TableHeaderCellProps } from './types';
 import {
   TableBody,
   TableCell,
@@ -34,8 +39,6 @@ import {
   TableRow,
   Table as UITable,
 } from '../ui/table';
-import { DataTablePagination } from './table-pagination';
-import { DataTableBodyProps, DataTableProps, PaginationState, TableHeaderCellProps } from './types';
 
 // 修改 TableHeaderCell 组件，参考 AG Grid 的表头样式
 function TableHeaderCell<TData>({ header, enableDragging }: TableHeaderCellProps<TData>) {

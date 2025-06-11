@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { withCORS } from '@/lib/auth/middleware';
-import { validateSession, destroySession } from '@/lib/auth/session'; // Keep if session logic is still used alongside token
 import { Buffer } from 'buffer'; // Required for base64 encoding
+
+import { NextRequest, NextResponse } from 'next/server';
+
+import { withCORS } from '@/lib/auth/middleware';
+import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { validateSession, destroySession } from '@/lib/auth/session'; // Keep if session logic is still used alongside token
+import { prisma } from '@/lib/prisma';
 
 // Helper function to revoke tokens
 const revokeToken = async (
@@ -66,7 +68,7 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
 
   try {
     // 1. Retrieve Tokens for Revocation
-    let accessTokenFromCookie = request.cookies.get('auth_token')?.value;
+    const accessTokenFromCookie = request.cookies.get('auth_token')?.value;
     let accessTokenFromBody: string | undefined;
     let refreshTokenFromBody: string | undefined;
 

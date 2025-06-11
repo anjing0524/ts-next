@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 // Assuming a Redis client setup, e.g., import { redis } from '@/lib/redis';
 // For now, we'll simulate cache logic and focus on permission calculation.
 

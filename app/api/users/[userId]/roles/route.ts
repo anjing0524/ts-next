@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import { z } from 'zod';
+
 import { withAuth, AuthContext, PermissionUtils, validateSession } from '@/lib/auth/middleware'; // Added validateSession for manual DELETE handling
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+
 
 // Zod Schema for setting user roles (替换用户所有角色的校验 Schema)
 // 接收一个角色 ID 数组

@@ -1,5 +1,5 @@
-import TimeWheel from '@/utils/time-wheel';
 import logger from '@/utils/logger';
+import TimeWheel from '@/utils/time-wheel';
 
 // 定义单例时间轮实例
 let singletonTimeWheel: TimeWheel | null = null;

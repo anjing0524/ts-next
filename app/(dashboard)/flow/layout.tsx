@@ -1,5 +1,5 @@
-import React from 'react';
 import { Metadata } from 'next';
+import React from 'react';
 
 export const metadata: Metadata = {
   title: '数据建模系统 | 调度系统',

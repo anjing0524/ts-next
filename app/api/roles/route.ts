@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming this middleware handles auth and permissions
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 
 // Schema for creating a new role (角色创建的校验 Schema)
 const CreateRoleSchema = z.object({

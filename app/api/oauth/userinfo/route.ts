@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
 
 async function handleUserInfo(request: NextRequest, context: AuthContext): Promise<NextResponse> {
   // UserInfo endpoint requires user context

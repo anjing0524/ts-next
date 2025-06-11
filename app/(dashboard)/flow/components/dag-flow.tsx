@@ -1,12 +1,17 @@
 'use client';
 
 import { ReactFlow, Background, Controls, MiniMap, Node, MarkerType, Edge } from '@xyflow/react';
+
 import '@xyflow/react/dist/style.css';
 import { useCallback, useMemo } from 'react';
-import { nodeTypes } from './customer-node';
+
+import { useShallow } from 'zustand/react/shallow';
+
 import { useFlowStore, FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useShallow } from 'zustand/react/shallow';
+
+import { nodeTypes } from './customer-node';
+
 
 /**
  * 计算节点的垂直布局

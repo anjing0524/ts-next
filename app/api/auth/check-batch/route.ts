@@ -3,10 +3,12 @@
 // /app/api/auth/check-batch/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // Prisma客户端实例 (Prisma client instance)
-import { withAuth, AuthContext } from '@/lib/auth/middleware'; // 假设的认证中间件 (Assumed authentication middleware)
-import { z } from 'zod'; // 用于数据校验的Zod库 (Zod library for data validation)
+
 import { Permission } from '@prisma/client'; // 导入Permission类型 (Import Permission type)
+import { z } from 'zod'; // 用于数据校验的Zod库 (Zod library for data validation)
+
+import { withAuth, AuthContext } from '@/lib/auth/middleware'; // 假设的认证中间件 (Assumed authentication middleware)
+import { prisma } from '@/lib/prisma'; // Prisma客户端实例 (Prisma client instance)
 
 // 单个权限检查请求的 Zod Schema (Zod Schema for a single permission check request)
 const IndividualCheckRequestSchema = z.object({

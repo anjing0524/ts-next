@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 
 // Schema for updating a role (角色更新的校验 Schema)
 const UpdateRoleSchema = z.object({

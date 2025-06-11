@@ -1,9 +1,12 @@
 'use client';
 
 import * as React from 'react';
+
 import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { useFlowStore, FlowStats } from '@/app/(dashboard)/flow/store/flow-store';
 import { useShallow } from 'zustand/react/shallow'; // 添加 shallow 导入
+
+import { useFlowStore, FlowStats } from '@/app/(dashboard)/flow/store/flow-store';
+import { Badge } from '@/components/ui/badge';
 import {
   Table as UITable,
   TableHead,
@@ -12,7 +15,6 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 
 export function StatsTable() {
   // 使用 shallow 比较优化状态选择，同时获取 currentStage 和 setCurrentStage

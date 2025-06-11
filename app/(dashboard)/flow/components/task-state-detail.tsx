@@ -1,5 +1,11 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+
+import { Loader2 } from 'lucide-react';
+
+import { getTaskInfo } from '@/app/actions/flow-actions';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -7,13 +13,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { getTaskInfo } from '@/app/actions/flow-actions';
-import { TaskStateDetailType } from '../types/type';
-import { Loader2 } from 'lucide-react';
+
 import { TASK_STATE_MAP } from '../cons';
+import { TaskStateDetailType } from '../types/type';
+
 
 interface TaskDetailProps {
   isOpen: boolean;

@@ -1,14 +1,6 @@
 'use client';
-import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
-import { TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
-import { getTaskDetails } from '@/app/actions/flow-actions';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import {
   ColumnDef,
   flexRender,
@@ -20,10 +12,18 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import { format } from 'date-fns';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { TASK_STATE_MAP } from '../cons';
-import { TaskStateDetail } from './task-state-detail';
+
+import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
+import { TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
+import { getTaskDetails } from '@/app/actions/flow-actions';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -31,7 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import React from 'react';
+
+import { TASK_STATE_MAP } from '../cons';
+import { TaskStateDetail } from './task-state-detail';
 
 type StateInfo = { label: string; variant: string; color?: string };
 

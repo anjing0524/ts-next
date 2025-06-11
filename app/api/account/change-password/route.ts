@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import * as bcrypt from 'bcrypt';
+import { z } from 'zod';
+
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For logging
-import { z } from 'zod';
-import * as bcrypt from 'bcrypt';
 import {
   PasswordComplexitySchema,
   checkPasswordHistory,
   SALT_ROUNDS
 } from '@/lib/auth/passwordUtils';
+import { prisma } from '@/lib/prisma';
 
 const ChangePasswordSchema = z.object({
   currentPassword: z.string(),

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming AuthContext is exported or merged by withAuth
+
 import { z } from 'zod';
+
+import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming AuthContext is exported or merged by withAuth
+import { prisma } from '@/lib/prisma';
 
 // 定义更新用户个人资料的 Zod Schema
 const UpdateUserProfileSchema = z.object({
