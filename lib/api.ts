@@ -159,18 +159,122 @@ export const adminApi = {
     return apiRequest(`/api/users?limit=${limit}`);
   },
 
-  getClients: async (limit = 10) => {
+  getClients: async (limit = 10) => { // Ensure this returns comprehensive details
     return apiRequest(`/api/clients?limit=${limit}`);
   },
 
-  registerClient: async (clientData: {
-    name: string;
-    redirectUris: string;
-    jwksUri?: string;
-  }) => {
-    return apiRequest('/api/clients/register', {
+  // registerClient: async (clientData: ...) => { ... } // This seems to be replaced by createClient for admin panel
+
+  // --- User Management ---
+  createUser: async (userData: object): Promise<any> => {
+    return apiRequest('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+  updateUser: async (userId: string, userData: object): Promise<any> => {
+    return apiRequest(`/api/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  },
+  deleteUser: async (userId: string): Promise<void> => {
+    // Assuming apiRequest handles 204 No Content or backend returns JSON for DELETE
+    return apiRequest(`/api/users/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- Role Management ---
+  getRoles: async (limit = 10): Promise<any> => {
+    return apiRequest(`/api/roles?limit=${limit}`);
+  },
+  createRole: async (roleData: object): Promise<any> => {
+    return apiRequest('/api/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData),
+    });
+  },
+  updateRole: async (roleId: string, roleData: object): Promise<any> => {
+    return apiRequest(`/api/roles/${roleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(roleData),
+    });
+  },
+  deleteRole: async (roleId: string): Promise<void> => {
+    return apiRequest(`/api/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- Permission Management (RBAC) ---
+  getPermissions: async (limit = 10): Promise<any> => {
+    return apiRequest(`/api/permissions?limit=${limit}`);
+  },
+  createPermission: async (permissionData: object): Promise<any> => {
+    return apiRequest('/api/permissions', {
+      method: 'POST',
+      body: JSON.stringify(permissionData),
+    });
+  },
+  updatePermission: async (permissionId: string, permissionData: object): Promise<any> => {
+    return apiRequest(`/api/permissions/${permissionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(permissionData),
+    });
+  },
+  deletePermission: async (permissionId: string): Promise<void> => {
+    return apiRequest(`/api/permissions/${permissionId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // --- OAuth Client Management ---
+  // Note: getClients is above, ensure it's comprehensive.
+  // The existing registerClient is likely for the public client registration page.
+  // This createClient is for the admin panel.
+  createClient: async (clientData: object): Promise<any> => {
+    return apiRequest('/api/clients', {
       method: 'POST',
       body: JSON.stringify(clientData),
+    });
+  },
+  updateClient: async (clientId: string, clientUpdateData: object): Promise<any> => {
+    return apiRequest(`/api/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientUpdateData),
+    });
+  },
+  deleteClient: async (clientId: string): Promise<void> => {
+    return apiRequest(`/api/clients/${clientId}`, {
+      method: 'DELETE',
+    });
+  },
+  regenerateClientSecret: async (clientId: string): Promise<any> => {
+    return apiRequest(`/api/clients/${clientId}/regenerate-secret`, {
+      method: 'POST', // Or PUT, depending on API design
+    });
+  },
+
+  // --- OAuth Scope Management ---
+  getOAuthScopes: async (limit = 10): Promise<any> => {
+    return apiRequest(`/api/scopes?limit=${limit}`);
+  },
+  createOAuthScope: async (scopeData: object): Promise<any> => {
+    return apiRequest('/api/scopes', {
+      method: 'POST',
+      body: JSON.stringify(scopeData),
+    });
+  },
+  updateOAuthScope: async (scopeId: string, scopeData: object): Promise<any> => {
+    return apiRequest(`/api/scopes/${scopeId}`, {
+      method: 'PUT',
+      body: JSON.stringify(scopeData),
+    });
+  },
+  deleteOAuthScope: async (scopeId: string): Promise<void> => {
+    return apiRequest(`/api/scopes/${scopeId}`, {
+      method: 'DELETE',
     });
   },
 };
