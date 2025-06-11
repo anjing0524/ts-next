@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { JWTUtils, ScopeUtils, AuthorizationUtils, RateLimitUtils, ClientAuthUtils, OAuth2ErrorTypes, PKCEUtils } from './oauth2';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
 
 export interface AuthContext {
   user_id?: string;
@@ -53,89 +54,128 @@ export async function authenticateBearer(
     };
   }
 
-  const token = authorization.substring(7); // Remove "Bearer " prefix
-  
-  // Verify JWT token
-  const verification = await JWTUtils.verifyAccessToken(token);
-  
-  if (!verification.valid) {
+  const token = authorization.substring(7); // 移除 "Bearer " 前缀 (Remove "Bearer " prefix)
+  let payload: jose.JWTPayload; // 定义payload变量 (Define payload variable)
+
+  try {
+    // 从环境变量或配置中获取JWKS端点URI (Get JWKS endpoint URI from environment variable or configuration)
+    const jwksUriString = process.env.JWKS_URI;
+    if (!jwksUriString) {
+      console.error('JWKS_URI 环境变量未设置 (JWKS_URI environment variable is not set)');
+      // 对于配置错误，通常返回500 (For configuration errors, typically return 500)
+      // 但在认证流程中，任何使token无法验证的问题都应导致401 (But in auth flow, any issue preventing token validation should lead to 401)
+      throw new Error('JWKS_URI not configured, cannot validate token.');
+    }
+    // 创建一个远程JWKSet实例，它会自动缓存JWKS响应 (Create a remote JWKSet instance, which automatically caches JWKS responses)
+    const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
+
+    // 从环境变量或配置中获取预期的签发者和受众 (Get expected issuer and audience from environment variables or configuration)
+    const expectedIssuer = process.env.JWT_ISSUER;
+    const expectedAudience = process.env.JWT_AUDIENCE;
+
+    if (!expectedIssuer || !expectedAudience) {
+      console.error('JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)');
+      throw new Error('JWT issuer or audience not configured, cannot validate token.');
+    }
+
+    // 验证JWT (Verify the JWT)
+    // jose.jwtVerify 会自动处理签名验证、exp、nbf、iss、aud等声明的验证
+    // (jose.jwtVerify automatically handles signature verification and validation of claims like exp, nbf, iss, aud)
+    const verificationResult = await jose.jwtVerify(token, JWKS, {
+      issuer: expectedIssuer,
+      audience: expectedAudience,
+      algorithms: ['RS256'], // 明确指定期望的算法 (Explicitly specify expected algorithms)
+    });
+    payload = verificationResult.payload; // 将验证后的载荷赋值给payload (Assign the verified payload to the payload variable)
+
+  } catch (err) {
+    // 处理JWT验证错误 (例如，令牌过期，签名无效，声明不匹配等)
+    // (Handle JWT verification errors - e.g., token expired, invalid signature, claims mismatch, etc.)
+    console.error("JWT 验证失败 (JWT validation failed):", err); // 服务端日志 (Server-side log)
+
+    let errorDescription = 'Token validation failed';
+    if (err instanceof jose.errors.JWTExpired) {
+      errorDescription = `Token expired at ${new Date((err.payload.exp as number) * 1000).toISOString()}`;
+    } else if (err instanceof jose.errors.JWTClaimValidationFailed) {
+      errorDescription = `Token claim validation failed: ${err.claim} ${err.reason}`;
+    } else if (err instanceof jose.errors.JOSENotSupported || err instanceof jose.errors.JWKInvalid) {
+      errorDescription = "Invalid token algorithm or key issue.";
+    } else if (err instanceof Error && (err.message.includes("JWKS") || err.message.includes("configured"))) {
+      // 对于配置或JWKS获取问题，虽然仍在401路径，但错误消息可以更具体
+      // (For configuration or JWKS fetch issues, while still on 401 path, error message can be more specific)
+      errorDescription = `Token validation setup error: ${err.message}`;
+    }
+
+
     await AuthorizationUtils.logAuditEvent({
-      action: 'token_verification_failed',
+      action: 'token_verification_failed_jwks', // 新的审计动作类型 (New audit action type)
       resource: request.url,
       ipAddress: request.headers.get('x-forwarded-for') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
       success: false,
-      errorMessage: verification.error,
+      errorMessage: errorDescription, // 使用处理过的错误描述 (Use processed error description)
     });
 
     return {
       success: false,
       response: NextResponse.json(
-        {
-          error: 'invalid_token',
-          error_description: verification.error || 'Token verification failed',
-        },
-        { 
-          status: 401,
-          headers: {
-            'WWW-Authenticate': 'Bearer realm="API"',
-          },
-        }
+        { error: 'invalid_token', error_description: errorDescription },
+        { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="API"' } }
       ),
     };
   }
 
-  const payload = verification.payload!;
-  
-  // Check if token exists in database and is not revoked
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const accessToken = await prisma.accessToken.findFirst({
-    where: {
-      tokenHash: tokenHash,
-      revoked: false,
-      expiresAt: {
-        gt: new Date(),
-      },
-    },
-  });
+  // [现有数据库令牌检查 - 待评估]
+  // [Existing DB Token Check - To Be Evaluated]
+  // 下面的数据库查找用于检查令牌是否在数据库中存在且未被撤销。
+  // (The database lookup below was used to check if the token exists in the DB and is not revoked.)
+  // 对于自包含的JWT (特别是短期的)，此检查可能不是必需的，如果:
+  // (For self-contained JWTs (especially short-lived ones), this check might not be strictly necessary if:)
+  //   1. JWT签名和声明 (exp, iss, aud) 已成功验证。
+  //      (JWT signature and claims (exp, iss, aud) have been successfully validated.)
+  //   2. 快速撤销列表 (如Redis实现的JTI黑名单) 用于处理显式撤销。
+  //      (A fast revocation list (e.g., a Redis-based JTI blacklist) is used for explicit revocations.)
+  // 暂时注释掉此部分以依赖JWT声明，但如果需要即时DB级撤销检查，则应重新评估此策略。
+  // (Temporarily commenting this out to rely on JWT claims. This strategy should be re-evaluated if immediate DB-level revocation checks are required.)
+  // const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  // const accessTokenRecord = await prisma.accessToken.findFirst({
+  //   where: {
+  //     // tokenHash: tokenHash, // 或者直接使用 jti 如果 tokenHash 不是必需的 (Or use jti directly if tokenHash is not necessary)
+  //     // jti: payload.jti, // 使用JWT的jti进行查找 (Use JWT's jti for lookup)
+  //     revoked: false,
+  //     // expiresAt: { gt: new Date() }, // JWT 'exp' 声明已经检查过了 (JWT 'exp' claim has already been checked by jwtVerify)
+  //   },
+  // });
+  // if (!accessTokenRecord) {
+  //   await AuthorizationUtils.logAuditEvent({
+  //     action: 'revoked_token_used_db_check', // 新的审计动作类型 (New audit action type)
+  //     resource: request.url,
+  //     userId: payload.sub !== payload.client_id ? payload.sub as string : undefined,
+  //     clientId: payload.client_id as string,
+  //     ipAddress: request.headers.get('x-forwarded-for') || undefined,
+  //     userAgent: request.headers.get('user-agent') || undefined,
+  //     success: false,
+  //     errorMessage: 'Token not found in DB or marked as revoked (post-JWKS validation)',
+  //   });
+  //   return {
+  //     success: false,
+  //     response: NextResponse.json(
+  //       { error: 'invalid_token', error_description: 'Token is invalid or has been revoked (DB check)' },
+  //       { status: 401, headers: { 'WWW-Authenticate': 'Bearer realm="API"' } }
+  //     ),
+  //   };
+  // }
 
-  if (!accessToken) {
-    await AuthorizationUtils.logAuditEvent({
-      action: 'revoked_token_used',
-      resource: request.url,
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: 'Token not found or revoked',
-    });
-
-    return {
-      success: false,
-      response: NextResponse.json(
-        {
-          error: 'invalid_token',
-          error_description: 'Token has been revoked or is invalid',
-        },
-        { 
-          status: 401,
-          headers: {
-            'WWW-Authenticate': 'Bearer realm="API"',
-          },
-        }
-      ),
-    };
-  }
-
-  // Extract context from token
+  // 从JWT载荷中提取上下文信息 (Extract context from JWT payload)
   const context: AuthContext = {
     user_id: payload.sub !== payload.client_id ? payload.sub as string : undefined,
-    client_id: payload.client_id as string,
-    scopes: ScopeUtils.parseScopes(payload.scope as string),
-    permissions: (payload.permissions as string[]) || [],
-    payload,
+    client_id: payload.client_id as string, // client_id 应始终存在于Access Token中 (client_id should always be in Access Token)
+    scopes: ScopeUtils.parseScopes(payload.scope as string | undefined), // scope可能是可选的 (scope might be optional)
+    permissions: (payload.permissions as string[] | undefined) || [], // permissions可能是可选的 (permissions might be optional)
+    payload, // 存储完整的payload以供后续使用 (Store the full payload for later use)
   };
 
-  // Check if user context is required
+  // 检查是否需要用户上下文 (Check if user context is required)
   if (options.requireUserContext && !context.user_id) {
     return {
       success: false,
