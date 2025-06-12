@@ -126,7 +126,7 @@ async function discoveryHandler(request: NextRequest) {
     introspection_endpoint: `${baseUrl}/api/v2/oauth/introspect`,
     revocation_endpoint: `${baseUrl}/api/v2/oauth/revoke`,
     userinfo_endpoint: `${baseUrl}/api/v2/oauth/userinfo`, // OIDC
-    jwks_uri: `${baseUrl}/api/.well-known/jwks.json`, // OIDC - 确保此端点存在
+    jwks_uri: `${baseUrl}/api/v2/.well-known/jwks.json`, // OIDC - 确保此端点存在
 
     // 示例值 - 应从实际配置中获取
     scopes_supported: [
