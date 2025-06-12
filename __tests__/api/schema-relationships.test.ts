@@ -171,14 +171,15 @@ describe('Database Schema Relationships Integrity Tests', () => {
       await prisma.accessToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
       await prisma.refreshToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
       await prisma.authorizationCode.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {})
-      await prisma.userSession.deleteMany({
-        where: {
-          OR: [
-            { userId: testUser?.id },
-            { userId: testUser2?.id }
-          ]
-        }
-      }).catch(() => {})
+      // UserSession model is deprecated/removed in favor of JWTs.
+      // await prisma.userSession.deleteMany({
+      //   where: {
+      //     OR: [
+      //       { userId: testUser?.id },
+      //       { userId: testUser2?.id }
+      //     ]
+      //   }
+      // }).catch(() => {})
       await prisma.auditLog.deleteMany({
         where: {
           OR: [
@@ -288,6 +289,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
       console.log('✅ User → AuthorizationCode relationship validated')
     })
 
+    // UserSession model is deprecated/removed in favor of JWTs. This test is no longer valid.
+    /*
     it('should create and validate User → UserSession relationship', async () => {
       const session = await prisma.userSession.create({
         data: {
@@ -314,6 +317,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
       await prisma.userSession.delete({ where: { id: session.id } })
       console.log('✅ User → UserSession relationship validated')
     })
+    */
   })
 
   describe('2. Client Entity Relationships', () => {
@@ -591,6 +595,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
         }
       })
 
+      // UserSession model is deprecated/removed in favor of JWTs.
+      /*
       const tempSession = await prisma.userSession.create({
         data: {
           userId: tempUser.id,
@@ -601,6 +607,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
           isActive: true,
         }
       })
+      */
 
       // Delete user - should cascade
       await prisma.user.delete({ where: { id: tempUser.id } })
@@ -609,14 +616,15 @@ describe('Database Schema Relationships Integrity Tests', () => {
       const remainingToken = await prisma.accessToken.findUnique({
         where: { id: tempAccessToken.id }
       })
-      const remainingSession = await prisma.userSession.findUnique({
-        where: { id: tempSession.id }
-      })
+      // UserSession model is deprecated/removed in favor of JWTs.
+      // const remainingSession = await prisma.userSession.findUnique({
+      //   where: { id: tempSession.id } // tempSession would be undefined here
+      // })
 
       expect(remainingToken).toBeNull()
-      expect(remainingSession).toBeNull()
+      // expect(remainingSession).toBeNull() // This check is no longer valid
 
-      console.log('✅ User deletion cascade behavior validated')
+      console.log('✅ User deletion cascade behavior validated (session part removed)')
     })
 
     it('should handle Client deletion cascade', async () => {

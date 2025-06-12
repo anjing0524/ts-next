@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify, JWTPayload } from 'jose'; // 引入JWT验证相关的模块
 
 import { AuthorizationUtils, OAuth2ErrorTypes, ScopeUtils } from '@/lib/auth/oauth2';
-import { validateSession } from '@/lib/auth/session'; // To validate user's current session
+// import { validateSession } from '@/lib/auth/session'; // To validate user's current session // 移除 session 验证
 import { prisma } from '@/lib/prisma';
+
+// 定义JWT相关的常量，与 authorize/route.ts 中保持一致
+// Define JWT related constants, consistent with authorize/route.ts
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-fallback-secret-key');
+const JWT_ISSUER = process.env.JWT_ISSUER || 'urn:example:issuer';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'urn:example:audience';
 
 interface ConsentFormData {
   decision?: 'approve' | 'deny';
@@ -20,15 +27,51 @@ export async function POST(request: NextRequest) {
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
   const userAgent = request.headers.get('user-agent') || undefined;
 
-  // 1. Validate user session
-  const sessionContext = await validateSession(request);
-  if (!sessionContext) {
-    // This should ideally not happen if the consent page requires login.
-    // Redirect to login or show an error.
-    // For simplicity, returning an error. A redirect to login with return URL might be better.
-    return NextResponse.json({ error: 'User session invalid or expired. Please login again.' }, { status: 401 });
+  // 1. 验证用户JWT // 1. Validate user JWT
+  // const sessionContext = await validateSession(request); // 旧的 session 验证方式 // Old session validation method
+  let userId: string;
+  const token = request.cookies.get('auth_token')?.value;
+
+  if (!token) {
+    // 如果没有 token，返回401错误
+    // If no token, return 401 error
+    await AuthorizationUtils.logAuditEvent({ // 记录审计事件时userId未知
+        action: 'consent_page_access_denied_no_token',
+        ipAddress, userAgent, success: false,
+        errorMessage: 'Access to consent page denied: no auth_token cookie.',
+    });
+    return NextResponse.json({ error: 'User authentication required. No token found.' }, { status: 401 });
   }
-  const { user } = sessionContext;
+
+  try {
+    const { payload }: { payload: JWTPayload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+    if (!payload.sub) {
+      // JWT中没有用户ID
+      // No user ID in JWT
+      await AuthorizationUtils.logAuditEvent({ // userId未知
+        action: 'consent_page_jwt_invalid_sub',
+        ipAddress, userAgent, success: false,
+        errorMessage: 'Access to consent page denied: JWT sub claim missing.',
+      });
+      return NextResponse.json({ error: 'Invalid token: User identifier missing.' }, { status: 401 });
+    }
+    userId = payload.sub; // 从JWT中获取用户ID // Get user ID from JWT
+  } catch (error) {
+    // JWT验证失败
+    // JWT verification failed
+    console.error('Consent page JWT verification failed:', error);
+    await AuthorizationUtils.logAuditEvent({ // userId未知或无效
+        action: 'consent_page_jwt_verification_failed',
+        ipAddress, userAgent, success: false,
+        errorMessage: `JWT verification failed on consent page: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    });
+    return NextResponse.json({ error: 'User authentication failed. Invalid token.' }, { status: 401 });
+  }
+
+  // const { user } = sessionContext; // 旧代码，user对象现在从JWT中提取ID得到 // Old code, user object's ID is now extracted from JWT
 
   // 2. Parse form data
   let formData: ConsentFormData;
@@ -60,7 +103,7 @@ export async function POST(request: NextRequest) {
   if (!oauthClient) {
     // Log this attempt, client_id might be tampered with
     await AuthorizationUtils.logAuditEvent({
-        userId: user.id,
+        userId: userId, // 使用从JWT获取的userId // Use userId obtained from JWT
         action: 'consent_decision_invalid_client',
         ipAddress, userAgent, success: false,
         errorMessage: `Consent decision for unknown client_id: ${client_id}`,
@@ -72,7 +115,7 @@ export async function POST(request: NextRequest) {
   const registeredUris = JSON.parse(oauthClient.redirectUris || '[]');
   if (!registeredUris.includes(redirect_uri)) {
      await AuthorizationUtils.logAuditEvent({
-        userId: user.id, clientId: oauthClient.id,
+        userId: userId, clientId: oauthClient.id, // 使用从JWT获取的userId // Use userId obtained from JWT
         action: 'consent_decision_invalid_redirect_uri',
         ipAddress, userAgent, success: false,
         errorMessage: `Consent decision with invalid redirect_uri: ${redirect_uri}`,
@@ -85,9 +128,11 @@ export async function POST(request: NextRequest) {
     const approvedScopes = ScopeUtils.parseScopes(requestedScopeString); // Use the originally requested scopes
 
     // Store/update consent grant
+    // 更新同意授权记录，使用从JWT获取的userId
+    // Update consent grant record, using userId obtained from JWT
     await prisma.consentGrant.upsert({
       where: {
-        userId_clientId: { userId: user.id, clientId: oauthClient.id }
+        userId_clientId: { userId: userId, clientId: oauthClient.id }
       },
       update: {
         scopes: JSON.stringify(approvedScopes),
@@ -96,7 +141,7 @@ export async function POST(request: NextRequest) {
         revokedAt: null,
       },
       create: {
-        userId: user.id,
+        userId: userId, // 使用从JWT获取的userId // Use userId obtained from JWT
         clientId: oauthClient.id,
         scopes: JSON.stringify(approvedScopes),
         issuedAt: new Date(),
@@ -105,7 +150,7 @@ export async function POST(request: NextRequest) {
     });
 
     await AuthorizationUtils.logAuditEvent({
-      userId: user.id,
+      userId: userId, // 使用从JWT获取的userId // Use userId obtained from JWT
       clientId: oauthClient.id,
       action: 'consent_approved',
       ipAddress, userAgent, success: true,
@@ -130,7 +175,7 @@ export async function POST(request: NextRequest) {
 
   } else { // Decision is 'deny' or anything else
     await AuthorizationUtils.logAuditEvent({
-      userId: user.id,
+      userId: userId, // 使用从JWT获取的userId // Use userId obtained from JWT
       clientId: oauthClient.id,
       action: 'consent_denied',
       ipAddress, userAgent, success: true, // Action was successful (denial was processed)

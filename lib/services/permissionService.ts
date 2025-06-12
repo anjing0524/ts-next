@@ -74,6 +74,11 @@ export class PermissionService {
         userRoles: {
           where: {
             role: { isActive: true }, // Ensure role is active
+            // 确保用户角色关联未过期 (Ensure user-role assignment is not expired)
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } }
+            ]
           },
           include: {
             role: {

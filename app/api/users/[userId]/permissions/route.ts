@@ -48,7 +48,12 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
 
     const effectivePermissions = new Map<string, { identifier: string; name: string; description: string | null; source: string; sourceDetail: string }>();
 
-    // 1. Get directly assigned active permissions
+    // 1. 获取直接分配的权限 (已移除)
+    // 1. Get directly assigned active permissions (REMOVED)
+    // 下列代码已注释掉，因为 UserPermission 模型不再使用。权限现在应完全通过角色进行管理。
+    // The following code has been commented out because the UserPermission model is no longer in use.
+    // Permissions should now be managed entirely through roles.
+    /*
     const directUserPermissions = await prisma.userPermission.findMany({
       where: {
         userId: userId,
@@ -73,6 +78,7 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
         });
       }
     });
+    */
 
     // 2. Get permissions from active roles, considering hierarchy
     const userRoles = await prisma.userRole.findMany({

@@ -303,66 +303,10 @@ export function withAuth(
   };
 }
 
-/**
- * Check if user has specific resource permission
- */
-export async function hasResourcePermission(
-  userId: string,
-  resourceName: string,
-  permissionName: string
-): Promise<boolean> {
-  const permission = await prisma.userResourcePermission.findFirst({
-    where: {
-      userId,
-      isActive: true,
-      resource: {
-        name: resourceName,
-        isActive: true,
-      },
-      permission: {
-        name: permissionName,
-        isActive: true,
-      },
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } },
-      ],
-    },
-  });
-
-  return !!permission;
-}
-
-/**
- * Get user's permissions for a specific resource
- */
-export async function getUserResourcePermissions(
-  userId: string,
-  resourceName: string
-): Promise<string[]> {
-  const permissions = await prisma.userResourcePermission.findMany({
-    where: {
-      userId,
-      isActive: true,
-      resource: {
-        name: resourceName,
-        isActive: true,
-      },
-      permission: {
-        isActive: true,
-      },
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } },
-      ],
-    },
-    include: {
-      permission: true,
-    },
-  });
-
-  return permissions.map(p => p.permission.name);
-}
+// 移除了 hasResourcePermission 和 getUserResourcePermissions 函数，因为它们依赖了不存在的 UserResourcePermission 模型。
+// 当前的RBAC模型不支持用户直接关联到特定资源实例的权限，权限应通过角色赋予。
+// (Removed hasResourcePermission and getUserResourcePermissions functions as they depended on the non-existent UserResourcePermission model.
+// The current RBAC model does not support direct user association with permissions on specific resource instances; permissions should be granted via roles.)
 
 /**
  * CORS middleware for OAuth2 endpoints
