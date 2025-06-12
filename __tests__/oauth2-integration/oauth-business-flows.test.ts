@@ -11,7 +11,9 @@ import {
   TestUser,
   TestClient,
   OAuth2TestHelper,
+  ScopeUtils, // Added ScopeUtils import
 } from '../utils/test-helpers';
+import { decodeJwt } from 'jose'; // For decoding JWTs
 
 describe('OAuth 2.0 Business Flows Integration Tests', () => {
   const { dataManager, httpClient, setup, cleanup } = createOAuth2TestSetup('oauth_business_flows');
@@ -228,59 +230,67 @@ describe('OAuth 2.0 Business Flows Integration Tests', () => {
   });
 
   describe('AM - 授权模式 (Authorization Modes)', () => {
-    describe('AM-001: 授权码模式完整流程 (Authorization Code Flow)', () => {
-      it('should complete full authorization code flow', async () => {
-        const state = TestUtils.generateState();
+    // AM-001: 授权码模式完整流程 (Authorization Code Flow) - Refactored
+    describe('AM-001: 授权码模式 - 预授权用户代码交换 (Authorization Code Flow - Pre-authenticated)', () => {
+      it('should complete full authorization code flow for a pre-authenticated user', async () => {
+        const requestedScope = 'openid profile email api:read';
+        const redirectUri = confidentialClient.redirectUris[0];
 
-        // Step 1: Authorization request
-        const authResponse = await httpClient.authorize({
-          response_type: 'code',
+        // 步骤1: 服务端为预认证用户和客户端直接生成授权码
+        // Step 1: Server directly generates an authorization code for a pre-authenticated user and client
+        const authCode = await dataManager.createAuthorizationCode(
+          regularUser.id!,
+          confidentialClient.clientId,
+          redirectUri,
+          requestedScope
+        );
+        expect(authCode).toBeDefined();
+
+        // 步骤2: 使用授权码交换令牌
+        // Step 2: Exchange authorization code for tokens
+        const tokenResponse = await httpClient.requestToken({
+          grant_type: 'authorization_code',
+          code: authCode,
+          redirect_uri: redirectUri,
           client_id: confidentialClient.clientId,
-          redirect_uri: confidentialClient.redirectUris[0],
-          scope: 'openid profile email',
-          state: state,
+          client_secret: confidentialClient.plainSecret!,
         });
 
-        // 授权请求应该返回重定向或授权页面
-        expect([
-          TEST_CONFIG.HTTP_STATUS.FOUND,
-          TEST_CONFIG.HTTP_STATUS.OK,
-          TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED,
-          307, // Temporary Redirect
-        ]).toContain(authResponse.status);
+        // 验证令牌响应是否成功 (Verify token response is successful)
+        expect(tokenResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+        const tokens = await tokenResponse.json();
 
-        if (authResponse.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
-          const location = authResponse.headers.get('location');
-          expect(location).toBeDefined();
+        // 基本令牌断言 (Basic token assertions)
+        expect(tokens.access_token).toBeDefined();
+        expect(tokens.refresh_token).toBeDefined();
+        expect(tokens.token_type).toBe('Bearer');
+        expect(tokens.expires_in).toBeGreaterThan(0);
 
-          // Check if we got a code or need to login
-          if (location?.includes('code=')) {
-            const url = new URL(location);
-            const code = url.searchParams.get('code');
-            const returnedState = url.searchParams.get('state');
+        // 验证作用域 (Verify scope)
+        // Note: The OAuth2 spec says the returned scope *can* be different if narrowed by the server.
+        // For this test, we assume it returns the same scope or a subset that contains the requested ones.
+        const grantedScopes = ScopeUtils.parseScopes(tokens.scope);
+        requestedScope.split(' ').forEach(scope => {
+          expect(grantedScopes).toContain(scope);
+        });
 
-            expect(code).toBeDefined();
-            expect(returnedState).toBe(state);
-
-            // Step 2: Exchange code for tokens
-            const tokenResponse = await httpClient.requestToken({
-              grant_type: 'authorization_code',
-              code: code!,
-              redirect_uri: confidentialClient.redirectUris[0],
-              client_id: confidentialClient.clientId,
-              client_secret: confidentialClient.plainSecret!,
-            });
-
-            if (tokenResponse.status === 200) {
-              const tokens = await TestAssertions.expectTokenResponse(tokenResponse);
-              expect(tokens.access_token).toBeDefined();
-              expect(tokens.refresh_token).toBeDefined();
-              console.log('✅ AM-001: Authorization code flow completed successfully');
-            }
+        // JWT 声明断言 (JWT Claims Assertions)
+        try {
+          const decodedAccessToken = decodeJwt(tokens.access_token);
+          expect(decodedAccessToken.sub).toBe(regularUser.id); // Subject should be user ID
+          expect(decodedAccessToken.client_id ?? decodedAccessToken.azp).toBe(confidentialClient.clientId); // Client ID
+          expect(decodedAccessToken.iss).toBeDefined(); // Issuer
+          expect(decodedAccessToken.aud).toBeDefined(); // Audience
+          // Check if scope in JWT matches granted scopes (if present)
+          if (decodedAccessToken.scope) {
+             const jwtScopes = ScopeUtils.parseScopes(decodedAccessToken.scope as string);
+             grantedScopes.forEach(scope => expect(jwtScopes).toContain(scope));
           }
-        } else {
-          expect([200, 401, 404, 429, 307]).toContain(authResponse.status);
-          console.log('⚠️ AM-001: Authorization endpoint requires login or not implemented');
+          console.log('✅ AM-001: Authorization code flow with JWT claims verification completed successfully');
+        } catch (e) {
+          console.error("Failed to decode access token or assert claims:", e);
+          // Fail the test if decoding/claims check fails
+          expect.fail("Access token was not a valid JWT or claims were incorrect.");
         }
       });
     });

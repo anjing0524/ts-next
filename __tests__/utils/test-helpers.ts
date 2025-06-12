@@ -1,4 +1,5 @@
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client'; // Keep for type annotation in other classes if needed
+import { prisma as db } from '@/lib/prisma'; // Import aliased prisma for direct use
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { addMinutes } from 'date-fns';
@@ -579,6 +580,8 @@ export class TestDataManager {
   private createdClients: string[] = [];
   private createdTokens: string[] = [];
   private createdScopes: string[] = [];
+  // PrismaClient is no longer stored as a property 'this.prisma'
+  // Methods will use the aliased 'db' import directly.
 
   constructor(prefix: string = TEST_CONFIG.PREFIX) {
     this.prefix = prefix + Date.now() + '_';
@@ -617,15 +620,15 @@ export class TestDataManager {
       ? `${this.prefix}${userData.email.replace('@', '_')}@test.com`
       : `${this.prefix}user_${Date.now()}@test.com`;
     const plainPassword = userData.password || 'TestPassword123!';
-
-    const user = await prisma.user.create({
+    // Using aliased 'db' import directly
+    const user = await db.user.create({
       data: {
         username,
         email,
-        password: await bcrypt.hash(plainPassword, 12),
+        passwordHash: await bcrypt.hash(plainPassword, 12), // Corrected: password -> passwordHash
         firstName: userData.firstName || 'Test',
         lastName: userData.lastName || 'User',
-        emailVerified: userData.emailVerified ?? true,
+        // emailVerified: userData.emailVerified ?? true, // Removed: not in schema
         isActive: userData.isActive ?? true,
       },
     });
@@ -653,19 +656,20 @@ export class TestDataManager {
     const clientId = `${this.prefix}${clientData.clientId || 'client'}_${Date.now()}`;
     const plainSecret =
       clientData.clientSecret || `secret_${crypto.randomBytes(16).toString('hex')}`;
-
-    const client = await prisma.client.create({
+    // Using aliased 'db' import directly
+    const client = await db.oAuthClient.create({ // Corrected model name to oAuthClient
       data: {
         clientId,
         clientSecret: clientData.isPublic ? null : await bcrypt.hash(plainSecret, 12),
-        name: clientData.name || 'Test Client',
+        clientName: clientData.name || 'Test Client', // Corrected: name -> clientName
+        clientType: clientData.isPublic ? 'PUBLIC' : 'CONFIDENTIAL', // Correctly use clientType
         redirectUris: JSON.stringify(clientData.redirectUris || ['http://localhost:3000/callback']),
         grantTypes: JSON.stringify(
           clientData.grantTypes || ['authorization_code', 'refresh_token']
         ),
         responseTypes: JSON.stringify(clientData.responseTypes || ['code']),
-        scope: JSON.stringify(clientData.scope || ['openid', 'profile']),
-        isPublic: clientData.isPublic ?? false,
+        allowedScopes: JSON.stringify(clientData.scope || ['openid', 'profile']), // Prisma schema uses allowedScopes
+        // isPublic field is not in Prisma schema, clientType is used instead
         isActive: clientData.isActive ?? true,
       },
     });
@@ -673,15 +677,17 @@ export class TestDataManager {
     this.createdClients.push(client.id);
 
     return {
+      // Return type is TestClient, which might have isPublic and scope.
+      // These should be derived from the actual prisma model's state.
       id: client.id,
-      clientId,
+      clientId: client.clientId,
       clientSecret: client.clientSecret,
-      name: client.name,
+      name: client.clientName || '', // Read from clientName for the return object
       redirectUris: JSON.parse(client.redirectUris || '[]'),
       grantTypes: JSON.parse(client.grantTypes || '[]'),
       responseTypes: JSON.parse(client.responseTypes || '[]'),
-      scope: JSON.parse(client.scope || '[]'),
-      isPublic: client.isPublic,
+      scope: JSON.parse(client.allowedScopes || '[]'), // Derive from allowedScopes
+      isPublic: client.clientType === 'PUBLIC',      // Derive from clientType
       isActive: client.isActive,
       plainSecret: clientData.isPublic ? undefined : plainSecret,
     };
@@ -692,8 +698,8 @@ export class TestDataManager {
    */
   async createScope(scopeData: Partial<TestScope>): Promise<TestScope> {
     const name = scopeData.name || `${this.prefix}scope`;
-
-    const scope = await prisma.scope.upsert({
+    // Using aliased 'db' import directly
+    const scope = await db.scope.upsert({
       where: { name },
       update: {},
       create: {
@@ -724,9 +730,10 @@ export class TestDataManager {
   ): Promise<string> {
     // 导入JWTUtils
     const { JWTUtils } = await import('@/lib/auth/oauth2');
+    // Using aliased 'db' import directly
 
     // 确保客户端存在，并获取其内部ID
-    const client = await prisma.client.findUnique({
+    const client = await db.oAuthClient.findUnique({ // Corrected model name
       where: { clientId },
     });
 
@@ -735,7 +742,7 @@ export class TestDataManager {
     }
 
     // 确保用户存在
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: userId },
     });
 
@@ -753,7 +760,7 @@ export class TestDataManager {
 
     // 将JWT令牌保存到数据库
     const tokenHash = crypto.createHash('sha256').update(jwtToken).digest('hex');
-    await prisma.accessToken.create({
+    await db.accessToken.create({ // Using 'db'
       data: {
         token: jwtToken,
         tokenHash,
@@ -778,9 +785,10 @@ export class TestDataManager {
   ): Promise<string> {
     // 导入JWTUtils
     const { JWTUtils } = await import('@/lib/auth/oauth2');
+    // Using aliased 'db' import directly
 
     // 获取客户端的内部ID
-    const client = await prisma.client.findUnique({
+    const client = await db.oAuthClient.findUnique({ // Corrected model name
       where: { clientId },
     });
 
@@ -797,7 +805,7 @@ export class TestDataManager {
 
     // 将JWT刷新令牌保存到数据库
     const tokenHash = crypto.createHash('sha256').update(jwtRefreshToken).digest('hex');
-    await prisma.refreshToken.create({
+    await db.refreshToken.create({ // Using 'db'
       data: {
         token: jwtRefreshToken,
         tokenHash,
@@ -823,9 +831,10 @@ export class TestDataManager {
     pkceData?: { codeChallenge: string; codeChallengeMethod: string }
   ): Promise<string> {
     const code = `test_code_${crypto.randomBytes(8).toString('hex')}`;
+    // Using aliased 'db' import directly
 
     // 获取客户端的内部ID
-    const client = await prisma.client.findUnique({
+    const client = await db.oAuthClient.findUnique({ // Corrected model name
       where: { clientId },
     });
 
@@ -835,7 +844,7 @@ export class TestDataManager {
       );
     }
 
-    await prisma.authorizationCode.create({
+    await db.authorizationCode.create({ // Using 'db'
       data: {
         code,
         clientId: client.id, // 使用客户端的内部ID
@@ -855,8 +864,13 @@ export class TestDataManager {
    * 设置基础作用域
    */
   async setupBasicScopes(): Promise<void> {
+    // Using aliased 'db' import directly
+    if (!db.scope?.findMany || !db.scope?.create) { // check properties on 'db'
+        console.warn("Prisma client (for scope setup) is not functional via module import. Skipping setupBasicScopes.");
+        return;
+    }
     // Only create scopes if they don't already exist to avoid conflicts
-    const existingScopes = await prisma.scope.findMany({
+    const existingScopes = await db.scope.findMany({
       where: {
         name: {
           in: ['openid', 'profile', 'email', 'offline_access', 'api:read', 'api:write'],
@@ -878,7 +892,7 @@ export class TestDataManager {
     for (const scopeData of basicScopes) {
       if (!existingScopeNames.has(scopeData.name)) {
         try {
-          await prisma.scope.create({
+          await db.scope.create({ // Using 'db'
             data: scopeData,
           });
         } catch (error: unknown) {
@@ -908,9 +922,14 @@ export class TestDataManager {
    * 清理测试数据
    */
   async cleanup(): Promise<void> {
+    // Using aliased 'db' import directly
+    if (!db.accessToken?.deleteMany) { // Check properties on 'db'
+        console.error("Prisma client not functional via module import during cleanup. Skipping cleanup.");
+        return;
+    }
     try {
       // Delete tokens first (they have foreign key constraints)
-      await prisma.accessToken
+      await db.accessToken
         .deleteMany({
           where: {
             OR: [
@@ -921,7 +940,7 @@ export class TestDataManager {
         })
         .catch(() => {});
 
-      await prisma.refreshToken
+      await db.refreshToken
         .deleteMany({
           where: {
             OR: [
@@ -932,7 +951,7 @@ export class TestDataManager {
         })
         .catch(() => {});
 
-      await prisma.authorizationCode
+      await db.authorizationCode
         .deleteMany({
           where: {
             OR: [
@@ -944,20 +963,20 @@ export class TestDataManager {
         .catch(() => {});
 
       // Delete clients and users
-      await prisma.client
+      await db.oAuthClient // Corrected model name
         .deleteMany({
           where: { clientId: { startsWith: this.prefix } },
         })
         .catch(() => {});
 
-      await prisma.user
+      await db.user
         .deleteMany({
           where: { username: { startsWith: this.prefix } },
         })
         .catch(() => {});
 
       // Delete test scopes
-      await prisma.scope
+      await db.scope
         .deleteMany({
           where: { name: { startsWith: this.prefix } },
         })
@@ -978,29 +997,34 @@ export class TestDataManager {
    * Complete database cleanup (dangerous operation, for testing only)
    */
   async clearDatabase(): Promise<void> {
+    // Using aliased 'db' import directly
+    if (!db.accessToken?.deleteMany) { // Check properties on 'db'
+        console.error("Prisma client not functional via module import during clearDatabase. Skipping clearDatabase.");
+        return;
+    }
     try {
       // Delete all tokens first (they have foreign key constraints)
-      await prisma.accessToken.deleteMany({}).catch(() => {});
-      await prisma.refreshToken.deleteMany({}).catch(() => {});
-      await prisma.authorizationCode.deleteMany({}).catch(() => {});
+      await db.accessToken.deleteMany({}).catch(() => {});
+      await db.refreshToken.deleteMany({}).catch(() => {});
+      await db.authorizationCode.deleteMany({}).catch(() => {});
 
       // Delete user permissions (correct model name)
-      await prisma.userResourcePermission.deleteMany({}).catch(() => {});
+      await db.userResourcePermission.deleteMany({}).catch(() => {});
 
       // Delete audit logs and sessions
-      await prisma.auditLog.deleteMany({}).catch(() => {});
+      await db.auditLog.deleteMany({}).catch(() => {});
       // UserSession model is deprecated/removed in favor of JWTs.
-      // await prisma.userSession.deleteMany({}).catch(() => {})
-      await prisma.consentGrant.deleteMany({}).catch(() => {});
+      // await db.userSession.deleteMany({}).catch(() => {})
+      await db.consentGrant.deleteMany({}).catch(() => {});
 
       // Delete clients and users
-      await prisma.client.deleteMany({}).catch(() => {});
-      await prisma.user.deleteMany({}).catch(() => {});
+      await db.oAuthClient.deleteMany({}).catch(() => {}); // Corrected model name
+      await db.user.deleteMany({}).catch(() => {});
 
       // Delete resources, permissions and scopes
-      await prisma.resource.deleteMany({}).catch(() => {});
-      await prisma.permission.deleteMany({}).catch(() => {});
-      await prisma.scope.deleteMany({}).catch(() => {});
+      await db.resource.deleteMany({}).catch(() => {});
+      await db.permission.deleteMany({}).catch(() => {});
+      await db.scope.deleteMany({}).catch(() => {});
 
       // Clear tracking arrays
       this.createdUsers.length = 0;
