@@ -1,34 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { PermissionType, HttpMethod } from '@prisma/client'; // 引入 Prisma 生成的枚举类型
 import { z } from 'zod';
 
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
-
-// 定义权限类型枚举 (和 Prisma schema 中的 PermissionType 保持一致)
-const PermissionTypeEnum = z.nativeEnum(PermissionType);
-const HttpMethodEnum = z.nativeEnum(HttpMethod); // 引入 HTTP 方法枚举
-
-// API 类型权限的特定字段校验 Schema (与 app/api/permissions/route.ts 中定义一致)
-const ApiPermissionDetailsSchema = z.object({
-  httpMethod: HttpMethodEnum,
-  endpoint: z.string().min(1, 'Endpoint is required').max(255),
-  rateLimit: z.number().int().positive().optional(),
-});
-
-// MENU 类型权限的特定字段校验 Schema (与 app/api/permissions/route.ts 中定义一致)
-const MenuPermissionDetailsSchema = z.object({
-  menuId: z.string().min(1, 'Menu ID is required').max(100),
-});
-
-// DATA 类型权限的特定字段校验 Schema (与 app/api/permissions/route.ts 中定义一致)
-const DataPermissionDetailsSchema = z.object({
-  tableName: z.string().min(1, 'Table name is required').max(100),
-  columnName: z.string().min(1, 'Column name is required').max(100).optional(),
-  conditions: z.string().max(1000).optional(), // JSON 字符串表示的查询条件
-});
+import {
+  // PermissionTypeEnum, // Not used in this file
+  // HttpMethodEnum, // Not directly used in UpdatePermissionSchema if it uses ApiPermissionDetailsSchema
+  ApiPermissionDetailsSchema,
+  MenuPermissionDetailsSchema,
+  DataPermissionDetailsSchema
+} from '@/schemas/permissionSchemas';
 
 // 更新权限的 Schema
 // name (唯一标识符) 和 type (类型) 通常不应在此处更新，以保持权限的稳定性和一致性。
@@ -50,7 +33,12 @@ interface PermissionRouteParams {
 }
 
 // GET /api/permissions/{permissionId} - 获取权限详情 (已重构)
-async function getPermission(request: NextRequest, { params }: PermissionRouteParams, authContext: AuthContext) {
+async function getPermission(
+  request: NextRequest,
+  { params }: PermissionRouteParams,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _authContext: AuthContext
+) {
   try {
     const permissionId = params.permissionId;
     // CUID 格式通常为 'c' + 24 位小写字母数字混合字符串。
@@ -110,10 +98,10 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
     const updatedPermission = await prisma.$transaction(async (tx) => {
       // 2a. 更新 Permission 主表中的通用字段
       const { apiDetails, menuDetails, dataDetails, ...scalarData } = dataToUpdate;
-      let mainPermissionUpdated = existingPermission; // 初始化为现有权限
+      // let mainPermissionUpdated = existingPermission; // This variable is assigned but never read
 
       if (Object.keys(scalarData).length > 0) {
-         mainPermissionUpdated = await tx.permission.update({
+         await tx.permission.update({
           where: { id: permissionId },
           data: scalarData,
         });

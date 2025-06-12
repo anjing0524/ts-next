@@ -228,11 +228,21 @@ enum PermissionType {
   DATA // 数据权限
 }
 
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  DELETE
+  PATCH
+  OPTIONS
+  HEAD
+}
+
 // API权限详细信息表
 model ApiPermission {
   id           String @id @default(cuid())
   permissionId String @unique
-  httpMethod   String // HTTP方法 (GET, POST, PUT, DELETE等)
+  httpMethod   HttpMethod // HTTP方法 (GET, POST, PUT, DELETE等)
   endpoint     String // API端点路径
   rateLimit    Int? // 速率限制 (每分钟请求数)
 
