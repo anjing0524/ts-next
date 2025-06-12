@@ -1,81 +1,59 @@
+// 文件路径: app/api/v1/auth/check-batch/route.ts
+// 版本: v1 - 重定向
+// 目标: 此端点 (原 /api/v1/permissions/batch-check) 现在重定向到 /api/permissions/check。
+//       根据路由优化报告，这是一个重复的权限检查端点，应被废弃并重定向。
+// 注意: 重定向目标 /api/permissions/check 现在处理【单个】权限请求。
+//       因此，原先使用此批量端点的客户端在重定向后可能会遇到请求格式不匹配的问题。
+//       强烈建议客户端迁移到新的 /api/v2/users/{userId}/permissions/batch-verify 以继续使用批量功能。
+
 import { NextRequest, NextResponse } from 'next/server';
 
-import { successResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
-import { PermissionService } from '@/lib/services/permissionService';
+// 移除了所有旧的业务逻辑相关的导入
 
-import {
-  BatchPermissionCheckRequestSchema,
-  BatchIndividualCheckRequestType,
-} from './schemas'; // Path relative to current dir
+/**
+ * @swagger
+ * /api/v1/auth/check-batch:
+ *   post:
+ *     summary: (V1 - 已废弃, 重定向) 批量权限检查端点
+ *     description: |
+ *       此端点 `/api/v1/permissions/batch-check` 已废弃。
+ *       所有请求将通过 HTTP 301 永久重定向到 `/api/permissions/check` (该端点处理单个权限检查)。
+ *       客户端应更新其请求地址。对于批量权限检查，请使用新的 `/api/v2/users/{userId}/permissions/batch-verify`。
+ *     tags:
+ *       - Permissions V1 (Compatibility)
+ *     deprecated: true
+ *     responses:
+ *       '301':
+ *         description: 永久重定向到 `/api/permissions/check`。
+ *         headers:
+ *           Location:
+ *             schema:
+ *               type: string
+ *               example: '/api/permissions/check'
+ */
+async function redirectToUnifiedCheckHandler(request: NextRequest) {
+  const targetPath = '/api/permissions/check'; // v1 的主检查路径 (现在是单个检查)
 
-const permissionService = new PermissionService();
+  console.warn(
+    `警告 (Warning): 端点 /api/v1/auth/check-batch (原 /api/v1/permissions/batch-check) 已废弃，正在重定向到 ${targetPath}。` +
+    `注意: 目标端点处理单个权限请求。对于批量操作，请迁移到 /api/v2/users/{userId}/permissions/batch-verify。`
+  );
 
-// Interface for requests to PermissionService, if it differs from client-facing schema
-interface PermissionServiceRequest {
-  id?: string; // Corresponds to client's requestId for correlation
-  name: string; // The permission string, e.g., "resource:action"
-  // Add other attributes if your PermissionService.checkBatchPermissions expects more
+  // 执行 301 永久重定向
+  return NextResponse.redirect(new URL(targetPath, request.url), 301);
 }
 
-async function checkBatchPermissionHandler(request: NextRequest) {
-  const requestId = (request as { requestId?: string }).requestId; // Overall requestId for this batch operation from withErrorHandler
-  const body = await request.json();
+export const POST = redirectToUnifiedCheckHandler;
 
-  // Validate the request body
-  const validationResult = BatchPermissionCheckRequestSchema.safeParse(body);
-  if (!validationResult.success) {
-    const errorMessages = validationResult.error.flatten((issue) => issue.message).fieldErrors;
-    const combinedErrorMessage = Object.entries(errorMessages)
-      .map(([key, messages]) => `${key}: ${messages?.join(', ')}`)
-      .join('; ');
-    throw new ApiError(400, `Invalid request body: ${combinedErrorMessage}`, 'VALIDATION_ERROR');
-  }
-
-  const { subjectAttributes, requests: clientRequests } = validationResult.data;
-
-  // Transform client requests into the format expected by PermissionService
-  const serviceRequests: PermissionServiceRequest[] = clientRequests.map(
-    (req: BatchIndividualCheckRequestType) => ({
-      id: req.requestId, // Pass along the client's requestId for this individual check
-      name: `${req.resourceAttributes.resourceId}:${req.action.type}`, // Construct permission name
-    })
-  );
-
-  // Call the permission service
-  // Assuming PermissionService.checkBatchPermissions returns an array of results corresponding to serviceRequests
-  // Example structure of a result item: { id?: string, allowed: boolean, reasonCode?: string, message?: string }
-  const serviceResults = await permissionService.checkBatchPermissions(
-    subjectAttributes.userId,
-    serviceRequests
-  );
-
-  // Adapt serviceResults to the PRD's specified response format for each item
-  const responseResults = serviceResults.map((sr) => ({
-    requestId: sr.id, // This was the original req.requestId from the client's batch
-    allowed: sr.allowed,
-    reasonCode: sr.reasonCode || (sr.allowed ? 'PERMISSION_GRANTED' : 'PERMISSION_DENIED'),
-    message:
-      sr.message ||
-      (sr.allowed ? 'Operation allowed for this item.' : 'Operation denied for this item.'),
-    // matchedPolicyIds: sr.matchedPolicyIds || [] // Optional, if your service provides this
-  }));
-
-  return NextResponse.json(
-    successResponse(
-      { results: responseResults },
-      200,
-      'Batch permission check completed.',
-      requestId
-    ),
-    { status: 200 }
-  );
-}
-
-export const POST = withErrorHandler(
-  withAuth(checkBatchPermissionHandler, {
-    requiredPermissions: ['auth:check-batch:execute'], // Example permission to call this API
-    requireUserContext: false, // Can be called by services or users with the right perm
-  })
-);
+// OPTIONS handler (if needed for CORS)
+// export async function OPTIONS(request: NextRequest) {
+//   return new NextResponse(null, {
+//     status: 204,
+//     headers: {
+//       'Access-Control-Allow-Origin': '*',
+//       'Access-Control-Allow-Methods': 'POST, OPTIONS',
+//       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+//     },
+//   });
+// }
+EOF
