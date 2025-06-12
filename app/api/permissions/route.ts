@@ -1,35 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { PermissionType, HttpMethod } from '@prisma/client'; // 引入 Prisma 生成的枚举类型
+import { Prisma, PermissionType } from '@prisma/client'; // 引入 Prisma 生成的枚举类型
 import { z } from 'zod';
 
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
-
-// 定义权限类型枚举 (和 Prisma schema 中的 PermissionType 保持一致)
-// PermissionTypeEnum 用于 Zod 校验，而 PermissionType 用于 Prisma 类型
-const PermissionTypeEnum = z.nativeEnum(PermissionType);
-const HttpMethodEnum = z.nativeEnum(HttpMethod); // 引入 HTTP 方法枚举
-
-// API 类型权限的特定字段校验 Schema
-const ApiPermissionDetailsSchema = z.object({
-  httpMethod: HttpMethodEnum, // HTTP 方法，使用 Prisma 生成的 HttpMethod 枚举
-  endpoint: z.string().min(1, 'Endpoint is required').max(255), // API 路径
-  rateLimit: z.number().int().positive().optional(), // 可选的速率限制
-});
-
-// MENU 类型权限的特定字段校验 Schema
-const MenuPermissionDetailsSchema = z.object({
-  menuId: z.string().min(1, 'Menu ID is required').max(100), // 菜单唯一标识符
-});
-
-// DATA 类型权限的特定字段校验 Schema
-const DataPermissionDetailsSchema = z.object({
-  tableName: z.string().min(1, 'Table name is required').max(100), // 数据库表名
-  columnName: z.string().min(1, 'Column name is required').max(100).optional(), // 可选的列名
-  conditions: z.string().max(1000).optional(), // JSON 字符串表示的查询条件
-});
+import {
+  PermissionTypeEnum,
+  // HttpMethodEnum, // Not directly used in CreatePermissionSchema if it uses ApiPermissionDetailsSchema
+  ApiPermissionDetailsSchema,
+  MenuPermissionDetailsSchema,
+  DataPermissionDetailsSchema
+} from '@/schemas/permissionSchemas';
 
 // 创建权限的 Schema (已重构)
 // 权限核心信息存储在 Permission 表，具体细节根据类型存储在关联表 (ApiPermission, MenuPermission, DataPermission)
@@ -191,7 +174,7 @@ async function listPermissions(request: NextRequest, authContext: AuthContext) {
     const skip = (page - 1) * limit;
     
     // 构建查询条件
-    const whereClause: any = {};
+    const whereClause: Prisma.PermissionWhereInput = {};
     if (type) whereClause.type = type;
     if (resourceQuery) whereClause.resource = { contains: resourceQuery, mode: 'insensitive' };
     if (actionQuery) whereClause.action = { contains: actionQuery, mode: 'insensitive' };
@@ -230,8 +213,19 @@ async function listPermissions(request: NextRequest, authContext: AuthContext) {
       },
     }, { status: 200 });
 
-  } catch (error) {
-    console.error('Error listing permissions:', error);
+  } catch (e: unknown) {
+    let logMessage: string;
+    let auditErrorMessage: string;
+
+    if (e instanceof Error) {
+      logMessage = `Error listing permissions: ${e.message}`;
+      auditErrorMessage = e.message;
+    } else {
+      const errorString = String(e);
+      logMessage = `An unknown error occurred while listing permissions: ${errorString}`;
+      auditErrorMessage = errorString;
+    }
+    console.error(logMessage);
     // 确保记录审计日志时 authContext.user_id 可用
     // 注意: list 操作通常不直接记录审计日志，除非有特定需求或发生异常
     // 此处仅为示例，实际中可能不需要对列表操作的常规错误进行审计
@@ -240,7 +234,7 @@ async function listPermissions(request: NextRequest, authContext: AuthContext) {
        userId: userIdForAudit,
        action: 'permission_list_failed_exception',
        success: false,
-       errorMessage: error instanceof Error ? error.message : 'Unknown error while listing permissions',
+       errorMessage: auditErrorMessage,
        ipAddress: request.ip || request.headers.get('x-forwarded-for'),
        userAgent: request.headers.get('user-agent'),
      });
