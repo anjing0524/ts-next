@@ -743,6 +743,10 @@ export class AuthorizationUtils {
   }
 }
 
+import { Client as OAuthClientPrismaType } from '@prisma/client'; // Added this import
+import { addHours, addDays } from 'date-fns'; // For token expiry
+import { ApiError } from '../api/errorHandler'; // Corrected import path for ApiError
+
 // Rate limiting utilities
 export class RateLimitUtils {
   private static requests = new Map<string, { count: number; resetTime: number }>();
@@ -807,4 +811,187 @@ export class RateLimitUtils {
       this.requests.set(key, { count, resetTime });
     }
   }
-} 
+}
+
+// Function to encapsulate refresh token grant logic
+export async function processRefreshTokenGrantLogic(
+  refreshTokenValue: string,
+  requestedScope: string | undefined,
+  client: OAuthClientPrismaType, // Use imported Prisma type
+  ipAddress?: string,
+  userAgent?: string
+): Promise<{
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  newRefreshToken: string;
+  scope?: string;
+}> {
+  // Verify refresh token structure and signature
+  const verification = await JWTUtils.verifyRefreshToken(refreshTokenValue);
+  if (!verification.valid || !verification.payload) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id,
+      action: 'invalid_refresh_token_structure',
+      resource: 'oauth/token_logic', // Indicate this is from shared logic
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: verification.error || 'Refresh token verification failed (structure/signature)',
+      metadata: { grantType: 'refresh_token' },
+    });
+    throw new ApiError(400, verification.error || 'Invalid refresh token', OAuth2ErrorTypes.INVALID_GRANT);
+  }
+
+  // Check if refresh token exists in database and is not revoked
+  const refreshTokenHashVerify = crypto.createHash('sha256').update(refreshTokenValue).digest('hex');
+  const storedRefreshToken = await prisma.refreshToken.findFirst({
+    where: {
+      tokenHash: refreshTokenHashVerify,
+      revoked: false,
+      expiresAt: {
+        gt: new Date(),
+      },
+      clientId: client.id, // Ensure token belongs to the authenticated client
+    },
+  });
+
+  if (!storedRefreshToken) {
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id,
+      action: 'refresh_token_not_found_or_revoked',
+      resource: 'oauth/token_logic',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Refresh token not found, revoked, expired, or client mismatch',
+      metadata: { grantType: 'refresh_token' },
+    });
+    throw new ApiError(400, 'Refresh token has been revoked, is invalid, or expired', OAuth2ErrorTypes.INVALID_GRANT);
+  }
+
+  // Client validation against token's client_id (already implicitly done by DB query with clientId)
+  // Redundant check, but good for clarity if query changes:
+  if (storedRefreshToken.clientId !== client.id) {
+      // This case should ideally not be reached if the DB query includes clientId
+    await AuthorizationUtils.logAuditEvent({
+      clientId: client.id,
+      action: 'refresh_token_client_mismatch_logic',
+      resource: 'oauth/token_logic',
+      ipAddress,
+      userAgent,
+      success: false,
+      errorMessage: 'Refresh token was issued to a different client (logic check)',
+      metadata: { grantType: 'refresh_token', tokenClientId: storedRefreshToken.clientId, currentClientId: client.id },
+    });
+    throw new ApiError(400, 'Refresh token was issued to a different client', OAuth2ErrorTypes.INVALID_GRANT);
+  }
+
+  // Handle scope parameter for refresh token
+  const originalScopes = ScopeUtils.parseScopes(storedRefreshToken.scope ?? '');
+  let finalGrantedScope = storedRefreshToken.scope ?? undefined;
+
+  if (requestedScope) {
+    const requestedScopeArray = ScopeUtils.parseScopes(requestedScope);
+    // Ensure all requested scopes are within the original scope
+    const scopeValidation = ScopeUtils.validateScopes(requestedScopeArray, originalScopes);
+    if (!scopeValidation.valid) {
+      await AuthorizationUtils.logAuditEvent({
+        clientId: client.id,
+        userId: storedRefreshToken.userId ?? undefined,
+        action: 'refresh_token_invalid_scope',
+        resource: 'oauth/token_logic',
+        ipAddress,
+        userAgent,
+        success: false,
+        errorMessage: `Requested scope is invalid or exceeds originally granted scope. Invalid: ${scopeValidation.invalidScopes.join(', ')}`,
+        metadata: { grantType: 'refresh_token', requestedScope, originalScope: storedRefreshToken.scope },
+      });
+      throw new ApiError(400, 'Requested scope is invalid or exceeds originally granted scope', OAuth2ErrorTypes.INVALID_SCOPE);
+    }
+    finalGrantedScope = requestedScope; // If valid, the new token gets the (potentially narrowed) requested scope
+  }
+
+  // Get permissions if user is involved
+  let permissions: string[] = [];
+  if (storedRefreshToken.userId) {
+    permissions = await AuthorizationUtils.getUserPermissions(storedRefreshToken.userId);
+  }
+
+  // Generate new access token
+  const newAccessToken = await JWTUtils.createAccessToken({
+    client_id: client.clientId, // Use client.clientId from the authenticated client object
+    user_id: storedRefreshToken.userId ?? undefined,
+    scope: finalGrantedScope,
+    permissions,
+    // exp: '1h' // Default in JWTUtils.createAccessToken
+  });
+  const newAccessTokenHash = crypto.createHash('sha256').update(newAccessToken).digest('hex');
+
+  // Store new access token in database
+  await prisma.accessToken.create({
+    data: {
+      token: newAccessToken, // Storing full token (consider if this is needed or just hash)
+      tokenHash: newAccessTokenHash,
+      clientId: client.id,
+      userId: storedRefreshToken.userId ?? undefined,
+      scope: finalGrantedScope,
+      expiresAt: addHours(new Date(), 1), // Consistent with JWTUtils default
+      revoked: false,
+    },
+  });
+
+  // Create new refresh token (rotation)
+  const newRefreshTokenValue = await JWTUtils.createRefreshToken({
+    client_id: client.clientId,
+    user_id: storedRefreshToken.userId ?? undefined,
+    scope: finalGrantedScope, // New refresh token should also carry the potentially narrowed scope
+    // exp: '30d' // Default in JWTUtils.createRefreshToken
+  });
+  const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshTokenValue).digest('hex');
+
+  // Revoke old refresh token
+  await prisma.refreshToken.update({
+    where: { id: storedRefreshToken.id },
+    data: { revoked: true, revokedAt: new Date(), replacedByTokenId: newRefreshTokenHash }, // Optional: link to new token
+  });
+
+  // Store new refresh token
+  await prisma.refreshToken.create({
+    data: {
+      token: newRefreshTokenValue, // Storing full token (consider if this is needed or just hash)
+      tokenHash: newRefreshTokenHash,
+      clientId: client.id,
+      userId: storedRefreshToken.userId ?? undefined,
+      scope: finalGrantedScope,
+      expiresAt: addDays(new Date(), 30), // Consistent with JWTUtils default
+      revoked: false,
+      previousTokenId: storedRefreshToken.id, // Optional: link to old token
+    },
+  });
+
+  // Log successful token refresh
+  await AuthorizationUtils.logAuditEvent({
+    clientId: client.id,
+    userId: storedRefreshToken.userId ?? undefined,
+    action: 'token_refreshed_logic',
+    resource: 'oauth/token_logic',
+    ipAddress,
+    userAgent,
+    success: true,
+    metadata: {
+      grantType: 'refresh_token',
+      scope: finalGrantedScope,
+      newAccessTokenId: newAccessTokenHash.substring(0,10), // Example: log part of hash
+      newRefreshTokenId: newRefreshTokenHash.substring(0,10),
+    },
+  });
+
+  return {
+    accessToken: newAccessToken,
+    tokenType: 'Bearer',
+    expiresIn: 3600, // Standard 1 hour
+    newRefreshToken: newRefreshTokenValue, // Send the new refresh token back
+    scope: finalGrantedScope,
+  };
+}

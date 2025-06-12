@@ -1,3 +1,5 @@
+// DEPRECATED: This endpoint is deprecated. Please use /api/v1/auth/check-batch instead.
+// This file may be removed in a future version.
 // /app/api/permissions/check/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -19,6 +21,7 @@ const BatchCheckRequestBodySchema = z.object({
 });
 
 async function handlePermissionsCheck(request: NextRequest, authContext: AuthContext) { // authContext provided by withAuth
+  console.warn("DEPRECATION WARNING: /api/permissions/check is deprecated. Use /api/v1/auth/check-batch or /api/v1/auth/check.");
   const requestUrl = request.url;
   // Prefer 'x-real-ip' if behind a trusted proxy, fallback to 'x-forwarded-for', then to undefined
   const ipAddress = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || undefined;

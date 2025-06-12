@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 import logger from '@/utils/logger';
+import { errorResponse, generateRequestId, ApiResponse } from './apiResponse'; // Adjusted path
 
 interface ApiErrorDetail {
   message: string;
@@ -11,9 +12,9 @@ interface ApiErrorDetail {
   details?: any; // For more specific error details
 }
 
-interface ApiErrorResponse {
-  errors: ApiErrorDetail[];
-}
+// interface ApiErrorResponse { // This might be deprecated or become internal
+//   errors: ApiErrorDetail[];
+// }
 
 // Custom Error class (optional for now, but good for future)
 export class ApiError extends Error {
@@ -34,8 +35,11 @@ export class ApiError extends Error {
   }
 }
 
-export function handleApiError(error: any): NextResponse<ApiErrorResponse> {
+// Updated function signature and return type
+export function handleApiError(error: any, requestId?: string): NextResponse<ApiResponse<null>> {
+  const currentRequestId = requestId || generateRequestId();
   logger.error('[API Error Handled]', {
+    requestId: currentRequestId, // Log requestId
     message: error.message,
     stack: error.stack,
     name: error.name,
@@ -44,17 +48,20 @@ export function handleApiError(error: any): NextResponse<ApiErrorResponse> {
   });
 
   if (error instanceof ApiError) {
-    return NextResponse.json(error.toErrorResponse(), { status: error.statusCode });
+    // Use errorResponse helper
+    return NextResponse.json(errorResponse(error.message, error.statusCode, currentRequestId, error.errorCode), { status: error.statusCode });
   }
 
   if (error instanceof ZodError) {
     const errorDetails: ApiErrorDetail[] = error.errors.map(err => ({
       message: err.message,
-      code: 'VALIDATION_ERROR',
+      code: 'VALIDATION_ERROR', // This code can be part of the message or a specific field in ApiResponse if extended
       path: err.path,
-      field: err.path.join('.') // Simple field representation
+      field: err.path.join('.')
     }));
-    return NextResponse.json({ errors: errorDetails }, { status: 400 });
+    // Construct a detailed message from Zod errors
+    const customMessage = errorDetails.map(e => `${e.field || (e.path && e.path.join('.')) || 'error'}: ${e.message}`).join(', ');
+    return NextResponse.json(errorResponse(customMessage || 'Validation failed', 400, currentRequestId, 'VALIDATION_ERROR'), { status: 400 });
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -92,19 +99,22 @@ export function handleApiError(error: any): NextResponse<ApiErrorResponse> {
         message = `A database error occurred. Prisma Code: ${error.code}`;
         break;
     }
-    return NextResponse.json({ errors: [{ message, code, details }] }, { status: statusCode });
+    // Use errorResponse helper, include Prisma code in message
+    return NextResponse.json(errorResponse(`${message} (Prisma Code: ${error.code})`, statusCode, currentRequestId, code), { status: statusCode });
   }
 
   if (error instanceof Prisma.PrismaClientValidationError) {
+    // Use errorResponse helper
     return NextResponse.json(
-      { errors: [{ message: 'Database validation error. Check your input data types and constraints.', code: 'DB_VALIDATION_ERROR', details: error.message }] },
+      errorResponse(`Database validation error: ${error.message.substring(error.message.lastIndexOf('Reason:') + 7)}`, 400, currentRequestId, 'DB_VALIDATION_ERROR'),
       { status: 400 }
     );
   }
 
   // Generic fallback
+  // Use errorResponse helper
   return NextResponse.json(
-    { errors: [{ message: 'An unexpected internal server error occurred.', code: 'INTERNAL_SERVER_ERROR' }] },
+    errorResponse('An unexpected internal server error occurred.', 500, currentRequestId, 'INTERNAL_SERVER_ERROR'),
     { status: 500 }
   );
 }
@@ -114,14 +124,23 @@ export function withErrorHandler<T extends NextRequest, U>(
   handler: (request: T, context: U) => Promise<NextResponse>
 ) {
   return async (request: T, context: U): Promise<NextResponse> => {
+    // Ensure requestId is generated or retrieved and passed through
+    const req = request as any;
+    const existingRequestId = req.requestId;
+    const requestId = existingRequestId || generateRequestId();
+
+    if (!existingRequestId) {
+      req.requestId = requestId; // Attach requestId to request if not already present
+    }
+
     try {
       return await handler(request, context);
     } catch (error) {
-      // If the error is already a NextResponse (e.g. from a manual return NextResponse.json(...)), just return it
       if (error instanceof NextResponse) {
-        return error;
+        return error; // Already a response, do not re-wrap
       }
-      return handleApiError(error);
+      // Pass requestId to handleApiError
+      return handleApiError(error, requestId);
     }
   };
 }

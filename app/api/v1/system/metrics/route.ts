@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { withErrorHandler } from '@/lib/api/errorHandler';
+import { successResponse } from '@/lib/api/apiResponse';
+import os from 'os'; // For os related info
+import process from 'process'; // For process related info
+
+async function getSystemMetricsHandler(request: NextRequest, context: AuthContext) {
+  const requestId = (request as any).requestId; // Injected by withErrorHandler
+
+  // Calculate memory usage, ensuring values are numbers before toFixed
+  const totalMemBytes = os.totalmem();
+  const freeMemBytes = os.freemem();
+
+  const rssBytes = process.memoryUsage().rss;
+  const heapTotalBytes = process.memoryUsage().heapTotal;
+  const heapUsedBytes = process.memoryUsage().heapUsed;
+  const externalBytes = process.memoryUsage().external;
+  // const arrayBuffersBytes = process.memoryUsage().arrayBuffers; // arrayBuffers might not exist on all Node versions or be 0
+
+  const metrics = {
+    timestamp: new Date().toISOString(),
+    nodejsVersion: process.version,
+    platform: os.platform(),
+    osType: os.type(), // e.g., 'Linux', 'Darwin', 'Windows_NT'
+    osRelease: os.release(), // Kernel release
+    architecture: os.arch(), // e.g., 'x64', 'arm64'
+    cpuCores: os.cpus().length,
+    // Convert bytes to MB and format to 2 decimal places
+    totalMemoryMB: (totalMemBytes / (1024 * 1024)).toFixed(2),
+    freeMemoryMB: (freeMemBytes / (1024 * 1024)).toFixed(2),
+    usedMemoryMB: ((totalMemBytes - freeMemBytes) / (1024 * 1024)).toFixed(2),
+    uptimeSeconds: Math.floor(process.uptime()), // System uptime in seconds
+    processMemoryUsage: { // Renamed from memoryUsage to be more specific
+      rssMB: (rssBytes / (1024 * 1024)).toFixed(2),
+      heapTotalMB: (heapTotalBytes / (1024 * 1024)).toFixed(2),
+      heapUsedMB: (heapUsedBytes / (1024 * 1024)).toFixed(2),
+      externalMB: (externalBytes / (1024 * 1024)).toFixed(2),
+      // arrayBuffersMB: arrayBuffersBytes ? (arrayBuffersBytes / (1024 * 1024)).toFixed(2) : '0.00', // Handle if arrayBuffers is undefined/zero
+    },
+    loadAverage: os.loadavg(), // System load average [1min, 5min, 15min]. May not be available on all platforms (e.g. Windows)
+    // message: "For detailed, time-series metrics, please refer to the dedicated monitoring system (e.g., Prometheus/Grafana)."
+  };
+
+  // Handle arrayBuffers specifically as it might not be present in all Node.js versions
+  if (typeof process.memoryUsage().arrayBuffers === 'number') {
+    (metrics.processMemoryUsage as any).arrayBuffersMB =
+      (process.memoryUsage().arrayBuffers / (1024 * 1024)).toFixed(2);
+  }
+
+
+  return NextResponse.json(successResponse(metrics, 200, 'System metrics retrieved successfully.', requestId));
+}
+
+export const GET = withErrorHandler(withAuth(getSystemMetricsHandler, {
+  requiredPermissions: ['system:metrics:read'], // Permission to read system metrics
+  requireUserContext: true, // Ensure an authenticated user/admin is making the request
+}));

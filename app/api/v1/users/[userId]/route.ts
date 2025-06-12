@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming AuthContext is exported or merged by withAuth
 import { prisma } from '@/lib/prisma';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
+import { successResponse } from '@/lib/api/apiResponse'; // Adjusted import path
 
 // 定义更新用户个人资料的 Zod Schema
 const UpdateUserProfileSchema = z.object({
@@ -71,8 +72,8 @@ export const GET = withErrorHandler(withAuth(
       // @ts-ignore //  userRoles will be removed after this
       delete userWithRoles.userRoles;
 
-
-      return NextResponse.json({ user: userWithRoles });
+      const requestId = (request as any).requestId;
+      return NextResponse.json(successResponse({ user: userWithRoles }, 200, 'User profile retrieved successfully.', requestId), { status: 200 });
   },
   {
     // requiredScopes: ['profile'], // 权限范围，根据实际 OAuth/OIDC 配置
@@ -136,7 +137,8 @@ export const PUT = withErrorHandler(withAuth(
         },
       });
 
-      return NextResponse.json({ user: updatedUser });
+      const requestId = (request as any).requestId;
+      return NextResponse.json(successResponse({ user: updatedUser }, 200, 'User profile updated successfully.', requestId), { status: 200 });
   },
   {
     // requiredScopes: ['profile:write'],
@@ -176,10 +178,8 @@ export const DELETE = withErrorHandler(withAuth(
         },
       });
 
-      return NextResponse.json({ 
-        message: 'User deactivated successfully',
-        user: deactivatedUser
-      });
+      const requestId = (request as any).requestId;
+      return NextResponse.json(successResponse({ message: 'User deactivated successfully', user: deactivatedUser }, 200, 'User deactivated successfully.', requestId), { status: 200 });
   },
   {
     requiredPermissions: ['user_profile:delete'], // 确保此权限与您的权限定义一致
