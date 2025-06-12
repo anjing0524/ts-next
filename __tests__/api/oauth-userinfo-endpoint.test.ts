@@ -167,6 +167,30 @@ describe('OAuth2.1 UserInfo Endpoint Tests', () => {
       expect(userInfo.sub).toBe(user.id);
       expect(userInfo.email).toBe(user.email);
     });
+
+    it('应该拒绝PUT方法（返回405 Method Not Allowed）', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const accessToken = await dataManager.createAccessToken(
+        user.id!,
+        client.clientId,
+        'openid'
+      );
+
+      const response = await httpClient.makeRequest('/api/oauth/userinfo', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: 'test' }), // PUT usually has a body
+      });
+
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.METHOD_NOT_ALLOWED);
+      // Optional: Check for Allow header if the API provides it
+      // expect(response.headers.get('allow')).toContain('GET');
+      // expect(response.headers.get('allow')).toContain('POST');
+    });
   });
 
   describe('错误处理和安全测试', () => {
@@ -293,28 +317,134 @@ describe('OAuth2.1 UserInfo Endpoint Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
       expect(result.error).toBe('invalid_token');
     });
+
+    it('应该拒绝不活跃用户的访问令牌', async () => {
+      const inactiveUser = await dataManager.createTestUser('INACTIVE');
+      // Ensure the user is actually inactive in the database for this test
+      await prisma.user.update({
+        where: { id: inactiveUser.id },
+        data: { isActive: false },
+      });
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const accessToken = await dataManager.createAccessToken(
+        inactiveUser.id!,
+        client.clientId,
+        'openid profile'
+      );
+
+      const response = await httpClient.getUserInfo(accessToken);
+
+      // Expect 401 because the user associated with the token is inactive.
+      // The system should treat this as an invalid token or an unauthorized user.
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe('invalid_token');
+      expect(error.error_description).toContain('User is inactive'); // Or similar message
+    });
+
+    it('应该返回401如果用户在令牌颁发后被删除', async () => {
+      const userToDelete = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+
+      const accessToken = await dataManager.createAccessToken(
+        userToDelete.id!,
+        client.clientId,
+        'openid profile'
+      );
+
+      // 用户被删除
+      await prisma.user.delete({ where: { id: userToDelete.id! } });
+
+      const response = await httpClient.getUserInfo(accessToken);
+
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe('invalid_token');
+      expect(error.error_description).toBe('User not found');
+    });
   });
 
-  describe('边界条件和特殊情况', () => {
-    it('应该处理用户名为空的情况', async () => {
-      // 创建没有firstName和lastName的用户
+  describe('Profile Scope Claim Details', () => {
+    it('当只有firstName时，name应为firstName，且有given_name', async () => {
+      const user = await dataManager.createUser({
+        username: 'firstname_only',
+        email: 'fname@test.com',
+        password: 'Password123!',
+        firstName: 'JustFirst',
+        lastName: null,
+        isActive: true,
+        emailVerified: true,
+      });
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const accessToken = await dataManager.createAccessToken(user.id!, client.clientId, 'openid profile');
+
+      const response = await httpClient.getUserInfo(accessToken);
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      const userInfo = await response.json();
+
+      expect(userInfo.name).toBe(user.firstName);
+      expect(userInfo.given_name).toBe(user.firstName);
+      expect(userInfo.family_name).toBeUndefined();
+      expect(userInfo.preferred_username).toBe(user.username);
+    });
+
+    it('当只有lastName时，name应为lastName，且有family_name', async () => {
+      const user = await dataManager.createUser({
+        username: 'lastname_only',
+        email: 'lname@test.com',
+        password: 'Password123!',
+        firstName: null,
+        lastName: 'JustLast',
+        isActive: true,
+        emailVerified: true,
+      });
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const accessToken = await dataManager.createAccessToken(user.id!, client.clientId, 'openid profile');
+
+      const response = await httpClient.getUserInfo(accessToken);
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      const userInfo = await response.json();
+
+      expect(userInfo.name).toBe(user.lastName);
+      expect(userInfo.family_name).toBe(user.lastName);
+      expect(userInfo.given_name).toBeUndefined();
+      expect(userInfo.preferred_username).toBe(user.username);
+    });
+
+    it('当firstName和lastName都存在时，name应为 "firstName lastName"', async () => {
+      const user = await dataManager.createUser({ // Using createUser directly for specific names
+        username: 'full_name_user',
+        email: 'fullname@test.com',
+        password: 'Password123!',
+        firstName: 'FullName',
+        lastName: 'User',
+        isActive: true,
+        emailVerified: true,
+      });
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const accessToken = await dataManager.createAccessToken(user.id!, client.clientId, 'openid profile');
+
+      const response = await httpClient.getUserInfo(accessToken);
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      const userInfo = await response.json();
+
+      expect(userInfo.name).toBe(`${user.firstName} ${user.lastName}`);
+      expect(userInfo.given_name).toBe(user.firstName);
+      expect(userInfo.family_name).toBe(user.lastName);
+      expect(userInfo.preferred_username).toBe(user.username);
+    });
+
+    // This test is from the original "边界条件和特殊情况" but fits better here.
+    // It tests the fallback of 'name' to 'username' when firstName and lastName are null.
+    it('当firstName和lastName都为空时，name应为username，且无given_name/family_name', async () => {
       const user = await dataManager.createUser({
         username: 'test-no-names',
         email: 'nonames@test.com',
         password: 'Password123!',
-        firstName: '', // 空字符串
-        lastName: '', // 空字符串
+        firstName: null, // Explicitly null
+        lastName: null, // Explicitly null
         isActive: true,
         emailVerified: true,
-      });
-
-      // 手动将firstName和lastName设为null
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          firstName: null,
-          lastName: null,
-        },
       });
 
       const client = await dataManager.createTestClient('CONFIDENTIAL');
@@ -332,7 +462,22 @@ describe('OAuth2.1 UserInfo Endpoint Tests', () => {
       expect(userInfo.name).toBe(user.username); // 应该回退到username
       expect(userInfo.given_name).toBeUndefined();
       expect(userInfo.family_name).toBeUndefined();
+      expect(userInfo.preferred_username).toBe(user.username);
     });
+  });
+
+  describe('边界条件和特殊情况', () => {
+    // The test "应该处理用户名为空的情况" was moved to "Profile Scope Claim Details"
+    // it('应该处理用户名为空的情况', async () => { ... });
+    // We keep other boundary tests here.
+
+    it('应该处理用户邮箱为空的情况', async () => {
+    // The test "应该处理用户名为空的情况" was moved to "Profile Scope Claim Details" as
+    // "当firstName和lastName都为空时，name应为username，且无given_name/family_name"
+    // and updated to use nulls directly in createUser.
+    // This ensures that the "边界条件和特殊情况" group is not empty if no other tests are here.
+    // If other tests are added to "边界条件和特殊情况", this comment can be removed.
+    // For now, this just ensures the structure remains.
 
     it('应该处理用户邮箱为空的情况', async () => {
       const user = await dataManager.createUser({

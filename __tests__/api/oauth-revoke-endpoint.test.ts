@@ -131,6 +131,52 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
     });
 
+    it('应该在撤销访问令牌时同时撤销相关的刷新令牌', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers'); // For hashing
+
+      // 创建访问令牌和多个刷新令牌
+      const accessTokenToRevoke = await dataManager.createAccessToken(
+        user.id!,
+        client.clientId,
+        'openid profile'
+      );
+      const refreshToken1 = await dataManager.createRefreshToken(
+        user.id!,
+        client.clientId,
+        'openid profile offline_access'
+      );
+      const refreshToken2 = await dataManager.createRefreshToken(
+        user.id!,
+        client.clientId,
+        'openid profile offline_access' // Same user, same client
+      );
+
+      // 撤销访问令牌
+      const response = await httpClient.revokeToken(
+        accessTokenToRevoke,
+        client.clientId,
+        client.plainSecret
+      );
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+
+      // 验证访问令牌已被撤销
+      const atHash = TestUtils.createTokenHash(accessTokenToRevoke);
+      const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
+      expect(dbAccessToken?.revoked).toBe(true);
+
+      // 验证相关的刷新令牌1也被撤销
+      const rt1Hash = TestUtils.createTokenHash(refreshToken1);
+      const dbRefreshToken1 = await prisma.refreshToken.findUnique({ where: { tokenHash: rt1Hash } });
+      expect(dbRefreshToken1?.revoked).toBe(true);
+
+      // 验证相关的刷新令牌2也被撤销
+      const rt2Hash = TestUtils.createTokenHash(refreshToken2);
+      const dbRefreshToken2 = await prisma.refreshToken.findUnique({ where: { tokenHash: rt2Hash } });
+      expect(dbRefreshToken2?.revoked).toBe(true);
+    });
+
     it('应该支持token_type_hint参数 - access_token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
@@ -174,9 +220,10 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
     });
 
-    it('应该支持token_type_hint参数 - refresh_token', async () => {
+    it('应该支持token_type_hint参数 - refresh_token (并撤销RT)', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers');
 
       const refreshToken = await dataManager.createRefreshToken(
         user.id!,
@@ -184,7 +231,6 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         'openid profile offline_access'
       );
 
-      // 使用token_type_hint指定为refresh_token
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'POST',
         headers: {
@@ -198,6 +244,117 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       });
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      const rtHash = TestUtils.createTokenHash(refreshToken);
+      const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
+      expect(dbRefreshToken?.revoked).toBe(true);
+    });
+  });
+
+  describe('Token Type Hint Specific Behavior Tests', () => {
+    const { TestUtils } = globalThis; // Assuming TestUtils is globally available or adjust import
+
+    beforeEach(async () => {
+      // Potentially re-import TestUtils if not global or handle scope
+      // const importedUtils = await import('../utils/test-helpers');
+      // TestUtils = importedUtils.TestUtils;
+    });
+
+    it('当 hint 为 access_token 时，不应撤销实际为 refresh_token 的令牌', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers');
+
+
+      const refreshTokenString = await dataManager.createRefreshToken(
+        user.id!,
+        client.clientId,
+        'openid offline_access'
+      );
+
+      const response = await httpClient.revokeToken(
+        refreshTokenString, // This is actually a refresh token
+        client.clientId,
+        client.plainSecret,
+        'access_token' // But hint says it's an access token
+      );
+
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK); // Endpoint always returns 200
+
+      // Verify the refresh token was NOT revoked
+      const rtHash = TestUtils.createTokenHash(refreshTokenString);
+      const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
+      expect(dbRefreshToken?.revoked).toBe(false);
+    });
+
+    it('当 hint 为 refresh_token 时，不应撤销实际为 access_token 的令牌', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers');
+
+      const accessTokenString = await dataManager.createAccessToken(
+        user.id!,
+        client.clientId,
+        'openid profile'
+      );
+
+      const response = await httpClient.revokeToken(
+        accessTokenString, // This is actually an access token
+        client.clientId,
+        client.plainSecret,
+        'refresh_token' // But hint says it's a refresh token
+      );
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+
+      // Verify the access token was NOT revoked
+      const atHash = TestUtils.createTokenHash(accessTokenString);
+      const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
+      expect(dbAccessToken?.revoked).toBe(false);
+    });
+
+    it('当 hint 为无效值时，应能撤销 access_token (回退到默认行为)', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers');
+
+      const accessToken = await dataManager.createAccessToken(user.id!, client.clientId, 'openid');
+
+      const response = await httpClient.revokeToken(
+        accessToken,
+        client.clientId,
+        client.plainSecret,
+        'unknown_hint_value' // Invalid hint
+      );
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+
+      const atHash = TestUtils.createTokenHash(accessToken);
+      const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
+      expect(dbAccessToken?.revoked).toBe(true);
+    });
+
+    it('当 hint 为无效值时，应能撤销 refresh_token (回退到默认行为)', async () => {
+      const user = await dataManager.createTestUser('REGULAR');
+      const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const { TestUtils } = await import('../utils/test-helpers');
+
+      const refreshToken = await dataManager.createRefreshToken(user.id!, client.clientId, 'openid');
+
+      // First, ensure no access token with the same string exists to isolate RT logic path
+      const atHashForRTString = TestUtils.createTokenHash(refreshToken);
+      const existingAT = await prisma.accessToken.findFirst({ where: { tokenHash: atHashForRTString }});
+      expect(existingAT).toBeNull();
+
+
+      const response = await httpClient.revokeToken(
+        refreshToken,
+        client.clientId,
+        client.plainSecret,
+        'another_invalid_hint' // Invalid hint
+      );
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+
+      const rtHash = TestUtils.createTokenHash(refreshToken);
+      const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
+      expect(dbRefreshToken?.revoked).toBe(true);
     });
   });
 
