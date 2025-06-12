@@ -292,53 +292,119 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
   }
 }
 
-// Replace the placeholder authenticateUser function
+// 移除基于 session 的用户认证，改为依赖JWT进行身份验证
+// Removed session-based user authentication, changed to rely on JWT for identity verification.
+import { jwtVerify } from 'jose'; // 用于JWT验证
+import { JWTPayload } from 'jose'; // JWT Payload 类型
+
+// 假设JWT密钥等环境变量已定义
+// Assuming JWT secret and other environment variables are defined
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-fallback-secret-key'); // Fallback for safety, should be configured
+const JWT_ISSUER = process.env.JWT_ISSUER || 'urn:example:issuer';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'urn:example:audience';
+
 async function authenticateUser(
   request: NextRequest,
   options: {
-    maxAge?: number;
-    prompt?: string;
-    clientId: string;
-    redirectUri: string;
-    scope: string;
-    state?: string;
+    maxAge?: number; // 最大认证有效期（秒）Max authentication age in seconds
+    prompt?: string; // OIDC prompt parameter
+    clientId: string; // Client ID requesting authorization
+    redirectUri: string; // Redirect URI for error reporting (in some cases)
+    scope: string; // Scopes requested
+    state?: string; // State parameter for error reporting
   }
 ): Promise<string | null> {
-  const { validateSession } = await import('@/lib/auth/session');
-  
-  // Check for existing user session
-  const sessionContext = await validateSession(request);
-  
-  if (!sessionContext) {
-    return null; // No valid session, needs to login
-  }
-  
-  const { user, session } = sessionContext;
-  
-  // Handle max_age parameter for re-authentication
-  if (options.maxAge !== undefined) {
-    const authTime = session.createdAt;
-    const maxAgeMs = options.maxAge * 1000;
-    const now = new Date();
-    
-    if (now.getTime() - authTime.getTime() > maxAgeMs) {
-      // Authentication is too old, force re-authentication
-      return null;
-    }
-  }
-  
-  // Handle prompt parameter
+  // 检查 prompt=login, 如果是，则强制重新登录
+  // Check for prompt=login, if so, force re-login
   if (options.prompt === 'login') {
-    // Force re-authentication regardless of session
+    // 用户请求强制登录，忽略现有JWT
+    // User requests forced login, ignore existing JWT
     return null;
   }
-  
-  if (options.prompt === 'none') {
-    // Silent authentication - must have valid session
-    return user.id;
+
+  const token = request.cookies.get('auth_token')?.value;
+
+  if (!token) {
+    // 没有JWT存在
+    // No JWT present
+    if (options.prompt === 'none') {
+      // 对于 prompt=none，如果无有效JWT，则表示登录失败或需要交互
+      // For prompt=none, if no valid JWT, it indicates login failure or interaction required
+      // 根据OIDC规范，可以返回 login_required 错误
+      // According to OIDC spec, can return login_required error
+      // 此处返回 null，上层逻辑会重定向到登录页面或根据redirect_uri返回错误
+      // Returning null here, upper logic will redirect to login or return error based on redirect_uri
+      return null;
+    }
+    // 对于其他情况，没有JWT则需要登录
+    // For other cases, no JWT means login is required
+    return null;
   }
-  
-  return user.id;
+
+  try {
+    // 验证JWT
+    // Verify the JWT
+    const { payload } : { payload: JWTPayload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+
+    const userId = payload.sub; // 从JWT的sub声明中获取用户ID
+    // Get user ID from JWT's sub claim
+
+    if (!userId) {
+      // JWT中没有用户ID
+      // No user ID in JWT
+      console.error('JWT verification successful, but sub (user ID) claim is missing.');
+      return null;
+    }
+
+    // 处理 max_age 参数
+    // Handle max_age parameter
+    if (options.maxAge !== undefined && payload.iat) {
+      const authTime = payload.iat; // JWT的iat (issued at) 声明，单位为秒
+                                     // JWT's iat (issued at) claim, in seconds
+      const maxAgeSec = options.maxAge;
+      const currentTimeSec = Math.floor(Date.now() / 1000);
+
+      if (currentTimeSec - authTime > maxAgeSec) {
+        // 认证时间过久，需要重新认证
+        // Authentication is too old, re-authentication required
+        // 如果 prompt=none，则返回错误或null
+        // If prompt=none, return error or null
+        if (options.prompt === 'none') {
+          // OIDC prompt=none: if authentication is too old, it's an error
+          // For simplicity, returning null; the caller handles redirection or error response.
+          return null;
+        }
+        return null; // 触发重新登录
+                     // Trigger re-login
+      }
+    }
+
+    // 如果 prompt=none 且JWT有效且满足max_age，则返回用户ID
+    // If prompt=none and JWT is valid and max_age is satisfied, return user ID
+    if (options.prompt === 'none') {
+      return userId;
+    }
+
+    // 对于其他 prompt 值或没有 prompt，只要JWT有效且满足max_age，就返回用户ID
+    // For other prompt values or no prompt, as long as JWT is valid and max_age is satisfied, return user ID
+    return userId;
+
+  } catch (error) {
+    // JWT验证失败 (例如过期、签名无效等)
+    // JWT verification failed (e.g., expired, invalid signature)
+    console.error('JWT verification failed:', error);
+    if (options.prompt === 'none') {
+      // 对于 prompt=none，验证失败意味着无法静默认证
+      // For prompt=none, verification failure means silent authentication is not possible
+      return null;
+    }
+    // 其他情况，验证失败则需要登录
+    // Other cases, verification failure means login is required
+    return null;
+  }
 }
 
 // Check if user consent is required

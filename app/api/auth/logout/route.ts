@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { withCORS } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-import { validateSession, destroySession } from '@/lib/auth/session'; // Keep if session logic is still used alongside token
+// import { validateSession, destroySession } from '@/lib/auth/session'; // 移除 session 管理相关导入
 import { prisma } from '@/lib/prisma';
 
 // Helper function to revoke tokens
@@ -94,22 +94,23 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
       await revokeToken(refreshTokenFromBody, 'refresh_token', request.url);
     }
 
-    // Legacy session destruction (if still applicable)
-    const sessionId = request.cookies.get('session_id')?.value;
-    if (sessionId) {
-      const sessionContext = await validateSession(request); // This might rely on a valid session
-      if (sessionContext) {
-        await destroySession(sessionId);
-        await AuthorizationUtils.logAuditEvent({
-          userId: sessionContext.user.id, // Use user ID from session if available
-          action: 'user_session_logout',
-          resource: 'auth/logout',
-          ipAddress,
-          userAgent,
-          success: true,
-        });
-      }
-    }
+    // 旧的 session 销毁逻辑（已移除）
+    // Legacy session destruction (if still applicable) - REMOVED
+    // const sessionId = request.cookies.get('session_id')?.value;
+    // if (sessionId) {
+    //   const sessionContext = await validateSession(request); // This might rely on a valid session
+    //   if (sessionContext) {
+    //     await destroySession(sessionId);
+    //     await AuthorizationUtils.logAuditEvent({
+    //       userId: sessionContext.user.id, // Use user ID from session if available
+    //       action: 'user_session_logout',
+    //       resource: 'auth/logout',
+    //       ipAddress,
+    //       userAgent,
+    //       success: true,
+    //     });
+    //   }
+    // }
 
     // Handle OAuth 2.0 post-logout redirection
     const { searchParams } = new URL(request.url);

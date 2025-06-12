@@ -932,7 +932,8 @@ export class TestDataManager {
       
       // Delete audit logs and sessions
       await prisma.auditLog.deleteMany({}).catch(() => {})
-      await prisma.userSession.deleteMany({}).catch(() => {})
+      // UserSession model is deprecated/removed in favor of JWTs.
+      // await prisma.userSession.deleteMany({}).catch(() => {})
       await prisma.consentGrant.deleteMany({}).catch(() => {})
 
       // Delete clients and users
