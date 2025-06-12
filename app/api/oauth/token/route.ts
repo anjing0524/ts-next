@@ -10,9 +10,12 @@ import {
   JWTUtils, 
   AuthorizationUtils, 
   OAuth2ErrorTypes,
-  ScopeUtils
+  ScopeUtils,
+  processRefreshTokenGrantLogic // Import the new function
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
+import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
+import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
 
 // PKCE S256 Verification Helper
 function verifyPkceChallenge(verifier: string, challenge: string): boolean {
@@ -346,14 +349,14 @@ async function handleAuthorizationCodeGrant(
 async function handleRefreshTokenGrant(
   request: NextRequest,
   body: FormData,
-  client: Record<string, unknown>,
+  client: OAuthClientPrismaType, // Use specific Prisma type
   ipAddress?: string,
   userAgent?: string
 ): Promise<NextResponse> {
-  const refresh_token = (body.get('refresh_token') ?? undefined) as string | undefined;
-  const scope = (body.get('scope') ?? undefined) as string | undefined;
+  const refreshTokenValue = (body.get('refresh_token') ?? undefined) as string | undefined;
+  const requestedScope = (body.get('scope') ?? undefined) as string | undefined;
 
-  if (!refresh_token) {
+  if (!refreshTokenValue) {
     return NextResponse.json(
       { 
         error: OAuth2ErrorTypes.INVALID_REQUEST,
@@ -364,188 +367,27 @@ async function handleRefreshTokenGrant(
   }
 
   try {
-    // Verify refresh token
-    const verification = await JWTUtils.verifyRefreshToken(refresh_token);
-    
-    if (!verification.valid) {
-      await AuthorizationUtils.logAuditEvent({
-        clientId: client.id as string,
-        action: 'invalid_refresh_token',
-        resource: 'oauth/token',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: verification.error,
-      });
-
-      return NextResponse.json(
-        { 
-          error: OAuth2ErrorTypes.INVALID_GRANT,
-          error_description: verification.error || 'Invalid refresh token' 
-        },
-        { status: 400 }
-      );
-    }
-
-    // Check if refresh token exists in database and is not revoked
-    const refreshTokenHashVerify = crypto.createHash('sha256').update(refresh_token).digest('hex');
-    const storedRefreshToken = await prisma.refreshToken.findFirst({
-      where: {
-        tokenHash: refreshTokenHashVerify,
-        revoked: false,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-    });
-
-    if (!storedRefreshToken) {
-      await AuthorizationUtils.logAuditEvent({
-        clientId: client.id as string,
-        action: 'revoked_refresh_token_used',
-        resource: 'oauth/token',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: 'Refresh token not found or revoked',
-      });
-
-      return NextResponse.json(
-        { 
-          error: OAuth2ErrorTypes.INVALID_GRANT,
-          error_description: 'Refresh token has been revoked or is invalid' 
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate client match
-    if (storedRefreshToken.clientId !== (client.id as string)) {
-      await AuthorizationUtils.logAuditEvent({
-        clientId: client.id as string,
-        action: 'refresh_token_client_mismatch',
-        resource: 'oauth/token',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: 'Refresh token was issued to a different client',
-      });
-
-      return NextResponse.json(
-        { 
-          error: OAuth2ErrorTypes.INVALID_GRANT,
-          error_description: 'Refresh token was issued to a different client' 
-        },
-        { status: 400 }
-      );
-    }
-
-    // Handle scope parameter for refresh token
-    const originalScopes = ScopeUtils.parseScopes(storedRefreshToken.scope ?? '');
-    let finalScope = storedRefreshToken.scope ?? undefined;
-    
-    if (scope) {
-      const requestedScopes = ScopeUtils.parseScopes(scope);
-      
-      // Ensure all requested scopes are within the original scope
-      const scopeValidation = ScopeUtils.validateScopes(requestedScopes, originalScopes);
-      if (!scopeValidation.valid) {
-        return NextResponse.json(
-          { 
-            error: OAuth2ErrorTypes.INVALID_SCOPE,
-            error_description: 'Requested scope is invalid or exceeds originally granted scope' 
-          },
-          { status: 400 }
-        );
-      }
-      
-      finalScope = scope;
-    }
-
-    // Get permissions if user is involved
-    let permissions: string[] = [];
-    if (storedRefreshToken.userId) {
-      permissions = await AuthorizationUtils.getUserPermissions(storedRefreshToken.userId);
-    }
-
-    // Generate new access token
-    const newAccessToken = await JWTUtils.createAccessToken({
-      client_id: client.clientId as string,
-      user_id: storedRefreshToken.userId ?? undefined,
-      scope: finalScope,
-      permissions,
-    });
-
-    const accessTokenHash = crypto.createHash('sha256').update(newAccessToken).digest('hex');
-
-    // Store new access token in database
-    await prisma.accessToken.create({
-      data: {
-        token: newAccessToken,
-        tokenHash: accessTokenHash,
-        clientId: client.id as string,
-        userId: storedRefreshToken.userId ?? undefined,
-        scope: finalScope ?? undefined,
-        expiresAt: addHours(new Date(), 1),
-        revoked: false,
-      },
-    });
-
-    // Optionally create new refresh token (recommended for security)
-    const newRefreshToken = await JWTUtils.createRefreshToken({
-      client_id: client.clientId as string,
-      user_id: storedRefreshToken.userId ?? undefined,
-      scope: finalScope,
-    });
-
-    const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
-
-    // Revoke old refresh token
-    await prisma.refreshToken.update({
-      where: { id: storedRefreshToken.id },
-      data: { revoked: true, revokedAt: new Date() },
-    });
-
-    // Store new refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: newRefreshToken,
-        tokenHash: newRefreshTokenHash,
-        clientId: client.id as string,
-        userId: storedRefreshToken.userId ?? undefined,
-        scope: finalScope ?? undefined,
-        expiresAt: addDays(new Date(), 30),
-        revoked: false,
-      },
-    });
-
-    // Log successful token refresh
-    await AuthorizationUtils.logAuditEvent({
-      clientId: client.id as string,
-      userId: storedRefreshToken.userId ?? undefined,
-      action: 'token_refreshed',
-      resource: 'oauth/token',
+    const tokenResponse = await processRefreshTokenGrantLogic(
+      refreshTokenValue,
+      requestedScope,
+      client, // client is already of OAuthClientPrismaType
       ipAddress,
-      userAgent,
-      success: true,
-      metadata: {
-        grantType: 'refresh_token',
-        scope: finalScope,
-      },
-    });
+      userAgent
+    );
 
+    // Format the successful response as per OAuth 2.0 standard (not ApiResponse)
     const response: Record<string, unknown> = {
-      access_token: newAccessToken,
-      token_type: 'Bearer',
-      expires_in: 3600,
-      refresh_token: newRefreshToken,
+      access_token: tokenResponse.accessToken,
+      token_type: tokenResponse.tokenType,
+      expires_in: tokenResponse.expiresIn,
+      refresh_token: tokenResponse.newRefreshToken, // Renamed from newRefreshTokenValue for clarity
     };
 
-    if (finalScope) {
-      response.scope = finalScope;
+    if (tokenResponse.scope) {
+      response.scope = tokenResponse.scope;
     }
 
-    return NextResponse.json(response, { 
+    return NextResponse.json(response, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store',
@@ -553,23 +395,39 @@ async function handleRefreshTokenGrant(
       },
     });
 
-  } catch (error: unknown) {
-    console.error('Refresh token processing error:', error);
+  } catch (error: any) { // Catch as 'any' to inspect its type
+    console.error('Refresh token processing error in handleRefreshTokenGrant:', error);
     
+    // If the error is an ApiError from processRefreshTokenGrantLogic, use its properties
+    if (error instanceof ApiError) {
+      // Audit logging for ApiError is already done within processRefreshTokenGrantLogic usually
+      // Or can be added here if specific context from handleRefreshTokenGrant is needed
+      // For now, assume processRefreshTokenGrantLogic handles its own audit failures.
+      return NextResponse.json(
+        {
+          error: error.errorCode || OAuth2ErrorTypes.INVALID_GRANT, // Use errorCode from ApiError if available
+          error_description: error.message
+        },
+        { status: error.statusCode }
+      );
+    }
+
+    // Generic error logging (if not an ApiError, something else went wrong)
     await AuthorizationUtils.logAuditEvent({
-      clientId: client.id as string,
-      action: 'refresh_token_error',
+      clientId: client.id, // client.id should be string due to OAuthClientPrismaType
+      action: 'refresh_token_unhandled_error',
       resource: 'oauth/token',
       ipAddress,
       userAgent,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorMessage: error instanceof Error ? error.message : 'Unknown internal error',
+      metadata: { grantType: 'refresh_token' },
     });
 
     return NextResponse.json(
       { 
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'Refresh token processing failed' 
+        error_description: 'Refresh token processing failed due to an internal error.'
       },
       { status: 500 }
     );
