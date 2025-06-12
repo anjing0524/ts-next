@@ -9,8 +9,7 @@ import {
 } from 'react';
 
 // 节流函数工具
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function throttle<T extends (...args: any[]) => any>(
+function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -74,8 +73,7 @@ export default function Main() {
   const setupWorkerMessageHandler = useCallback(
     (worker: Worker) => {
       // 使用消息类型映射优化消息处理
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const messageHandlers: Record<string, (data: any) => void> = {
+      const messageHandlers: Record<string, (data: unknown) => void> = {
         initialized: () => {
           if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
             setError('Canvas元素未找到');

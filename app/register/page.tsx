@@ -67,7 +67,7 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
   });
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [registerError, setRegisterError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -76,7 +76,7 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear field error when user starts typing
     if (errors[field]) {
-      setErrors((prev: any) => ({ ...prev, [field]: '' }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -88,7 +88,7 @@ export default function RegisterPage() {
 
     const result = registerSchema.safeParse(formData);
     if (!result.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
         if (issue.path[0]) {
           fieldErrors[issue.path[0]] = issue.message;

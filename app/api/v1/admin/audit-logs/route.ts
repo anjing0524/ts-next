@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { AuditLogQuerySchema, AuditLogQueryType } from './schemas';
 
 async function getAuditLogsHandler(request: NextRequest, context: AuthContext) {
-  const requestId = (request as any).requestId; // Injected by withErrorHandler
+  const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
   const { searchParams } = new URL(request.url);
 
   // Convert searchParams to a plain object for Zod parsing

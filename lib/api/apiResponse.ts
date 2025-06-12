@@ -31,7 +31,6 @@ export function errorResponse(
   message: string,
   statusCode: number,
   customRequestId?: string
-  // errorCode?: string, // Optional: if we want to pass a string code too
 ): ApiResponse<null> {
   return {
     code: statusCode,
@@ -39,6 +38,5 @@ export function errorResponse(
     data: null,
     timestamp: new Date().toISOString(),
     requestId: customRequestId || generateRequestId(),
-    // ...(errorCode && { errorCodeString: errorCode }),
   };
 }

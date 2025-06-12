@@ -1,13 +1,11 @@
-import crypto from 'crypto';
-
 import { NextRequest, NextResponse } from 'next/server';
 
+import { Client } from '@prisma/client';
 import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
 
 import { prisma } from '@/lib/prisma';
 
 import {
-  JWTUtils,
   ScopeUtils,
   AuthorizationUtils,
   RateLimitUtils,
@@ -21,7 +19,7 @@ export interface AuthContext {
   client_id: string;
   scopes: string[];
   permissions: string[];
-  payload: any;
+  payload: Record<string, unknown>;
 }
 
 export interface AuthOptions {
@@ -438,7 +436,7 @@ export function withOAuthMiddleware(
       }
 
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 5. 错误处理和审计日志
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -565,7 +563,7 @@ export interface OAuthValidationResult {
   response?: NextResponse;
   context?: {
     body?: FormData;
-    client?: any; // Consider using a more specific Client type if available
+    client?: Client; // Consider using a more specific Client type if available
     ipAddress?: string;
     userAgent?: string;
     params?: Record<string, string>;
@@ -612,14 +610,14 @@ export async function validateOAuthRequest(
   }
 
   let body: FormData | undefined;
-  let client: any; // Consider using a more specific Client type
+  let client: Client | undefined; // Consider using a more specific Client type
   const params: Record<string, string> = {};
 
   // Parse request body if validating form data or if client auth is required (as it might need body params)
   if (options.validateFormData || options.requireClientAuth) {
     try {
       body = await request.formData();
-    } catch (error) {
+    } catch {
       const actionType = options.requireClientAuth
         ? `${options.auditAction || 'oauth_request'}_client_auth_parse_failure`
         : `${options.auditAction || 'oauth_request'}_parse_error`;
@@ -791,7 +789,7 @@ export async function validateOAuthRequest(
  */
 export async function validateOAuthScopes( // Renamed to avoid conflict if a different validateScopes exists
   requestedScopes: string[],
-  client: any, // Consider using a more specific Client type
+  client: Client, // Consider using a more specific Client type
   options: {
     auditAction?: string;
     ipAddress?: string;

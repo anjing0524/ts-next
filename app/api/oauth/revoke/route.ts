@@ -130,7 +130,7 @@ async function handleRevokeRequest(
     // According to RFC 7009, the revocation endpoint should return 200 OK
     // even if the token was not found or already revoked
     return new NextResponse(null, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     await AuthorizationUtils.logAuditEvent({

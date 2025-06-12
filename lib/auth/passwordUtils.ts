@@ -66,6 +66,7 @@ export function generateSecurePassword(length: number = 12): string {
   } catch (e) {
     // Fallback to a simpler generation if somehow the above fails complexity, though unlikely
     // Or, ideally, loop until a valid one is generated. For now, simple fallback.
+    console.error(e);
     console.warn(
       'Initial generated password failed complexity check, retrying with simpler logic for safety.'
     );

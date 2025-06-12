@@ -43,11 +43,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // The actual algorithm used for signing should match what's specified in JWT_ALGORITHM.
       const publicKey = await jose.importSPKI(publicKeyPem, algorithm as string); // alg is required by importSPKI
       jwk = await jose.exportJWK(publicKey);
-    } catch (importError: any) {
+    } catch (importError: unknown) {
+      const error = importError as Error & { code?: string };
       logger.error('[JWKS] Failed to import or export public key:', {
-        message: importError.message,
-        stack: importError.stack,
-        code: importError.code, // jose errors often have a code property
+        message: error.message,
+        stack: error.stack,
+        code: error.code, // jose errors often have a code property
       });
       return NextResponse.json(
         {
@@ -75,7 +76,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         'Cache-Control': 'public, max-age=3600, must-revalidate', // Cache for 1 hour
       },
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     logger.error('[JWKS] Unexpected error generating JWKS:', {
       message: error.message,
       stack: error.stack,

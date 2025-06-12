@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
+import { Client } from '@prisma/client';
 
 import { successResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
@@ -12,12 +12,11 @@ import { processRefreshTokenGrantLogic, OAuth2ErrorTypes } from '@/lib/auth/oaut
 // and provide 'client', 'ipAddress', 'userAgent', 'body', 'params' in the context.
 
 // Define the expected context structure after client authentication by the middleware
-interface RefreshAuthContext extends OAuthValidationContext {
-  // client, ipAddress, userAgent, params, body are from OAuthValidationContext
-}
+// Using a type alias as RefreshAuthContext currently adds no new properties to OAuthValidationContext
+type RefreshAuthContext = OAuthValidationContext;
 
 async function refreshTokenHandler(request: NextRequest, context: RefreshAuthContext) {
-  const requestId = (request as any).requestId; // Injected by withErrorHandler
+  const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
 
   if (!context.client) {
     // This should ideally be caught by withOAuthTokenValidation if client auth fails
@@ -51,7 +50,7 @@ async function refreshTokenHandler(request: NextRequest, context: RefreshAuthCon
   const tokenResponse = await processRefreshTokenGrantLogic(
     refreshTokenValue,
     requestedScope,
-    context.client as OAuthClientPrismaType, // Cast client to the specific Prisma type
+    context.client as Client, // Cast client to the specific Prisma type
     context.ipAddress,
     context.userAgent
   );

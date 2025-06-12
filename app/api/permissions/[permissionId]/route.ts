@@ -33,12 +33,7 @@ interface PermissionRouteParams {
 }
 
 // GET /api/permissions/{permissionId} - 获取权限详情 (已重构)
-async function getPermission(
-  request: NextRequest,
-  { params }: PermissionRouteParams,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _authContext: AuthContext
-) {
+async function getPermission(request: NextRequest, { params }: PermissionRouteParams) {
   try {
     const permissionId = params.permissionId;
     // CUID 格式通常为 'c' + 24 位小写字母数字混合字符串。

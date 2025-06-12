@@ -41,7 +41,7 @@ async function handleUserInfo(request: NextRequest, context: AuthContext): Promi
     }
 
     // Build user info response based on requested scopes
-    const userInfo: any = {
+    const userInfo: Record<string, unknown> = {
       sub: user.id, // Subject identifier
     };
 

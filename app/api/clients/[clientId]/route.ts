@@ -148,7 +148,7 @@ async function handleUpdateClient(
   }
 
   // Build update data
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
 
   if (validatedData.name !== undefined) updateData.name = validatedData.name;
   if (validatedData.description !== undefined) updateData.description = validatedData.description;

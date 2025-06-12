@@ -49,13 +49,13 @@ const revokeToken = async (
         success: true,
       });
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(`Error calling revoke endpoint for ${tokenTypeHint}:`, e);
     await AuthorizationUtils.logAuditEvent({
       action: `revoke_token_exception_${tokenTypeHint}`,
       resource: 'auth/logout',
       success: false,
-      errorMessage: e.message || 'Exception during token revocation',
+      errorMessage: e instanceof Error ? e.message : 'Exception during token revocation',
     });
   }
 };
@@ -162,7 +162,7 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error during logout';
 
     await AuthorizationUtils.logAuditEvent({

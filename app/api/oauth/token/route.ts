@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
+import { Client } from '@prisma/client';
 import { addHours, addDays, isPast } from 'date-fns';
 
 import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
@@ -349,7 +349,7 @@ async function handleAuthorizationCodeGrant(
 async function handleRefreshTokenGrant(
   request: NextRequest,
   body: FormData,
-  client: OAuthClientPrismaType, // Use specific Prisma type
+  client: Client, // Use specific Prisma type
   ipAddress?: string,
   userAgent?: string
 ): Promise<NextResponse> {
@@ -370,7 +370,7 @@ async function handleRefreshTokenGrant(
     const tokenResponse = await processRefreshTokenGrantLogic(
       refreshTokenValue,
       requestedScope,
-      client, // client is already of OAuthClientPrismaType
+      client, // client is already of Client type
       ipAddress,
       userAgent
     );
@@ -394,8 +394,8 @@ async function handleRefreshTokenGrant(
         Pragma: 'no-cache',
       },
     });
-  } catch (error: any) {
-    // Catch as 'any' to inspect its type
+  } catch (error: unknown) {
+    // Catch as 'unknown' to inspect its type
     console.error('Refresh token processing error in handleRefreshTokenGrant:', error);
 
     // If the error is an ApiError from processRefreshTokenGrantLogic, use its properties
@@ -414,7 +414,7 @@ async function handleRefreshTokenGrant(
 
     // Generic error logging (if not an ApiError, something else went wrong)
     await AuthorizationUtils.logAuditEvent({
-      clientId: client.id, // client.id should be string due to OAuthClientPrismaType
+      clientId: client.id, // client.id should be string due to Client type
       action: 'refresh_token_unhandled_error',
       resource: 'oauth/token',
       ipAddress,

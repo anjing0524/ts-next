@@ -49,7 +49,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
 
     const result = loginSchema.safeParse({ username, password });
     if (!result.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
         if (issue.path[0]) {
           fieldErrors[issue.path[0]] = issue.message;

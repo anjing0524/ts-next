@@ -12,7 +12,7 @@ interface ApiErrorDetail {
   code: string;
   field?: string; // For validation errors on specific fields
   path?: (string | number)[]; // For Zod field errors
-  details?: any; // For more specific error details
+  details?: Record<string, unknown>; // For more specific error details
 }
 
 // interface ApiErrorResponse { // This might be deprecated or become internal
@@ -23,9 +23,9 @@ interface ApiErrorDetail {
 export class ApiError extends Error {
   statusCode: number;
   errorCode: string;
-  details?: any;
+  details?: Record<string, unknown>;
 
-  constructor(statusCode: number, message: string, errorCode: string, details?: any) {
+  constructor(statusCode: number, message: string, errorCode: string, details?: Record<string, unknown>) {
     super(message);
     this.statusCode = statusCode;
     this.errorCode = errorCode;
@@ -39,7 +39,7 @@ export class ApiError extends Error {
 }
 
 // Updated function signature and return type
-export function handleApiError(error: any, requestId?: string): NextResponse<ApiResponse<null>> {
+export function handleApiError(error: unknown, requestId?: string): NextResponse<ApiResponse<null>> {
   const currentRequestId = requestId || generateRequestId();
   logger.error('[API Error Handled]', {
     requestId: currentRequestId, // Log requestId
@@ -84,7 +84,7 @@ export function handleApiError(error: any, requestId?: string): NextResponse<Api
     let statusCode = 500;
     let message = 'A database error occurred.';
     let code = 'DB_ERROR';
-    const details: any = { prismaCode: error.code };
+    const details: Record<string, unknown> = { prismaCode: error.code };
 
     switch (error.code) {
       case 'P2002': // Unique constraint violation
@@ -158,7 +158,7 @@ export function withErrorHandler<T extends NextRequest, U>(
 ) {
   return async (request: T, context: U): Promise<NextResponse> => {
     // Ensure requestId is generated or retrieved and passed through
-    const req = request as any;
+    const req = request as { requestId?: string };
     const existingRequestId = req.requestId;
     const requestId = existingRequestId || generateRequestId();
 

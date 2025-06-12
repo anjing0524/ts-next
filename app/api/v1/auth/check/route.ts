@@ -10,7 +10,7 @@ import { SinglePermissionCheckRequestSchema, SinglePermissionCheckRequestType } 
 const permissionService = new PermissionService();
 
 async function checkSinglePermissionHandler(request: NextRequest, context: AuthContext) {
-  const requestId = (request as any).requestId; // From withErrorHandler
+  const requestId = (request as { requestId?: string }).requestId; // From withErrorHandler
   const body = await request.json();
 
   // Validate the request body

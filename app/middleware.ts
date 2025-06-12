@@ -189,7 +189,7 @@ export async function middleware(request: NextRequest) {
       `[Middleware] Path ${pathname} does not require specific permissions or is not explicitly protected. Allowing.`
     );
     return NextResponse.next();
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
     logger.error(`[Middleware] Token verification failed: ${errorMessage}`, error);
     await AuthorizationUtils.logAuditEvent({

@@ -60,7 +60,7 @@ async function authenticateIntrospectingClient(request: NextRequest): Promise<Cl
 
 function buildIntrospectionResponse(
   tokenData: AccessToken | RefreshToken,
-  jwtPayload: any,
+  jwtPayload: Record<string, unknown>,
   isActive: boolean,
   tokenType: 'access_token' | 'refresh_token'
 ): IntrospectionResponse {

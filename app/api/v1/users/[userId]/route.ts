@@ -80,7 +80,7 @@ export const GET = withErrorHandler(
       // @ts-ignore //  userRoles will be removed after this
       delete userWithRoles.userRoles;
 
-      const requestId = (request as any).requestId;
+      const requestId = (request as { requestId?: string }).requestId;
       return NextResponse.json(
         successResponse(
           { user: userWithRoles },
@@ -121,7 +121,7 @@ export const PUT = withErrorHandler(
       const { firstName, lastName, email, isActive } = validatedData;
 
       // 构建要更新的数据对象，只包含请求中提供的字段
-      const dataToUpdate: any = {};
+      const dataToUpdate: Record<string, unknown> = {};
       if (firstName !== undefined) dataToUpdate.firstName = firstName;
       if (lastName !== undefined) dataToUpdate.lastName = lastName;
       if (email !== undefined) dataToUpdate.email = email;
@@ -162,7 +162,7 @@ export const PUT = withErrorHandler(
         },
       });
 
-      const requestId = (request as any).requestId;
+      const requestId = (request as { requestId?: string }).requestId;
       return NextResponse.json(
         successResponse(
           { user: updatedUser },
@@ -223,7 +223,7 @@ export const DELETE = withErrorHandler(
         },
       });
 
-      const requestId = (request as any).requestId;
+      const requestId = (request as { requestId?: string }).requestId;
       return NextResponse.json(
         successResponse(
           { message: 'User deactivated successfully', user: deactivatedUser },

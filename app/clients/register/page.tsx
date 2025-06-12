@@ -46,11 +46,11 @@ export default function ClientRegisterPage() {
   const [name, setName] = useState('');
   const [redirectUris, setRedirectUris] = useState('');
   const [jwksUri, setJwksUri] = useState(''); // 1. Update State
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiResponse, setApiResponse] = useState<{
     type: 'success' | 'error';
     message: string;
-    data?: any;
+    data?: Record<string, string>;
   } | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -61,7 +61,7 @@ export default function ClientRegisterPage() {
     // 4. Update handleSubmit Function (safeParse)
     const validation = clientRegisterSchema.safeParse({ name, redirectUris, jwksUri });
     if (!validation.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
       for (const issue of validation.error.issues) {
         if (issue.path[0]) {
           fieldErrors[issue.path[0]] = issue.message;

@@ -1,5 +1,3 @@
-import { Role, UserRole, Permission } from '@prisma/client'; // Ensure these are available if needed by other parts of the class
-
 import { prisma } from '@/lib/prisma';
 
 // Define a type for the structure of permission requests in checkBatchPermissions

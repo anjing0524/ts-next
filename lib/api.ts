@@ -1,5 +1,3 @@
-import { toast } from '@/components/ui/use-toast';
-
 // Helper function to get a cookie value
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -86,7 +84,7 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
 /**
  * Convenience wrapper for JSON API calls
  */
-export async function apiRequest<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+export async function apiRequest<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await apiFetch(url, options);
 
   if (!response.ok) {
@@ -167,13 +165,13 @@ export const adminApi = {
   // registerClient: async (clientData: ...) => { ... } // This seems to be replaced by createClient for admin panel
 
   // --- User Management ---
-  createUser: async (userData: object): Promise<any> => {
+  createUser: async (userData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest('/api/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   },
-  updateUser: async (userId: string, userData: object): Promise<any> => {
+  updateUser: async (userId: string, userData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest(`/api/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
@@ -187,16 +185,16 @@ export const adminApi = {
   },
 
   // --- Role Management ---
-  getRoles: async (limit = 10): Promise<any> => {
+  getRoles: async (limit = 10): Promise<unknown> => {
     return apiRequest(`/api/roles?limit=${limit}`);
   },
-  createRole: async (roleData: object): Promise<any> => {
+  createRole: async (roleData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest('/api/roles', {
       method: 'POST',
       body: JSON.stringify(roleData),
     });
   },
-  updateRole: async (roleId: string, roleData: object): Promise<any> => {
+  updateRole: async (roleId: string, roleData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest(`/api/roles/${roleId}`, {
       method: 'PUT',
       body: JSON.stringify(roleData),
@@ -209,16 +207,19 @@ export const adminApi = {
   },
 
   // --- Permission Management (RBAC) ---
-  getPermissions: async (limit = 10): Promise<any> => {
+  getPermissions: async (limit = 10): Promise<unknown> => {
     return apiRequest(`/api/permissions?limit=${limit}`);
   },
-  createPermission: async (permissionData: object): Promise<any> => {
+  createPermission: async (permissionData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest('/api/permissions', {
       method: 'POST',
       body: JSON.stringify(permissionData),
     });
   },
-  updatePermission: async (permissionId: string, permissionData: object): Promise<any> => {
+  updatePermission: async (
+    permissionId: string,
+    permissionData: Record<string, unknown>
+  ): Promise<unknown> => {
     return apiRequest(`/api/permissions/${permissionId}`, {
       method: 'PUT',
       body: JSON.stringify(permissionData),
@@ -234,13 +235,16 @@ export const adminApi = {
   // Note: getClients is above, ensure it's comprehensive.
   // The existing registerClient is likely for the public client registration page.
   // This createClient is for the admin panel.
-  createClient: async (clientData: object): Promise<any> => {
+  createClient: async (clientData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest('/api/clients', {
       method: 'POST',
       body: JSON.stringify(clientData),
     });
   },
-  updateClient: async (clientId: string, clientUpdateData: object): Promise<any> => {
+  updateClient: async (
+    clientId: string,
+    clientUpdateData: Record<string, unknown>
+  ): Promise<unknown> => {
     return apiRequest(`/api/clients/${clientId}`, {
       method: 'PUT',
       body: JSON.stringify(clientUpdateData),
@@ -251,23 +255,26 @@ export const adminApi = {
       method: 'DELETE',
     });
   },
-  regenerateClientSecret: async (clientId: string): Promise<any> => {
+  regenerateClientSecret: async (clientId: string): Promise<unknown> => {
     return apiRequest(`/api/clients/${clientId}/regenerate-secret`, {
       method: 'POST', // Or PUT, depending on API design
     });
   },
 
   // --- OAuth Scope Management ---
-  getOAuthScopes: async (limit = 10): Promise<any> => {
+  getOAuthScopes: async (limit = 10): Promise<unknown> => {
     return apiRequest(`/api/scopes?limit=${limit}`);
   },
-  createOAuthScope: async (scopeData: object): Promise<any> => {
+  createOAuthScope: async (scopeData: Record<string, unknown>): Promise<unknown> => {
     return apiRequest('/api/scopes', {
       method: 'POST',
       body: JSON.stringify(scopeData),
     });
   },
-  updateOAuthScope: async (scopeId: string, scopeData: object): Promise<any> => {
+  updateOAuthScope: async (
+    scopeId: string,
+    scopeData: Record<string, unknown>
+  ): Promise<unknown> => {
     return apiRequest(`/api/scopes/${scopeId}`, {
       method: 'PUT',
       body: JSON.stringify(scopeData),

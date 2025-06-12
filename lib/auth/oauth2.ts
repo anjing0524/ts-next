@@ -2,8 +2,7 @@ import crypto from 'crypto';
 
 import { NextRequest } from 'next/server';
 
-import { User, Client, Scope } from '@prisma/client';
-import { Client as OAuthClientPrismaType } from '@prisma/client'; // Added this import
+import { User, Client } from '@prisma/client';
 import { addHours, addDays } from 'date-fns'; // For token expiry
 import * as jose from 'jose';
 
@@ -187,19 +186,6 @@ export class ScopeUtils {
 
 // JWT utilities
 export class JWTUtils {
-  // HS256用的密钥获取方法 (Key retrieval method for HS256)
-  // private static getSecret(): Uint8Array {
-  //   const secret = process.env.JWT_ACCESS_TOKEN_SECRET;
-  //   if (!secret) {
-  //     if (process.env.NODE_ENV === 'production') {
-  //       throw new Error('JWT_ACCESS_TOKEN_SECRET is not set in production environment');
-  //     }
-  //     // Default secret for development
-  //     return new TextEncoder().encode('super-secret-key-for-hs256-oauth-dev-env-32-chars-for-dev-only');
-  //   }
-  //   return new TextEncoder().encode(secret);
-  // }
-
   // 内部方法，用于获取RSA私钥进行签名 (Internal method to get RSA private key for signing)
   private static async getRSAPrivateKeyForSigning(): Promise<jose.KeyLike> {
     const pem = process.env.JWT_PRIVATE_KEY_PEM; // Changed variable name
@@ -490,7 +476,7 @@ export class ClientAuthUtils {
           client_id = client_id || basicClientId;
           client_secret = client_secret || basicClientSecret;
         }
-      } catch (error) {
+      } catch {
         return {
           client: null,
           error: {
@@ -689,7 +675,7 @@ export class ClientAuthUtils {
       });
 
       return { client };
-    } catch (error) {
+    } catch {
       return {
         client: null,
         error: {
@@ -739,7 +725,7 @@ export class AuthorizationUtils {
     userAgent?: string;
     success: boolean;
     errorMessage?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<void> {
     try {
       // Validate userId exists if provided
@@ -866,7 +852,7 @@ export class RateLimitUtils {
 export async function processRefreshTokenGrantLogic(
   refreshTokenValue: string,
   requestedScope: string | undefined,
-  client: OAuthClientPrismaType, // Use imported Prisma type
+  client: Client, // Use imported Prisma type
   ipAddress?: string,
   userAgent?: string
 ): Promise<{

@@ -13,7 +13,7 @@ const ActionSchema = z.object({
   type: z.string().min(1, 'Action type is required'), // e.g., "read", "write"
 });
 
-const EnvironmentAttributesSchema = z.record(z.any()).optional();
+const EnvironmentAttributesSchema = z.record(z.unknown()).optional();
 
 export const SinglePermissionCheckRequestSchema = z.object({
   subjectAttributes: SubjectAttributesSchema,

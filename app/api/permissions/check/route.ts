@@ -99,7 +99,7 @@ async function handlePermissionsCheck(request: NextRequest, authContext: AuthCon
     // });
 
     return NextResponse.json({ results: serviceResults });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Permissions check API encountered an error:', error);
 
     // Ensure targetUserId is available for logging if parsing succeeded before error

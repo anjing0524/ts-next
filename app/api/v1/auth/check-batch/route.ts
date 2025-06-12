@@ -21,7 +21,7 @@ interface PermissionServiceRequest {
 }
 
 async function checkBatchPermissionHandler(request: NextRequest, context: AuthContext) {
-  const requestId = (request as any).requestId; // Overall requestId for this batch operation from withErrorHandler
+  const requestId = (request as { requestId?: string }).requestId; // Overall requestId for this batch operation from withErrorHandler
   const body = await request.json();
 
   // Validate the request body

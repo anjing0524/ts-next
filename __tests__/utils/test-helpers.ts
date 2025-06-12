@@ -881,9 +881,20 @@ export class TestDataManager {
           await prisma.scope.create({
             data: scopeData,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If scope already exists (race condition), ignore the error
-          if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
+          if (
+            error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            error.code === 'P2002' &&
+            'meta' in error &&
+            error.meta &&
+            typeof error.meta === 'object' &&
+            'target' in error.meta &&
+            Array.isArray(error.meta.target) &&
+            error.meta.target.includes('name')
+          ) {
             console.log(`Scope ${scopeData.name} already exists, skipping...`);
           } else {
             throw error;
@@ -1045,7 +1056,7 @@ export class TestAssertions {
   /**
    * 验证令牌响应
    */
-  static async expectTokenResponse(response: Response): Promise<any> {
+  static async expectTokenResponse(response: Response): Promise<Record<string, unknown>> {
     const data = await response.json();
 
     if (!data.access_token) {
@@ -1058,7 +1069,7 @@ export class TestAssertions {
   /**
    * 验证有效的令牌响应格式
    */
-  static assertValidTokens(tokens: any): void {
+  static assertValidTokens(tokens: Record<string, unknown>): void {
     if (!tokens.access_token) {
       throw new Error('Missing access_token in response');
     }
@@ -1111,7 +1122,7 @@ export class TestAssertions {
   /**
    * 验证令牌响应格式
    */
-  static async validateTokenResponse(response: Response): Promise<any> {
+  static async validateTokenResponse(response: Response): Promise<Record<string, unknown>> {
     if (response.status !== TEST_CONFIG.HTTP_STATUS.OK) {
       throw new Error(`Expected status 200, got ${response.status}`);
     }

@@ -86,7 +86,7 @@ async function handleBatchPermissionCheck(request: NextRequest, context: Service
     }));
 
     return NextResponse.json({ results: clientResults });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Batch permission check API encountered an error:', error);
     return NextResponse.json(
       {

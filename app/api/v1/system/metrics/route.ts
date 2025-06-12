@@ -8,7 +8,7 @@ import { withErrorHandler } from '@/lib/api/errorHandler';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 
 async function getSystemMetricsHandler(request: NextRequest, context: AuthContext) {
-  const requestId = (request as any).requestId; // Injected by withErrorHandler
+  const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
 
   // Calculate memory usage, ensuring values are numbers before toFixed
   const totalMemBytes = os.totalmem();
@@ -47,10 +47,9 @@ async function getSystemMetricsHandler(request: NextRequest, context: AuthContex
 
   // Handle arrayBuffers specifically as it might not be present in all Node.js versions
   if (typeof process.memoryUsage().arrayBuffers === 'number') {
-    (metrics.processMemoryUsage as any).arrayBuffersMB = (
-      process.memoryUsage().arrayBuffers /
-      (1024 * 1024)
-    ).toFixed(2);
+    (
+      metrics.processMemoryUsage as typeof metrics.processMemoryUsage & { arrayBuffersMB?: string }
+    ).arrayBuffersMB = (process.memoryUsage().arrayBuffers / (1024 * 1024)).toFixed(2);
   }
 
   return NextResponse.json(

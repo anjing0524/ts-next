@@ -259,7 +259,7 @@ async function handleAuthorizeRequest(
     if (state) redirectUrl.searchParams.set('state', state);
 
     return NextResponse.redirect(redirectUrl.toString());
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     await AuthorizationUtils.logAuditEvent({

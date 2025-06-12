@@ -77,7 +77,7 @@ async function handleGetClients(request: NextRequest, context: AuthContext): Pro
   });
 
   // Build where clause
-  const where: any = {};
+  const where: Record<string, unknown> = {};
 
   if (isActive !== undefined) {
     where.isActive = isActive;
@@ -217,7 +217,7 @@ async function handleCreateClient(
   // IMPORTANT: Return the raw secret to the admin ONCE on creation
   // It will not be stored in raw format.
   if (clientSecret) {
-    (client as any).clientSecret = clientSecret;
+    (client as typeof client & { clientSecret?: string }).clientSecret = clientSecret;
   }
 
   // Log creation
