@@ -4,7 +4,10 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
 
-// Define permissions based on scopes that imply API access
+async function main() {
+  console.log('prisma/seed.ts: Main function started. Attempting to seed database...'); // New initial log
+
+  // Define permissions based on scopes that imply API access
 // Format: { name: "resource:action", displayName: "Can do X to Y", resource: "ResourceName", action: "ActionName" }
 const adminPermissionsData = [
   // User Management
@@ -151,8 +154,7 @@ const adminPermissionsData = [
   },
 ];
 
-async function main() {
-  console.log('Start seeding...');
+  console.log('prisma/seed.ts: Start seeding database content...'); // Modified existing log
 
   // 1. Seed Scopes (keeping existing logic, ensuring admin scopes are present)
   console.log('Seeding scopes...');
@@ -312,7 +314,7 @@ async function main() {
       firstName: 'Admin',
       lastName: 'User',
       isActive: true,
-      emailVerified: true, // Assuming admin's email is verified for seeding
+      // emailVerified: true, // Removed as not in schema
       mustChangePassword: false, // For ease of first login
     },
   });
@@ -345,8 +347,105 @@ async function main() {
   }
   console.log('Admin role assigned.');
 
-  // 7. Seed OAuth Client for Auth Service (e.g., for backend services or admin UI)
-  console.log('Seeding OAuth client for auth service...');
+  // NEW USER VARIETY
+  console.log('Seeding additional user variations...');
+  const generalPassword = 'password'; // Common password for test users
+  const hashedGeneralPassword = await bcrypt.hash(generalPassword, SALT_ROUNDS);
+
+  // Regular User (Non-Admin)
+  const testUser = await prisma.user.upsert({
+    where: { username: 'testuser' },
+    update: { email: 'testuser@example.com', passwordHash: hashedGeneralPassword, isActive: true, mustChangePassword: false, firstName: 'Test', lastName: 'User' }, // emailVerified removed
+    create: {
+      username: 'testuser',
+      email: 'testuser@example.com',
+      passwordHash: hashedGeneralPassword,
+      firstName: 'Test',
+      lastName: 'User',
+      isActive: true,
+      // emailVerified: true, // Removed as not in schema
+      mustChangePassword: false,
+    },
+  });
+  console.log(`Upserted user: ${testUser.username}`);
+  await prisma.passwordHistory.create({ data: { userId: testUser.id, passwordHash: hashedGeneralPassword } }).catch(e => console.warn(`Password history for ${testUser.username} might already exist.`));
+
+  // Inactive User
+  const inactiveUser = await prisma.user.upsert({
+    where: { username: 'inactiveuser' },
+    update: { email: 'inactive@example.com', passwordHash: hashedGeneralPassword, isActive: false, firstName: 'Inactive', lastName: 'Person' }, // emailVerified removed
+    create: {
+      username: 'inactiveuser',
+      email: 'inactive@example.com',
+      passwordHash: hashedGeneralPassword,
+      firstName: 'Inactive',
+      lastName: 'Person',
+      isActive: false,
+      // emailVerified: false, // Removed as not in schema
+    },
+  });
+  console.log(`Upserted user: ${inactiveUser.username}`);
+  await prisma.passwordHistory.create({ data: { userId: inactiveUser.id, passwordHash: hashedGeneralPassword } }).catch(e => console.warn(`Password history for ${inactiveUser.username} might already exist.`));
+
+  // Locked User
+  const lockedUntilDate = new Date();
+  lockedUntilDate.setDate(lockedUntilDate.getDate() + 7); // Locked for 7 days
+  const lockedUser = await prisma.user.upsert({
+    where: { username: 'lockeduser' },
+    update: { email: 'locked@example.com', passwordHash: hashedGeneralPassword, isActive: true, lockedUntil: lockedUntilDate, firstName: 'Locked', lastName: 'Account' }, // emailVerified removed
+    create: {
+      username: 'lockeduser',
+      email: 'locked@example.com',
+      passwordHash: hashedGeneralPassword,
+      firstName: 'Locked',
+      lastName: 'Account',
+      isActive: true,
+      // emailVerified: true, // Removed as not in schema
+      lockedUntil: lockedUntilDate,
+    },
+  });
+  console.log(`Upserted user: ${lockedUser.username}`);
+  await prisma.passwordHistory.create({ data: { userId: lockedUser.id, passwordHash: hashedGeneralPassword } }).catch(e => console.warn(`Password history for ${lockedUser.username} might already exist.`));
+
+  // User Requiring Password Change
+  const changePwUser = await prisma.user.upsert({
+    where: { username: 'changepwuser' },
+    update: { email: 'changepw@example.com', passwordHash: hashedGeneralPassword, isActive: true, mustChangePassword: true, firstName: 'ChangePass', lastName: 'Now' }, // emailVerified removed
+    create: {
+      username: 'changepwuser',
+      email: 'changepw@example.com',
+      passwordHash: hashedGeneralPassword,
+      firstName: 'ChangePass',
+      lastName: 'Now',
+      isActive: true,
+      // emailVerified: true, // Removed as not in schema
+      mustChangePassword: true,
+    },
+  });
+  console.log(`Upserted user: ${changePwUser.username}`);
+  await prisma.passwordHistory.create({ data: { userId: changePwUser.id, passwordHash: hashedGeneralPassword } }).catch(e => console.warn(`Password history for ${changePwUser.username} might already exist.`));
+
+  // NEW ROLE VARIETY
+  console.log('Seeding basic "user" role...');
+  const basicUserRole = await prisma.role.upsert({
+    where: { name: 'user' },
+    update: { displayName: 'Regular User', isActive: true },
+    create: { name: 'user', displayName: 'Regular User', isActive: true, description: 'Basic user role with limited permissions.' },
+  });
+  console.log(`Upserted role: ${basicUserRole.name}`);
+
+  // ASSIGN 'user' ROLE TO 'testuser'
+  console.log(`Assigning '${basicUserRole.name}' role to '${testUser.username}'...`);
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: testUser.id, roleId: basicUserRole.id } },
+    update: {},
+    create: { userId: testUser.id, roleId: basicUserRole.id },
+  });
+  console.log(`Assigned role ${basicUserRole.name} to user ${testUser.username}`);
+  console.log('Additional user variations and basic role seeded.');
+
+  // 7. Seed OAuth Client for Auth Service (e.g., for backend services or admin UI) - RENUMBERED to 8
+  console.log('Seeding OAuth client for auth service (renumbered to 8)...');
   const clientSecret = 'adminclientsecret'; // For seeding, should be changed
   const hashedClientSecret = await bcrypt.hash(clientSecret, SALT_ROUNDS);
 
@@ -366,6 +465,7 @@ async function main() {
     update: {
       clientSecret: hashedClientSecret, // Update secret if changed
       clientName: 'Auth Center Admin Client',
+      clientType: 'CONFIDENTIAL', // Use clientType instead of isPublic
       redirectUris: JSON.stringify([
         'http://localhost/callback',
         'http://localhost:3000/callback',
@@ -374,7 +474,7 @@ async function main() {
       grantTypes: JSON.stringify(['authorization_code', 'client_credentials', 'refresh_token']),
       responseTypes: JSON.stringify(['code', 'token']),
       allowedScopes: adminClientScopes,
-      isPublic: false,
+      // isPublic: false, // Removed
       requirePkce: true,
       requireConsent: false, // Admin client might not need user consent for its own operations
       tokenEndpointAuthMethod: 'client_secret_basic',
@@ -384,6 +484,7 @@ async function main() {
       clientSecret: hashedClientSecret,
       clientName: 'Auth Center Admin Client',
       clientDescription: 'OAuth client for internal admin tasks and services.',
+      clientType: 'CONFIDENTIAL', // Use clientType instead of isPublic
       redirectUris: JSON.stringify([
         'http://localhost/callback',
         'http://localhost:3000/callback',
@@ -392,7 +493,7 @@ async function main() {
       grantTypes: JSON.stringify(['authorization_code', 'client_credentials', 'refresh_token']),
       responseTypes: JSON.stringify(['code', 'token']),
       allowedScopes: adminClientScopes,
-      isPublic: false,
+      // isPublic: false, // Removed
       isActive: true,
       requirePkce: true,
       requireConsent: false,
@@ -403,6 +504,76 @@ async function main() {
     `Upserted OAuth client: ${adminClient.clientId}. IMPORTANT: Raw secret for seeding is '${clientSecret}'`
   );
   console.log('OAuth client seeded.');
+
+  // NEW OAUTH CLIENT VARIETY (Now step 9)
+  console.log('Seeding additional OAuth client variations...');
+
+  // Public Client (SPA)
+  const publicTestClient = await prisma.oAuthClient.upsert({
+    where: { clientId: 'public-test-client' },
+    update: {
+      clientName: 'Public Test SPA Client',
+      clientType: 'PUBLIC',
+      redirectUris: JSON.stringify(['http://localhost:3001/callback']),
+      grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
+      responseTypes: JSON.stringify(['code']),
+      allowedScopes: 'openid profile email order:read', // Space-separated
+      requirePkce: true,
+      requireConsent: true,
+      isActive: true,
+    },
+    create: {
+      clientId: 'public-test-client',
+      clientName: 'Public Test SPA Client',
+      clientDescription: 'A public test client for SPA applications.',
+      clientType: 'PUBLIC',
+      redirectUris: JSON.stringify(['http://localhost:3001/callback']),
+      grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
+      responseTypes: JSON.stringify(['code']),
+      allowedScopes: 'openid profile email order:read', // Space-separated
+      requirePkce: true,
+      requireConsent: true,
+      isActive: true,
+      tokenEndpointAuthMethod: 'none', // Public clients might use 'none'
+    },
+  });
+  console.log(`Upserted public OAuth client: ${publicTestClient.clientId}`);
+
+  // Confidential Client (Web App)
+  const confidentialClientSecretRaw = 'confidentialclientsecret';
+  const hashedConfidentialClientSecret = await bcrypt.hash(confidentialClientSecretRaw, SALT_ROUNDS);
+  const confidentialTestClient = await prisma.oAuthClient.upsert({
+    where: { clientId: 'confidential-test-client' },
+    update: {
+      clientName: 'Confidential Test Web Client',
+      clientSecret: hashedConfidentialClientSecret,
+      clientType: 'CONFIDENTIAL',
+      redirectUris: JSON.stringify(['http://localhost:3002/callback']),
+      grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
+      responseTypes: JSON.stringify(['code']),
+      allowedScopes: 'openid profile email order:read order:create product:read', // Space-separated
+      requirePkce: true,
+      requireConsent: true,
+      isActive: true,
+    },
+    create: {
+      clientId: 'confidential-test-client',
+      clientName: 'Confidential Test Web Client',
+      clientDescription: 'A confidential test client for web applications.',
+      clientSecret: hashedConfidentialClientSecret,
+      clientType: 'CONFIDENTIAL',
+      redirectUris: JSON.stringify(['http://localhost:3002/callback']),
+      grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
+      responseTypes: JSON.stringify(['code']),
+      allowedScopes: 'openid profile email order:read order:create product:read', // Space-separated
+      requirePkce: true, // Good practice
+      requireConsent: true,
+      isActive: true,
+      tokenEndpointAuthMethod: 'client_secret_basic',
+    },
+  });
+  console.log(`Upserted confidential OAuth client: ${confidentialTestClient.clientId}. Raw secret: '${confidentialClientSecretRaw}'`);
+  console.log('Additional OAuth clients seeded.');
 
   console.log('Seeding finished successfully.');
 }

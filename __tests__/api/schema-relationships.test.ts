@@ -37,8 +37,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
         data: {
           username: 'schema-user1-' + testDataSuffix,
           email: `schema-user1-${testDataSuffix}@example.com`,
-          password,
-          emailVerified: true,
+          passwordHash: password, // Corrected field name
+          // emailVerified: true, // Removed
           isActive: true,
           firstName: 'Schema',
           lastName: 'User1',
@@ -49,8 +49,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
         data: {
           username: 'schema-user2-' + testDataSuffix,
           email: `schema-user2-${testDataSuffix}@example.com`,
-          password,
-          emailVerified: true,
+          passwordHash: password, // Corrected field name
+          // emailVerified: true, // Removed
           isActive: true,
           firstName: 'Schema',
           lastName: 'User2',
@@ -58,35 +58,39 @@ describe('Database Schema Relationships Integrity Tests', () => {
       });
 
       // Create test client
-      testClient = await prisma.client.create({
+      testClient = await prisma.oAuthClient.create({ // Corrected model name
         data: {
           clientId: 'schema-client-' + testDataSuffix,
           clientSecret: await bcrypt.hash('schema-secret', 12),
-          name: `Schema Test Client ${testDataSuffix}`,
+          clientName: `Schema Test Client ${testDataSuffix}`, // Corrected field name
+          clientType: 'CONFIDENTIAL', // Corrected field
           redirectUris: JSON.stringify(['http://localhost:3000/callback']),
           grantTypes: JSON.stringify(['authorization_code', 'client_credentials', 'refresh_token']),
           responseTypes: JSON.stringify(['code']),
-          scope: 'openid profile email test:read test:write',
-          isPublic: false,
+          allowedScopes: JSON.stringify('openid profile email test:read test:write'.split(' ')), // Corrected field name & format
           isActive: true,
         },
       });
 
-      // Create test resource with unique name
-      testResource = await prisma.resource.create({
-        data: {
-          name: `SCHEMA_TEST_RESOURCE_${testDataSuffix}`,
-          description: 'Test resource for schema validation',
-          apiPath: '/api/test/*',
-          isActive: true,
-        },
-      });
+      // Create test resource with unique name - REMOVED as Resource model does not exist
+      // testResource = await prisma.resource.create({
+      //   data: {
+      //     name: `SCHEMA_TEST_RESOURCE_${testDataSuffix}`,
+      //     description: 'Test resource for schema validation',
+      //     apiPath: '/api/test/*',
+      //     isActive: true,
+      //   },
+      // });
+      testResource = null; // Ensure it's null
 
       // Create test permission with unique name
       testPermission = await prisma.permission.create({
         data: {
           name: `SCHEMA_TEST_PERMISSION_${testDataSuffix}`,
+          displayName: `Test Display Permission ${testDataSuffix}`, // Added
           description: 'Test permission for schema validation',
+          resource: `test_resource_perm_${testDataSuffix}`, // Added
+          action: 'read', // Added
           isActive: true,
         },
       });
@@ -111,15 +115,15 @@ describe('Database Schema Relationships Integrity Tests', () => {
   async function cleanupExistingTestData(): Promise<void> {
     try {
       // Clean up any leftover test data from previous runs
-      await prisma.resource
-        .deleteMany({
-          where: {
-            name: {
-              startsWith: 'SCHEMA_TEST_RESOURCE',
-            },
-          },
-        })
-        .catch(() => {});
+      // await prisma.resource // REMOVED
+      //   .deleteMany({
+      //     where: {
+      //       name: {
+      //         startsWith: 'SCHEMA_TEST_RESOURCE',
+      //       },
+      //     },
+      //   })
+      //   .catch(() => {});
 
       await prisma.permission
         .deleteMany({
@@ -141,7 +145,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
         })
         .catch(() => {});
 
-      await prisma.client
+      await prisma.oAuthClient // Corrected model name
         .deleteMany({
           where: {
             clientId: {
@@ -168,32 +172,29 @@ describe('Database Schema Relationships Integrity Tests', () => {
   async function cleanupTestData(): Promise<void> {
     try {
       // Clean up in reverse order to respect foreign key constraints
-      await prisma.userResourcePermission
-        .deleteMany({
-          where: {
-            OR: [{ userId: testUser?.id }, { userId: testUser2?.id }],
-          },
-        })
-        .catch(() => {});
+      // await prisma.userResourcePermission // REMOVED
+      //   .deleteMany({
+      //     where: {
+      //       OR: [{ userId: testUser?.id }, { userId: testUser2?.id }],
+      //     },
+      //   })
+      //   .catch(() => {});
 
-      await prisma.accessToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {});
-      await prisma.refreshToken.deleteMany({ where: { clientId: testClient?.id } }).catch(() => {});
+      await prisma.accessToken.deleteMany({ where: { OR: [{userId: testUser?.id}, {clientId: testClient?.id}] } }).catch(() => {});
+      await prisma.refreshToken.deleteMany({ where: { OR: [{userId: testUser?.id}, {clientId: testClient?.id}] } }).catch(() => {});
       await prisma.authorizationCode
-        .deleteMany({ where: { clientId: testClient?.id } })
+        .deleteMany({ where: { OR: [{userId: testUser?.id}, {clientId: testClient?.id}] } })
         .catch(() => {});
       // UserSession model is deprecated/removed in favor of JWTs.
-      // await prisma.userSession.deleteMany({
-      //   where: {
-      //     OR: [
-      //       { userId: testUser?.id },
-      //       { userId: testUser2?.id }
-      //     ]
-      //   }
-      // }).catch(() => {})
+
       await prisma.auditLog
         .deleteMany({
           where: {
-            OR: [{ userId: testUser?.id }, { userId: testUser2?.id }, { clientId: testClient?.id }],
+            OR: [
+              { userId: testUser?.id },
+              { userId: testUser2?.id },
+              { actorId: testClient?.id, actorType: 'CLIENT' } // Adjusted for AuditLog schema
+            ],
           },
         })
         .catch(() => {});
@@ -201,10 +202,10 @@ describe('Database Schema Relationships Integrity Tests', () => {
       if (testScope?.id) await prisma.scope.delete({ where: { id: testScope.id } }).catch(() => {});
       if (testPermission?.id)
         await prisma.permission.delete({ where: { id: testPermission.id } }).catch(() => {});
-      if (testResource?.id)
-        await prisma.resource.delete({ where: { id: testResource.id } }).catch(() => {});
+      // if (testResource?.id) // REMOVED
+      //   await prisma.resource.delete({ where: { id: testResource.id } }).catch(() => {});
       if (testClient?.id)
-        await prisma.client.delete({ where: { id: testClient.id } }).catch(() => {});
+        await prisma.oAuthClient.delete({ where: { id: testClient.id } }).catch(() => {}); // Corrected model name
       if (testUser?.id) await prisma.user.delete({ where: { id: testUser.id } }).catch(() => {});
       if (testUser2?.id) await prisma.user.delete({ where: { id: testUser2.id } }).catch(() => {});
 
@@ -281,7 +282,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
           userId: testUser.id,
           clientId: testClient.id,
           scope: 'openid profile',
-          state: 'test-state',
+          // state: 'test-state', // Removed: 'state' is not a field in AuthorizationCode model
         },
       });
 
@@ -339,12 +340,13 @@ describe('Database Schema Relationships Integrity Tests', () => {
           tokenHash: crypto.createHash('sha256').update('test_client_token').digest('hex'),
           expiresAt: addMinutes(new Date(), 60),
           clientId: testClient.id,
+          userId: testUser.id, // Added to satisfy schema constraint
           scope: 'client_credentials',
         },
       });
 
       // Verify relationship
-      const clientWithTokens = await prisma.client.findUnique({
+      const clientWithTokens = await prisma.oAuthClient.findUnique({ // Corrected model name
         where: { id: testClient.id },
         include: { accessTokens: true },
       });
@@ -373,7 +375,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
       });
 
       // Verify relationship
-      const clientWithRefreshTokens = await prisma.client.findUnique({
+      const clientWithRefreshTokens = await prisma.oAuthClient.findUnique({ // Corrected model name
         where: { id: testClient.id },
         include: { refreshTokens: true },
       });
@@ -398,12 +400,12 @@ describe('Database Schema Relationships Integrity Tests', () => {
           userId: testUser.id,
           clientId: testClient.id,
           scope: 'openid profile',
-          state: 'test-state',
+          // state: 'test-state', // Removed: 'state' is not a field in AuthorizationCode model
         },
       });
 
       // Verify relationship
-      const clientWithAuthCodes = await prisma.client.findUnique({
+      const clientWithAuthCodes = await prisma.oAuthClient.findUnique({ // Corrected model name
         where: { id: testClient.id },
         include: { authorizationCodes: true },
       });
@@ -420,154 +422,93 @@ describe('Database Schema Relationships Integrity Tests', () => {
     });
   });
 
-  describe('3. UserResourcePermission Complex Relationships', () => {
-    it('should validate User ↔ Resource ↔ Permission relationship', async () => {
-      // Create UserResourcePermission
-      const userResourcePermission = await prisma.userResourcePermission.create({
-        data: {
-          userId: testUser.id,
-          resourceId: testResource.id,
-          permissionId: testPermission.id,
-          grantedBy: testUser2.id,
-          isActive: true,
-        },
-      });
-
-      // Verify relationship through User
-      const userWithPermissions = await prisma.user.findUnique({
-        where: { id: testUser.id },
-        include: {
-          permissions: {
-            include: {
-              resource: true,
-              permission: true,
-            },
-          },
-        },
-      });
-
-      expect(userWithPermissions).toBeTruthy();
-      expect(userWithPermissions!.permissions.length).toBeGreaterThan(0);
-      expect(userWithPermissions!.permissions[0].resource.id).toBe(testResource.id);
-      expect(userWithPermissions!.permissions[0].permission.id).toBe(testPermission.id);
-
-      // Verify relationship through Resource
-      const resourceWithPermissions = await prisma.resource.findUnique({
-        where: { id: testResource.id },
-        include: {
-          userPermissions: {
-            include: {
-              user: true,
-              permission: true,
-            },
-          },
-        },
-      });
-
-      expect(resourceWithPermissions).toBeTruthy();
-      expect(resourceWithPermissions!.userPermissions.length).toBeGreaterThan(0);
-      expect(resourceWithPermissions!.userPermissions[0].user.id).toBe(testUser.id);
-
-      // Verify relationship through Permission
-      const permissionWithUsers = await prisma.permission.findUnique({
-        where: { id: testPermission.id },
-        include: {
-          userPermissions: {
-            include: {
-              user: true,
-              resource: true,
-            },
-          },
-        },
-      });
-
-      expect(permissionWithUsers).toBeTruthy();
-      expect(permissionWithUsers!.userPermissions.length).toBeGreaterThan(0);
-      expect(permissionWithUsers!.userPermissions[0].user.id).toBe(testUser.id);
-
-      // Cleanup
-      await prisma.userResourcePermission.delete({ where: { id: userResourcePermission.id } });
-      console.log('✅ User ↔ Resource ↔ Permission complex relationship validated');
-    });
-
-    it('should validate permission expiration handling', async () => {
-      // Create expired permission
-      const expiredPermission = await prisma.userResourcePermission.create({
-        data: {
-          userId: testUser.id,
-          resourceId: testResource.id,
-          permissionId: testPermission.id,
-          grantedBy: testUser2.id,
-          expiresAt: new Date(Date.now() - 3600000), // Expired 1 hour ago
-          isActive: true,
-        },
-      });
-
-      // Create active permission
-      const activePermission = await prisma.userResourcePermission.create({
-        data: {
-          userId: testUser2.id,
-          resourceId: testResource.id,
-          permissionId: testPermission.id,
-          grantedBy: testUser.id,
-          expiresAt: addDays(new Date(), 1), // Expires in 1 day
-          isActive: true,
-        },
-      });
-
-      // Query for active permissions only
-      const activePermissions = await prisma.userResourcePermission.findMany({
-        where: {
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        include: {
-          user: true,
-          resource: true,
-          permission: true,
-        },
-      });
-
-      // Should only find the active permission
-      expect(activePermissions.length).toBeGreaterThanOrEqual(1);
-      expect(activePermissions.some((p) => p.id === activePermission.id)).toBe(true);
-      expect(activePermissions.some((p) => p.id === expiredPermission.id)).toBe(false);
-
-      // Cleanup
-      await prisma.userResourcePermission.deleteMany({
-        where: { id: { in: [expiredPermission.id, activePermission.id] } },
-      });
-      console.log('✅ Permission expiration handling validated');
-    });
-  });
+  // describe('3. UserResourcePermission Complex Relationships', () => { // REMOVED
+    // This section is removed as UserResourcePermission and Resource models are not in the schema.
+  // });
 
   describe('4. Audit Log Relationships', () => {
-    it('should validate AuditLog → User → Client relationships', async () => {
-      const auditLog = await prisma.auditLog.create({
+    it('should validate AuditLog → User relationship for user actions', async () => {
+      const auditLogUserAction = await prisma.auditLog.create({
         data: {
-          userId: testUser.id,
-          clientId: testClient.id,
-          action: 'test_action',
-          resource: 'test_resource',
+          userId: testUser.id, // Direct relation
+          actorType: 'USER',
+          actorId: testUser.id,
+          action: 'user_login_success',
+          resourceType: 'user_session',
+          status: 'SUCCESS',
           ipAddress: '127.0.0.1',
           userAgent: 'Test Agent',
-          success: true,
-          metadata: JSON.stringify({ test: 'data' }),
+          details: JSON.stringify({ loginMethod: 'password' }),
         },
       });
 
       // Verify relationships
-      const logWithRelations = await prisma.auditLog.findUnique({
-        where: { id: auditLog.id },
+      const logWithUser = await prisma.auditLog.findUnique({
+        where: { id: auditLogUserAction.id },
         include: {
           user: true,
-          client: true,
+          // client: true, // Client is not a direct relation on AuditLog
         },
       });
 
-      expect(logWithRelations).toBeTruthy();
-      expect(logWithRelations!.user!.id).toBe(testUser.id);
-      expect(logWithRelations!.client!.id).toBe(testClient.id);
+      expect(logWithUser).toBeTruthy();
+      expect(logWithUser!.user!.id).toBe(testUser.id);
+      // expect(logWithUser!.client).toBeNull(); // No direct client relation here
+
+      // Verify reverse relationship
+      const userWithAuditLogs = await prisma.user.findUnique({
+        where: { id: testUser.id },
+        include: { auditLogs: true },
+      });
+
+      expect(userWithAuditLogs).toBeTruthy();
+      expect(userWithAuditLogs!.auditLogs.some((log) => log.id === auditLogUserAction.id)).toBe(true);
+
+      // Cleanup
+      await prisma.auditLog.delete({ where: { id: auditLogUserAction.id } });
+      console.log('✅ AuditLog → User relationship (user action) validated');
+    });
+
+    it('should validate AuditLog for client actions', async () => {
+      const auditLogClientAction = await prisma.auditLog.create({
+        data: {
+          // userId: null, // No specific user for a pure client action
+          actorType: 'CLIENT',
+          actorId: testClient.id, // Using the oAuthClient.id
+          action: 'client_credentials_grant',
+          resourceType: 'oauth_token',
+          status: 'SUCCESS',
+          ipAddress: '192.168.1.100',
+          userAgent: 'Client Service',
+          details: JSON.stringify({ grantType: 'client_credentials' }),
+        },
+      });
+       // Verify (no direct user or client relations to include from AuditLog for actorId)
+      const logEntry = await prisma.auditLog.findUnique({
+        where: { id: auditLogClientAction.id }
+      });
+      expect(logEntry).toBeTruthy();
+      expect(logEntry!.actorId).toBe(testClient.id);
+      expect(logEntry!.actorType).toBe('CLIENT');
+
+      // Cleanup
+      await prisma.auditLog.delete({ where: { id: auditLogClientAction.id } });
+      console.log('✅ AuditLog for client actions validated');
+    });
+  });
+
+  describe('5. Cascade Deletion Behavior', () => {
+    it('should handle User deletion cascade', async () => {
+      // Create a temporary user with related data
+      const tempUser = await prisma.user.create({
+        data: {
+          username: 'temp-user-' + Date.now(),
+          email: `temp-user-${Date.now()}@example.com`,
+          passwordHash: await bcrypt.hash('temp123', 12), // Corrected
+          // emailVerified: true, // Removed
+          isActive: true,
+        },
+      });
 
       // Verify reverse relationship
       const userWithAuditLogs = await prisma.user.findUnique({
@@ -591,8 +532,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
         data: {
           username: 'temp-user-' + Date.now(),
           email: `temp-user-${Date.now()}@example.com`,
-          password: await bcrypt.hash('temp123', 12),
-          emailVerified: true,
+          passwordHash: await bcrypt.hash('temp123', 12), // Corrected
+          // emailVerified: true, // Removed
           isActive: true,
         },
       });
@@ -643,16 +584,16 @@ describe('Database Schema Relationships Integrity Tests', () => {
 
     it('should handle Client deletion cascade', async () => {
       // Create a temporary client with related data
-      const tempClient = await prisma.client.create({
+      const tempClient = await prisma.oAuthClient.create({ // Corrected model name
         data: {
           clientId: 'temp-client-' + crypto.randomBytes(8).toString('hex'),
           clientSecret: await bcrypt.hash('temp-secret', 12),
-          name: 'Temp Client',
+          clientName: 'Temp Client', // Corrected field name
+          clientType: 'CONFIDENTIAL', // Corrected field
           redirectUris: JSON.stringify(['http://localhost:3000/callback']),
           grantTypes: JSON.stringify(['client_credentials']),
           responseTypes: JSON.stringify([]),
-          scope: 'test:read',
-          isPublic: false,
+          allowedScopes: JSON.stringify(['test:read']), // Corrected field name
           isActive: true,
         },
       });
@@ -663,13 +604,14 @@ describe('Database Schema Relationships Integrity Tests', () => {
           token: 'temp_client_token_' + crypto.randomBytes(16).toString('hex'),
           tokenHash: crypto.createHash('sha256').update('temp_client_token').digest('hex'),
           expiresAt: addMinutes(new Date(), 60),
+          userId: testUser.id, // Added userId to satisfy schema
           clientId: tempClient.id,
           scope: 'test:read',
         },
       });
 
       // Delete client - should cascade
-      await prisma.client.delete({ where: { id: tempClient.id } });
+      await prisma.oAuthClient.delete({ where: { id: tempClient.id } }); // Corrected model name
 
       // Verify cascaded deletion
       const remainingToken = await prisma.accessToken.findUnique({
@@ -683,35 +625,7 @@ describe('Database Schema Relationships Integrity Tests', () => {
   });
 
   describe('6. Unique Constraints Validation', () => {
-    it('should enforce UserResourcePermission unique constraint', async () => {
-      // Create first permission
-      const permission1 = await prisma.userResourcePermission.create({
-        data: {
-          userId: testUser.id,
-          resourceId: testResource.id,
-          permissionId: testPermission.id,
-          grantedBy: testUser2.id,
-          isActive: true,
-        },
-      });
-
-      // Attempt to create duplicate - should fail
-      await expect(
-        prisma.userResourcePermission.create({
-          data: {
-            userId: testUser.id,
-            resourceId: testResource.id,
-            permissionId: testPermission.id,
-            grantedBy: testUser2.id,
-            isActive: true,
-          },
-        })
-      ).rejects.toThrow();
-
-      // Cleanup
-      await prisma.userResourcePermission.delete({ where: { id: permission1.id } });
-      console.log('✅ UserResourcePermission unique constraint validated');
-    });
+    // UserResourcePermission unique constraint test removed as model does not exist.
 
     it('should enforce User email uniqueness', async () => {
       const email = `unique-test-${Date.now()}@example.com`;
@@ -721,8 +635,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
         data: {
           username: 'unique-user1-' + Date.now(),
           email,
-          password: await bcrypt.hash('test123', 12),
-          emailVerified: true,
+          passwordHash: await bcrypt.hash('test123', 12), // Corrected
+          // emailVerified: true, // Removed
           isActive: true,
         },
       });
@@ -733,8 +647,8 @@ describe('Database Schema Relationships Integrity Tests', () => {
           data: {
             username: 'unique-user2-' + Date.now(),
             email, // Same email
-            password: await bcrypt.hash('test123', 12),
-            emailVerified: true,
+            passwordHash: await bcrypt.hash('test123', 12), // Corrected
+            // emailVerified: true, // Removed
             isActive: true,
           },
         })
@@ -745,44 +659,44 @@ describe('Database Schema Relationships Integrity Tests', () => {
       console.log('✅ User email uniqueness constraint validated');
     });
 
-    it('should enforce Client clientId uniqueness', async () => {
+    it('should enforce OAuthClient clientId uniqueness', async () => {
       const clientId = 'unique-client-' + Date.now();
 
       // Create first client
-      const client1 = await prisma.client.create({
+      const client1 = await prisma.oAuthClient.create({ // Corrected model name
         data: {
           clientId,
           clientSecret: await bcrypt.hash('secret', 12),
-          name: 'Unique Client 1',
+          clientName: 'Unique Client 1', // Corrected field name
+          clientType: 'CONFIDENTIAL', // Corrected field
           redirectUris: JSON.stringify(['http://localhost:3000/callback']),
           grantTypes: JSON.stringify(['client_credentials']),
           responseTypes: JSON.stringify([]),
-          scope: 'test:read',
-          isPublic: false,
+          allowedScopes: JSON.stringify(['test:read']), // Corrected field name
           isActive: true,
         },
       });
 
       // Attempt to create client with same clientId - should fail
       await expect(
-        prisma.client.create({
+        prisma.oAuthClient.create({ // Corrected model name
           data: {
             clientId, // Same clientId
             clientSecret: await bcrypt.hash('secret', 12),
-            name: 'Unique Client 2',
+            clientName: 'Unique Client 2', // Corrected field name
+            clientType: 'CONFIDENTIAL', // Corrected field
             redirectUris: JSON.stringify(['http://localhost:3000/callback']),
             grantTypes: JSON.stringify(['client_credentials']),
             responseTypes: JSON.stringify([]),
-            scope: 'test:read',
-            isPublic: false,
+            allowedScopes: JSON.stringify(['test:read']), // Corrected field name
             isActive: true,
           },
         })
       ).rejects.toThrow();
 
       // Cleanup
-      await prisma.client.delete({ where: { id: client1.id } });
-      console.log('✅ Client clientId uniqueness constraint validated');
+      await prisma.oAuthClient.delete({ where: { id: client1.id } }); // Corrected model name
+      console.log('✅ OAuthClient clientId uniqueness constraint validated');
     });
   });
 });
