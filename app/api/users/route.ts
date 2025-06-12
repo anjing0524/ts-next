@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { z } from 'zod';
 
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
-
 // Remove direct crypto import for password generation, use new util
 // import crypto from 'crypto';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
@@ -29,21 +29,6 @@ const CreateUserSchema = z.object({
   // Note: role field not supported in current schema
 });
 
-const UpdateUserSchema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_-]+$/)
-    .optional(),
-  email: z.string().email().optional(),
-  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-  firstName: z.string().min(1).max(100).optional(),
-  lastName: z.string().min(1).max(100).optional(),
-  isActive: z.boolean().optional(),
-  // Note: role field not supported in current schema
-});
-
 // GET /api/users - List users (admin only)
 async function handleGetUsers(request: NextRequest, context: AuthContext): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
@@ -54,7 +39,7 @@ async function handleGetUsers(request: NextRequest, context: AuthContext): Promi
   const active = searchParams.get('active');
 
   // Build filter conditions
-  const where: any = {};
+  const where: Prisma.UserWhereInput = {};
 
   if (search) {
     where.OR = [

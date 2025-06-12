@@ -44,7 +44,7 @@ interface ServiceAuthContext extends AuthContext {
 // Please use the new endpoint at /api/permissions/check for batch permission evaluations.
 // This file will be removed in a future version.
 // POST /api/auth/check-batch - Handles batch permission check requests
-async function handleBatchPermissionCheck(request: NextRequest, context: ServiceAuthContext) {
+async function handleBatchPermissionCheck(request: NextRequest) {
   try {
     const body = await request.json();
     const validationResult = BatchCheckRequestBodySchema.safeParse(body);

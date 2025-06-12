@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { User, Client, AccessToken, RefreshToken } from '@prisma/client';
+import { Client, AccessToken, RefreshToken } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-import { JWTUtils, ClientAuthUtils, AuthorizationUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2';
+import { JWTUtils, AuthorizationUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 
-const SALT_ROUNDS = 10; // Should be consistent if used, though not directly for token introspection logic itself
+// const SALT_ROUNDS = 10; // Should be consistent if used, though not directly for token introspection logic itself
 
 interface IntrospectionResponse {
   active: boolean;
@@ -100,7 +100,7 @@ function buildIntrospectionResponse(
 
 export async function POST(request: NextRequest) {
   const introspectingClient = await authenticateIntrospectingClient(request);
-  const requestBaseUrl = request.nextUrl.origin; // For constructing issuer/audience if needed
+  // const requestBaseUrl = request.nextUrl.origin; // For constructing issuer/audience if needed
 
   if (!introspectingClient) {
     await AuthorizationUtils.logAuditEvent({

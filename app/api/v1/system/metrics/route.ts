@@ -5,9 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { successResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler } from '@/lib/api/errorHandler';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { withAuth } from '@/lib/auth/middleware';
 
-async function getSystemMetricsHandler(request: NextRequest, context: AuthContext) {
+async function getSystemMetricsHandler(request: NextRequest) {
   const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
 
   // Calculate memory usage, ensuring values are numbers before toFixed

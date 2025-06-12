@@ -1,9 +1,9 @@
 'use client';
 
+import { useCallback, useMemo } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, Node, MarkerType, Edge } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
-import { useCallback, useMemo } from 'react';
 
 import { useShallow } from 'zustand/react/shallow';
 

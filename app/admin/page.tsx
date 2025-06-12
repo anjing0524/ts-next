@@ -103,7 +103,7 @@ export default function DashboardPage() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [clients, setClients] = useState<OAuthClient[]>([]); // Renamed Client to OAuthClient
-  const [isLoading, setIsLoading] = useState(true); // General loading for initial page
+  const [isLoading] = useState(true); // General loading for initial page
   const [activeTab, setActiveTab] = useState('overview');
 
   // State variables for User Management Modals
@@ -190,7 +190,7 @@ export default function DashboardPage() {
   const [isAddScopeModalOpen, setIsAddScopeModalOpen] = useState(false);
   const [isEditScopeModalOpen, setIsEditScopeModalOpen] = useState(false);
   // No ViewScopeModal specified, Edit/List covers display.
-  const [selectedOAuthScope, setSelectedOAuthScope] = useState<OAuthScope | null>(null);
+  const [, setSelectedOAuthScope] = useState<OAuthScope | null>(null);
   const [newOAuthScopeData, setNewOAuthScopeData] = useState<{
     name: string;
     description: string;
@@ -280,7 +280,7 @@ export default function DashboardPage() {
     loadClients();
     loadRoles(); // Call loadRoles
     loadPermissions(); // Call loadPermissions
-  }, []);
+  }, [loadUserInfo]);
 
   const loadUserInfo = async () => {
     try {
@@ -927,7 +927,7 @@ export default function DashboardPage() {
         {
           id: 'scope_2',
           name: 'profile',
-          description: "Access to user's default profile information.",
+          description: "Access to user&apos;s default profile information.",
           isDefault: true,
           isRestricted: false,
           createdAt: new Date(Date.now() - 550000000).toISOString(),
@@ -935,7 +935,7 @@ export default function DashboardPage() {
         {
           id: 'scope_3',
           name: 'email',
-          description: "Access to user's email address.",
+          description: "Access to user&apos;s email address.",
           isDefault: true,
           isRestricted: false,
           createdAt: new Date(Date.now() - 500000000).toISOString(),

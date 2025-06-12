@@ -4,7 +4,7 @@ import * as jose from 'jose';
 
 import logger from '../../../../utils/logger';
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
   try {
     const publicKeyPem = process.env.JWT_PUBLIC_KEY_PEM;
     const keyId = process.env.JWT_KEY_ID || 'default-kid'; // Default KID if not set

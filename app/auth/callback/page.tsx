@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Terminal } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { authApi, getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
+import { getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -17,7 +17,7 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const exchangeCodeForToken = async () => {
       const code = searchParams.get('code');
-      const state = searchParams.get('state'); // You might want to validate state if you generated one
+      // const state = searchParams.get('state'); // You might want to validate state if you generated one
 
       if (!code) {
         setError('Authorization code not found in callback.');

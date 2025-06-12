@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { withAuth } from '@/lib/auth/middleware';
@@ -28,14 +29,14 @@ const updateScopeSchema = z.object({
 
 // GET /api/scopes - List all scopes
 export const GET = withAuth(
-  async (request: NextRequest, context) => {
+  async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('includeInactive') === 'true';
     const isPublic = searchParams.get('isPublic');
     const isDefault = searchParams.get('isDefault');
 
     try {
-      const where: any = {};
+      const where: Prisma.ScopeWhereInput = {};
 
       if (!includeInactive) {
         where.isActive = true;
@@ -68,7 +69,7 @@ export const GET = withAuth(
 
 // POST /api/scopes - Create a new scope
 export const POST = withAuth(
-  async (request: NextRequest, context) => {
+  async (request: NextRequest) => {
     try {
       const body = await request.json();
 
@@ -126,7 +127,7 @@ export const POST = withAuth(
 
 // PUT /api/scopes - Update a scope
 export const PUT = withAuth(
-  async (request: NextRequest, context) => {
+  async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const scopeName = searchParams.get('name');
 
@@ -182,7 +183,7 @@ export const PUT = withAuth(
 
 // DELETE /api/scopes - Delete/deactivate a scope
 export const DELETE = withAuth(
-  async (request: NextRequest, context) => {
+  async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const scopeName = searchParams.get('name');
 

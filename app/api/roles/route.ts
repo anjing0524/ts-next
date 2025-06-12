@@ -74,7 +74,7 @@ async function createRole(request: NextRequest, authContext: AuthContext) {
 }
 
 // GET /api/roles - 列出所有角色
-async function listRoles(request: NextRequest, authContext: AuthContext) {
+async function listRoles() {
   // TODO: 实现分页、筛选、排序功能
   // 例如: /api/roles?page=1&limit=10&sortBy=name&sortOrder=asc&isActive=true&search=admin
   const roles = await prisma.role.findMany({

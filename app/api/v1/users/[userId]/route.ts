@@ -77,7 +77,7 @@ export const GET = withErrorHandler(
         ...user,
         roles: user.userRoles.map((ur) => ur.role),
       };
-      // @ts-ignore //  userRoles will be removed after this
+      // @ts-expect-error //  userRoles will be removed after this
       delete userWithRoles.userRoles;
 
       const requestId = (request as { requestId?: string }).requestId;
