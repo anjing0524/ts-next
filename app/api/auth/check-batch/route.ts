@@ -3,6 +3,7 @@
 // This file will be removed in a future version.
 // app/api/auth/check-batch/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+
 import { z } from 'zod';
 
 import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming this middleware handles auth
@@ -58,7 +59,7 @@ async function handleBatchPermissionCheck(request: NextRequest, context: Service
     const { subjectAttributes, requests: clientRequests } = validationResult.data;
 
     // 1. Adapt client requests to the format expected by PermissionService
-    const serviceRequests = clientRequests.map(req => ({
+    const serviceRequests = clientRequests.map((req) => ({
       id: req.requestId,
       resource: req.resourceAttributes.resourceId,
       action: req.action.type,
@@ -67,10 +68,13 @@ async function handleBatchPermissionCheck(request: NextRequest, context: Service
     }));
 
     // 2. Call the new PermissionService
-    const serviceResults = await permissionService.checkBatchPermissions(subjectAttributes.userId, serviceRequests);
+    const serviceResults = await permissionService.checkBatchPermissions(
+      subjectAttributes.userId,
+      serviceRequests
+    );
 
     // 3. Adapt service results back to the format expected by the client
-    const clientResults = serviceResults.map(sr => ({
+    const clientResults = serviceResults.map((sr) => ({
       requestId: sr.id, // Map 'id' back to 'requestId'
       allowed: sr.allowed,
       // Map reason codes and messages. The service provides:
@@ -82,11 +86,13 @@ async function handleBatchPermissionCheck(request: NextRequest, context: Service
     }));
 
     return NextResponse.json({ results: clientResults });
-
   } catch (error: any) {
     console.error('Batch permission check API encountered an error:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error', message: 'An internal error occurred while processing permission requests.' },
+      {
+        error: 'Internal Server Error',
+        message: 'An internal error occurred while processing permission requests.',
+      },
       { status: 500 }
     );
   }

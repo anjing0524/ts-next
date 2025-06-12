@@ -119,7 +119,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         // 处理canvas外的情况，如果坐标为-1，说明是canvas外的事件
         const isOutsideCanvas = data.x === -1 && data.y === -1;
         let isDragEnd;
-        
+
         if (isOutsideCanvas) {
           // 对于canvas外的事件，首先发送mouseleave
           processorRef.handle_mouse_leave();
@@ -129,7 +129,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           // 正常处理canvas内的鼠标抬起
           isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
         }
-        
+
         // 通知主线程鼠标释放事件处理结果
         self.postMessage({
           type: 'mouseupHandled',
@@ -148,7 +148,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         // 通知主线程鼠标离开处理结果
         self.postMessage({
           type: 'mouseleaveHandled',
-          needsRedraw: needsRedraw
+          needsRedraw: needsRedraw,
         });
         break;
       case 'wheel':

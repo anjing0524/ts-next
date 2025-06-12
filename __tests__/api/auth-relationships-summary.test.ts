@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest';
 
 describe('Authentication & Authorization Center - Relationships Testing Summary', () => {
   describe('📋 Testing Coverage Summary', () => {
@@ -9,37 +9,37 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           status: '✅ TESTED',
           description: 'User can have multiple access tokens',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User → RefreshToken': {
           status: '✅ TESTED',
           description: 'User can have multiple refresh tokens',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User → AuthorizationCode': {
           status: '✅ TESTED',
           description: 'User can have multiple authorization codes',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User → UserSession': {
           status: '✅ TESTED',
           description: 'User can have multiple sessions',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User → UserResourcePermission': {
           status: '✅ TESTED',
           description: 'User can have permissions for resources',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User → AuditLog': {
           status: '✅ TESTED',
           description: 'User actions are logged in audit trail',
           cascadeBehavior: 'ON DELETE SET NULL - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
 
         // 2. Client Entity Relationships (✅ Fully Tested)
@@ -47,25 +47,25 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           status: '✅ TESTED',
           description: 'Client can issue multiple access tokens',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client → RefreshToken': {
           status: '✅ TESTED',
           description: 'Client can issue multiple refresh tokens',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client → AuthorizationCode': {
           status: '✅ TESTED',
           description: 'Client can have multiple authorization codes',
           cascadeBehavior: 'ON DELETE CASCADE - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client → AuditLog': {
           status: '✅ TESTED',
           description: 'Client actions are logged in audit trail',
           cascadeBehavior: 'ON DELETE SET NULL - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
 
         // 3. Complex Multi-Entity Relationships (✅ Fully Tested)
@@ -74,13 +74,13 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           description: 'UserResourcePermission junction table relationships',
           uniqueConstraint: 'userId + resourceId + permissionId - Verified',
           expirationHandling: 'Permission expiration logic - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Token → User → Client Binding': {
           status: '✅ TESTED',
           description: 'Tokens maintain user-client binding integrity',
           scopeInheritance: 'Token respects client scope limitations - Verified',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
 
         // 4. OAuth Flow Relationships (✅ Fully Tested)
@@ -88,20 +88,20 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           status: '✅ TESTED',
           description: 'User can authorize specific clients',
           consentHandling: 'User consent flow - Verified',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Client → Resource Access': {
           status: '✅ TESTED',
           description: 'Clients have scope-limited resource access',
           scopeEnforcement: 'Client scope restrictions - Verified',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'User → Resource Access': {
           status: '✅ TESTED',
           description: 'Users have permission-based resource access',
           hierarchicalPermissions: 'Permission inheritance - Verified',
           resourceBoundaries: 'User resource boundaries - Verified',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
 
         // 5. Security and Audit Relationships (✅ Fully Tested)
@@ -109,163 +109,163 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           status: '✅ TESTED',
           description: 'Comprehensive audit trail relationships',
           relationshipIntegrity: 'Bidirectional relationship integrity - Verified',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'UserSession → User': {
           status: '✅ TESTED',
           description: 'User session management and tracking',
           multiSessionSupport: 'Multiple concurrent sessions - Verified',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
-        }
-      }
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
+        },
+      };
 
       // Verify all critical relationships are documented and tested
-      expect(Object.keys(testedRelationships)).toHaveLength(17)
-      
-      // Verify all relationships have required status
-      Object.values(testedRelationships).forEach(relationship => {
-        expect(relationship.status).toBe('✅ TESTED')
-        expect(relationship.description).toBeTruthy()
-        expect(relationship.testLocation).toBeTruthy()
-      })
+      expect(Object.keys(testedRelationships)).toHaveLength(17);
 
-      console.log('✅ All entity relationships documented and tested')
-    })
+      // Verify all relationships have required status
+      Object.values(testedRelationships).forEach((relationship) => {
+        expect(relationship.status).toBe('✅ TESTED');
+        expect(relationship.description).toBeTruthy();
+        expect(relationship.testLocation).toBeTruthy();
+      });
+
+      console.log('✅ All entity relationships documented and tested');
+    });
 
     it('should verify unique constraints are properly tested', () => {
       const uniqueConstraints = {
         'User.email': {
           status: '✅ TESTED',
           description: 'User email must be unique across system',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User.username': {
           status: '✅ TESTED',
           description: 'Username must be unique across system',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client.clientId': {
           status: '✅ TESTED',
           description: 'OAuth client ID must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'AccessToken.tokenHash': {
           status: '✅ TESTED',
           description: 'Access token hash must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'RefreshToken.tokenHash': {
           status: '✅ TESTED',
           description: 'Refresh token hash must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'AuthorizationCode.code': {
           status: '✅ TESTED',
           description: 'Authorization code must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'UserResourcePermission.userId+resourceId+permissionId': {
           status: '✅ TESTED',
           description: 'Composite unique constraint on user-resource-permission',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'UserSession.sessionId': {
           status: '✅ TESTED',
           description: 'Session ID must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Resource.name': {
           status: '✅ TESTED',
           description: 'Resource name must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Permission.name': {
           status: '✅ TESTED',
           description: 'Permission name must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Scope.name': {
           status: '✅ TESTED',
           description: 'OAuth scope name must be unique',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
-        }
-      }
+          testLocation: '__tests__/api/schema-relationships.test.ts',
+        },
+      };
 
-      expect(Object.keys(uniqueConstraints)).toHaveLength(11)
-      
-      Object.values(uniqueConstraints).forEach(constraint => {
-        expect(constraint.status).toBe('✅ TESTED')
-        expect(constraint.description).toBeTruthy()
-        expect(constraint.testLocation).toBeTruthy()
-      })
+      expect(Object.keys(uniqueConstraints)).toHaveLength(11);
 
-      console.log('✅ All unique constraints documented and tested')
-    })
+      Object.values(uniqueConstraints).forEach((constraint) => {
+        expect(constraint.status).toBe('✅ TESTED');
+        expect(constraint.description).toBeTruthy();
+        expect(constraint.testLocation).toBeTruthy();
+      });
+
+      console.log('✅ All unique constraints documented and tested');
+    });
 
     it('should verify cascade deletion behaviors are tested', () => {
       const cascadeBehaviors = {
         'User deletion → Access tokens deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User deletion → Refresh tokens deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User deletion → Authorization codes deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User deletion → User sessions deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User deletion → User permissions deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'User deletion → Audit logs set to NULL': {
           status: '✅ TESTED',
           behavior: 'SET NULL',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client deletion → Access tokens deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client deletion → Refresh tokens deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client deletion → Authorization codes deleted': {
           status: '✅ TESTED',
           behavior: 'CASCADE DELETE',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
+          testLocation: '__tests__/api/schema-relationships.test.ts',
         },
         'Client deletion → Audit logs set to NULL': {
           status: '✅ TESTED',
           behavior: 'SET NULL',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
-        }
-      }
+          testLocation: '__tests__/api/schema-relationships.test.ts',
+        },
+      };
 
-      expect(Object.keys(cascadeBehaviors)).toHaveLength(10)
-      
-      Object.values(cascadeBehaviors).forEach(cascade => {
-        expect(cascade.status).toBe('✅ TESTED')
-        expect(['CASCADE DELETE', 'SET NULL']).toContain(cascade.behavior)
-        expect(cascade.testLocation).toBeTruthy()
-      })
+      expect(Object.keys(cascadeBehaviors)).toHaveLength(10);
 
-      console.log('✅ All cascade deletion behaviors documented and tested')
-    })
+      Object.values(cascadeBehaviors).forEach((cascade) => {
+        expect(cascade.status).toBe('✅ TESTED');
+        expect(['CASCADE DELETE', 'SET NULL']).toContain(cascade.behavior);
+        expect(cascade.testLocation).toBeTruthy();
+      });
+
+      console.log('✅ All cascade deletion behaviors documented and tested');
+    });
 
     it('should verify OAuth 2.0 flow relationships are tested', () => {
       const oauthFlowRelationships = {
@@ -279,9 +279,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
             'PKCE implementation',
             'Authorization code generation and validation',
             'Token exchange',
-            'Scope validation and inheritance'
+            'Scope validation and inheritance',
           ],
-          testLocation: '__tests__/api/oauth-integration-complete.test.ts'
+          testLocation: '__tests__/api/oauth-integration-complete.test.ts',
         },
         'Client Credentials Flow': {
           status: '✅ TESTED',
@@ -290,9 +290,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
             'Client authentication',
             'Scope-based resource access',
             'Client type validation (public vs confidential)',
-            'Token generation and validation'
+            'Token generation and validation',
           ],
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Refresh Token Flow': {
           status: '✅ TESTED',
@@ -301,9 +301,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
             'Refresh token validation',
             'Token rotation',
             'Scope inheritance',
-            'User-client binding preservation'
+            'User-client binding preservation',
           ],
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Token Revocation': {
           status: '✅ TESTED',
@@ -312,9 +312,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
             'Access token revocation',
             'Refresh token revocation',
             'Relationship cleanup',
-            'Security boundary enforcement'
+            'Security boundary enforcement',
           ],
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'UserInfo Endpoint': {
           status: '✅ TESTED',
@@ -323,80 +323,80 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
             'Token validation',
             'User information retrieval',
             'Scope-based data filtering',
-            'User-client authorization validation'
+            'User-client authorization validation',
           ],
-          testLocation: '__tests__/api/oauth-integration-complete.test.ts'
-        }
-      }
+          testLocation: '__tests__/api/oauth-integration-complete.test.ts',
+        },
+      };
 
-      expect(Object.keys(oauthFlowRelationships)).toHaveLength(5)
-      
-      Object.values(oauthFlowRelationships).forEach(flow => {
-        expect(flow.status).toBe('✅ TESTED')
-        expect(flow.description).toBeTruthy()
-        expect(Array.isArray(flow.testCoverage)).toBe(true)
-        expect(flow.testCoverage.length).toBeGreaterThan(0)
-        expect(flow.testLocation).toBeTruthy()
-      })
+      expect(Object.keys(oauthFlowRelationships)).toHaveLength(5);
 
-      console.log('✅ All OAuth 2.0 flow relationships documented and tested')
-    })
+      Object.values(oauthFlowRelationships).forEach((flow) => {
+        expect(flow.status).toBe('✅ TESTED');
+        expect(flow.description).toBeTruthy();
+        expect(Array.isArray(flow.testCoverage)).toBe(true);
+        expect(flow.testCoverage.length).toBeGreaterThan(0);
+        expect(flow.testLocation).toBeTruthy();
+      });
+
+      console.log('✅ All OAuth 2.0 flow relationships documented and tested');
+    });
 
     it('should verify security relationship validations are tested', () => {
       const securityValidations = {
         'Cross-Client Permission Boundaries': {
           status: '✅ TESTED',
           description: 'Permissions do not leak across different clients',
-          testLocation: '__tests__/api/user-resource-client-management.test.ts'
+          testLocation: '__tests__/api/user-resource-client-management.test.ts',
         },
         'User Resource Boundaries': {
           status: '✅ TESTED',
           description: 'Users cannot access resources they do not have permissions for',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Token-Based Access Validation': {
           status: '✅ TESTED',
           description: 'Resources can only be accessed with appropriate tokens',
-          testLocation: '__tests__/api/user-resource-client-management.test.ts'
+          testLocation: '__tests__/api/user-resource-client-management.test.ts',
         },
         'Permission Expiration Enforcement': {
           status: '✅ TESTED',
           description: 'Expired permissions are properly enforced',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Scope Inheritance Validation': {
           status: '✅ TESTED',
           description: 'Tokens respect client scope limitations',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Admin Access Control': {
           status: '✅ TESTED',
           description: 'Admin operations are properly restricted',
-          testLocation: '__tests__/api/user-resource-client-management.test.ts'
+          testLocation: '__tests__/api/user-resource-client-management.test.ts',
         },
         'Rate Limiting per Relationship': {
           status: '✅ TESTED',
           description: 'Rate limiting is applied per user-client relationship',
-          testLocation: '__tests__/api/auth-center-relationships.test.ts'
+          testLocation: '__tests__/api/auth-center-relationships.test.ts',
         },
         'Audit Trail Completeness': {
           status: '✅ TESTED',
           description: 'All security events are properly logged with relationships',
-          testLocation: '__tests__/api/schema-relationships.test.ts'
-        }
-      }
+          testLocation: '__tests__/api/schema-relationships.test.ts',
+        },
+      };
 
-      expect(Object.keys(securityValidations)).toHaveLength(8)
-      
-      Object.values(securityValidations).forEach(validation => {
-        expect(validation.status).toBe('✅ TESTED')
-        expect(validation.description).toBeTruthy()
-        expect(validation.testLocation).toBeTruthy()
-      })
+      expect(Object.keys(securityValidations)).toHaveLength(8);
 
-      console.log('✅ All security relationship validations documented and tested')
-    })
-  })
+      Object.values(securityValidations).forEach((validation) => {
+        expect(validation.status).toBe('✅ TESTED');
+        expect(validation.description).toBeTruthy();
+        expect(validation.testLocation).toBeTruthy();
+      });
+
+      console.log('✅ All security relationship validations documented and tested');
+    });
+  });
 
   describe('📊 Test Results Summary', () => {
     it('should summarize testing achievements', () => {
@@ -415,25 +415,25 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
           'Security Validations',
           'API Endpoint Integration',
           'Business Logic Validation',
-          'Performance Considerations'
-        ]
-      }
+          'Performance Considerations',
+        ],
+      };
 
-      expect(testingSummary.totalRelationshipTypes).toBe(14)
-      expect(testingSummary.totalUniqueConstraints).toBe(11)
-      expect(testingSummary.totalCascadeBehaviors).toBe(10)
-      expect(testingSummary.totalOAuthFlows).toBe(5)
-      expect(testingSummary.totalSecurityValidations).toBe(8)
-      expect(testingSummary.coverageAreas).toHaveLength(8)
+      expect(testingSummary.totalRelationshipTypes).toBe(14);
+      expect(testingSummary.totalUniqueConstraints).toBe(11);
+      expect(testingSummary.totalCascadeBehaviors).toBe(10);
+      expect(testingSummary.totalOAuthFlows).toBe(5);
+      expect(testingSummary.totalSecurityValidations).toBe(8);
+      expect(testingSummary.coverageAreas).toHaveLength(8);
 
-      console.log('📊 Testing Summary:')
-      console.log(`   • ${testingSummary.totalRelationshipTypes} Entity Relationships Tested`)
-      console.log(`   • ${testingSummary.totalUniqueConstraints} Unique Constraints Validated`)
-      console.log(`   • ${testingSummary.totalCascadeBehaviors} Cascade Behaviors Verified`)
-      console.log(`   • ${testingSummary.totalOAuthFlows} OAuth 2.0 Flows Tested`)
-      console.log(`   • ${testingSummary.totalSecurityValidations} Security Validations Completed`)
-      console.log(`   • ${testingSummary.totalTestFiles} Comprehensive Test Files Created`)
-      console.log('✅ Authentication & Authorization Center relationship testing COMPLETE')
-    })
-  })
-}) 
+      console.log('📊 Testing Summary:');
+      console.log(`   • ${testingSummary.totalRelationshipTypes} Entity Relationships Tested`);
+      console.log(`   • ${testingSummary.totalUniqueConstraints} Unique Constraints Validated`);
+      console.log(`   • ${testingSummary.totalCascadeBehaviors} Cascade Behaviors Verified`);
+      console.log(`   • ${testingSummary.totalOAuthFlows} OAuth 2.0 Flows Tested`);
+      console.log(`   • ${testingSummary.totalSecurityValidations} Security Validations Completed`);
+      console.log(`   • ${testingSummary.totalTestFiles} Comprehensive Test Files Created`);
+      console.log('✅ Authentication & Authorization Center relationship testing COMPLETE');
+    });
+  });
+});

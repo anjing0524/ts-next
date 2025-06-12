@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -7,7 +7,6 @@ import { Shield, Key, Users, Lock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
 
 export default function Home() {
   const router = useRouter();
@@ -40,7 +39,11 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-white">OAuth 2.0 Admin Center</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={handleLogin} className="text-white hover:bg-white/10">
+              <Button
+                variant="ghost"
+                onClick={handleLogin}
+                className="text-white hover:bg-white/10"
+              >
                 Sign In
               </Button>
               <Button onClick={handleRegister} className="bg-indigo-600 hover:bg-indigo-700">
@@ -59,14 +62,19 @@ export default function Home() {
             Secure Authentication & Authorization
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-            A comprehensive OAuth 2.0 and OpenID Connect authorization server with enterprise-grade 
+            A comprehensive OAuth 2.0 and OpenID Connect authorization server with enterprise-grade
             security, user management, and client administration capabilities.
           </p>
           <div className="flex justify-center space-x-4">
             <Button size="lg" onClick={handleLogin} className="bg-indigo-600 hover:bg-indigo-700">
               Access Admin Center
             </Button>
-            <Button size="lg" variant="outline" onClick={handleRegister} className="text-white border-white hover:bg-white/10">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleRegister}
+              className="text-white border-white hover:bg-white/10"
+            >
               Create Account
             </Button>
           </div>
@@ -81,7 +89,8 @@ export default function Home() {
               </div>
               <CardTitle>User Management</CardTitle>
               <CardDescription className="text-gray-300">
-                Comprehensive user account management with role-based access control and audit trails.
+                Comprehensive user account management with role-based access control and audit
+                trails.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -93,7 +102,8 @@ export default function Home() {
               </div>
               <CardTitle>OAuth 2.0 Clients</CardTitle>
               <CardDescription className="text-gray-300">
-                Register and manage OAuth 2.0 client applications with PKCE, scopes, and security policies.
+                Register and manage OAuth 2.0 client applications with PKCE, scopes, and security
+                policies.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -105,7 +115,8 @@ export default function Home() {
               </div>
               <CardTitle>Permission Control</CardTitle>
               <CardDescription className="text-gray-300">
-                Fine-grained permission management with resource-based access control and scope validation.
+                Fine-grained permission management with resource-based access control and scope
+                validation.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -158,9 +169,7 @@ export default function Home() {
 
         {/* API Endpoints */}
         <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8">
-          <h3 className="text-2xl font-bold text-white mb-6 text-center">
-            OAuth 2.0 Endpoints
-          </h3>
+          <h3 className="text-2xl font-bold text-white mb-6 text-center">OAuth 2.0 Endpoints</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
             <div>
               <h4 className="font-semibold text-white mb-3">Core OAuth 2.0</h4>

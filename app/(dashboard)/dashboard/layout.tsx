@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <nav className="flex items-center space-x-4 lg:space-x-6">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
-              return ( 
+              return (
                 <Link
                   key={item.href}
                   href={item.href}

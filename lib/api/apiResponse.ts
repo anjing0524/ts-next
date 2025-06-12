@@ -30,7 +30,7 @@ export function successResponse<T>(
 export function errorResponse(
   message: string,
   statusCode: number,
-  customRequestId?: string,
+  customRequestId?: string
   // errorCode?: string, // Optional: if we want to pass a string code too
 ): ApiResponse<null> {
   return {

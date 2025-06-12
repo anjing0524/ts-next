@@ -20,14 +20,14 @@ async function main() {
         type: PermissionType.API,
       },
       select: {
-        id: true,         // 权限的唯一ID (Unique ID of the permission)
-        name: true,       // 权限的名称/标识符 (Name/identifier of the permission, e.g., "user:create_api")
-        resource: true,   // 权限关联的资源路径 (Resource path associated with the permission, e.g., "/api/users")
-        description: true // (可选) 权限的描述 (Optional: Description of the permission)
+        id: true, // 权限的唯一ID (Unique ID of the permission)
+        name: true, // 权限的名称/标识符 (Name/identifier of the permission, e.g., "user:create_api")
+        resource: true, // 权限关联的资源路径 (Resource path associated with the permission, e.g., "/api/users")
+        description: true, // (可选) 权限的描述 (Optional: Description of the permission)
       },
       orderBy: {
         resource: 'asc', // 按资源路径排序，方便查看 (Sort by resource path for easier viewing)
-      }
+      },
     });
 
     if (apiPermissions.length === 0) {
@@ -39,7 +39,7 @@ async function main() {
 
       // 以更易读的格式打印，或者直接打印JSON
       // (Print in a more readable format, or print JSON directly)
-      apiPermissions.forEach(perm => {
+      apiPermissions.forEach((perm) => {
         console.log(
           `  ID: ${perm.id}, 名称 (Name): "${perm.name}", 资源 (Resource): "${perm.resource}", 描述 (Description): "${perm.description || 'N/A'}"`
         );
@@ -50,7 +50,6 @@ async function main() {
       // console.log('\nJSON output:');
       // console.log(JSON.stringify(apiPermissions, null, 2));
     }
-
   } catch (error) {
     console.error('查询权限时发生错误 (Error occurred while querying permissions):', error);
     process.exitCode = 1; // 设置退出码为1，表示错误 (Set exit code to 1 to indicate an error)

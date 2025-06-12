@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
-import { withErrorHandler } from '@/lib/api/errorHandler';
-import { successResponse } from '@/lib/api/apiResponse';
 import os from 'os'; // For os related info
 import process from 'process'; // For process related info
+
+import { NextRequest, NextResponse } from 'next/server';
+
+import { successResponse } from '@/lib/api/apiResponse';
+import { withErrorHandler } from '@/lib/api/errorHandler';
+import { withAuth, AuthContext } from '@/lib/auth/middleware';
 
 async function getSystemMetricsHandler(request: NextRequest, context: AuthContext) {
   const requestId = (request as any).requestId; // Injected by withErrorHandler
@@ -31,7 +33,8 @@ async function getSystemMetricsHandler(request: NextRequest, context: AuthContex
     freeMemoryMB: (freeMemBytes / (1024 * 1024)).toFixed(2),
     usedMemoryMB: ((totalMemBytes - freeMemBytes) / (1024 * 1024)).toFixed(2),
     uptimeSeconds: Math.floor(process.uptime()), // System uptime in seconds
-    processMemoryUsage: { // Renamed from memoryUsage to be more specific
+    processMemoryUsage: {
+      // Renamed from memoryUsage to be more specific
       rssMB: (rssBytes / (1024 * 1024)).toFixed(2),
       heapTotalMB: (heapTotalBytes / (1024 * 1024)).toFixed(2),
       heapUsedMB: (heapUsedBytes / (1024 * 1024)).toFixed(2),
@@ -44,15 +47,20 @@ async function getSystemMetricsHandler(request: NextRequest, context: AuthContex
 
   // Handle arrayBuffers specifically as it might not be present in all Node.js versions
   if (typeof process.memoryUsage().arrayBuffers === 'number') {
-    (metrics.processMemoryUsage as any).arrayBuffersMB =
-      (process.memoryUsage().arrayBuffers / (1024 * 1024)).toFixed(2);
+    (metrics.processMemoryUsage as any).arrayBuffersMB = (
+      process.memoryUsage().arrayBuffers /
+      (1024 * 1024)
+    ).toFixed(2);
   }
 
-
-  return NextResponse.json(successResponse(metrics, 200, 'System metrics retrieved successfully.', requestId));
+  return NextResponse.json(
+    successResponse(metrics, 200, 'System metrics retrieved successfully.', requestId)
+  );
 }
 
-export const GET = withErrorHandler(withAuth(getSystemMetricsHandler, {
-  requiredPermissions: ['system:metrics:read'], // Permission to read system metrics
-  requireUserContext: true, // Ensure an authenticated user/admin is making the request
-}));
+export const GET = withErrorHandler(
+  withAuth(getSystemMetricsHandler, {
+    requiredPermissions: ['system:metrics:read'], // Permission to read system metrics
+    requireUserContext: true, // Ensure an authenticated user/admin is making the request
+  })
+);

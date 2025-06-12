@@ -2,15 +2,15 @@ import { z } from 'zod';
 
 // For Single Permission Check (/api/v1/auth/check)
 const SubjectAttributesSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
+  userId: z.string().min(1, 'User ID is required'),
 });
 
 const ResourceAttributesSchema = z.object({
-  resourceId: z.string().min(1, "Resource ID is required"), // e.g., "orders", "documentX"
+  resourceId: z.string().min(1, 'Resource ID is required'), // e.g., "orders", "documentX"
 });
 
 const ActionSchema = z.object({
-  type: z.string().min(1, "Action type is required"), // e.g., "read", "write"
+  type: z.string().min(1, 'Action type is required'), // e.g., "read", "write"
 });
 
 const EnvironmentAttributesSchema = z.record(z.any()).optional();
@@ -34,7 +34,9 @@ const BatchIndividualCheckRequestSchema = z.object({
 
 export const BatchPermissionCheckRequestSchema = z.object({
   subjectAttributes: SubjectAttributesSchema,
-  requests: z.array(BatchIndividualCheckRequestSchema).min(1, "At least one permission request is required"),
+  requests: z
+    .array(BatchIndividualCheckRequestSchema)
+    .min(1, 'At least one permission request is required'),
 });
 
 export type BatchPermissionCheckRequestType = z.infer<typeof BatchPermissionCheckRequestSchema>;

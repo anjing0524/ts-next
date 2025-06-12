@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-import { 
-  Users, 
-  Settings, 
-  Shield, 
+import {
+  Users,
+  Settings,
+  Shield,
   Key,
   Activity,
   LogOut,
@@ -14,7 +14,7 @@ import {
   Eye,
   Edit,
   Trash2,
-  Users2 // Icon for Roles
+  Users2, // Icon for Roles
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +29,13 @@ import {
   DialogTitle,
   // DialogTrigger, // Not using Trigger directly for these modals
   DialogClose,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select"; // Assuming this path
-import { Switch } from "@/components/ui/switch";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select'; // Assuming this path
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from "@/components/ui/textarea"; // Added for role description
+import { Textarea } from '@/components/ui/textarea'; // Added for role description
 import { authApi, adminApi } from '@/lib/api';
 
 interface User {
@@ -128,12 +128,21 @@ export default function DashboardPage() {
   const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
   const [isViewRoleModalOpen, setIsViewRoleModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [newRoleData, setNewRoleData] = useState<{ name: string; description: string; permissionIds: string[] }>({
+  const [newRoleData, setNewRoleData] = useState<{
+    name: string;
+    description: string;
+    permissionIds: string[];
+  }>({
     name: '',
     description: '',
     permissionIds: [],
   });
-  const [editRoleData, setEditRoleData] = useState<{ id: string; name: string; description: string; permissionIds: string[] } | null>(null);
+  const [editRoleData, setEditRoleData] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    permissionIds: string[];
+  } | null>(null);
 
   // State variables for Permission Management
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
@@ -141,11 +150,17 @@ export default function DashboardPage() {
   const [isEditPermissionModalOpen, setIsEditPermissionModalOpen] = useState(false);
   const [isViewPermissionModalOpen, setIsViewPermissionModalOpen] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null);
-  const [newPermissionData, setNewPermissionData] = useState<{ name: string; description: string }>({
-    name: '',
-    description: '',
-  });
-  const [editPermissionData, setEditPermissionData] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [newPermissionData, setNewPermissionData] = useState<{ name: string; description: string }>(
+    {
+      name: '',
+      description: '',
+    }
+  );
+  const [editPermissionData, setEditPermissionData] = useState<{
+    id: string;
+    name: string;
+    description: string;
+  } | null>(null);
 
   // State variables for OAuthClient Management
   const [oauthScopes, setOAuthScopes] = useState<OAuthScope[]>([]);
@@ -154,7 +169,13 @@ export default function DashboardPage() {
   const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false);
   const [isViewClientModalOpen, setIsViewClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<OAuthClient | null>(null);
-  const [newClientData, setNewClientData] = useState<{ name: string; description: string; isPublic: boolean; redirectUris: string[]; scopes: string[] }>({
+  const [newClientData, setNewClientData] = useState<{
+    name: string;
+    description: string;
+    isPublic: boolean;
+    redirectUris: string[];
+    scopes: string[];
+  }>({
     name: '',
     description: '',
     isPublic: false,
@@ -170,7 +191,12 @@ export default function DashboardPage() {
   const [isEditScopeModalOpen, setIsEditScopeModalOpen] = useState(false);
   // No ViewScopeModal specified, Edit/List covers display.
   const [selectedOAuthScope, setSelectedOAuthScope] = useState<OAuthScope | null>(null);
-  const [newOAuthScopeData, setNewOAuthScopeData] = useState<{ name: string; description: string; isDefault?: boolean; isRestricted?: boolean }>({
+  const [newOAuthScopeData, setNewOAuthScopeData] = useState<{
+    name: string;
+    description: string;
+    isDefault?: boolean;
+    isRestricted?: boolean;
+  }>({
     name: '',
     description: '',
     isDefault: false,
@@ -178,32 +204,35 @@ export default function DashboardPage() {
   });
   const [editOAuthScopeData, setEditOAuthScopeData] = useState<OAuthScope | null>(null);
 
-
-  const handleNewRoleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewRoleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setNewRoleData(prevState => ({
+    setNewRoleData((prevState) => ({
       ...prevState,
       [name]: value,
     }));
   };
 
   const handleNewRolePermissionsChange = (selectedPermissionIds: string[]) => {
-    setNewRoleData(prevState => ({
+    setNewRoleData((prevState) => ({
       ...prevState,
       permissionIds: selectedPermissionIds,
     }));
   };
 
-  const handleEditRoleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleEditRoleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setEditRoleData(prevState => {
+    setEditRoleData((prevState) => {
       if (!prevState) return null;
       return { ...prevState, [name]: value };
     });
   };
 
   const handleEditRolePermissionsChange = (selectedPermissionIds: string[]) => {
-    setEditRoleData(prevState => {
+    setEditRoleData((prevState) => {
       if (!prevState) return null;
       return { ...prevState, permissionIds: selectedPermissionIds };
     });
@@ -211,36 +240,36 @@ export default function DashboardPage() {
 
   const handleNewUserInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewUser(prevState => ({
+    setNewUser((prevState) => ({
       ...prevState,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleNewUserSwitchChange = (checked: boolean) => {
-    setNewUser(prevState => ({
+    setNewUser((prevState) => ({
       ...prevState,
-      isActive: checked
+      isActive: checked,
     }));
   };
 
   const handleSelectedUserInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setSelectedUser(prevUser => {
+    setSelectedUser((prevUser) => {
       if (!prevUser) return null;
       return {
         ...prevUser,
-        [name]: value
+        [name]: value,
       };
     });
   };
 
   const handleSelectedUserSwitchChange = (checked: boolean) => {
-    setSelectedUser(prevUser => {
+    setSelectedUser((prevUser) => {
       if (!prevUser) return null;
       return {
         ...prevUser,
-        isActive: checked
+        isActive: checked,
       };
     });
   };
@@ -295,8 +324,14 @@ export default function DashboardPage() {
   const handleEditRoleClick = (role: Role) => {
     setSelectedRole(role);
     // Ensure permissionIds is an array, even if role.permissions is not populated yet
-    const currentPermissionIds = role.permissionIds || (role.permissions ? role.permissions.map(p => p.id) : []);
-    setEditRoleData({ id: role.id, name: role.name, description: role.description, permissionIds: currentPermissionIds });
+    const currentPermissionIds =
+      role.permissionIds || (role.permissions ? role.permissions.map((p) => p.id) : []);
+    setEditRoleData({
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      permissionIds: currentPermissionIds,
+    });
     setIsEditRoleModalOpen(true);
   };
 
@@ -308,7 +343,9 @@ export default function DashboardPage() {
   };
 
   const handleDeleteRoleConfirmation = (roleId: string) => {
-    if (window.confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+    if (
+      window.confirm('Are you sure you want to delete this role? This action cannot be undone.')
+    ) {
       handleDeleteRole(roleId);
     }
   };
@@ -356,14 +393,18 @@ export default function DashboardPage() {
   // --- End Role Management Handlers ---
 
   // --- Permission Management Handlers ---
-  const handleNewPermissionInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewPermissionInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setNewPermissionData(prevState => ({ ...prevState, [name]: value }));
+    setNewPermissionData((prevState) => ({ ...prevState, [name]: value }));
   };
 
-  const handleEditPermissionInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleEditPermissionInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setEditPermissionData(prevState => {
+    setEditPermissionData((prevState) => {
       if (!prevState) return null;
       return { ...prevState, [name]: value };
     });
@@ -376,7 +417,11 @@ export default function DashboardPage() {
 
   const handleEditPermissionClick = (permission: Permission) => {
     setSelectedPermission(permission);
-    setEditPermissionData({ id: permission.id, name: permission.name, description: permission.description || '' });
+    setEditPermissionData({
+      id: permission.id,
+      name: permission.name,
+      description: permission.description || '',
+    });
     setIsEditPermissionModalOpen(true);
   };
 
@@ -386,7 +431,11 @@ export default function DashboardPage() {
   };
 
   const handleDeletePermissionConfirmation = (permissionId: string) => {
-    if (window.confirm('Are you sure you want to delete this permission? This might affect roles that use it.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to delete this permission? This might affect roles that use it.'
+      )
+    ) {
       handleDeletePermission(permissionId);
     }
   };
@@ -434,42 +483,52 @@ export default function DashboardPage() {
   // --- End Permission Management Handlers ---
 
   // --- OAuth Client Management Handlers ---
-  const handleNewClientInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewClientInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setNewClientData(prev => ({ ...prev, [name]: value }));
+    setNewClientData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleNewClientSwitchChange = (checked: boolean, name: string) => {
     // For 'isPublic' or other future switches
-    setNewClientData(prev => ({ ...prev, [name]: checked }));
+    setNewClientData((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleNewClientRedirectUrisChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     // Assuming comma or newline separated URIs
-    const uris = e.target.value.split(/[\n,]+/).map(uri => uri.trim()).filter(uri => uri);
-    setNewClientData(prev => ({ ...prev, redirectUris: uris }));
+    const uris = e.target.value
+      .split(/[\n,]+/)
+      .map((uri) => uri.trim())
+      .filter((uri) => uri);
+    setNewClientData((prev) => ({ ...prev, redirectUris: uris }));
   };
 
   const handleNewClientScopesChange = (selectedScopes: string[]) => {
-    setNewClientData(prev => ({ ...prev, scopes: selectedScopes }));
+    setNewClientData((prev) => ({ ...prev, scopes: selectedScopes }));
   };
 
-  const handleEditClientInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleEditClientInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setEditClientData(prev => prev ? ({ ...prev, [name]: value }) : null);
+    setEditClientData((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
   const handleEditClientSwitchChange = (checked: boolean, name: string) => {
-    setEditClientData(prev => prev ? ({ ...prev, [name]: checked }) : null);
+    setEditClientData((prev) => (prev ? { ...prev, [name]: checked } : null));
   };
 
   const handleEditClientRedirectUrisChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const uris = e.target.value.split(/[\n,]+/).map(uri => uri.trim()).filter(uri => uri);
-    setEditClientData(prev => prev ? ({ ...prev, redirectUris: uris }) : null);
+    const uris = e.target.value
+      .split(/[\n,]+/)
+      .map((uri) => uri.trim())
+      .filter((uri) => uri);
+    setEditClientData((prev) => (prev ? { ...prev, redirectUris: uris } : null));
   };
 
   const handleEditClientScopesChange = (selectedScopes: string[]) => {
-    setEditClientData(prev => prev ? ({ ...prev, scopes: selectedScopes }) : null);
+    setEditClientData((prev) => (prev ? { ...prev, scopes: selectedScopes } : null));
   };
 
   const handleAddClientClick = () => {
@@ -480,7 +539,7 @@ export default function DashboardPage() {
 
   const handleEditClientClick = (client: OAuthClient) => {
     setSelectedClient(client); // Keep original selected client for reference
-    setEditClientData({...client}); // Clone client data for editing form
+    setEditClientData({ ...client }); // Clone client data for editing form
     setNewlyCreatedClientSecret(null);
     setIsEditClientModalOpen(true);
   };
@@ -492,7 +551,11 @@ export default function DashboardPage() {
   };
 
   const handleDeleteClientConfirmation = (clientId: string) => {
-    if (window.confirm('Are you sure you want to delete this OAuth client? This action cannot be undone.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to delete this OAuth client? This action cannot be undone.'
+      )
+    ) {
       handleDeleteClient(clientId);
     }
   };
@@ -519,7 +582,7 @@ export default function DashboardPage() {
         clientId: `mock-client-id-${Date.now()}`,
         clientSecret: !newClientData.isPublic ? `mock-secret-${Date.now()}` : undefined,
         isActive: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
       alert('OAuth client created successfully (Simulated).');
       loadClients();
@@ -546,25 +609,33 @@ export default function DashboardPage() {
       loadClients();
       setIsEditClientModalOpen(false);
       setEditClientData(null);
-    } catch (error)
-{
+    } catch (error) {
       console.error('Error updating client:', error);
       alert(`Error updating client: ${error.message || 'Unknown error'} (Simulated)`);
     }
   };
 
   const handleRegenerateClientSecret = async (clientId: string) => {
-    if (!window.confirm("Are you sure you want to regenerate this client's secret? The current secret will become invalid immediately.")) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to regenerate this client's secret? The current secret will become invalid immediately."
+      )
+    )
+      return;
     try {
       // Simulate API: const result = await adminApi.regenerateClientSecret(clientId);
       const mockNewSecret = `new-mock-secret-${Date.now()}`;
-      console.log(`Simulating regenerate secret for client ID: ${clientId}. New Secret: ${mockNewSecret}`);
-      alert(`Client secret regenerated successfully (Simulated): ${mockNewSecret}. Please save it now, it won't be shown again.`);
+      console.log(
+        `Simulating regenerate secret for client ID: ${clientId}. New Secret: ${mockNewSecret}`
+      );
+      alert(
+        `Client secret regenerated successfully (Simulated): ${mockNewSecret}. Please save it now, it won't be shown again.`
+      );
       // Update state to display the new secret, perhaps in the edit or view modal if open
       if (isEditClientModalOpen && editClientData && editClientData.id === clientId) {
         setNewlyCreatedClientSecret(mockNewSecret); // Show in edit modal
       } else if (isViewClientModalOpen && selectedClient && selectedClient.id === clientId) {
-         setNewlyCreatedClientSecret(mockNewSecret); // Or handle display in view modal
+        setNewlyCreatedClientSecret(mockNewSecret); // Or handle display in view modal
       }
       // No need to reload clients unless backend changes other client data on secret regeneration
     } catch (error) {
@@ -575,22 +646,26 @@ export default function DashboardPage() {
   // --- End OAuth Client Management Handlers ---
 
   // --- OAuth Scope Management Handlers ---
-  const handleNewOAuthScopeInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewOAuthScopeInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setNewOAuthScopeData(prev => ({ ...prev, [name]: value }));
+    setNewOAuthScopeData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleNewOAuthScopeSwitchChange = (checked: boolean, name: string) => {
-    setNewOAuthScopeData(prev => ({ ...prev, [name]: checked }));
+    setNewOAuthScopeData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  const handleEditOAuthScopeInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleEditOAuthScopeInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setEditOAuthScopeData(prev => prev ? ({ ...prev, [name]: value }) : null);
+    setEditOAuthScopeData((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
   const handleEditOAuthScopeSwitchChange = (checked: boolean, name: string) => {
-     setEditOAuthScopeData(prev => prev ? ({ ...prev, [name]: checked }) : null);
+    setEditOAuthScopeData((prev) => (prev ? { ...prev, [name]: checked } : null));
   };
 
   const handleAddScopeClick = () => {
@@ -605,12 +680,16 @@ export default function DashboardPage() {
   };
 
   const handleDeleteOAuthScopeConfirmation = (scopeId: string) => {
-    const scope = oauthScopes.find(s => s.id === scopeId);
+    const scope = oauthScopes.find((s) => s.id === scopeId);
     if (scope?.isDefault) {
-      alert("Default scopes cannot be deleted.");
+      alert('Default scopes cannot be deleted.');
       return;
     }
-    if (window.confirm(`Are you sure you want to delete the scope "${scope?.name}"? This might affect existing clients.`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete the scope "${scope?.name}"? This might affect existing clients.`
+      )
+    ) {
       handleDeleteOAuthScope(scopeId);
     }
   };
@@ -666,7 +745,8 @@ export default function DashboardPage() {
       alert('User created successfully (Simulated)');
       loadUsers(); // Refresh users list
       setIsAddUserModalOpen(false); // Close modal
-      setNewUser({ // Reset form
+      setNewUser({
+        // Reset form
         username: '',
         email: '',
         firstName: '',
@@ -695,9 +775,39 @@ export default function DashboardPage() {
       // Simulate API Call: const data = await adminApi.getClients(100); // Fetch more/all
       // Ensure API returns redirectUris (string[]) and scopes (string[])
       const mockClients: OAuthClient[] = [
-        { id: 'client_1', clientId: 'app-xyz-123', name: 'Main Frontend App', description: 'Primary user-facing application.', isPublic: false, isActive: true, redirectUris: ['https://app.example.com/oauth/callback'], scopes: ['openid', 'profile', 'email'], createdAt: new Date(Date.now() - 50000000).toISOString() },
-        { id: 'client_2', clientId: 'mobile-abc-789', name: 'Mobile App', description: 'iOS and Android application.', isPublic: false, isActive: true, redirectUris: ['myapp://oauth/callback'], scopes: ['openid', 'profile', 'custom_api:read'], createdAt: new Date(Date.now() - 150000000).toISOString() },
-        { id: 'client_3', clientId: 'third-party-svc', name: 'Reporting Service', description: 'Third-party data analytics.', isPublic: true, isActive: false, redirectUris: ['https://reporter.example.net/cb'], scopes: ['custom_api:reports'], createdAt: new Date(Date.now() - 250000000).toISOString() },
+        {
+          id: 'client_1',
+          clientId: 'app-xyz-123',
+          name: 'Main Frontend App',
+          description: 'Primary user-facing application.',
+          isPublic: false,
+          isActive: true,
+          redirectUris: ['https://app.example.com/oauth/callback'],
+          scopes: ['openid', 'profile', 'email'],
+          createdAt: new Date(Date.now() - 50000000).toISOString(),
+        },
+        {
+          id: 'client_2',
+          clientId: 'mobile-abc-789',
+          name: 'Mobile App',
+          description: 'iOS and Android application.',
+          isPublic: false,
+          isActive: true,
+          redirectUris: ['myapp://oauth/callback'],
+          scopes: ['openid', 'profile', 'custom_api:read'],
+          createdAt: new Date(Date.now() - 150000000).toISOString(),
+        },
+        {
+          id: 'client_3',
+          clientId: 'third-party-svc',
+          name: 'Reporting Service',
+          description: 'Third-party data analytics.',
+          isPublic: true,
+          isActive: false,
+          redirectUris: ['https://reporter.example.net/cb'],
+          scopes: ['custom_api:reports'],
+          createdAt: new Date(Date.now() - 250000000).toISOString(),
+        },
       ];
       // const data = await adminApi.getClients(10); // Original call
       // setClients(data.clients || []);
@@ -719,9 +829,27 @@ export default function DashboardPage() {
       console.log('Fetching roles...');
       // Mock data for roles
       const mockRoles: Role[] = [
-        { id: 'role_1', name: 'Administrator', description: 'Full access to all features', permissionIds: ['perm_1', 'perm_2', 'perm_3'], createdAt: new Date().toISOString() },
-        { id: 'role_2', name: 'Editor', description: 'Can edit content', permissionIds: ['perm_2'], createdAt: new Date().toISOString() },
-        { id: 'role_3', name: 'Viewer', description: 'Can only view content', permissionIds: ['perm_3'], createdAt: new Date().toISOString() },
+        {
+          id: 'role_1',
+          name: 'Administrator',
+          description: 'Full access to all features',
+          permissionIds: ['perm_1', 'perm_2', 'perm_3'],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'role_2',
+          name: 'Editor',
+          description: 'Can edit content',
+          permissionIds: ['perm_2'],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'role_3',
+          name: 'Viewer',
+          description: 'Can only view content',
+          permissionIds: ['perm_3'],
+          createdAt: new Date().toISOString(),
+        },
       ];
       // setRoles(data.roles || []);
       setRoles(mockRoles);
@@ -741,11 +869,36 @@ export default function DashboardPage() {
       console.log('Fetching permissions for Permission Management Tab...');
       // Mock data for permissions - ensure it includes createdAt for view modal
       const mockPermissionsData: Permission[] = [
-        { id: 'perm_1', name: 'manage_users', description: 'Allows creating, reading, updating, and deleting users.', createdAt: new Date(Date.now() - 100000000).toISOString() },
-        { id: 'perm_2', name: 'edit_content', description: 'Allows creating, editing, and deleting website content.', createdAt: new Date(Date.now() - 200000000).toISOString() },
-        { id: 'perm_3', name: 'view_content', description: 'Allows viewing website content.', createdAt: new Date(Date.now() - 300000000).toISOString() },
-        { id: 'perm_4', name: 'manage_settings', description: 'Allows accessing and modifying system settings.', createdAt: new Date(Date.now() - 400000000).toISOString() },
-        { id: 'perm_5', name: 'publish_articles', description: 'Allows users to publish articles.', createdAt: new Date(Date.now() - 500000000).toISOString() },
+        {
+          id: 'perm_1',
+          name: 'manage_users',
+          description: 'Allows creating, reading, updating, and deleting users.',
+          createdAt: new Date(Date.now() - 100000000).toISOString(),
+        },
+        {
+          id: 'perm_2',
+          name: 'edit_content',
+          description: 'Allows creating, editing, and deleting website content.',
+          createdAt: new Date(Date.now() - 200000000).toISOString(),
+        },
+        {
+          id: 'perm_3',
+          name: 'view_content',
+          description: 'Allows viewing website content.',
+          createdAt: new Date(Date.now() - 300000000).toISOString(),
+        },
+        {
+          id: 'perm_4',
+          name: 'manage_settings',
+          description: 'Allows accessing and modifying system settings.',
+          createdAt: new Date(Date.now() - 400000000).toISOString(),
+        },
+        {
+          id: 'perm_5',
+          name: 'publish_articles',
+          description: 'Allows users to publish articles.',
+          createdAt: new Date(Date.now() - 500000000).toISOString(),
+        },
       ];
       setPermissions(mockPermissionsData); // This state is already used by Roles for MultiSelect
       console.log('Permissions loaded and available for Permission Tab:', mockPermissionsData);
@@ -763,12 +916,54 @@ export default function DashboardPage() {
       // Simulate API Call: const data = await adminApi.getOAuthScopes();
       console.log('Fetching OAuth scopes for management...');
       const mockOAuthScopesData: OAuthScope[] = [
-        { id: 'scope_1', name: 'openid', description: 'OpenID Connect standard scope for authentication.', isDefault: true, isRestricted: false, createdAt: new Date(Date.now() - 600000000).toISOString() },
-        { id: 'scope_2', name: 'profile', description: 'Access to user\'s default profile information.', isDefault: true, isRestricted: false, createdAt: new Date(Date.now() - 550000000).toISOString() },
-        { id: 'scope_3', name: 'email', description: 'Access to user\'s email address.', isDefault: true, isRestricted: false, createdAt: new Date(Date.now() - 500000000).toISOString() },
-        { id: 'scope_4', name: 'custom_api:read', description: 'Read access to custom API resources.', isDefault: false, isRestricted: false, createdAt: new Date(Date.now() - 450000000).toISOString() },
-        { id: 'scope_5', name: 'custom_api:write', description: 'Write access to custom API resources.', isDefault: false, isRestricted: false, createdAt: new Date(Date.now() - 400000000).toISOString() },
-        { id: 'scope_6', name: 'admin', description: 'Administrative privileges for the system.', isDefault: false, isRestricted: true, createdAt: new Date(Date.now() - 350000000).toISOString() },
+        {
+          id: 'scope_1',
+          name: 'openid',
+          description: 'OpenID Connect standard scope for authentication.',
+          isDefault: true,
+          isRestricted: false,
+          createdAt: new Date(Date.now() - 600000000).toISOString(),
+        },
+        {
+          id: 'scope_2',
+          name: 'profile',
+          description: "Access to user's default profile information.",
+          isDefault: true,
+          isRestricted: false,
+          createdAt: new Date(Date.now() - 550000000).toISOString(),
+        },
+        {
+          id: 'scope_3',
+          name: 'email',
+          description: "Access to user's email address.",
+          isDefault: true,
+          isRestricted: false,
+          createdAt: new Date(Date.now() - 500000000).toISOString(),
+        },
+        {
+          id: 'scope_4',
+          name: 'custom_api:read',
+          description: 'Read access to custom API resources.',
+          isDefault: false,
+          isRestricted: false,
+          createdAt: new Date(Date.now() - 450000000).toISOString(),
+        },
+        {
+          id: 'scope_5',
+          name: 'custom_api:write',
+          description: 'Write access to custom API resources.',
+          isDefault: false,
+          isRestricted: false,
+          createdAt: new Date(Date.now() - 400000000).toISOString(),
+        },
+        {
+          id: 'scope_6',
+          name: 'admin',
+          description: 'Administrative privileges for the system.',
+          isDefault: false,
+          isRestricted: true,
+          createdAt: new Date(Date.now() - 350000000).toISOString(),
+        },
       ];
       setOAuthScopes(mockOAuthScopesData);
       console.log('OAuth Scopes loaded for management:', mockOAuthScopesData);
@@ -858,8 +1053,8 @@ export default function DashboardPage() {
                 Welcome, {userInfo?.name || userInfo?.preferred_username}
               </p>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleLogout}
               className="flex items-center space-x-2"
             >
@@ -906,9 +1101,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{users.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Active registered users
-                  </p>
+                  <p className="text-xs text-muted-foreground">Active registered users</p>
                 </CardContent>
               </Card>
 
@@ -919,9 +1112,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{clients.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Registered OAuth applications
-                  </p>
+                  <p className="text-xs text-muted-foreground">Registered OAuth applications</p>
                 </CardContent>
               </Card>
 
@@ -932,9 +1123,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">Secure</div>
-                  <p className="text-xs text-muted-foreground">
-                    All systems operational
-                  </p>
+                  <p className="text-xs text-muted-foreground">All systems operational</p>
                 </CardContent>
               </Card>
             </div>
@@ -945,34 +1134,31 @@ export default function DashboardPage() {
                 <CardDescription>Common administrative tasks</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex items-center space-x-2 h-auto p-4"
                   onClick={() => setActiveTab('users')}
                 >
                   <Users className="h-5 w-5" />
                   <span>Manage Users</span>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex items-center space-x-2 h-auto p-4"
                   onClick={() => setActiveTab('clients')}
                 >
                   <Key className="h-5 w-5" />
                   <span>OAuth Clients</span>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex items-center space-x-2 h-auto p-4"
                   onClick={() => setActiveTab('permissions')}
                 >
                   <Shield className="h-5 w-5" />
                   <span>Permissions</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex items-center space-x-2 h-auto p-4"
-                >
+                <Button variant="outline" className="flex items-center space-x-2 h-auto p-4">
                   <Settings className="h-5 w-5" />
                   <span>Settings</span>
                 </Button>
@@ -1001,20 +1187,25 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="space-y-4">
                   {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex items-center space-x-4">
                         <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
                           <Users className="h-5 w-5 text-indigo-600" />
                         </div>
                         <div>
-                          <h3 className="font-medium">{user.firstName} {user.lastName}</h3>
+                          <h3 className="font-medium">
+                            {user.firstName} {user.lastName}
+                          </h3>
                           <p className="text-sm text-gray-600">@{user.username}</p>
                           <p className="text-sm text-gray-500">{user.email}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant={user.isActive ? "default" : "secondary"}>
-                          {user.isActive ? "Active" : "Inactive"}
+                        <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                          {user.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                         <Button variant="ghost" size="sm" onClick={() => handleViewUserClick(user)}>
                           <Eye className="h-4 w-4" />
@@ -1022,7 +1213,11 @@ export default function DashboardPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleEditUserClick(user)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteUserConfirmation(user.id)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteUserConfirmation(user.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
@@ -1040,9 +1235,9 @@ export default function DashboardPage() {
                 <h2 className="text-2xl font-bold text-gray-900">OAuth Client Management</h2>
                 <p className="text-gray-600">Manage OAuth 2.0 client applications</p>
               </div>
-            <Button className="flex items-center space-x-2" onClick={handleAddClientClick}>
+              <Button className="flex items-center space-x-2" onClick={handleAddClientClick}>
                 <Plus className="h-4 w-4" />
-              <span>Add Client</span>
+                <span>Add Client</span>
               </Button>
             </div>
 
@@ -1052,48 +1247,81 @@ export default function DashboardPage() {
                 <CardDescription>Registered OAuth 2.0 applications</CardDescription>
               </CardHeader>
               <CardContent>
-              {isLoadingClients ? (
-                 <div className="flex items-center justify-center py-8">
-                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                   <p className="ml-2 text-gray-600">Loading clients...</p>
-                 </div>
-              ) : clients.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No OAuth clients found.</p>
-              ) : (
-                <div className="space-y-4">
-                  {clients.map((client) => (
-                    <div key={client.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4 flex-1 min-w-0">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <Key className="h-5 w-5 text-green-600" />
+                {isLoadingClients ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p className="ml-2 text-gray-600">Loading clients...</p>
+                  </div>
+                ) : clients.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">No OAuth clients found.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {clients.map((client) => (
+                      <div
+                        key={client.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="flex items-center space-x-4 flex-1 min-w-0">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <Key className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium truncate" title={client.name}>
+                              {client.name}
+                            </h3>
+                            <p className="text-sm text-gray-600 truncate" title={client.clientId}>
+                              {client.clientId}
+                            </p>
+                            <p
+                              className="text-sm text-gray-500 truncate"
+                              title={client.description}
+                            >
+                              {client.description}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium truncate" title={client.name}>{client.name}</h3>
-                          <p className="text-sm text-gray-600 truncate" title={client.clientId}>{client.clientId}</p>
-                          <p className="text-sm text-gray-500 truncate" title={client.description}>{client.description}</p>
-                        </div>
-                        </div>
-                      <div className="flex items-center space-x-1 ml-2">
-                        <Badge variant={client.isPublic ? "secondary" : "default"} className="hidden sm:inline-flex">
-                          {client.isPublic ? "Public" : "Confidential"}
-                        </Badge>
-                        <Badge variant={client.isActive ? "default" : "secondary"} className="hidden sm:inline-flex">
-                          {client.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewClientClick(client)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClientClick(client)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteClientConfirmation(client.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Badge
+                            variant={client.isPublic ? 'secondary' : 'default'}
+                            className="hidden sm:inline-flex"
+                          >
+                            {client.isPublic ? 'Public' : 'Confidential'}
+                          </Badge>
+                          <Badge
+                            variant={client.isActive ? 'default' : 'secondary'}
+                            className="hidden sm:inline-flex"
+                          >
+                            {client.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleViewClientClick(client)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditClientClick(client)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleDeleteClientConfirmation(client.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
                         </div>
                       </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1119,7 +1347,11 @@ export default function DashboardPage() {
                     <CardTitle>Available OAuth Scopes</CardTitle>
                     <CardDescription>Manage system-wide OAuth 2.0 scopes</CardDescription>
                   </div>
-                  <Button size="sm" onClick={handleAddScopeClick} className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddScopeClick}
+                    className="flex items-center space-x-2"
+                  >
                     <Plus className="h-4 w-4" />
                     <span>Add Scope</span>
                   </Button>
@@ -1135,23 +1367,46 @@ export default function DashboardPage() {
                   ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {oauthScopes.map((scope) => (
-                        <div key={scope.id} className="flex items-start justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div
+                          key={scope.id}
+                          className="flex items-start justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
                           <div className="flex-1 min-w-0 mr-2">
-                            <h4 className="font-medium text-sm truncate" title={scope.name}>{scope.name}</h4>
+                            <h4 className="font-medium text-sm truncate" title={scope.name}>
+                              {scope.name}
+                            </h4>
                             <p className="text-xs text-gray-500" title={scope.description}>
-                              {scope.description || "No description."}
+                              {scope.description || 'No description.'}
                             </p>
                             <div className="mt-1">
-                              {scope.isDefault && <Badge variant="outline" className="mr-1 text-xs">Default</Badge>}
-                              {scope.isRestricted && <Badge variant="destructive" className="text-xs">Restricted</Badge>}
+                              {scope.isDefault && (
+                                <Badge variant="outline" className="mr-1 text-xs">
+                                  Default
+                                </Badge>
+                              )}
+                              {scope.isRestricted && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Restricted
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-1 flex-shrink-0">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditScopeClick(scope)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEditScopeClick(scope)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                             {!scope.isDefault && ( // Prevent deleting default scopes
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteOAuthScopeConfirmation(scope.id)}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleDeleteOAuthScopeConfirmation(scope.id)}
+                              >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
@@ -1170,7 +1425,11 @@ export default function DashboardPage() {
                     <CardTitle>Application Permissions</CardTitle>
                     <CardDescription>Define and manage system-wide permissions</CardDescription>
                   </div>
-                  <Button size="sm" onClick={handleAddPermissionClick} className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddPermissionClick}
+                    className="flex items-center space-x-2"
+                  >
                     <Plus className="h-4 w-4" />
                     <span>Add Permission</span>
                   </Button>
@@ -1184,23 +1443,52 @@ export default function DashboardPage() {
                   ) : permissions.length === 0 ? (
                     <p className="text-center text-gray-500 py-4">No permissions defined.</p>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto"> {/* Added scroll for long lists */}
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {' '}
+                      {/* Added scroll for long lists */}
                       {permissions.map((permission) => (
-                        <div key={permission.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <div className="flex-1 min-w-0"> {/* Flex properties for truncation */}
-                            <h4 className="font-medium text-sm truncate" title={permission.name}>{permission.name}</h4>
-                            <p className="text-xs text-gray-500 truncate" title={permission.description}>
-                              {permission.description || "No description provided."}
+                        <div
+                          key={permission.id}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            {' '}
+                            {/* Flex properties for truncation */}
+                            <h4 className="font-medium text-sm truncate" title={permission.name}>
+                              {permission.name}
+                            </h4>
+                            <p
+                              className="text-xs text-gray-500 truncate"
+                              title={permission.description}
+                            >
+                              {permission.description || 'No description provided.'}
                             </p>
                           </div>
-                          <div className="flex items-center space-x-1 ml-2"> {/* Added margin */}
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewPermissionClick(permission)}>
+                          <div className="flex items-center space-x-1 ml-2">
+                            {' '}
+                            {/* Added margin */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleViewPermissionClick(permission)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPermissionClick(permission)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEditPermissionClick(permission)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeletePermissionConfirmation(permission.id)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDeletePermissionConfirmation(permission.id)}
+                            >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
@@ -1216,7 +1504,9 @@ export default function DashboardPage() {
 
         {/* Add User Modal */}
         <Dialog open={isAddUserModalOpen} onOpenChange={setIsAddUserModalOpen}>
-          <DialogContent className="sm:max-w-[475px]"> {/* Increased width slightly */}
+          <DialogContent className="sm:max-w-[475px]">
+            {' '}
+            {/* Increased width slightly */}
             <DialogHeader>
               <DialogTitle>Add New User</DialogTitle>
               <DialogDescription>
@@ -1291,8 +1581,12 @@ export default function DashboardPage() {
                   placeholder="••••••••"
                 />
               </div>
-              <div className="flex items-center space-x-2 justify-end mt-2 pr-4"> {/* Adjusted for alignment */}
-                <Label htmlFor="isActive-add" className=""> {/* Removed text-right */}
+              <div className="flex items-center space-x-2 justify-end mt-2 pr-4">
+                {' '}
+                {/* Adjusted for alignment */}
+                <Label htmlFor="isActive-add" className="">
+                  {' '}
+                  {/* Removed text-right */}
                   Active
                 </Label>
                 <Switch
@@ -1304,9 +1598,13 @@ export default function DashboardPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleCreateUser}>Submit</Button>
+              <Button type="submit" onClick={handleCreateUser}>
+                Submit
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1385,9 +1683,17 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsEditUserModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditUserModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleUpdateUser}>Save Changes</Button>
+              <Button type="submit" onClick={handleUpdateUser}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1397,12 +1703,12 @@ export default function DashboardPage() {
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle>View User Details</DialogTitle>
-              <DialogDescription>
-                Detailed information for the selected user.
-              </DialogDescription>
+              <DialogDescription>Detailed information for the selected user.</DialogDescription>
             </DialogHeader>
             {selectedUser && (
-              <div className="grid gap-3 py-4 px-2"> {/* Added some padding */}
+              <div className="grid gap-3 py-4 px-2">
+                {' '}
+                {/* Added some padding */}
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-500">User ID:</span>
                   <span className="text-sm text-gray-900">{selectedUser.id}</span>
@@ -1425,8 +1731,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-500">Status:</span>
-                  <Badge variant={selectedUser.isActive ? "default" : "secondary"}>
-                    {selectedUser.isActive ? "Active" : "Inactive"}
+                  <Badge variant={selectedUser.isActive ? 'default' : 'secondary'}>
+                    {selectedUser.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
@@ -1440,7 +1746,9 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" onClick={() => setIsViewUserModalOpen(false)}>Close</Button>
+                <Button type="button" onClick={() => setIsViewUserModalOpen(false)}>
+                  Close
+                </Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
@@ -1448,12 +1756,12 @@ export default function DashboardPage() {
 
         {/* Add Role Modal */}
         <Dialog open={isAddRoleModalOpen} onOpenChange={setIsAddRoleModalOpen}>
-          <DialogContent className="sm:max-w-lg"> {/* Wider for permissions */}
+          <DialogContent className="sm:max-w-lg">
+            {' '}
+            {/* Wider for permissions */}
             <DialogHeader>
               <DialogTitle>Add New Role</DialogTitle>
-              <DialogDescription>
-                Define a new role and select its permissions.
-              </DialogDescription>
+              <DialogDescription>Define a new role and select its permissions.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -1469,8 +1777,12 @@ export default function DashboardPage() {
                   placeholder="e.g., Contributor"
                 />
               </div>
-              <div className="grid grid-cols-4 items-start gap-4"> {/* items-start for textarea alignment */}
-                <Label htmlFor="roleDescription-add" className="text-right pt-1"> {/* Adjust label alignment */}
+              <div className="grid grid-cols-4 items-start gap-4">
+                {' '}
+                {/* items-start for textarea alignment */}
+                <Label htmlFor="roleDescription-add" className="text-right pt-1">
+                  {' '}
+                  {/* Adjust label alignment */}
                   Description
                 </Label>
                 <Textarea
@@ -1489,7 +1801,12 @@ export default function DashboardPage() {
                 </Label>
                 <div className="col-span-3">
                   <MultiSelect
-                    options={permissions.map(p => ({ value: p.id, label: `${p.name} (${p.description || 'No description'})` })) as MultiSelectOption[]}
+                    options={
+                      permissions.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} (${p.description || 'No description'})`,
+                      })) as MultiSelectOption[]
+                    }
                     selectedValues={newRoleData.permissionIds}
                     onChange={handleNewRolePermissionsChange}
                     placeholder="Select permissions..."
@@ -1503,9 +1820,17 @@ export default function DashboardPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsAddRoleModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddRoleModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleCreateRole}>Create Role</Button>
+              <Button type="submit" onClick={handleCreateRole}>
+                Create Role
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1552,13 +1877,18 @@ export default function DashboardPage() {
                   </Label>
                   <div className="col-span-3">
                     <MultiSelect
-                      options={permissions.map(p => ({ value: p.id, label: `${p.name} (${p.description || 'No description'})` })) as MultiSelectOption[]}
+                      options={
+                        permissions.map((p) => ({
+                          value: p.id,
+                          label: `${p.name} (${p.description || 'No description'})`,
+                        })) as MultiSelectOption[]
+                      }
                       selectedValues={editRoleData.permissionIds}
                       onChange={handleEditRolePermissionsChange}
                       placeholder="Select permissions..."
                       className="w-full"
                     />
-                     <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Select one or more permissions for this role.
                     </p>
                   </div>
@@ -1567,9 +1897,17 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsEditRoleModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditRoleModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleUpdateRole}>Save Changes</Button>
+              <Button type="submit" onClick={handleUpdateRole}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1614,9 +1952,17 @@ export default function DashboardPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsAddPermissionModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddPermissionModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleCreatePermission}>Create Permission</Button>
+              <Button type="submit" onClick={handleCreatePermission}>
+                Create Permission
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1662,9 +2008,17 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsEditPermissionModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditPermissionModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleUpdatePermission}>Save Changes</Button>
+              <Button type="submit" onClick={handleUpdatePermission}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1681,18 +2035,38 @@ export default function DashboardPage() {
             {selectedPermission && (
               <div className="space-y-3 py-4">
                 <div>
-                  <Label htmlFor="permissionName-view" className="text-sm font-medium text-gray-500">Name</Label>
-                  <p id="permissionName-view" className="text-sm text-gray-900 mt-1">{selectedPermission.name}</p>
+                  <Label
+                    htmlFor="permissionName-view"
+                    className="text-sm font-medium text-gray-500"
+                  >
+                    Name
+                  </Label>
+                  <p id="permissionName-view" className="text-sm text-gray-900 mt-1">
+                    {selectedPermission.name}
+                  </p>
                 </div>
                 <div>
-                  <Label htmlFor="permissionDescription-view" className="text-sm font-medium text-gray-500">Description</Label>
-                  <p id="permissionDescription-view" className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">
-                    {selectedPermission.description || "N/A"}
+                  <Label
+                    htmlFor="permissionDescription-view"
+                    className="text-sm font-medium text-gray-500"
+                  >
+                    Description
+                  </Label>
+                  <p
+                    id="permissionDescription-view"
+                    className="text-sm text-gray-900 mt-1 whitespace-pre-wrap"
+                  >
+                    {selectedPermission.description || 'N/A'}
                   </p>
                 </div>
                 {selectedPermission.createdAt && (
                   <div>
-                    <Label htmlFor="permissionCreatedAt-view" className="text-sm font-medium text-gray-500">Created At</Label>
+                    <Label
+                      htmlFor="permissionCreatedAt-view"
+                      className="text-sm font-medium text-gray-500"
+                    >
+                      Created At
+                    </Label>
                     <p id="permissionCreatedAt-view" className="text-sm text-gray-900 mt-1">
                       {new Date(selectedPermission.createdAt).toLocaleString()}
                     </p>
@@ -1702,42 +2076,75 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" onClick={() => setIsViewPermissionModalOpen(false)}>Close</Button>
+                <Button type="button" onClick={() => setIsViewPermissionModalOpen(false)}>
+                  Close
+                </Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Add OAuth Client Modal */}
-        <Dialog open={isAddClientModalOpen} onOpenChange={(isOpen) => {
-          setIsAddClientModalOpen(isOpen);
-          if (!isOpen) setNewlyCreatedClientSecret(null); // Clear secret when modal closes
-        }}>
+        <Dialog
+          open={isAddClientModalOpen}
+          onOpenChange={(isOpen) => {
+            setIsAddClientModalOpen(isOpen);
+            if (!isOpen) setNewlyCreatedClientSecret(null); // Clear secret when modal closes
+          }}
+        >
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Add New OAuth Client</DialogTitle>
-              <DialogDescription>
-                Configure a new OAuth 2.0 client application.
-              </DialogDescription>
+              <DialogDescription>Configure a new OAuth 2.0 client application.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="clientName-add" className="text-right">Name</Label>
-                <Input id="clientName-add" name="name" value={newClientData.name} onChange={handleNewClientInputChange} className="col-span-3" placeholder="My Awesome App" />
+                <Label htmlFor="clientName-add" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="clientName-add"
+                  name="name"
+                  value={newClientData.name}
+                  onChange={handleNewClientInputChange}
+                  className="col-span-3"
+                  placeholder="My Awesome App"
+                />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="clientDescription-add" className="text-right pt-1">Description</Label>
-                <Textarea id="clientDescription-add" name="description" value={newClientData.description} onChange={handleNewClientInputChange} className="col-span-3" placeholder="Brief description of the client" rows={2} />
+                <Label htmlFor="clientDescription-add" className="text-right pt-1">
+                  Description
+                </Label>
+                <Textarea
+                  id="clientDescription-add"
+                  name="description"
+                  value={newClientData.description}
+                  onChange={handleNewClientInputChange}
+                  className="col-span-3"
+                  placeholder="Brief description of the client"
+                  rows={2}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="clientIsPublic-add" className="text-right">Client Type</Label>
+                <Label htmlFor="clientIsPublic-add" className="text-right">
+                  Client Type
+                </Label>
                 <div className="col-span-3 flex items-center space-x-2">
-                  <Switch id="clientIsPublic-add" name="isPublic" checked={newClientData.isPublic} onCheckedChange={(checked) => handleNewClientSwitchChange(checked, 'isPublic')} />
-                  <span className="text-sm">{newClientData.isPublic ? 'Public' : 'Confidential'}</span>
+                  <Switch
+                    id="clientIsPublic-add"
+                    name="isPublic"
+                    checked={newClientData.isPublic}
+                    onCheckedChange={(checked) => handleNewClientSwitchChange(checked, 'isPublic')}
+                  />
+                  <span className="text-sm">
+                    {newClientData.isPublic ? 'Public' : 'Confidential'}
+                  </span>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="clientRedirectUris-add" className="text-right pt-1">Redirect URIs</Label>
+                <Label htmlFor="clientRedirectUris-add" className="text-right pt-1">
+                  Redirect URIs
+                </Label>
                 <Textarea
                   id="clientRedirectUris-add"
                   name="redirectUris"
@@ -1747,13 +2154,22 @@ export default function DashboardPage() {
                   placeholder="https://app.example.com/callback&#10;myapp://callback"
                   rows={3}
                 />
-                <p className="col-span-3 col-start-2 text-xs text-muted-foreground">Enter one URI per line or comma-separated.</p>
+                <p className="col-span-3 col-start-2 text-xs text-muted-foreground">
+                  Enter one URI per line or comma-separated.
+                </p>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="clientScopes-add" className="text-right pt-1">Scopes</Label>
+                <Label htmlFor="clientScopes-add" className="text-right pt-1">
+                  Scopes
+                </Label>
                 <div className="col-span-3">
                   <MultiSelect
-                    options={oauthScopes.map(s => ({ value: s.name, label: `${s.name} (${s.description || 'N/A'})` })) as MultiSelectOption[]}
+                    options={
+                      oauthScopes.map((s) => ({
+                        value: s.name,
+                        label: `${s.name} (${s.description || 'N/A'})`,
+                      })) as MultiSelectOption[]
+                    }
                     selectedValues={newClientData.scopes}
                     onChange={handleNewClientScopesChange}
                     placeholder="Select scopes..."
@@ -1764,33 +2180,55 @@ export default function DashboardPage() {
 
               {newlyCreatedClientSecret && !newClientData.isPublic && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                  <Label className="font-semibold text-green-700">Client Secret (Save Securely!)</Label>
+                  <Label className="font-semibold text-green-700">
+                    Client Secret (Save Securely!)
+                  </Label>
                   <p className="text-sm text-green-600 break-all bg-white p-2 rounded mt-1">
                     {newlyCreatedClientSecret}
                   </p>
-                  <p className="text-xs text-yellow-700 mt-1">This secret will not be shown again. Copy and store it securely.</p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    This secret will not be shown again. Copy and store it securely.
+                  </p>
                 </div>
               )}
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => { setIsAddClientModalOpen(false); setNewlyCreatedClientSecret(null); }}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddClientModalOpen(false);
+                    setNewlyCreatedClientSecret(null);
+                  }}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleCreateClient} disabled={!!newlyCreatedClientSecret && !newClientData.isPublic}>
-                {newlyCreatedClientSecret && !newClientData.isPublic ? "Client Created" : "Create Client"}
+              <Button
+                type="submit"
+                onClick={handleCreateClient}
+                disabled={!!newlyCreatedClientSecret && !newClientData.isPublic}
+              >
+                {newlyCreatedClientSecret && !newClientData.isPublic
+                  ? 'Client Created'
+                  : 'Create Client'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Edit OAuth Client Modal */}
-        <Dialog open={isEditClientModalOpen} onOpenChange={(isOpen) => {
-          setIsEditClientModalOpen(isOpen);
-          if (!isOpen) {
-            setNewlyCreatedClientSecret(null); // Clear any displayed secret
-            setEditClientData(null); // Clear edit data
-          }
-        }}>
+        <Dialog
+          open={isEditClientModalOpen}
+          onOpenChange={(isOpen) => {
+            setIsEditClientModalOpen(isOpen);
+            if (!isOpen) {
+              setNewlyCreatedClientSecret(null); // Clear any displayed secret
+              setEditClientData(null); // Clear edit data
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Edit OAuth Client</DialogTitle>
@@ -1801,30 +2239,74 @@ export default function DashboardPage() {
             {editClientData && (
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="clientId-edit" className="text-right">Client ID</Label>
-                  <Input id="clientId-edit" value={editClientData.clientId} readOnly className="col-span-3 bg-gray-100" />
+                  <Label htmlFor="clientId-edit" className="text-right">
+                    Client ID
+                  </Label>
+                  <Input
+                    id="clientId-edit"
+                    value={editClientData.clientId}
+                    readOnly
+                    className="col-span-3 bg-gray-100"
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="clientName-edit" className="text-right">Name</Label>
-                  <Input id="clientName-edit" name="name" value={editClientData.name} onChange={handleEditClientInputChange} className="col-span-3" />
+                  <Label htmlFor="clientName-edit" className="text-right">
+                    Name
+                  </Label>
+                  <Input
+                    id="clientName-edit"
+                    name="name"
+                    value={editClientData.name}
+                    onChange={handleEditClientInputChange}
+                    className="col-span-3"
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="clientDescription-edit" className="text-right pt-1">Description</Label>
-                  <Textarea id="clientDescription-edit" name="description" value={editClientData.description} onChange={handleEditClientInputChange} className="col-span-3" rows={2}/>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="clientIsPublic-edit" className="text-right">Client Type</Label>
-                  <Input id="clientIsPublic-edit" value={editClientData.isPublic ? 'Public' : 'Confidential'} readOnly className="col-span-3 bg-gray-100" />
+                  <Label htmlFor="clientDescription-edit" className="text-right pt-1">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="clientDescription-edit"
+                    name="description"
+                    value={editClientData.description}
+                    onChange={handleEditClientInputChange}
+                    className="col-span-3"
+                    rows={2}
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="clientIsActive-edit" className="text-right">Status</Label>
-                   <div className="col-span-3 flex items-center space-x-2">
-                    <Switch id="clientIsActive-edit" name="isActive" checked={editClientData.isActive} onCheckedChange={(checked) => handleEditClientSwitchChange(checked, 'isActive')} />
-                    <span className="text-sm">{editClientData.isActive ? 'Active' : 'Inactive'}</span>
+                  <Label htmlFor="clientIsPublic-edit" className="text-right">
+                    Client Type
+                  </Label>
+                  <Input
+                    id="clientIsPublic-edit"
+                    value={editClientData.isPublic ? 'Public' : 'Confidential'}
+                    readOnly
+                    className="col-span-3 bg-gray-100"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="clientIsActive-edit" className="text-right">
+                    Status
+                  </Label>
+                  <div className="col-span-3 flex items-center space-x-2">
+                    <Switch
+                      id="clientIsActive-edit"
+                      name="isActive"
+                      checked={editClientData.isActive}
+                      onCheckedChange={(checked) =>
+                        handleEditClientSwitchChange(checked, 'isActive')
+                      }
+                    />
+                    <span className="text-sm">
+                      {editClientData.isActive ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="clientRedirectUris-edit" className="text-right pt-1">Redirect URIs</Label>
+                  <Label htmlFor="clientRedirectUris-edit" className="text-right pt-1">
+                    Redirect URIs
+                  </Label>
                   <Textarea
                     id="clientRedirectUris-edit"
                     name="redirectUris"
@@ -1833,13 +2315,22 @@ export default function DashboardPage() {
                     className="col-span-3"
                     rows={3}
                   />
-                   <p className="col-span-3 col-start-2 text-xs text-muted-foreground">Enter one URI per line or comma-separated.</p>
+                  <p className="col-span-3 col-start-2 text-xs text-muted-foreground">
+                    Enter one URI per line or comma-separated.
+                  </p>
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="clientScopes-edit" className="text-right pt-1">Scopes</Label>
+                  <Label htmlFor="clientScopes-edit" className="text-right pt-1">
+                    Scopes
+                  </Label>
                   <div className="col-span-3">
                     <MultiSelect
-                      options={oauthScopes.map(s => ({ value: s.name, label: `${s.name} (${s.description || 'N/A'})` })) as MultiSelectOption[]}
+                      options={
+                        oauthScopes.map((s) => ({
+                          value: s.name,
+                          label: `${s.name} (${s.description || 'N/A'})`,
+                        })) as MultiSelectOption[]
+                      }
                       selectedValues={editClientData.scopes}
                       onChange={handleEditClientScopesChange}
                       placeholder="Select scopes..."
@@ -1852,16 +2343,25 @@ export default function DashboardPage() {
                   <div className="col-span-4">
                     <Label className="text-sm font-medium">Client Secret</Label>
                     {newlyCreatedClientSecret ? (
-                       <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
                         <p className="text-sm text-green-600 break-all bg-white p-2 rounded">
                           {newlyCreatedClientSecret}
                         </p>
-                        <p className="text-xs text-yellow-700 mt-1">This new secret is shown once. Copy and store it securely.</p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          This new secret is shown once. Copy and store it securely.
+                        </p>
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-1">Secret is hidden. Regenerate to get a new one.</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Secret is hidden. Regenerate to get a new one.
+                      </p>
                     )}
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => handleRegenerateClientSecret(editClientData.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleRegenerateClientSecret(editClientData.id)}
+                    >
                       Regenerate Secret
                     </Button>
                   </div>
@@ -1870,18 +2370,33 @@ export default function DashboardPage() {
             )}
             <DialogFooter>
               <DialogClose asChild>
-                 <Button type="button" variant="outline" onClick={() => { setIsEditClientModalOpen(false); setNewlyCreatedClientSecret(null); setEditClientData(null);}}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditClientModalOpen(false);
+                    setNewlyCreatedClientSecret(null);
+                    setEditClientData(null);
+                  }}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleUpdateClient}>Save Changes</Button>
+              <Button type="submit" onClick={handleUpdateClient}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* View OAuth Client Modal */}
-        <Dialog open={isViewClientModalOpen} onOpenChange={(isOpen) => {
-          setIsViewClientModalOpen(isOpen);
-          if (!isOpen) setNewlyCreatedClientSecret(null); // Clear secret when modal closes
-        }}>
+        <Dialog
+          open={isViewClientModalOpen}
+          onOpenChange={(isOpen) => {
+            setIsViewClientModalOpen(isOpen);
+            if (!isOpen) setNewlyCreatedClientSecret(null); // Clear secret when modal closes
+          }}
+        >
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>View OAuth Client Details</DialogTitle>
@@ -1901,51 +2416,78 @@ export default function DashboardPage() {
                 </div>
                 <div className="border-b pb-2">
                   <span className="text-sm font-medium text-gray-500">Description:</span>
-                  <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">{selectedClient.description || "N/A"}</p>
+                  <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">
+                    {selectedClient.description || 'N/A'}
+                  </p>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium text-gray-500">Client Type:</span>
-                  <span className="text-sm text-gray-900">{selectedClient.isPublic ? 'Public' : 'Confidential'}</span>
+                  <span className="text-sm text-gray-900">
+                    {selectedClient.isPublic ? 'Public' : 'Confidential'}
+                  </span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium text-gray-500">Status:</span>
-                  <Badge variant={selectedClient.isActive ? "default" : "secondary"}>
-                    {selectedClient.isActive ? "Active" : "Inactive"}
+                  <Badge variant={selectedClient.isActive ? 'default' : 'secondary'}>
+                    {selectedClient.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
                 <div className="border-b pb-2">
                   <span className="text-sm font-medium text-gray-500">Redirect URIs:</span>
                   {selectedClient.redirectUris.length > 0 ? (
                     <ul className="list-disc list-inside pl-2 mt-1">
-                      {selectedClient.redirectUris.map((uri, idx) => <li key={idx} className="text-sm text-gray-700 break-all">{uri}</li>)}
+                      {selectedClient.redirectUris.map((uri, idx) => (
+                        <li key={idx} className="text-sm text-gray-700 break-all">
+                          {uri}
+                        </li>
+                      ))}
                     </ul>
-                  ) : <p className="text-sm text-gray-500 mt-1">No redirect URIs configured.</p>}
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">No redirect URIs configured.</p>
+                  )}
                 </div>
                 <div className="border-b pb-2">
                   <span className="text-sm font-medium text-gray-500">Assigned Scopes:</span>
-                   {selectedClient.scopes.length > 0 ? (
+                  {selectedClient.scopes.length > 0 ? (
                     <ul className="list-disc list-inside pl-2 mt-1">
-                      {selectedClient.scopes.map(scopeName => {
-                        const scopeDetail = oauthScopes.find(s => s.name === scopeName);
-                        return <li key={scopeName} className="text-sm text-gray-700">{scopeDetail ? `${scopeDetail.name} (${scopeDetail.description || 'N/A'})` : scopeName}</li>;
+                      {selectedClient.scopes.map((scopeName) => {
+                        const scopeDetail = oauthScopes.find((s) => s.name === scopeName);
+                        return (
+                          <li key={scopeName} className="text-sm text-gray-700">
+                            {scopeDetail
+                              ? `${scopeDetail.name} (${scopeDetail.description || 'N/A'})`
+                              : scopeName}
+                          </li>
+                        );
                       })}
                     </ul>
-                  ) : <p className="text-sm text-gray-500 mt-1">No scopes assigned.</p>}
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">No scopes assigned.</p>
+                  )}
                 </div>
                 {!selectedClient.isPublic && (
                   <div className="border-b pb-2">
                     <span className="text-sm font-medium text-gray-500">Client Secret:</span>
-                     {newlyCreatedClientSecret ? (
-                       <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
+                    {newlyCreatedClientSecret ? (
+                      <div className="mt-1 p-3 bg-green-50 border border-green-200 rounded-md">
                         <p className="text-sm text-green-600 break-all bg-white p-2 rounded">
                           {newlyCreatedClientSecret}
                         </p>
-                        <p className="text-xs text-yellow-700 mt-1">This new secret is shown once. Copy and store it securely.</p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          This new secret is shown once. Copy and store it securely.
+                        </p>
                       </div>
                     ) : (
-                       <p className="text-sm text-gray-600 mt-1">&lt;Hidden&gt; - Regenerate to view a new secret.</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        &lt;Hidden&gt; - Regenerate to view a new secret.
+                      </p>
                     )}
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => handleRegenerateClientSecret(selectedClient.id)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => handleRegenerateClientSecret(selectedClient.id)}
+                    >
                       Regenerate Secret
                     </Button>
                   </div>
@@ -1953,14 +2495,24 @@ export default function DashboardPage() {
                 {selectedClient.createdAt && (
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-500">Created At:</span>
-                    <span className="text-sm text-gray-900">{new Date(selectedClient.createdAt).toLocaleString()}</span>
+                    <span className="text-sm text-gray-900">
+                      {new Date(selectedClient.createdAt).toLocaleString()}
+                    </span>
                   </div>
                 )}
               </div>
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" onClick={() => { setIsViewClientModalOpen(false); setNewlyCreatedClientSecret(null); }}>Close</Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setIsViewClientModalOpen(false);
+                    setNewlyCreatedClientSecret(null);
+                  }}
+                >
+                  Close
+                </Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
@@ -1977,33 +2529,82 @@ export default function DashboardPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="scopeName-add" className="text-right">Name</Label>
-                <Input id="scopeName-add" name="name" value={newOAuthScopeData.name} onChange={handleNewOAuthScopeInputChange} className="col-span-3" placeholder="e.g., chat:read" />
+                <Label htmlFor="scopeName-add" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="scopeName-add"
+                  name="name"
+                  value={newOAuthScopeData.name}
+                  onChange={handleNewOAuthScopeInputChange}
+                  className="col-span-3"
+                  placeholder="e.g., chat:read"
+                />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="scopeDescription-add" className="text-right pt-1">Description</Label>
-                <Textarea id="scopeDescription-add" name="description" value={newOAuthScopeData.description} onChange={handleNewOAuthScopeInputChange} className="col-span-3" placeholder="Describe what this scope allows" rows={3} />
+                <Label htmlFor="scopeDescription-add" className="text-right pt-1">
+                  Description
+                </Label>
+                <Textarea
+                  id="scopeDescription-add"
+                  name="description"
+                  value={newOAuthScopeData.description}
+                  onChange={handleNewOAuthScopeInputChange}
+                  className="col-span-3"
+                  placeholder="Describe what this scope allows"
+                  rows={3}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="scopeIsDefault-add" className="text-right">Default</Label>
+                <Label htmlFor="scopeIsDefault-add" className="text-right">
+                  Default
+                </Label>
                 <div className="col-span-3">
-                   <Switch id="scopeIsDefault-add" name="isDefault" checked={newOAuthScopeData.isDefault} onCheckedChange={(checked) => handleNewOAuthScopeSwitchChange(checked, 'isDefault')} />
-                   <p className="text-xs text-muted-foreground mt-1">Assign by default to new clients (if applicable).</p>
+                  <Switch
+                    id="scopeIsDefault-add"
+                    name="isDefault"
+                    checked={newOAuthScopeData.isDefault}
+                    onCheckedChange={(checked) =>
+                      handleNewOAuthScopeSwitchChange(checked, 'isDefault')
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Assign by default to new clients (if applicable).
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="scopeIsRestricted-add" className="text-right">Restricted</Label>
-                 <div className="col-span-3">
-                    <Switch id="scopeIsRestricted-add" name="isRestricted" checked={newOAuthScopeData.isRestricted} onCheckedChange={(checked) => handleNewOAuthScopeSwitchChange(checked, 'isRestricted')} />
-                    <p className="text-xs text-muted-foreground mt-1">Requires special approval or admin only.</p>
-                 </div>
+                <Label htmlFor="scopeIsRestricted-add" className="text-right">
+                  Restricted
+                </Label>
+                <div className="col-span-3">
+                  <Switch
+                    id="scopeIsRestricted-add"
+                    name="isRestricted"
+                    checked={newOAuthScopeData.isRestricted}
+                    onCheckedChange={(checked) =>
+                      handleNewOAuthScopeSwitchChange(checked, 'isRestricted')
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Requires special approval or admin only.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsAddScopeModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddScopeModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleCreateOAuthScope}>Create Scope</Button>
+              <Button type="submit" onClick={handleCreateOAuthScope}>
+                Create Scope
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2020,34 +2621,82 @@ export default function DashboardPage() {
             {editOAuthScopeData && (
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="scopeName-edit" className="text-right">Name</Label>
-                  <Input id="scopeName-edit" name="name" value={editOAuthScopeData.name} onChange={handleEditOAuthScopeInputChange} className="col-span-3 bg-gray-100" readOnly />
+                  <Label htmlFor="scopeName-edit" className="text-right">
+                    Name
+                  </Label>
+                  <Input
+                    id="scopeName-edit"
+                    name="name"
+                    value={editOAuthScopeData.name}
+                    onChange={handleEditOAuthScopeInputChange}
+                    className="col-span-3 bg-gray-100"
+                    readOnly
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="scopeDescription-edit" className="text-right pt-1">Description</Label>
-                  <Textarea id="scopeDescription-edit" name="description" value={editOAuthScopeData.description} onChange={handleEditOAuthScopeInputChange} className="col-span-3" rows={3} />
+                  <Label htmlFor="scopeDescription-edit" className="text-right pt-1">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="scopeDescription-edit"
+                    name="description"
+                    value={editOAuthScopeData.description}
+                    onChange={handleEditOAuthScopeInputChange}
+                    className="col-span-3"
+                    rows={3}
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="scopeIsDefault-edit" className="text-right">Default</Label>
+                  <Label htmlFor="scopeIsDefault-edit" className="text-right">
+                    Default
+                  </Label>
                   <div className="col-span-3">
-                    <Switch id="scopeIsDefault-edit" name="isDefault" checked={editOAuthScopeData.isDefault} onCheckedChange={(checked) => handleEditOAuthScopeSwitchChange(checked, 'isDefault')} />
-                     <p className="text-xs text-muted-foreground mt-1">Assign by default to new clients (if applicable).</p>
+                    <Switch
+                      id="scopeIsDefault-edit"
+                      name="isDefault"
+                      checked={editOAuthScopeData.isDefault}
+                      onCheckedChange={(checked) =>
+                        handleEditOAuthScopeSwitchChange(checked, 'isDefault')
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Assign by default to new clients (if applicable).
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="scopeIsRestricted-edit" className="text-right">Restricted</Label>
+                  <Label htmlFor="scopeIsRestricted-edit" className="text-right">
+                    Restricted
+                  </Label>
                   <div className="col-span-3">
-                    <Switch id="scopeIsRestricted-edit" name="isRestricted" checked={editOAuthScopeData.isRestricted} onCheckedChange={(checked) => handleEditOAuthScopeSwitchChange(checked, 'isRestricted')} />
-                    <p className="text-xs text-muted-foreground mt-1">Requires special approval or admin only.</p>
+                    <Switch
+                      id="scopeIsRestricted-edit"
+                      name="isRestricted"
+                      checked={editOAuthScopeData.isRestricted}
+                      onCheckedChange={(checked) =>
+                        handleEditOAuthScopeSwitchChange(checked, 'isRestricted')
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Requires special approval or admin only.
+                    </p>
                   </div>
                 </div>
               </div>
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => setIsEditScopeModalOpen(false)}>Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditScopeModalOpen(false)}
+                >
+                  Cancel
+                </Button>
               </DialogClose>
-              <Button type="submit" onClick={handleUpdateOAuthScope}>Save Changes</Button>
+              <Button type="submit" onClick={handleUpdateOAuthScope}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2069,32 +2718,42 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-1">Description</h4>
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedRole.description || "N/A"}</p>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                    {selectedRole.description || 'N/A'}
+                  </p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-1">Permissions</h4>
                   {selectedRole.permissionIds && selectedRole.permissionIds.length > 0 ? (
                     <ul className="list-disc list-inside space-y-1">
-                      {selectedRole.permissionIds.map(pid => {
-                        const perm = permissions.find(p => p.id === pid);
-                        return <li key={pid} className="text-sm text-gray-700">{perm ? perm.name : `Unknown permission (ID: ${pid})`}</li>;
+                      {selectedRole.permissionIds.map((pid) => {
+                        const perm = permissions.find((p) => p.id === pid);
+                        return (
+                          <li key={pid} className="text-sm text-gray-700">
+                            {perm ? perm.name : `Unknown permission (ID: ${pid})`}
+                          </li>
+                        );
                       })}
                     </ul>
                   ) : (
                     <p className="text-sm text-gray-500">No permissions assigned to this role.</p>
                   )}
                 </div>
-                 {selectedRole.createdAt && (
+                {selectedRole.createdAt && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1">Created At</h4>
-                    <p className="text-sm text-gray-900">{new Date(selectedRole.createdAt).toLocaleString()}</p>
+                    <p className="text-sm text-gray-900">
+                      {new Date(selectedRole.createdAt).toLocaleString()}
+                    </p>
                   </div>
                 )}
               </div>
             )}
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" onClick={() => setIsViewRoleModalOpen(false)}>Close</Button>
+                <Button type="button" onClick={() => setIsViewRoleModalOpen(false)}>
+                  Close
+                </Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
@@ -2129,7 +2788,10 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-4">
                   {roles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div
+                      key={role.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex items-center space-x-4">
                         <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                           <Users2 className="h-5 w-5 text-purple-600" />
@@ -2147,7 +2809,11 @@ export default function DashboardPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleEditRoleClick(role)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteRoleConfirmation(role.id)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteRoleConfirmation(role.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
@@ -2158,7 +2824,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
       </main>
     </div>
   );

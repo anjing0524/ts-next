@@ -51,7 +51,7 @@ class TimeWheel {
     logger.debug(
       `添加任务: ${id}, 延迟: ${options.delay}ms, 槽位: ${slotIndex}, 重复: ${options.repeat}${maxExecutionsInfo}`
     );
-    
+
     // 延迟启动时间轮，避免影响槽位计算
     // 使用setImmediate确保所有同步的addTask调用完成后再启动
     if (!this.isRunning) {
@@ -59,7 +59,7 @@ class TimeWheel {
         this.ensureRunning();
       });
     }
-    
+
     return id;
   }
 
@@ -134,11 +134,11 @@ class TimeWheel {
   private executeTasks(tasks: Map<string, Task>): void {
     // 先收集所有任务到数组，避免在迭代过程中修改Map
     const tasksToExecute = Array.from(tasks.values());
-    
+
     for (const task of tasksToExecute) {
       // 增加执行次数计数，无论任务是否成功执行
       const newExecutionCount = task.executionCount + 1;
-      
+
       try {
         logger.debug(`执行任务: ${task.id}, 执行次数: ${newExecutionCount}`);
         task.callback();
@@ -147,7 +147,7 @@ class TimeWheel {
           `执行任务 ${task.id} 时发生错误: ${error instanceof Error ? error.message : error}`
         );
       }
-      
+
       // 处理重复任务的重新添加，无论任务是否成功执行
       if (task.repeat) {
         if (!task.maxExecutions || newExecutionCount < task.maxExecutions) {

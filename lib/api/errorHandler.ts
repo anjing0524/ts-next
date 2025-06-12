@@ -1,7 +1,10 @@
 import { NextResponse, NextRequest } from 'next/server';
+
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
+
 import logger from '@/utils/logger';
+
 import { errorResponse, generateRequestId, ApiResponse } from './apiResponse'; // Adjusted path
 
 interface ApiErrorDetail {
@@ -44,40 +47,57 @@ export function handleApiError(error: any, requestId?: string): NextResponse<Api
     stack: error.stack,
     name: error.name,
     cause: error.cause,
-    meta: error.meta // For Prisma errors
+    meta: error.meta, // For Prisma errors
   });
 
   if (error instanceof ApiError) {
     // Use errorResponse helper
-    return NextResponse.json(errorResponse(error.message, error.statusCode, currentRequestId, error.errorCode), { status: error.statusCode });
+    return NextResponse.json(
+      errorResponse(error.message, error.statusCode, currentRequestId, error.errorCode),
+      { status: error.statusCode }
+    );
   }
 
   if (error instanceof ZodError) {
-    const errorDetails: ApiErrorDetail[] = error.errors.map(err => ({
+    const errorDetails: ApiErrorDetail[] = error.errors.map((err) => ({
       message: err.message,
       code: 'VALIDATION_ERROR', // This code can be part of the message or a specific field in ApiResponse if extended
       path: err.path,
-      field: err.path.join('.')
+      field: err.path.join('.'),
     }));
     // Construct a detailed message from Zod errors
-    const customMessage = errorDetails.map(e => `${e.field || (e.path && e.path.join('.')) || 'error'}: ${e.message}`).join(', ');
-    return NextResponse.json(errorResponse(customMessage || 'Validation failed', 400, currentRequestId, 'VALIDATION_ERROR'), { status: 400 });
+    const customMessage = errorDetails
+      .map((e) => `${e.field || (e.path && e.path.join('.')) || 'error'}: ${e.message}`)
+      .join(', ');
+    return NextResponse.json(
+      errorResponse(
+        customMessage || 'Validation failed',
+        400,
+        currentRequestId,
+        'VALIDATION_ERROR'
+      ),
+      { status: 400 }
+    );
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     let statusCode = 500;
     let message = 'A database error occurred.';
     let code = 'DB_ERROR';
-    let details: any = { prismaCode: error.code };
+    const details: any = { prismaCode: error.code };
 
     switch (error.code) {
       case 'P2002': // Unique constraint violation
         statusCode = 409;
         message = `Conflict: A record with this unique value already exists.`;
-        if (error.meta?.target && Array.isArray(error.meta.target) && error.meta.target.length > 0) {
-            message = `Conflict: The value for field '${error.meta.target.join(', ')}' already exists or is not unique.`;
+        if (
+          error.meta?.target &&
+          Array.isArray(error.meta.target) &&
+          error.meta.target.length > 0
+        ) {
+          message = `Conflict: The value for field '${error.meta.target.join(', ')}' already exists or is not unique.`;
         } else if (error.meta?.target) {
-             message = `Conflict: The value for field '${error.meta.target}' already exists or is not unique.`;
+          message = `Conflict: The value for field '${error.meta.target}' already exists or is not unique.`;
         }
         code = 'DB_CONFLICT';
         details.target = error.meta?.target;
@@ -100,13 +120,21 @@ export function handleApiError(error: any, requestId?: string): NextResponse<Api
         break;
     }
     // Use errorResponse helper, include Prisma code in message
-    return NextResponse.json(errorResponse(`${message} (Prisma Code: ${error.code})`, statusCode, currentRequestId, code), { status: statusCode });
+    return NextResponse.json(
+      errorResponse(`${message} (Prisma Code: ${error.code})`, statusCode, currentRequestId, code),
+      { status: statusCode }
+    );
   }
 
   if (error instanceof Prisma.PrismaClientValidationError) {
     // Use errorResponse helper
     return NextResponse.json(
-      errorResponse(`Database validation error: ${error.message.substring(error.message.lastIndexOf('Reason:') + 7)}`, 400, currentRequestId, 'DB_VALIDATION_ERROR'),
+      errorResponse(
+        `Database validation error: ${error.message.substring(error.message.lastIndexOf('Reason:') + 7)}`,
+        400,
+        currentRequestId,
+        'DB_VALIDATION_ERROR'
+      ),
       { status: 400 }
     );
   }
@@ -114,7 +142,12 @@ export function handleApiError(error: any, requestId?: string): NextResponse<Api
   // Generic fallback
   // Use errorResponse helper
   return NextResponse.json(
-    errorResponse('An unexpected internal server error occurred.', 500, currentRequestId, 'INTERNAL_SERVER_ERROR'),
+    errorResponse(
+      'An unexpected internal server error occurred.',
+      500,
+      currentRequestId,
+      'INTERNAL_SERVER_ERROR'
+    ),
     { status: 500 }
   );
 }

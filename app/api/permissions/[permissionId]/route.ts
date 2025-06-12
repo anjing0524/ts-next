@@ -10,7 +10,7 @@ import {
   // HttpMethodEnum, // Not directly used in UpdatePermissionSchema if it uses ApiPermissionDetailsSchema
   ApiPermissionDetailsSchema,
   MenuPermissionDetailsSchema,
-  DataPermissionDetailsSchema
+  DataPermissionDetailsSchema,
 } from '@/schemas/permissionSchemas';
 
 // 更新权限的 Schema
@@ -50,9 +50,9 @@ async function getPermission(
     const permission = await prisma.permission.findUnique({
       where: { id: permissionId },
       include: {
-        apiPermission: true,   // 包含 API 权限详情
-        menuPermission: true,  // 包含菜单权限详情
-        dataPermission: true,  // 包含数据权限详情
+        apiPermission: true, // 包含 API 权限详情
+        menuPermission: true, // 包含菜单权限详情
+        dataPermission: true, // 包含数据权限详情
       },
     });
 
@@ -71,7 +71,11 @@ async function getPermission(
 }
 
 // PUT /api/permissions/{permissionId} - 更新权限详情 (已重构)
-async function updatePermission(request: NextRequest, { params }: PermissionRouteParams, authContext: AuthContext) {
+async function updatePermission(
+  request: NextRequest,
+  { params }: PermissionRouteParams,
+  authContext: AuthContext
+) {
   try {
     const permissionId = params.permissionId;
     // 移除了 UUID 格式校验
@@ -80,7 +84,10 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
     const validationResult = UpdatePermissionSchema.safeParse(body);
 
     if (!validationResult.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validationResult.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Validation failed', details: validationResult.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const dataToUpdate = validationResult.data;
@@ -101,7 +108,7 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
       // let mainPermissionUpdated = existingPermission; // This variable is assigned but never read
 
       if (Object.keys(scalarData).length > 0) {
-         await tx.permission.update({
+        await tx.permission.update({
           where: { id: permissionId },
           data: scalarData,
         });
@@ -136,7 +143,7 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
           apiPermission: true,
           menuPermission: true,
           dataPermission: true,
-        }
+        },
       });
     });
 
@@ -146,13 +153,15 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
       resource: `permission:${updatedPermission.id}`,
       success: true,
       // metadata 中记录被更新的字段和权限名称/ID
-      metadata: { updatedFields: Object.keys(dataToUpdate), permissionName: updatedPermission.name },
+      metadata: {
+        updatedFields: Object.keys(dataToUpdate),
+        permissionName: updatedPermission.name,
+      },
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
 
     return NextResponse.json(updatedPermission, { status: 200 });
-
   } catch (error) {
     console.error(`Error updating permission ${params.permissionId}:`, error);
     // 确保记录审计日志时 authContext.user_id 可用
@@ -162,7 +171,8 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
       action: 'permission_update_failed_exception',
       resource: `permission:${params.permissionId}`,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while updating permission',
+      errorMessage:
+        error instanceof Error ? error.message : 'Unknown error while updating permission',
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
@@ -171,7 +181,11 @@ async function updatePermission(request: NextRequest, { params }: PermissionRout
 }
 
 // DELETE /api/permissions/{permissionId} - 删除权限 (已重构)
-async function deletePermission(request: NextRequest, { params }: PermissionRouteParams, authContext: AuthContext) {
+async function deletePermission(
+  request: NextRequest,
+  { params }: PermissionRouteParams,
+  authContext: AuthContext
+) {
   try {
     const permissionId = params.permissionId;
     // 移除了 UUID 格式校验
@@ -180,8 +194,8 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
     const permission = await prisma.permission.findUnique({
       where: { id: permissionId },
       include: {
-        rolePermissions: { select: { roleId: true } } // 仅选择需要的字段以优化查询
-      }
+        rolePermissions: { select: { roleId: true } }, // 仅选择需要的字段以优化查询
+      },
     });
 
     if (!permission) {
@@ -190,7 +204,7 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
 
     // 2. 检查权限是否仍被任何角色使用
     if (permission.rolePermissions && permission.rolePermissions.length > 0) {
-      const roleIds = permission.rolePermissions.map(rp => rp.roleId);
+      const roleIds = permission.rolePermissions.map((rp) => rp.roleId);
       await AuthorizationUtils.logAuditEvent({
         userId: authContext.user_id,
         action: 'permission_delete_failed_in_use_by_roles', // 更具体的 action
@@ -202,10 +216,13 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
         ipAddress: request.ip || request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return NextResponse.json({
-        error: 'Permission is in use by roles. Remove from roles first.',
-        details: { associatedRoleIds: roleIds }
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Permission is in use by roles. Remove from roles first.',
+          details: { associatedRoleIds: roleIds },
+        },
+        { status: 400 }
+      );
     }
 
     // 3. UserPermission 表已从 schema.prisma 移除，因此不再需要检查 directUserAssignments。
@@ -229,7 +246,6 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
     });
 
     return NextResponse.json({ message: 'Permission deleted successfully' }, { status: 200 });
-
   } catch (error) {
     console.error(`Error deleting permission ${params.permissionId}:`, error);
     // 确保记录审计日志时 authContext.user_id 可用
@@ -239,7 +255,8 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
       action: 'permission_delete_failed_exception',
       resource: `permission:${params.permissionId}`,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while deleting permission',
+      errorMessage:
+        error instanceof Error ? error.message : 'Unknown error while deleting permission',
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
@@ -250,5 +267,9 @@ async function deletePermission(request: NextRequest, { params }: PermissionRout
 // 应用权限中间件。用户需要 'system:permission:manage' 权限 (示例，具体权限标识符应更新为新格式)
 // 注意: 这里的 'system:permission:manage' 权限标识符可能需要根据新的命名规范 (如 'permission:manage:system') 进行调整
 export const GET = withAuth(getPermission, { requiredPermissions: ['system:permission:manage'] });
-export const PUT = withAuth(updatePermission, { requiredPermissions: ['system:permission:manage'] });
-export const DELETE = withAuth(deletePermission, { requiredPermissions: ['system:permission:manage'] });
+export const PUT = withAuth(updatePermission, {
+  requiredPermissions: ['system:permission:manage'],
+});
+export const DELETE = withAuth(deletePermission, {
+  requiredPermissions: ['system:permission:manage'],
+});

@@ -6,7 +6,6 @@ import { withAuth, AuthContext, PermissionUtils, validateSession } from '@/lib/a
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 
-
 // Zod Schema for setting user roles (替换用户所有角色的校验 Schema)
 // 接收一个角色 ID 数组
 const SetUserRolesSchema = z.object({
@@ -23,7 +22,11 @@ interface DynamicRouteParams {
 }
 
 // GET /api/users/{userId}/roles - 获取指定用户的角色列表
-async function handleGetUserRoles(request: NextRequest, authContext: AuthContext, routeParams: { params: DynamicRouteParams }) {
+async function handleGetUserRoles(
+  request: NextRequest,
+  authContext: AuthContext,
+  routeParams: { params: DynamicRouteParams }
+) {
   const { userId: targetUserId } = routeParams.params; // 从路径参数中获取目标用户 ID
   const requestingUserId = authContext.user_id; // 当前操作用户的 ID (来自 withAuth 中间件)
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
@@ -39,7 +42,9 @@ async function handleGetUserRoles(request: NextRequest, authContext: AuthContext
       userId: requestingUserId,
       action: 'user_roles_list_unauthorized',
       resource: `users/${targetUserId}/roles`,
-      ipAddress, userAgent, success: false,
+      ipAddress,
+      userAgent,
+      success: false,
       errorMessage: 'Permission denied to view user roles.',
     });
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
@@ -52,7 +57,7 @@ async function handleGetUserRoles(request: NextRequest, authContext: AuthContext
       include: {
         role: true, // 包含关联的 Role 对象
       },
-      orderBy: { role: { name: 'asc' }} // 按角色名称升序排序
+      orderBy: { role: { name: 'asc' } }, // 按角色名称升序排序
     });
 
     // 记录审计日志：成功列出用户角色
@@ -60,12 +65,14 @@ async function handleGetUserRoles(request: NextRequest, authContext: AuthContext
       userId: requestingUserId,
       action: 'user_roles_list_success',
       resource: `users/${targetUserId}/roles`,
-      ipAddress, userAgent, success: true,
-      metadata: { targetUserId, listedRolesCount: userRoles.length }
+      ipAddress,
+      userAgent,
+      success: true,
+      metadata: { targetUserId, listedRolesCount: userRoles.length },
     });
 
     // 返回角色对象数组
-    return NextResponse.json(userRoles.map(ur => ur.role));
+    return NextResponse.json(userRoles.map((ur) => ur.role));
   } catch (error) {
     console.error(`Error fetching roles for user ${targetUserId}:`, error);
     // 记录审计日志：获取用户角色列表失败
@@ -73,16 +80,22 @@ async function handleGetUserRoles(request: NextRequest, authContext: AuthContext
       userId: requestingUserId,
       action: 'user_roles_list_error',
       resource: `users/${targetUserId}/roles`,
-      ipAddress, userAgent, success: false,
+      ipAddress,
+      userAgent,
+      success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error fetching user roles',
-      metadata: { targetUserId }
+      metadata: { targetUserId },
     });
     return NextResponse.json({ error: 'Failed to fetch user roles' }, { status: 500 });
   }
 }
 
 // POST /api/users/{userId}/roles - 设置/替换指定用户的角色 (已重构为 "Replace All" 逻辑)
-async function handleSetUserRoles(request: NextRequest, authContext: AuthContext, routeParams: { params: DynamicRouteParams }) {
+async function handleSetUserRoles(
+  request: NextRequest,
+  authContext: AuthContext,
+  routeParams: { params: DynamicRouteParams }
+) {
   const { userId: targetUserId } = routeParams.params; // 目标用户 ID
   const requestingUserId = authContext.user_id; // 操作用户 ID
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
@@ -99,11 +112,16 @@ async function handleSetUserRoles(request: NextRequest, authContext: AuthContext
         userId: requestingUserId,
         action: 'user_roles_set_validation_failed', // 更新 action 名称
         resource: `users/${targetUserId}/roles`,
-        ipAddress, userAgent, success: false,
+        ipAddress,
+        userAgent,
+        success: false,
         errorMessage: 'Input validation failed for setting user roles.',
         metadata: { targetUserId, errors: validation.error.flatten().fieldErrors },
       });
-      return NextResponse.json({ error: 'Validation error', details: validation.error.flatten().fieldErrors }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Validation error', details: validation.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
     const { roleIds } = validation.data; // 获取角色 ID 列表
 
@@ -123,23 +141,30 @@ async function handleSetUserRoles(request: NextRequest, authContext: AuthContext
       });
       if (validRolesCount !== roleIds.length) {
         // 找出无效或未激活的角色ID (用于更详细的错误信息)
-         const validRoles = await prisma.role.findMany({
-            where: { id: { in: roleIds }, isActive: true },
-            select: { id: true }
+        const validRoles = await prisma.role.findMany({
+          where: { id: { in: roleIds }, isActive: true },
+          select: { id: true },
         });
-        const validRoleIdSet = new Set(validRoles.map(r => r.id));
-        const invalidOrInactiveRoleIds = roleIds.filter(id => !validRoleIdSet.has(id));
+        const validRoleIdSet = new Set(validRoles.map((r) => r.id));
+        const invalidOrInactiveRoleIds = roleIds.filter((id) => !validRoleIdSet.has(id));
 
         await AuthorizationUtils.logAuditEvent({
-            userId: requestingUserId,
-            action: 'user_roles_set_failed_invalid_roles',
-            resource: `users/${targetUserId}/roles`,
-            success: false,
-            errorMessage: 'One or more provided role IDs are invalid or refer to inactive roles.',
-            metadata: { targetUserId, invalidOrInactiveRoleIds },
-            ipAddress, userAgent,
+          userId: requestingUserId,
+          action: 'user_roles_set_failed_invalid_roles',
+          resource: `users/${targetUserId}/roles`,
+          success: false,
+          errorMessage: 'One or more provided role IDs are invalid or refer to inactive roles.',
+          metadata: { targetUserId, invalidOrInactiveRoleIds },
+          ipAddress,
+          userAgent,
         });
-        return NextResponse.json({ error: 'One or more provided role IDs are invalid or refer to inactive roles.', invalidOrInactiveRoleIds }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: 'One or more provided role IDs are invalid or refer to inactive roles.',
+            invalidOrInactiveRoleIds,
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -170,17 +195,22 @@ async function handleSetUserRoles(request: NextRequest, authContext: AuthContext
       userId: requestingUserId,
       action: 'user_roles_set_success', // 更新 action 名称
       resource: `users/${targetUserId}/roles`,
-      ipAddress, userAgent, success: true,
+      ipAddress,
+      userAgent,
+      success: true,
       metadata: { targetUserId, assignedRoleIds: roleIds, assignedRolesCount: roleIds.length },
     });
 
     // 返回成功响应，可以包含新分配的角色列表或其ID
     const updatedUserRoles = await prisma.userRole.findMany({
-        where: { userId: targetUserId },
-        include: { role: true }
+      where: { userId: targetUserId },
+      include: { role: true },
     });
 
-    return NextResponse.json(updatedUserRoles.map(ur => ur.role), { status: 200 });
+    return NextResponse.json(
+      updatedUserRoles.map((ur) => ur.role),
+      { status: 200 }
+    );
   } catch (error) {
     console.error(`Error setting roles for user ${targetUserId}:`, error);
     // 记录审计日志：设置用户角色时发生异常
@@ -188,9 +218,11 @@ async function handleSetUserRoles(request: NextRequest, authContext: AuthContext
       userId: requestingUserId,
       action: 'user_roles_set_error', // 更新 action 名称
       resource: `users/${targetUserId}/roles`,
-      ipAddress, userAgent, success: false,
+      ipAddress,
+      userAgent,
+      success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error setting user roles',
-      metadata: { targetUserId }
+      metadata: { targetUserId },
     });
     return NextResponse.json({ error: 'Failed to set user roles' }, { status: 500 });
   }
@@ -200,7 +232,11 @@ async function handleSetUserRoles(request: NextRequest, authContext: AuthContext
 // 此函数签名和逻辑假定它用于处理带有 roleId 的路径 (例如 /api/users/[userId]/roles/[roleId])
 // 本次子任务不修改此 DELETE 处理程序。
 // This function expects `params.roleId` to be populated from the dynamic route segment.
-async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthContext, routeParams: { params: Required<DynamicRouteParams> }) {
+async function handleRemoveRoleFromUser(
+  request: NextRequest,
+  authContext: AuthContext,
+  routeParams: { params: Required<DynamicRouteParams> }
+) {
   const { userId: targetUserId, roleId: targetRoleId } = routeParams.params; // 目标用户ID和目标角色ID
   const requestingUserId = authContext.user_id; // 操作用户ID
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
@@ -218,9 +254,11 @@ async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthC
         userId: requestingUserId,
         action: 'user_role_remove_not_found',
         resource: `users/${targetUserId}/roles/${targetRoleId}`,
-        ipAddress, userAgent, success: false,
+        ipAddress,
+        userAgent,
+        success: false,
         errorMessage: 'Role assignment not found for deletion.',
-        metadata: { targetUserId, targetRoleId }
+        metadata: { targetUserId, targetRoleId },
       });
       return NextResponse.json({ error: 'Role assignment not found' }, { status: 404 });
     }
@@ -235,7 +273,9 @@ async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthC
       userId: requestingUserId,
       action: 'user_role_remove_success',
       resource: `users/${targetUserId}/roles/${targetRoleId}`,
-      ipAddress, userAgent, success: true,
+      ipAddress,
+      userAgent,
+      success: true,
       metadata: { removedRoleId: targetRoleId, targetUserId },
     });
 
@@ -247,9 +287,11 @@ async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthC
       userId: requestingUserId,
       action: 'user_role_remove_error',
       resource: `users/${targetUserId}/roles/${targetRoleId}`,
-      ipAddress, userAgent, success: false,
+      ipAddress,
+      userAgent,
+      success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error removing user role',
-      metadata: { targetUserId, targetRoleId }
+      metadata: { targetUserId, targetRoleId },
     });
     return NextResponse.json({ error: 'Failed to remove role' }, { status: 500 });
   }
@@ -257,14 +299,14 @@ async function handleRemoveRoleFromUser(request: NextRequest, authContext: AuthC
 
 // 导出经过包装的路由处理函数
 export const GET = withAuth(handleGetUserRoles, {
-    requiredPermissions: [], // 权限在处理函数内部进行更灵活的检查 (用户自身 vs 管理员)
-    requireUserContext: true, // 确保 authContext 中包含用户信息
+  requiredPermissions: [], // 权限在处理函数内部进行更灵活的检查 (用户自身 vs 管理员)
+  requireUserContext: true, // 确保 authContext 中包含用户信息
 });
 
 // POST 请求处理函数 (已更新为 handleSetUserRoles)
 export const POST = withAuth(handleSetUserRoles, {
-    requiredPermissions: ['users:edit_roles', 'admin'], // 设置用户角色所需的权限
-    requireUserContext: true,
+  requiredPermissions: ['users:edit_roles', 'admin'], // 设置用户角色所需的权限
+  requireUserContext: true,
 });
 
 // 关于 DELETE 请求:
@@ -278,33 +320,42 @@ export const POST = withAuth(handleSetUserRoles, {
 // 如果此文件 *必须* 是 /api/users/[userId]/roles/route.ts，则 DELETE 需要从查询中获取 roleId。
 // 本次任务中，DELETE 部分的现有结构和导出方式保持不变。
 
-export async function DELETE(request: NextRequest, { params }: { params: { userId: string, roleId: string } }) {
-    // 手动重新包装 DELETE 以确保 AuthContext 和 params 正确处理。
-    // 如果 `withAuth` 不能完美地将 Next.js 传递的路由参数应用于所有 HTTP 方法，通常需要这样做。
-    const authContext = await validateSession(request); // `validateSession` 应返回包含 user_id 和 permissions 的 AuthContext
-    if (!authContext || !authContext.user_id) {
-        return NextResponse.json({ error: 'Unauthorized for DELETE' }, { status: 401 });
-    }
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { userId: string; roleId: string } }
+) {
+  // 手动重新包装 DELETE 以确保 AuthContext 和 params 正确处理。
+  // 如果 `withAuth` 不能完美地将 Next.js 传递的路由参数应用于所有 HTTP 方法，通常需要这样做。
+  const authContext = await validateSession(request); // `validateSession` 应返回包含 user_id 和 permissions 的 AuthContext
+  if (!authContext || !authContext.user_id) {
+    return NextResponse.json({ error: 'Unauthorized for DELETE' }, { status: 401 });
+  }
 
-    // 权限检查 (此处的权限检查是示例性的，实际应与 withAuth 中使用的逻辑一致或更完善)
-    const hasPermission = PermissionUtils.hasPermission(authContext.permissions || [], 'users:edit_roles') ||
-                          PermissionUtils.hasPermission(authContext.permissions || [], 'admin');
+  // 权限检查 (此处的权限检查是示例性的，实际应与 withAuth 中使用的逻辑一致或更完善)
+  const hasPermission =
+    PermissionUtils.hasPermission(authContext.permissions || [], 'users:edit_roles') ||
+    PermissionUtils.hasPermission(authContext.permissions || [], 'admin');
 
-    if (!hasPermission) {
-        // 记录审计日志：删除用户角色权限不足
-        await AuthorizationUtils.logAuditEvent({
-            userId: authContext.user_id,
-            action: 'user_role_remove_unauthorized',
-            resource: `users/${params.userId}/roles/${params.roleId}`,
-            success: false,
-            errorMessage: 'Permission denied to remove role from user.',
-            ipAddress: request.headers.get('x-forwarded-for') || undefined,
-            userAgent: request.headers.get('user-agent') || undefined,
-        });
-        return NextResponse.json({ error: 'Permission Denied to remove role from user' }, { status: 403 });
-    }
+  if (!hasPermission) {
+    // 记录审计日志：删除用户角色权限不足
+    await AuthorizationUtils.logAuditEvent({
+      userId: authContext.user_id,
+      action: 'user_role_remove_unauthorized',
+      resource: `users/${params.userId}/roles/${params.roleId}`,
+      success: false,
+      errorMessage: 'Permission denied to remove role from user.',
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
+    return NextResponse.json(
+      { error: 'Permission Denied to remove role from user' },
+      { status: 403 }
+    );
+  }
 
-    // 构造传递给实际处理函数的参数
-    const routeParamsForHandler: { params: Required<DynamicRouteParams> } = { params: { userId: params.userId, roleId: params.roleId } };
-    return handleRemoveRoleFromUser(request, authContext as AuthContext, routeParamsForHandler);
+  // 构造传递给实际处理函数的参数
+  const routeParamsForHandler: { params: Required<DynamicRouteParams> } = {
+    params: { userId: params.userId, roleId: params.roleId },
+  };
+  return handleRemoveRoleFromUser(request, authContext as AuthContext, routeParamsForHandler);
 }

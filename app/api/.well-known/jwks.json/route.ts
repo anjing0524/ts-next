@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import * as jose from 'jose';
+
 import logger from '../../../../utils/logger';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

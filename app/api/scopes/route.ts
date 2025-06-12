@@ -6,21 +6,21 @@ import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
 const createScopeSchema = z.object({
-  name: z.string()
+  name: z
+    .string()
     .min(1, 'Scope name is required')
     .max(100, 'Scope name must be less than 100 characters')
-    .regex(/^[a-zA-Z0-9:_-]+$/, 'Scope name can only contain letters, numbers, colons, underscores, and hyphens'),
-  description: z.string()
-    .max(500, 'Description must be less than 500 characters')
-    .optional(),
+    .regex(
+      /^[a-zA-Z0-9:_-]+$/,
+      'Scope name can only contain letters, numbers, colons, underscores, and hyphens'
+    ),
+  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
   isDefault: z.boolean().default(false),
   isPublic: z.boolean().default(true),
 });
 
 const updateScopeSchema = z.object({
-  description: z.string()
-    .max(500, 'Description must be less than 500 characters')
-    .optional(),
+  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
   isDefault: z.boolean().optional(),
   isPublic: z.boolean().optional(),
   isActive: z.boolean().optional(),
@@ -36,34 +36,28 @@ export const GET = withAuth(
 
     try {
       const where: any = {};
-      
+
       if (!includeInactive) {
         where.isActive = true;
       }
-      
+
       if (isPublic !== null) {
         where.isPublic = isPublic === 'true';
       }
-      
+
       if (isDefault !== null) {
         where.isDefault = isDefault === 'true';
       }
 
       const scopes = await prisma.scope.findMany({
         where,
-        orderBy: [
-          { isDefault: 'desc' },
-          { name: 'asc' },
-        ],
+        orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
       });
 
       return NextResponse.json({ scopes });
     } catch (error) {
       console.error('Error fetching scopes:', error);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   },
   {
@@ -77,15 +71,15 @@ export const POST = withAuth(
   async (request: NextRequest, context) => {
     try {
       const body = await request.json();
-      
+
       // Validate input
       const validation = createScopeSchema.safeParse(body);
       if (!validation.success) {
         return NextResponse.json(
-          { 
+          {
             error: 'invalid_request',
             error_description: 'Validation failed',
-            validation_errors: validation.error.flatten().fieldErrors
+            validation_errors: validation.error.flatten().fieldErrors,
           },
           { status: 400 }
         );
@@ -99,10 +93,7 @@ export const POST = withAuth(
       });
 
       if (existingScope) {
-        return NextResponse.json(
-          { error: 'Scope with this name already exists' },
-          { status: 409 }
-        );
+        return NextResponse.json({ error: 'Scope with this name already exists' }, { status: 409 });
       }
 
       // Create scope
@@ -115,16 +106,16 @@ export const POST = withAuth(
         },
       });
 
-      return NextResponse.json({ 
-        message: 'Scope created successfully',
-        scope 
-      }, { status: 201 });
+      return NextResponse.json(
+        {
+          message: 'Scope created successfully',
+          scope,
+        },
+        { status: 201 }
+      );
     } catch (error) {
       console.error('Error creating scope:', error);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   },
   {
@@ -140,23 +131,20 @@ export const PUT = withAuth(
     const scopeName = searchParams.get('name');
 
     if (!scopeName) {
-      return NextResponse.json(
-        { error: 'Scope name parameter is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Scope name parameter is required' }, { status: 400 });
     }
 
     try {
       const body = await request.json();
-      
+
       // Validate input
       const validation = updateScopeSchema.safeParse(body);
       if (!validation.success) {
         return NextResponse.json(
-          { 
+          {
             error: 'invalid_request',
             error_description: 'Validation failed',
-            validation_errors: validation.error.flatten().fieldErrors
+            validation_errors: validation.error.flatten().fieldErrors,
           },
           { status: 400 }
         );
@@ -168,10 +156,7 @@ export const PUT = withAuth(
       });
 
       if (!existingScope) {
-        return NextResponse.json(
-          { error: 'Scope not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'Scope not found' }, { status: 404 });
       }
 
       // Update scope
@@ -180,16 +165,13 @@ export const PUT = withAuth(
         data: validation.data,
       });
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         message: 'Scope updated successfully',
-        scope: updatedScope 
+        scope: updatedScope,
       });
     } catch (error) {
       console.error('Error updating scope:', error);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   },
   {
@@ -205,10 +187,7 @@ export const DELETE = withAuth(
     const scopeName = searchParams.get('name');
 
     if (!scopeName) {
-      return NextResponse.json(
-        { error: 'Scope name parameter is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Scope name parameter is required' }, { status: 400 });
     }
 
     try {
@@ -218,10 +197,7 @@ export const DELETE = withAuth(
       });
 
       if (!existingScope) {
-        return NextResponse.json(
-          { error: 'Scope not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'Scope not found' }, { status: 404 });
       }
 
       // Soft delete - mark as inactive
@@ -230,19 +206,16 @@ export const DELETE = withAuth(
         data: { isActive: false },
       });
 
-      return NextResponse.json({ 
-        message: 'Scope deactivated successfully' 
+      return NextResponse.json({
+        message: 'Scope deactivated successfully',
       });
     } catch (error) {
       console.error('Error deleting scope:', error);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   },
   {
     requiredPermissions: ['scopes:delete'],
     requireUserContext: true,
   }
-); 
+);

@@ -8,7 +8,7 @@ import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For logging
 import {
   PasswordComplexitySchema,
   checkPasswordHistory,
-  SALT_ROUNDS
+  SALT_ROUNDS,
 } from '@/lib/auth/passwordUtils';
 import { prisma } from '@/lib/prisma';
 
@@ -19,7 +19,10 @@ const ChangePasswordSchema = z.object({
 
 const NUM_PASSWORDS_TO_CHECK_IN_HISTORY = 5; // Configurable: How many recent passwords to check
 
-async function handleChangePassword(request: NextRequest, context: AuthContext): Promise<NextResponse> {
+async function handleChangePassword(
+  request: NextRequest,
+  context: AuthContext
+): Promise<NextResponse> {
   if (!context.user_id) {
     // This should ideally be caught by withAuth, but as a safeguard
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -79,7 +82,11 @@ async function handleChangePassword(request: NextRequest, context: AuthContext):
     }
 
     // c. Password History Check
-    const isPasswordNovel = await checkPasswordHistory(user.id, newPassword, NUM_PASSWORDS_TO_CHECK_IN_HISTORY);
+    const isPasswordNovel = await checkPasswordHistory(
+      user.id,
+      newPassword,
+      NUM_PASSWORDS_TO_CHECK_IN_HISTORY
+    );
     if (!isPasswordNovel) {
       await AuthorizationUtils.logAuditEvent({
         userId: context.user_id,
@@ -89,7 +96,10 @@ async function handleChangePassword(request: NextRequest, context: AuthContext):
         success: false,
         errorMessage: 'New password matches one of the recent passwords.',
       });
-      return NextResponse.json({ error: 'New password cannot be the same as recent passwords' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'New password cannot be the same as recent passwords' },
+        { status: 400 }
+      );
     }
 
     // d. If all checks pass:
@@ -121,30 +131,33 @@ async function handleChangePassword(request: NextRequest, context: AuthContext):
     });
 
     return NextResponse.json({ message: 'Password changed successfully' });
-
   } catch (error) {
     console.error('Error changing password:', error);
     let errorMessage = 'Internal server error';
     if (error instanceof Error) {
-        errorMessage = error.message;
+      errorMessage = error.message;
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: context.user_id, // Attempt to log with user_id if available
-        action: 'account_change_password_error',
-        ipAddress: request.headers.get('x-forwarded-for') || undefined,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: errorMessage,
+      userId: context.user_id, // Attempt to log with user_id if available
+      action: 'account_change_password_error',
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+      success: false,
+      errorMessage: errorMessage,
     });
 
-    if (error instanceof z.ZodError) { // Should be caught by safeParse earlier, but as a fallback
-        return NextResponse.json(
-            { error: 'Validation error', details: error.flatten().fieldErrors },
-            { status: 400 }
-        );
+    if (error instanceof z.ZodError) {
+      // Should be caught by safeParse earlier, but as a fallback
+      return NextResponse.json(
+        { error: 'Validation error', details: error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
-    return NextResponse.json({ error: 'Internal server error while changing password' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error while changing password' },
+      { status: 500 }
+    );
   }
 }
 

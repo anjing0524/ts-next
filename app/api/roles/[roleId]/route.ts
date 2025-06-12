@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { z } from 'zod';
 
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Schema for updating a role (角色更新的校验 Schema)
 const UpdateRoleSchema = z.object({
@@ -26,33 +26,41 @@ interface RoleRouteParams {
 }
 
 // GET /api/roles/{roleId} - 获取角色详情 (已重构)
-async function getRole(request: NextRequest, { params }: RoleRouteParams, authContext: AuthContext) {
+async function getRole(
+  request: NextRequest,
+  { params }: RoleRouteParams,
+  authContext: AuthContext
+) {
   const roleId = params.roleId;
   // Prisma 会自动处理无效 CUID 格式的查询（通常返回 null），所以特定格式校验已移除。
 
-    // 查询角色及其关联的权限信息
-    const role = await prisma.role.findUnique({
-      where: { id: roleId },
-      include: {
-        // 包含角色权限关联记录，并进一步包含每个权限的详细信息
-        rolePermissions: {
-          include: {
-            permission: true, // 包含关联的 Permission 对象
-          },
+  // 查询角色及其关联的权限信息
+  const role = await prisma.role.findUnique({
+    where: { id: roleId },
+    include: {
+      // 包含角色权限关联记录，并进一步包含每个权限的详细信息
+      rolePermissions: {
+        include: {
+          permission: true, // 包含关联的 Permission 对象
         },
       },
-    });
+    },
+  });
 
-    if (!role) {
-      throw new ApiError(404, 'Role not found', 'ROLE_NOT_FOUND');
-    }
+  if (!role) {
+    throw new ApiError(404, 'Role not found', 'ROLE_NOT_FOUND');
+  }
 
-    // 返回的数据将包含角色信息及其嵌套的权限列表
-    return NextResponse.json(role, { status: 200 });
+  // 返回的数据将包含角色信息及其嵌套的权限列表
+  return NextResponse.json(role, { status: 200 });
 }
 
 // PUT /api/roles/{roleId} - 更新角色详情 (已重构)
-async function updateRole(request: NextRequest, { params }: RoleRouteParams, authContext: AuthContext) {
+async function updateRole(
+  request: NextRequest,
+  { params }: RoleRouteParams,
+  authContext: AuthContext
+) {
   const roleId = params.roleId;
   // CUID 格式校验已移除
 
@@ -68,28 +76,32 @@ async function updateRole(request: NextRequest, { params }: RoleRouteParams, aut
 
   // parentId 和 isSystem 相关的逻辑已移除，因为这些字段不在新的 Role 模型中。
 
-    // 执行更新
-    const updatedRole = await prisma.role.update({
-      where: { id: roleId },
-      data: dataToUpdate, // dataToUpdate 只包含 displayName, description, isActive
-    });
+  // 执行更新
+  const updatedRole = await prisma.role.update({
+    where: { id: roleId },
+    data: dataToUpdate, // dataToUpdate 只包含 displayName, description, isActive
+  });
 
-    // 记录审计日志：角色更新成功
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_updated',
-      resource: `role:${updatedRole.id}`,
-      success: true,
-      metadata: { updatedFields: Object.keys(dataToUpdate), roleName: updatedRole.name },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
+  // 记录审计日志：角色更新成功
+  await AuthorizationUtils.logAuditEvent({
+    userId: authContext.user_id,
+    action: 'role_updated',
+    resource: `role:${updatedRole.id}`,
+    success: true,
+    metadata: { updatedFields: Object.keys(dataToUpdate), roleName: updatedRole.name },
+    ipAddress: request.ip || request.headers.get('x-forwarded-for'),
+    userAgent: request.headers.get('user-agent'),
+  });
 
-    return NextResponse.json(updatedRole, { status: 200 });
+  return NextResponse.json(updatedRole, { status: 200 });
 }
 
 // DELETE /api/roles/{roleId} - 删除角色 (已重构)
-async function deleteRole(request: NextRequest, { params }: RoleRouteParams, authContext: AuthContext) {
+async function deleteRole(
+  request: NextRequest,
+  { params }: RoleRouteParams,
+  authContext: AuthContext
+) {
   const roleId = params.roleId;
   // CUID 格式校验已移除
 
@@ -97,8 +109,8 @@ async function deleteRole(request: NextRequest, { params }: RoleRouteParams, aut
   const role = await prisma.role.findUnique({
     where: { id: roleId },
     include: {
-      userRoles: { select: { userId: true } } // 仅选择需要的字段以优化查询
-    }
+      userRoles: { select: { userId: true } }, // 仅选择需要的字段以优化查询
+    },
   });
 
   if (!role) {
@@ -120,28 +132,34 @@ async function deleteRole(request: NextRequest, { params }: RoleRouteParams, aut
   }
 
   // 4. 执行删除。
-    // Prisma Schema 中 RolePermission 的 onDelete: Cascade (如果设置) 会自动删除关联的权限分配。
-    // UserRole 的 onDelete: Cascade (如果设置) 也会自动处理。
-    await prisma.role.delete({
-      where: { id: roleId },
-    });
+  // Prisma Schema 中 RolePermission 的 onDelete: Cascade (如果设置) 会自动删除关联的权限分配。
+  // UserRole 的 onDelete: Cascade (如果设置) 也会自动处理。
+  await prisma.role.delete({
+    where: { id: roleId },
+  });
 
-    // 记录审计日志：角色删除成功
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_deleted',
-      resource: `role:${roleId}`,
-      success: true,
-      metadata: { deletedRoleName: role.name, isActive: role.isActive },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
+  // 记录审计日志：角色删除成功
+  await AuthorizationUtils.logAuditEvent({
+    userId: authContext.user_id,
+    action: 'role_deleted',
+    resource: `role:${roleId}`,
+    success: true,
+    metadata: { deletedRoleName: role.name, isActive: role.isActive },
+    ipAddress: request.ip || request.headers.get('x-forwarded-for'),
+    userAgent: request.headers.get('user-agent'),
+  });
 
-    return NextResponse.json({ message: 'Role deleted successfully' }, { status: 200 });
+  return NextResponse.json({ message: 'Role deleted successfully' }, { status: 200 });
 }
 
 // 应用认证中间件。用户需要 'system:role:manage' 权限 (示例，具体权限标识符应更新为新格式)
 // 注意: 这里的 'system:role:manage' 权限标识符可能需要根据新的权限命名规范进行调整
-export const GET = withErrorHandler(withAuth(getRole, { requiredPermissions: ['system:role:manage'] })); // 或更细粒度的读取权限 'system:role:read'
-export const PUT = withErrorHandler(withAuth(updateRole, { requiredPermissions: ['system:role:manage'] }));
-export const DELETE = withErrorHandler(withAuth(deleteRole, { requiredPermissions: ['system:role:manage'] }));
+export const GET = withErrorHandler(
+  withAuth(getRole, { requiredPermissions: ['system:role:manage'] })
+); // 或更细粒度的读取权限 'system:role:read'
+export const PUT = withErrorHandler(
+  withAuth(updateRole, { requiredPermissions: ['system:role:manage'] })
+);
+export const DELETE = withErrorHandler(
+  withAuth(deleteRole, { requiredPermissions: ['system:role:manage'] })
+);

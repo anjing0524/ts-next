@@ -13,7 +13,10 @@ interface UserPermissionsRouteParams {
 }
 
 // Helper function to get all parent roles for a given roleId
-async function getRoleHierarchy(roleId: string, allRolesMap: Map<string, { id: string; parentId: string | null }>): Promise<string[]> {
+async function getRoleHierarchy(
+  roleId: string,
+  allRolesMap: Map<string, { id: string; parentId: string | null }>
+): Promise<string[]> {
   const hierarchy = new Set<string>();
   let currentRoleId: string | null = roleId;
   while (currentRoleId && !hierarchy.has(currentRoleId)) {
@@ -24,13 +27,18 @@ async function getRoleHierarchy(roleId: string, allRolesMap: Map<string, { id: s
   return Array.from(hierarchy);
 }
 
-
 // GET /api/users/{userId}/permissions - List all effective permissions for a user
-async function getUserEffectivePermissions(request: NextRequest, { params }: UserPermissionsRouteParams, authContext: AuthContext) {
+async function getUserEffectivePermissions(
+  request: NextRequest,
+  { params }: UserPermissionsRouteParams,
+  authContext: AuthContext
+) {
   try {
     const userId = params.userId;
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)) {
-        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    if (
+      !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId)
+    ) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -46,7 +54,16 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
     // }
     // --- End Placeholder ---
 
-    const effectivePermissions = new Map<string, { identifier: string; name: string; description: string | null; source: string; sourceDetail: string }>();
+    const effectivePermissions = new Map<
+      string,
+      {
+        identifier: string;
+        name: string;
+        description: string | null;
+        source: string;
+        sourceDetail: string;
+      }
+    >();
 
     // 1. 获取直接分配的权限 (已移除)
     // 1. Get directly assigned active permissions (REMOVED)
@@ -86,24 +103,24 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
         userId: userId,
         isActive: true,
         role: { isActive: true },
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } },
-        ],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       },
       include: { role: true },
     });
 
     if (userRoles.length > 0) {
       // Fetch all active roles once to build hierarchy map efficiently
-      const allActiveRoles = await prisma.role.findMany({ where: { isActive: true }, select: { id: true, parentId: true, name: true } });
-      const allRolesMap = new Map(allActiveRoles.map(r => [r.id, r]));
+      const allActiveRoles = await prisma.role.findMany({
+        where: { isActive: true },
+        select: { id: true, parentId: true, name: true },
+      });
+      const allRolesMap = new Map(allActiveRoles.map((r) => [r.id, r]));
 
       const allRelevantRoleIds = new Set<string>();
       for (const ur of userRoles) {
         if (ur.role) {
           const roleHierarchyIds = await getRoleHierarchy(ur.role.id, allRolesMap);
-          roleHierarchyIds.forEach(id => allRelevantRoleIds.add(id));
+          roleHierarchyIds.forEach((id) => allRelevantRoleIds.add(id));
         }
       }
 
@@ -116,14 +133,15 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
           include: { permission: true, role: { select: { name: true, displayName: true } } },
         });
 
-        rolePermissions.forEach(rp => {
-          if (rp.permission && !effectivePermissions.has(rp.permission.identifier)) { // Add only if not already present from direct assignment or higher precedence
+        rolePermissions.forEach((rp) => {
+          if (rp.permission && !effectivePermissions.has(rp.permission.identifier)) {
+            // Add only if not already present from direct assignment or higher precedence
             effectivePermissions.set(rp.permission.identifier, {
-                identifier: rp.permission.identifier,
-                name: rp.permission.name,
-                description: rp.permission.description,
-                source: 'role',
-                sourceDetail: `${rp.role.displayName} (${rp.role.name})`
+              identifier: rp.permission.identifier,
+              name: rp.permission.name,
+              description: rp.permission.description,
+              source: 'role',
+              sourceDetail: `${rp.role.displayName} (${rp.role.name})`,
             });
           }
         });
@@ -141,13 +159,15 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
     // Consider if authContext.user_id (current admin) is different from params.userId (target user)
     // to log who is querying whose permissions.
 
-    return NextResponse.json({
+    return NextResponse.json(
+      {
         userId: userId,
         permissions: permissionsArray,
         retrievedAt: new Date().toISOString(),
         // cached: false // Add cache status if implementing cache
-    }, { status: 200 });
-
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error(`Error fetching effective permissions for user ${params.userId}:`, error);
     // Add audit log for failure if necessary
@@ -159,4 +179,6 @@ async function getUserEffectivePermissions(request: NextRequest, { params }: Use
 // Could be 'system:user:read_permissions' or part of 'system:user:manage' or even 'system:role:manage'
 // For now, let's use 'system:role:manage' as it's already used for role-related APIs.
 // A more specific permission like 'system:user:read_effective_permissions' would be better.
-export const GET = withAuth(getUserEffectivePermissions, { requiredPermissions: ['system:role:manage'] });
+export const GET = withAuth(getUserEffectivePermissions, {
+  requiredPermissions: ['system:role:manage'],
+});

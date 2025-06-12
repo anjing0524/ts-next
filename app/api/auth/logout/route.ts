@@ -27,7 +27,7 @@ const revokeToken = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${credentials}`,
+        Authorization: `Basic ${credentials}`,
       },
       body: new URLSearchParams({ token, token_type_hint: tokenTypeHint }),
     });
@@ -59,7 +59,6 @@ const revokeToken = async (
     });
   }
 };
-
 
 async function handleLogout(request: NextRequest): Promise<NextResponse> {
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
@@ -129,7 +128,8 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
     } else {
       response = NextResponse.json({
         success: true,
-        message: 'Logged out successfully. Client should clear any local storage (e.g., sessionStorage).',
+        message:
+          'Logged out successfully. Client should clear any local storage (e.g., sessionStorage).',
       });
     }
 
@@ -162,10 +162,9 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
     });
 
     return response;
-
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error during logout';
-    
+
     await AuthorizationUtils.logAuditEvent({
       userId: userIdFromToken,
       action: 'logout_processing_error',
@@ -177,17 +176,29 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
     });
 
     console.error('Error during logout processing:', error);
-    
+
     // Even in case of error, try to clear cookies
     const errorResponse = NextResponse.json(
-      { 
+      {
         error: 'server_error',
-        error_description: errorMessage
+        error_description: errorMessage,
       },
       { status: 500 }
     );
-    errorResponse.cookies.set('auth_token', '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 0, path: '/' });
-    errorResponse.cookies.set('session_id', '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 0, path: '/' });
+    errorResponse.cookies.set('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0,
+      path: '/',
+    });
+    errorResponse.cookies.set('session_id', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0,
+      path: '/',
+    });
     return errorResponse;
   }
 }

@@ -132,7 +132,10 @@ interface OAuth2AuthorizationService {
   // OAuth2.1 标准端点
   authorize(params: OAuthAuthorizeParams): Promise<OAuthAuthorizeResult>; // 处理授权请求，返回授权码或错误
   token(params: OAuthTokenParams): Promise<OAuthTokenResult>; // 处理令牌请求，发放访问令牌和刷新令牌
-  introspectToken(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<TokenIntrospectionResult>; // 令牌自省
+  introspectToken(
+    token: string,
+    tokenTypeHint?: 'access_token' | 'refresh_token'
+  ): Promise<TokenIntrospectionResult>; // 令牌自省
   revokeToken(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void>; // 令牌吊销
   userinfo(accessToken: string): Promise<UserInfo>; // 获取用户信息
 
@@ -195,7 +198,9 @@ interface RBACManagementService {
 interface UnifiedAuthorizationVerificationService {
   // 权限验证
   verifyAccess(request: AccessVerificationRequest): Promise<AccessVerificationResult>; // 包含用户信息、资源信息、操作、环境上下文
-  batchVerifyAccess(requests: AccessVerificationRequest[]): Promise<BatchAccessVerificationResult[]>;
+  batchVerifyAccess(
+    requests: AccessVerificationRequest[]
+  ): Promise<BatchAccessVerificationResult[]>;
 
   // SDK/中间件支持 (概念性，具体实现可能在SDK中)
   // getVerificationMiddleware(options: MiddlewareOptions): MiddlewareFunction;
@@ -357,6 +362,7 @@ Role }o--o{ Permission : RolePermission
 ```
 
 **说明**:
+
 - 上述ERD为概念模型，具体数据库表结构可能因Prisma或其他ORM的实现而略有不同。
 - `UserProfile` 存储了用户的基本属性信息，如部门、组织、工作地点。
 - `Permission` 实体现在更具体，包含了资源模式和操作。
@@ -369,46 +375,46 @@ Role }o--o{ Permission : RolePermission
 - **用户 (User)**: 系统中的操作主体。
 - **角色 (Role)**: 一组权限的集合，代表了系统中的一种职责或身份 (如 `admin`, `editor`, `viewer`)。
 - **权限 (Permission)**: 对特定资源执行特定操作的许可 (如 `CREATE_USER`, `READ_ORDER`, `UPDATE_DOCUMENT:sectionA`)。
-    - **权限定义**: 权限应具有清晰的命名规范，例如 `resource:action` 或 `resource:sub_resource:action`。
-    - **权限粒度**: 根据业务需求设计合适的权限粒度，避免过于粗糙或过于细致。
+  - **权限定义**: 权限应具有清晰的命名规范，例如 `resource:action` 或 `resource:sub_resource:action`。
+  - **权限粒度**: 根据业务需求设计合适的权限粒度，避免过于粗糙或过于细致。
 - **关系**:
-    - 用户可以被分配一个或多个角色。
-    - 角色可以包含一个或多个权限。
-    - 用户的有效权限是其所有角色的权限总和。
+  - 用户可以被分配一个或多个角色。
+  - 角色可以包含一个或多个权限。
+  - 用户的有效权限是其所有角色的权限总和。
 
 #### 2.2.2 ABAC (Attribute-Based Access Control)
 
 - **主体属性 (Subject Attributes)**: 描述发起访问请求的用户或服务的特征。
-    - 示例: `user.department = 'Sales'`, `user.organization = 'HQ'`, `user.workLocation = 'New York'`, `user.securityClearance = 'Level2'`。
-    - 这些属性主要存储在 `UserProfile` 表中，或在运行时从其他来源获取。
+  - 示例: `user.department = 'Sales'`, `user.organization = 'HQ'`, `user.workLocation = 'New York'`, `user.securityClearance = 'Level2'`。
+  - 这些属性主要存储在 `UserProfile` 表中，或在运行时从其他来源获取。
 - **资源属性 (Resource Attributes)**: 描述被访问对象的特征。
-    - 示例: `document.sensitivity = 'Confidential'`, `report.region = 'APAC'`, `data.owner = 'user_xyz'`。
+  - 示例: `document.sensitivity = 'Confidential'`, `report.region = 'APAC'`, `data.owner = 'user_xyz'`。
 - **操作属性 (Action Attributes)**: 描述主体试图对资源执行的操作。
-    - 示例: `action.type = 'read'`, `action.type = 'write'`, `action.criticality = 'high'`。
+  - 示例: `action.type = 'read'`, `action.type = 'write'`, `action.criticality = 'high'`。
 - **环境属性 (Environment Attributes)**: 描述访问发生时的上下文条件。
-    - 示例: `timeOfDay = '10:00'`, `ipAddress = '192.168.1.100'`, `device.securityPatchLevel = 'latest'`。
+  - 示例: `timeOfDay = '10:00'`, `ipAddress = '192.168.1.100'`, `device.securityPatchLevel = 'latest'`。
 - **策略 (Policy)**: 一组规则，规定了在特定属性条件下是否允许或拒绝访问。
-    - **策略结构**: 通常包含目标（Target - 哪些请求适用此策略）、条件（Condition - 属性之间的逻辑关系）和效果（Effect - Allow/Deny）。
-    - **策略语言**: 可以使用JSON、YAML或自定义DSL来定义策略，如 `ABACPolicy` 实体所示。
-    - **策略示例 (概念)**:
-        ```json
-        {
-          "name": "AllowSalesReportsInWorkHours",
-          "effect": "Allow",
-          "target": {
-            "subject": { "department": "Sales" },
-            "resource": { "type": "Sales Report" },
-            "action": ["read"]
-          },
-          "condition": {
-            "operator": "AND",
-            "operands": [
-              { "attribute": "environment.timeOfDay", "operator": ">=", "value": "09:00" },
-              { "attribute": "environment.timeOfDay", "operator": "<=", "value": "17:00" }
-            ]
-          }
-        }
-        ```
+  - **策略结构**: 通常包含目标（Target - 哪些请求适用此策略）、条件（Condition - 属性之间的逻辑关系）和效果（Effect - Allow/Deny）。
+  - **策略语言**: 可以使用JSON、YAML或自定义DSL来定义策略，如 `ABACPolicy` 实体所示。
+  - **策略示例 (概念)**:
+    ```json
+    {
+      "name": "AllowSalesReportsInWorkHours",
+      "effect": "Allow",
+      "target": {
+        "subject": { "department": "Sales" },
+        "resource": { "type": "Sales Report" },
+        "action": ["read"]
+      },
+      "condition": {
+        "operator": "AND",
+        "operands": [
+          { "attribute": "environment.timeOfDay", "operator": ">=", "value": "09:00" },
+          { "attribute": "environment.timeOfDay", "operator": "<=", "value": "17:00" }
+        ]
+      }
+    }
+    ```
 - **策略决策点 (PDP - Policy Decision Point)**: 评估适用策略并做出访问决策。
 - **策略执行点 (PEP - Policy Enforcement Point)**: 拦截访问请求，向PDP查询决策，并执行该决策。
 
@@ -417,7 +423,7 @@ Role }o--o{ Permission : RolePermission
 - **RBAC权限标识**: 如 `Permission` 实体中的 `name` (e.g., `user:create`, `order:read:{orderId}`).
 - **ABAC策略**: 通过 `ABACPolicy` 实体定义，不直接使用单一标识符，而是通过属性匹配和条件评估。
 - **组合决策**: 系统将首先基于RBAC检查用户是否拥有基础权限。如果RBAC允许，再通过ABAC引擎评估相关策略，以实现更细粒度的动态控制。
-    - 例如，用户可能通过角色拥有 `document:read` 权限，但ABAC策略可能进一步限制其只能在特定时间、特定地点或针对特定敏感级别的文档执行此操作。
+  - 例如，用户可能通过角色拥有 `document:read` 权限，但ABAC策略可能进一步限制其只能在特定时间、特定地点或针对特定敏感级别的文档执行此操作。
 
 ```typescript
 // 概念性权限标识符 (主要用于RBAC)
@@ -426,35 +432,35 @@ interface PermissionIdentifier {
   resource: string; // 资源标识, e.g., "users", "orders/{orderId}", "reports/financial"
   action: string; // 操作, e.g., "create", "read", "update", "delete", "approve"
 }
-
-
 ```
-  action: string; // 操作类型
+
+action: string; // 操作类型
 }
 
 // 标准权限示例
 const PERMISSIONS = {
-  // 系统管理权限
-  SYSTEM_USER_CREATE: 'system:user:create',
-  SYSTEM_ROLE_ASSIGN: 'system:role:assign',
-  SYSTEM_CLIENT_MANAGE: 'system:client:manage',
+// 系统管理权限
+SYSTEM_USER_CREATE: 'system:user:create',
+SYSTEM_ROLE_ASSIGN: 'system:role:assign',
+SYSTEM_CLIENT_MANAGE: 'system:client:manage',
 
-  // 应用访问权限
-  APP_OA_ACCESS: 'app:oa:access',
-  APP_CRM_ADMIN: 'app:crm:admin',
+// 应用访问权限
+APP_OA_ACCESS: 'app:oa:access',
+APP_CRM_ADMIN: 'app:crm:admin',
 
-  // API接口权限
-  API_USER_READ: 'api:user:read',
-  API_USER_WRITE: 'api:user:write',
+// API接口权限
+API_USER_READ: 'api:user:read',
+API_USER_WRITE: 'api:user:write',
 
-  // 数据操作权限
-  DATA_DOCUMENT_READ: 'data:document:read',
-  DATA_FINANCE_APPROVE: 'data:finance:approve',
+// 数据操作权限
+DATA_DOCUMENT_READ: 'data:document:read',
+DATA_FINANCE_APPROVE: 'data:finance:approve',
 
-  // 页面访问权限
-  PAGE_ADMIN_ACCESS: 'page:admin:access',
-  PAGE_REPORT_VIEW: 'page:report:view',
+// 页面访问权限
+PAGE_ADMIN_ACCESS: 'page:admin:access',
+PAGE_REPORT_VIEW: 'page:report:view',
 };
+
 ```
 
 
@@ -536,6 +542,7 @@ const PERMISSIONS = {
   - 参数: `token`, `token_type_hint` (optional), `client_id`, `client_secret` (if endpoint is protected for specific clients)
   - 响应 (JSON): `{ active: boolean, scope?, client_id?, username?, token_type?, exp?, iat?, sub?, iss?, jti?, ... }`
 - **用户信息端点** (OpenID Connect)
+
   - `GET /oauth2/userinfo` or `POST /oauth2/userinfo`
   - Header: `Authorization: Bearer {accessToken}`
   - 响应 (JSON): User claims (e.g., `sub`, `name`, `email`, `profile`, `department`, `organization`, `workLocation`)
@@ -564,15 +571,13 @@ const PERMISSIONS = {
   - `PUT /permissions/{permissionId}`: 更新权限定义
   - `DELETE /permissions/{permissionId}`: 删除权限定义
 - **分配管理** (UC-2.5.2-003, UC-2.8.2-003, UC-2.8.2-004)
-  - `POST /roles/{roleId}/permissions`: 为角色分配权限 (请求体: `{ permissionId }` or `[permissionId1, permissionId2]`) 
+  - `POST /roles/{roleId}/permissions`: 为角色分配权限 (请求体: `{ permissionId }` or `[permissionId1, permissionId2]`)
   - `DELETE /roles/{roleId}/permissions/{permissionId}`: 从角色移除权限
   - `GET /roles/{roleId}/permissions`: 查看角色的权限列表
-  - `POST /users/{userId}/roles`: 为用户分配角色 (请求体: `{ roleId }` or `[roleId1, roleId2]`) 
+  - `POST /users/{userId}/roles`: 为用户分配角色 (请求体: `{ roleId }` or `[roleId1, roleId2]`)
   - `DELETE /users/{userId}/roles/{roleId}`: 从用户移除角色
   - `GET /users/{userId}/roles`: 查看用户的角色列表
   - `GET /users/{userId}/permissions`: 查看用户合并后的总权限列表 (直接和间接通过角色获得)
-
-
 
 ### 3.4 统一权限验证服务 API (对应 PRD 2.7)
 
@@ -616,7 +621,7 @@ const PERMISSIONS = {
 
 ### 4.1 认证安全 (PRD 2.1.3)
 
-- **强密码策略** (UC-2.1.3-002): 
+- **强密码策略** (UC-2.1.3-002):
     - 强制用户设置复杂密码（长度、字符类型组合）。
     - 密码存储使用强哈希算法（如Argon2id或bcrypt）加盐处理，防止彩虹表攻击。
     - 定期提醒或强制用户更新密码。
@@ -638,7 +643,7 @@ const PERMISSIONS = {
 
 - **遵循OAuth 2.1规范**: 淘汰不安全的授权类型（如Implicit Grant和Resource Owner Password Credentials Grant）。
 - **PKCE (Proof Key for Code Exchange)** (RFC 7636): 对所有使用授权码流程的客户端（包括公共客户端和机密客户端）强制使用PKCE，防止授权码注入攻击。
-- **客户端认证**: 
+- **客户端认证**:
     - 机密客户端 (Confidential Clients) 使用客户端密钥 (`client_secret`) 或其他强认证机制（如mTLS）进行认证。
     - 公共客户端 (Public Clients) 不应存储密钥，依赖PKCE。
 - **重定向URI验证**: 严格匹配已注册的重定向URI，防止开放重定向漏洞。
@@ -659,17 +664,17 @@ const PERMISSIONS = {
     - **ID Token** (OpenID Connect):
         - JWT格式，包含用户身份信息。
         - 必须进行签名验证和声明验证（`iss`, `aud`, `exp`, `nonce`）。
-- **令牌泄露防护**: 
+- **令牌泄露防护**:
     - 令牌自省端点 (`/oauth2/introspect`) (UC-2.2-003) 允许资源服务器验证令牌有效性。
     - 令牌吊销端点 (`/oauth2/revoke`) (UC-2.4-001) 允许客户端或用户吊销令牌。
 
 ### 4.3 数据安全
 
 - **传输层安全 (TLS)**: 所有API接口和Web页面强制使用HTTPS (TLS 1.2+)，使用强加密套件。
-- **存储加密**: 
+- **存储加密**:
     - 敏感数据（如用户密码哈希、OAuth客户端密钥）在数据库中加密存储。
     - 数据库连接加密。
-- **数据校验与过滤**: 
+- **数据校验与过滤**:
     - 对所有外部输入（API请求参数、请求体、HTTP头部）进行严格的格式、类型、长度和内容校验。
     - 输出编码，防止XSS攻击。
     - 使用参数化查询或ORM，防止SQL注入。
@@ -694,7 +699,7 @@ const PERMISSIONS = {
 - **速率限制**: 对API请求实施速率限制，防止滥用和DoS攻击。
 - **输入验证**: 严格验证所有API输入参数。
 - **敏感数据暴露**: API响应中避免返回不必要的敏感数据。
-- **HTTP安全头部**: 
+- **HTTP安全头部**:
     - `Strict-Transport-Security (HSTS)`: 强制浏览器使用HTTPS。
     - `Content-Security-Policy (CSP)`: 防止XSS攻击。
     - `X-Content-Type-Options: nosniff`: 防止浏览器MIME类型嗅探。
@@ -798,11 +803,11 @@ MonitoringService --> AlertingService
 - **API网关**: 统一的请求入口，负责请求路由、认证、限流、日志记录等。
 - **负载均衡器**: 将流量分发到后端的应用服务实例，实现高可用和水平扩展。
 - **应用服务集群**: 运行核心业务逻辑的微服务，可以根据需求独立部署和扩展。
-    - **用户认证管理服务**: 处理用户注册、登录、密码管理、MFA等。
-    - **OAuth2.1认证服务**: 实现OAuth 2.1授权服务器功能。
-    - **RBAC权限管理服务**: 管理角色、权限及其分配。
-    - **统一权限验证服务**: 提供统一的权限校验接口。
-    - **管理界面服务**: 提供系统管理后台功能。
+  - **用户认证管理服务**: 处理用户注册、登录、密码管理、MFA等。
+  - **OAuth2.1认证服务**: 实现OAuth 2.1授权服务器功能。
+  - **RBAC权限管理服务**: 管理角色、权限及其分配。
+  - **统一权限验证服务**: 提供统一的权限校验接口。
+  - **管理界面服务**: 提供系统管理后台功能。
 - **主数据库 (PostgreSQL)**: 存储核心业务数据，如用户信息、角色、权限、OAuth客户端等。
 - **缓存数据库 (Redis)**: 缓存热点数据，如会话信息、权限数据、访问令牌等，提升性能。
 - **审计日志存储**: 存储审计日志，用于安全分析和合规性检查。
@@ -827,24 +832,24 @@ MonitoringService --> AlertingService
 
 ## 6. 技术选型 (PRD 3.3)
 
-| 类别             | 技术/框架/服务        | 理由                                                                 |
-| ---------------- | --------------------- | -------------------------------------------------------------------- |
-| **后端语言**     | Node.js (TypeScript)  | 高性能I/O, 异步非阻塞, 庞大的NPM生态, TypeScript提供类型安全。         |
-| **Web框架**      | NestJS / Express.js   | NestJS提供模块化、可测试的架构；Express.js轻量灵活。根据团队熟悉度选择。 |
-| **数据库**       | PostgreSQL            | 功能强大, ACID兼容, 扩展性好, 开源, 社区活跃。                         |
-| **缓存**         | Redis                 | 高性能键值存储, 支持多种数据结构, 广泛用于缓存、会话管理。             |
-| **ORM/查询构建器**| Prisma / TypeORM      | Prisma提供类型安全的数据库访问；TypeORM功能全面。                      |
-| **API网关**      | AWS API Gateway / Nginx / Kong | 成熟的API管理方案。                                                  |
-| **容器化**       | Docker                | 标准化的应用打包和部署方式。                                           |
-| **容器编排**     | Kubernetes (EKS/GKE/AKS) | 强大的容器编排平台, 实现自动化部署、扩展和管理。                     |
-| **前端框架**     | React / Next.js       | React生态成熟, Next.js提供SSR/SSG, 优化SEO和首屏加载。               |
-| **状态管理(前端)**| Redux / Zustand / Jotai | 根据应用复杂度选择。                                                 |
-| **代码版本控制** | Git / GitHub          | 分布式版本控制系统, 广泛使用。                                         |
-| **CI/CD**        | GitHub Actions / Jenkins / GitLab CI | 自动化构建、测试和部署流程。                                       |
-| **日志管理**     | ELK Stack (Elasticsearch, Logstash, Kibana) / Loki & Grafana | 集中式日志收集、存储、查询和可视化。                                 |
-| **监控与告警**   | Prometheus & Grafana & Alertmanager | 开源监控解决方案, 强大的数据模型和查询语言。                         |
-| **消息队列 (可选)**| RabbitMQ / Kafka      | 用于异步任务处理、服务间解耦 (如果需要)。                            |
-| **安全库**       | `bcrypt`, `jsonwebtoken`, `helmet`, `csurf` 等NPM包 | 提供密码哈希、JWT处理、HTTP安全头部等功能。                          |
+| 类别                | 技术/框架/服务                                               | 理由                                                                     |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| **后端语言**        | Node.js (TypeScript)                                         | 高性能I/O, 异步非阻塞, 庞大的NPM生态, TypeScript提供类型安全。           |
+| **Web框架**         | NestJS / Express.js                                          | NestJS提供模块化、可测试的架构；Express.js轻量灵活。根据团队熟悉度选择。 |
+| **数据库**          | PostgreSQL                                                   | 功能强大, ACID兼容, 扩展性好, 开源, 社区活跃。                           |
+| **缓存**            | Redis                                                        | 高性能键值存储, 支持多种数据结构, 广泛用于缓存、会话管理。               |
+| **ORM/查询构建器**  | Prisma / TypeORM                                             | Prisma提供类型安全的数据库访问；TypeORM功能全面。                        |
+| **API网关**         | AWS API Gateway / Nginx / Kong                               | 成熟的API管理方案。                                                      |
+| **容器化**          | Docker                                                       | 标准化的应用打包和部署方式。                                             |
+| **容器编排**        | Kubernetes (EKS/GKE/AKS)                                     | 强大的容器编排平台, 实现自动化部署、扩展和管理。                         |
+| **前端框架**        | React / Next.js                                              | React生态成熟, Next.js提供SSR/SSG, 优化SEO和首屏加载。                   |
+| **状态管理(前端)**  | Redux / Zustand / Jotai                                      | 根据应用复杂度选择。                                                     |
+| **代码版本控制**    | Git / GitHub                                                 | 分布式版本控制系统, 广泛使用。                                           |
+| **CI/CD**           | GitHub Actions / Jenkins / GitLab CI                         | 自动化构建、测试和部署流程。                                             |
+| **日志管理**        | ELK Stack (Elasticsearch, Logstash, Kibana) / Loki & Grafana | 集中式日志收集、存储、查询和可视化。                                     |
+| **监控与告警**      | Prometheus & Grafana & Alertmanager                          | 开源监控解决方案, 强大的数据模型和查询语言。                             |
+| **消息队列 (可选)** | RabbitMQ / Kafka                                             | 用于异步任务处理、服务间解耦 (如果需要)。                                |
+| **安全库**          | `bcrypt`, `jsonwebtoken`, `helmet`, `csurf` 等NPM包          | 提供密码哈希、JWT处理、HTTP安全头部等功能。                              |
 
 ---
 
@@ -853,17 +858,17 @@ MonitoringService --> AlertingService
 ### 7.1 监控指标
 
 - **系统层面**: CPU使用率, 内存使用率,磁盘I/O, 网络流量。
-- **应用层面**: 
-    - QPS (每秒查询率), RPS (每秒请求数)
-    - 请求延迟 (平均值, P95, P99)
-    - 错误率 (HTTP 4xx, 5xx)
-    - 数据库连接池状态
-    - 缓存命中率
+- **应用层面**:
+  - QPS (每秒查询率), RPS (每秒请求数)
+  - 请求延迟 (平均值, P95, P99)
+  - 错误率 (HTTP 4xx, 5xx)
+  - 数据库连接池状态
+  - 缓存命中率
 - **业务层面**:
-    - 用户登录成功/失败次数
-    - OAuth授权请求数
-    - 令牌颁发/刷新/吊销次数
-    - 权限校验通过/拒绝次数
+  - 用户登录成功/失败次数
+  - OAuth授权请求数
+  - 令牌颁发/刷新/吊销次数
+  - 权限校验通过/拒绝次数
 
 ### 7.2 日志收集
 
@@ -880,25 +885,27 @@ MonitoringService --> AlertingService
 - **告警处理流程**: 建立清晰的告警响应和处理流程。
 
 **示例告警场景**:
+
 - 生产环境API接口错误率超过5%持续5分钟。
 - 数据库CPU使用率超过80%持续10分钟。
 - 关键服务实例宕机。
 - 检测到可疑的登录尝试或权限提升行为。
 
 ---
-  reason: string;
-  expiresAt: Date;
+
+reason: string;
+expiresAt: Date;
 }
 
 class PermissionResultCache {
-  async cacheResult(
-    userId: string,
-    permission: string,
-    context: any,
-    result: PermissionResult
-  ): Promise<void> {
-    const resourceHash = this.hashContext(context);
-    const cacheKey = `perm:${userId}:${permission}:${resourceHash}`;
+async cacheResult(
+userId: string,
+permission: string,
+context: any,
+result: PermissionResult
+): Promise<void> {
+const resourceHash = this.hashContext(context);
+const cacheKey = `perm:${userId}:${permission}:${resourceHash}`;
 
     await this.redis.setex(
       cacheKey,
@@ -909,15 +916,16 @@ class PermissionResultCache {
         cachedAt: new Date().toISOString(),
       })
     );
-  }
 
-  async getCachedResult(
-    userId: string,
-    permission: string,
-    context: any
-  ): Promise<PermissionResult | null> {
-    const resourceHash = this.hashContext(context);
-    const cacheKey = `perm:${userId}:${permission}:${resourceHash}`;
+}
+
+async getCachedResult(
+userId: string,
+permission: string,
+context: any
+): Promise<PermissionResult | null> {
+const resourceHash = this.hashContext(context);
+const cacheKey = `perm:${userId}:${permission}:${resourceHash}`;
 
     const cached = await this.redis.get(cacheKey);
     if (!cached) return null;
@@ -929,9 +937,11 @@ class PermissionResultCache {
       fromCache: true,
       ttl: await this.redis.ttl(cacheKey),
     };
-  }
+
 }
-```
+}
+
+````
 
 ### 5.2 数据库优化
 
@@ -960,7 +970,7 @@ CREATE INDEX idx_access_tokens_client ON access_tokens(client_id, created_at);
 -- 审计日志索引
 CREATE INDEX idx_audit_logs_user_action ON audit_logs(user_id, action, created_at);
 CREATE INDEX idx_audit_logs_time ON audit_logs(created_at);
-```
+````
 
 #### 5.2.2 查询优化
 

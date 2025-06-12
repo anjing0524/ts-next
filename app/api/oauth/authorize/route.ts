@@ -2,21 +2,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { addMinutes } from 'date-fns';
-import { any, unknown } from 'zod';
 
 import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
-import { 
-  PKCEUtils, 
-  ScopeUtils, 
-  AuthorizationUtils, 
-  OAuth2ErrorTypes, 
-  RateLimitUtils 
+import {
+  PKCEUtils,
+  ScopeUtils,
+  AuthorizationUtils,
+  OAuth2ErrorTypes,
+  RateLimitUtils,
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 
-async function handleAuthorizeRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
+async function handleAuthorizeRequest(
+  request: NextRequest,
+  context: OAuthValidationResult['context']
+): Promise<NextResponse> {
   const { client, ipAddress, userAgent, params } = context!;
-  
+
   // Extract parameters (already validated by middleware)
   const client_id = params!.client_id;
   const redirect_uri = params!.redirect_uri;
@@ -33,11 +35,11 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
     // Parse and validate scopes
     const requestedScopes = ScopeUtils.parseScopes(scope);
     const scopeValidation = await ScopeUtils.validateScopes(requestedScopes, client);
-    
+
     if (!scopeValidation.valid) {
       const error = {
         error: OAuth2ErrorTypes.INVALID_SCOPE,
-        error_description: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`
+        error_description: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`,
       };
 
       const redirectUrl = new URL(redirect_uri);
@@ -61,12 +63,12 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
 
     // PKCE validation
     let pkceData: { codeChallenge?: string; codeChallengeMethod?: string } = {};
-    
+
     if (code_challenge) {
       if (!code_challenge_method || code_challenge_method !== 'S256') {
         const error = {
           error: OAuth2ErrorTypes.INVALID_REQUEST,
-          error_description: 'code_challenge_method must be S256'
+          error_description: 'code_challenge_method must be S256',
         };
 
         await AuthorizationUtils.logAuditEvent({
@@ -90,7 +92,7 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
       if (!PKCEUtils.validateCodeChallenge(code_challenge)) {
         const error = {
           error: OAuth2ErrorTypes.INVALID_REQUEST,
-          error_description: 'Invalid code_challenge format'
+          error_description: 'Invalid code_challenge format',
         };
 
         await AuthorizationUtils.logAuditEvent({
@@ -111,14 +113,14 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
         return NextResponse.redirect(redirectUrl.toString());
       }
 
-      pkceData = { 
-        codeChallenge: code_challenge, 
-        codeChallengeMethod: code_challenge_method 
+      pkceData = {
+        codeChallenge: code_challenge,
+        codeChallengeMethod: code_challenge_method,
       };
     } else if (client.requirePkce) {
       const error = {
         error: OAuth2ErrorTypes.INVALID_REQUEST,
-        error_description: 'PKCE is required for this client'
+        error_description: 'PKCE is required for this client',
       };
 
       await AuthorizationUtils.logAuditEvent({
@@ -146,7 +148,7 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
     // 2. Redirect to login page if not authenticated
     // 3. Handle max_age parameter for re-authentication
     // 4. Handle prompt parameter (none, login, consent, select_account)
-    
+
     const userId = await authenticateUser(request, {
       maxAge: max_age ? parseInt(max_age) : undefined,
       prompt: prompt ?? undefined,
@@ -169,13 +171,18 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
         loginUrl.searchParams.set('code_challenge_method', code_challenge_method!);
       }
       if (nonce) loginUrl.searchParams.set('nonce', nonce);
-      
+
       return NextResponse.redirect(loginUrl.toString());
     }
 
     // Check if user consent is required
-    const needsConsent = await checkConsentRequired(userId, client_id, requestedScopes, client.requireConsent);
-    
+    const needsConsent = await checkConsentRequired(
+      userId,
+      client_id,
+      requestedScopes,
+      client.requireConsent
+    );
+
     if (needsConsent && prompt !== 'none') {
       // Redirect to consent page
       const consentUrl = new URL('/datamgr_flow/auth/consent', request.url);
@@ -189,7 +196,7 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
         consentUrl.searchParams.set('code_challenge_method', code_challenge_method!);
       }
       if (nonce) consentUrl.searchParams.set('nonce', nonce);
-      
+
       return NextResponse.redirect(consentUrl.toString());
     }
 
@@ -197,7 +204,7 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
       // Consent required but prompt=none, return error
       const error = {
         error: OAuth2ErrorTypes.ACCESS_DENIED,
-        error_description: 'User consent required'
+        error_description: 'User consent required',
       };
 
       const redirectUrl = new URL(redirect_uri);
@@ -252,12 +259,11 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
     if (state) redirectUrl.searchParams.set('state', state);
 
     return NextResponse.redirect(redirectUrl.toString());
-
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     await AuthorizationUtils.logAuditEvent({
-      clientId: client?.id || "null", // Client may not be available in catch block
+      clientId: client?.id || 'null', // Client may not be available in catch block
       action: 'authorization_server_error',
       resource: 'oauth/authorize',
       ipAddress,
@@ -267,7 +273,7 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
     });
 
     console.error('Error during authorization:', error);
-    
+
     // Try to redirect with error if we have a valid redirect_uri
     if (redirect_uri) {
       try {
@@ -275,17 +281,17 @@ async function handleAuthorizeRequest(request: NextRequest, context: OAuthValida
         errorRedirectUrl.searchParams.set('error', OAuth2ErrorTypes.SERVER_ERROR);
         errorRedirectUrl.searchParams.set('error_description', 'An unexpected error occurred');
         if (state) errorRedirectUrl.searchParams.set('state', state);
-        
+
         return NextResponse.redirect(errorRedirectUrl.toString());
       } catch {
         // If redirect_uri is invalid, return JSON error
       }
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'An unexpected error occurred'
+        error_description: 'An unexpected error occurred',
       },
       { status: 500 }
     );
@@ -344,7 +350,7 @@ async function authenticateUser(
   try {
     // 验证JWT
     // Verify the JWT
-    const { payload } : { payload: JWTPayload } = await jwtVerify(token, JWT_SECRET, {
+    const { payload }: { payload: JWTPayload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });
@@ -363,7 +369,7 @@ async function authenticateUser(
     // Handle max_age parameter
     if (options.maxAge !== undefined && payload.iat) {
       const authTime = payload.iat; // JWT的iat (issued at) 声明，单位为秒
-                                     // JWT's iat (issued at) claim, in seconds
+      // JWT's iat (issued at) claim, in seconds
       const maxAgeSec = options.maxAge;
       const currentTimeSec = Math.floor(Date.now() / 1000);
 
@@ -378,7 +384,7 @@ async function authenticateUser(
           return null;
         }
         return null; // 触发重新登录
-                     // Trigger re-login
+        // Trigger re-login
       }
     }
 
@@ -391,7 +397,6 @@ async function authenticateUser(
     // 对于其他 prompt 值或没有 prompt，只要JWT有效且满足max_age，就返回用户ID
     // For other prompt values or no prompt, as long as JWT is valid and max_age is satisfied, return user ID
     return userId;
-
   } catch (error) {
     // JWT验证失败 (例如过期、签名无效等)
     // JWT verification failed (e.g., expired, invalid signature)
@@ -429,7 +434,8 @@ async function checkConsentRequired(
 
   const existingConsent = await prisma.consentGrant.findUnique({
     where: {
-      userId_clientId: { // This is the @@unique constraint name
+      userId_clientId: {
+        // This is the @@unique constraint name
         userId: userId,
         clientId: clientIdFromRequest, // Use the ID of the client model
       },
@@ -453,12 +459,12 @@ async function checkConsentRequired(
     if (!Array.isArray(grantedScopes)) grantedScopes = [];
   } catch (e) {
     // Invalid JSON in DB, treat as no scopes granted or log error
-    console.error("Invalid JSON in ConsentGrant.scopes for grant ID:", existingConsent.id);
+    console.error('Invalid JSON in ConsentGrant.scopes for grant ID:', existingConsent.id);
     return true; // Requires re-consent if scopes are malformed
   }
 
-  const allRequestedScopesCovered = requestedScopes.every(scope => grantedScopes.includes(scope));
-  
+  const allRequestedScopesCovered = requestedScopes.every((scope) => grantedScopes.includes(scope));
+
   return !allRequestedScopesCovered; // True if not all scopes are covered (i.e., consent is required)
 }
 

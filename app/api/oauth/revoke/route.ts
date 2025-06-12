@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { withOAuthRevokeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
-import { 
-  ClientAuthUtils, 
-  AuthorizationUtils, 
+import {
+  ClientAuthUtils,
+  AuthorizationUtils,
   OAuth2ErrorTypes,
-  RateLimitUtils 
+  RateLimitUtils,
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 
-async function handleRevokeRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
+async function handleRevokeRequest(
+  request: NextRequest,
+  context: OAuthValidationResult['context']
+): Promise<NextResponse> {
   const { body, client, ipAddress, userAgent, params } = context!;
   const token = params!.token;
   const token_type_hint = (body!.get('token_type_hint') ?? undefined) as string | undefined; // 'access_token' or 'refresh_token'
@@ -113,7 +116,10 @@ async function handleRevokeRequest(request: NextRequest, context: OAuthValidatio
       ipAddress,
       userAgent,
       success: revokedAccessToken || revokedRefreshToken,
-      errorMessage: (revokedAccessToken || revokedRefreshToken) ? undefined : 'Token not found or already revoked',
+      errorMessage:
+        revokedAccessToken || revokedRefreshToken
+          ? undefined
+          : 'Token not found or already revoked',
       metadata: {
         tokenTypeHint: token_type_hint,
         revokedAccessToken,
@@ -124,10 +130,9 @@ async function handleRevokeRequest(request: NextRequest, context: OAuthValidatio
     // According to RFC 7009, the revocation endpoint should return 200 OK
     // even if the token was not found or already revoked
     return new NextResponse(null, { status: 200 });
-
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     await AuthorizationUtils.logAuditEvent({
       clientId: client.id,
       action: 'token_revocation_error',
@@ -139,11 +144,11 @@ async function handleRevokeRequest(request: NextRequest, context: OAuthValidatio
     });
 
     console.error('Error during token revocation:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'An unexpected error occurred' 
+        error_description: 'An unexpected error occurred',
       },
       { status: 500 }
     );
@@ -151,4 +156,4 @@ async function handleRevokeRequest(request: NextRequest, context: OAuthValidatio
 }
 
 // Apply middleware that handles rate limiting, client auth, and validation
-export const POST = withOAuthRevokeValidation(handleRevokeRequest); 
+export const POST = withOAuthRevokeValidation(handleRevokeRequest);

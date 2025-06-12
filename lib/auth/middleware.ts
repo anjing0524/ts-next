@@ -6,7 +6,15 @@ import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
 
 import { prisma } from '@/lib/prisma';
 
-import { JWTUtils, ScopeUtils, AuthorizationUtils, RateLimitUtils, ClientAuthUtils, OAuth2ErrorTypes, PKCEUtils } from './oauth2';
+import {
+  JWTUtils,
+  ScopeUtils,
+  AuthorizationUtils,
+  RateLimitUtils,
+  ClientAuthUtils,
+  OAuth2ErrorTypes,
+  PKCEUtils,
+} from './oauth2';
 
 export interface AuthContext {
   user_id?: string;
@@ -35,12 +43,12 @@ export async function authenticateBearer(
   response?: NextResponse;
 }> {
   const authorization = request.headers.get('authorization');
-  
+
   if (!authorization || !authorization.startsWith('Bearer ')) {
     if (options.allowPublicAccess) {
       return { success: true };
     }
-    
+
     return {
       success: false,
       response: NextResponse.json(
@@ -48,7 +56,7 @@ export async function authenticateBearer(
           error: 'invalid_token',
           error_description: 'Missing or invalid authorization header',
         },
-        { 
+        {
           status: 401,
           headers: {
             'WWW-Authenticate': 'Bearer realm="API"',
@@ -78,7 +86,9 @@ export async function authenticateBearer(
     const expectedAudience = process.env.JWT_AUDIENCE;
 
     if (!expectedIssuer || !expectedAudience) {
-      console.error('JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)');
+      console.error(
+        'JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)'
+      );
       throw new Error('JWT issuer or audience not configured, cannot validate token.');
     }
 
@@ -91,25 +101,29 @@ export async function authenticateBearer(
       algorithms: ['RS256'], // 明确指定期望的算法 (Explicitly specify expected algorithms)
     });
     payload = verificationResult.payload; // 将验证后的载荷赋值给payload (Assign the verified payload to the payload variable)
-
   } catch (err) {
     // 处理JWT验证错误 (例如，令牌过期，签名无效，声明不匹配等)
     // (Handle JWT verification errors - e.g., token expired, invalid signature, claims mismatch, etc.)
-    console.error("JWT 验证失败 (JWT validation failed):", err); // 服务端日志 (Server-side log)
+    console.error('JWT 验证失败 (JWT validation failed):', err); // 服务端日志 (Server-side log)
 
     let errorDescription = 'Token validation failed';
     if (err instanceof jose.errors.JWTExpired) {
       errorDescription = `Token expired at ${new Date((err.payload.exp as number) * 1000).toISOString()}`;
     } else if (err instanceof jose.errors.JWTClaimValidationFailed) {
       errorDescription = `Token claim validation failed: ${err.claim} ${err.reason}`;
-    } else if (err instanceof jose.errors.JOSENotSupported || err instanceof jose.errors.JWKInvalid) {
-      errorDescription = "Invalid token algorithm or key issue.";
-    } else if (err instanceof Error && (err.message.includes("JWKS") || err.message.includes("configured"))) {
+    } else if (
+      err instanceof jose.errors.JOSENotSupported ||
+      err instanceof jose.errors.JWKInvalid
+    ) {
+      errorDescription = 'Invalid token algorithm or key issue.';
+    } else if (
+      err instanceof Error &&
+      (err.message.includes('JWKS') || err.message.includes('configured'))
+    ) {
       // 对于配置或JWKS获取问题，虽然仍在401路径，但错误消息可以更具体
       // (For configuration or JWKS fetch issues, while still on 401 path, error message can be more specific)
       errorDescription = `Token validation setup error: ${err.message}`;
     }
-
 
     await AuthorizationUtils.logAuditEvent({
       action: 'token_verification_failed_jwks', // 新的审计动作类型 (New audit action type)
@@ -172,7 +186,7 @@ export async function authenticateBearer(
 
   // 从JWT载荷中提取上下文信息 (Extract context from JWT payload)
   const context: AuthContext = {
-    user_id: payload.sub !== payload.client_id ? payload.sub as string : undefined,
+    user_id: payload.sub !== payload.client_id ? (payload.sub as string) : undefined,
     client_id: payload.client_id as string, // client_id 应始终存在于Access Token中 (client_id should always be in Access Token)
     scopes: ScopeUtils.parseScopes(payload.scope as string | undefined), // scope可能是可选的 (scope might be optional)
     permissions: (payload.permissions as string[] | undefined) || [], // permissions可能是可选的 (permissions might be optional)
@@ -196,7 +210,7 @@ export async function authenticateBearer(
   // Check required scopes
   if (options.requiredScopes && options.requiredScopes.length > 0) {
     const hasRequiredScopes = ScopeUtils.hasAllScopes(context.scopes, options.requiredScopes);
-    
+
     if (!hasRequiredScopes) {
       await AuthorizationUtils.logAuditEvent({
         userId: context.user_id,
@@ -221,7 +235,7 @@ export async function authenticateBearer(
             error_description: `Required scopes: ${options.requiredScopes.join(' ')}`,
             scope: options.requiredScopes.join(' '),
           },
-          { 
+          {
             status: 403,
             headers: {
               'WWW-Authenticate': `Bearer realm="API", scope="${options.requiredScopes.join(' ')}"`,
@@ -234,7 +248,7 @@ export async function authenticateBearer(
 
   // Check required permissions
   if (options.requiredPermissions && options.requiredPermissions.length > 0) {
-    const hasRequiredPermissions = options.requiredPermissions.every(permission =>
+    const hasRequiredPermissions = options.requiredPermissions.every((permission) =>
       context.permissions.includes(permission)
     );
 
@@ -294,11 +308,11 @@ export function withAuth(
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     const auth = await authenticateBearer(request, options);
-    
+
     if (!auth.success) {
       return auth.response!;
     }
-    
+
     return handler(request, auth.context!);
   };
 }
@@ -327,12 +341,12 @@ export function withCORS(handler: (request: NextRequest) => Promise<NextResponse
     }
 
     const response = await handler(request);
-    
+
     // Add CORS headers to response
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
+
     return response;
   };
 }
@@ -361,12 +375,11 @@ export function withOAuthMiddleware(
       windowMs = 60000,
       requireAuth = false,
       auditAction,
-      skipRateLimit = false
+      skipRateLimit = false,
     } = options;
 
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown';
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 
     try {
@@ -382,14 +395,14 @@ export function withOAuthMiddleware(
               ipAddress,
               userAgent,
               success: false,
-              errorMessage: 'Rate limit exceeded'
+              errorMessage: 'Rate limit exceeded',
             });
           }
 
           return NextResponse.json(
-            { 
+            {
               error: 'rate_limit_exceeded',
-              error_description: 'Too many requests. Please try again later.' 
+              error_description: 'Too many requests. Please try again later.',
             },
             { status: 429 }
           );
@@ -401,9 +414,9 @@ export function withOAuthMiddleware(
         const authHeader = request.headers.get('authorization');
         if (!authHeader?.startsWith('Bearer ')) {
           return NextResponse.json(
-            { 
+            {
               error: 'unauthorized',
-              error_description: 'Authentication required' 
+              error_description: 'Authentication required',
             },
             { status: 401 }
           );
@@ -420,16 +433,15 @@ export function withOAuthMiddleware(
           resource: new URL(request.url).pathname,
           ipAddress,
           userAgent,
-          success: true
+          success: true,
         });
       }
 
       return response;
-
     } catch (error: any) {
       // 5. 错误处理和审计日志
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       if (auditAction) {
         await AuthorizationUtils.logAuditEvent({
           action: `${auditAction}_error`,
@@ -437,16 +449,16 @@ export function withOAuthMiddleware(
           ipAddress,
           userAgent,
           success: false,
-          errorMessage
+          errorMessage,
         });
       }
 
       console.error(`OAuth middleware error in ${new URL(request.url).pathname}:`, error);
 
       return NextResponse.json(
-        { 
+        {
           error: 'server_error',
-          error_description: 'An unexpected error occurred' 
+          error_description: 'An unexpected error occurred',
         },
         { status: 500 }
       );
@@ -463,15 +475,12 @@ export function withOAuthEndpoint(
   auditAction: string,
   options: Partial<OAuthMiddlewareOptions> = {}
 ) {
-  return withOAuthMiddleware(
-    withCORS(handler),
-    {
-      auditAction,
-      maxRequests: 60, // OAuth端点的默认速率限制
-      windowMs: 60000, // 1分钟窗口
-      ...options
-    }
-  );
+  return withOAuthMiddleware(withCORS(handler), {
+    auditAction,
+    maxRequests: 60, // OAuth端点的默认速率限制
+    windowMs: 60000, // 1分钟窗口
+    ...options,
+  });
 }
 
 /**
@@ -483,15 +492,12 @@ export function withAuthEndpoint(
   auditAction: string,
   options: Partial<OAuthMiddlewareOptions> = {}
 ) {
-  return withOAuthMiddleware(
-    withCORS(handler),
-    {
-      auditAction,
-      maxRequests: 10, // 认证端点更严格的速率限制
-      windowMs: 60000,
-      ...options
-    }
-  );
+  return withOAuthMiddleware(withCORS(handler), {
+    auditAction,
+    maxRequests: 10, // 认证端点更严格的速率限制
+    windowMs: 60000,
+    ...options,
+  });
 }
 
 /**
@@ -503,15 +509,12 @@ export function withPublicEndpoint(
   auditAction: string,
   options: Partial<OAuthMiddlewareOptions> = {}
 ) {
-  return withOAuthMiddleware(
-    withCORS(handler),
-    {
-      auditAction,
-      maxRequests: 200, // 公共端点更宽松的限制
-      windowMs: 60000,
-      ...options
-    }
-  );
+  return withOAuthMiddleware(withCORS(handler), {
+    auditAction,
+    maxRequests: 200, // 公共端点更宽松的限制
+    windowMs: 60000,
+    ...options,
+  });
 }
 
 /**
@@ -523,16 +526,13 @@ export function withAdminEndpoint(
   auditAction: string,
   options: Partial<OAuthMiddlewareOptions> = {}
 ) {
-  return withOAuthMiddleware(
-    withCORS(handler),
-    {
-      auditAction,
-      requireAuth: true,
-      maxRequests: 30,
-      windowMs: 60000,
-      ...options
-    }
-  );
+  return withOAuthMiddleware(withCORS(handler), {
+    auditAction,
+    requireAuth: true,
+    maxRequests: 30,
+    windowMs: 60000,
+    ...options,
+  });
 }
 
 /**
@@ -582,12 +582,12 @@ export async function validateOAuthRequest(
 ): Promise<OAuthValidationResult> {
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
   const userAgent = request.headers.get('user-agent') || undefined;
-  
+
   // 速率限制检查
   if (options.rateLimit) {
     const { maxRequests, windowMs, keyType } = options.rateLimit;
     const rateLimitKey = RateLimitUtils.getRateLimitKey(request, keyType);
-    
+
     if (RateLimitUtils.isRateLimited(rateLimitKey, maxRequests, windowMs)) {
       await AuthorizationUtils.logAuditEvent({
         action: options.auditAction || 'rate_limit_exceeded',
@@ -603,10 +603,10 @@ export async function validateOAuthRequest(
         response: NextResponse.json(
           {
             error: OAuth2ErrorTypes.TEMPORARILY_UNAVAILABLE,
-            error_description: 'Rate limit exceeded'
+            error_description: 'Rate limit exceeded',
           },
           { status: 429 }
-        )
+        ),
       };
     }
   }
@@ -620,9 +620,9 @@ export async function validateOAuthRequest(
     try {
       body = await request.formData();
     } catch (error) {
-      const actionType = options.requireClientAuth ? 
-        `${options.auditAction || 'oauth_request'}_client_auth_parse_failure` :
-        `${options.auditAction || 'oauth_request'}_parse_error`;
+      const actionType = options.requireClientAuth
+        ? `${options.auditAction || 'oauth_request'}_client_auth_parse_failure`
+        : `${options.auditAction || 'oauth_request'}_parse_error`;
 
       await AuthorizationUtils.logAuditEvent({
         action: actionType,
@@ -630,7 +630,8 @@ export async function validateOAuthRequest(
         ipAddress,
         userAgent,
         success: false,
-        errorMessage: 'Failed to parse request body for client authentication or form data validation',
+        errorMessage:
+          'Failed to parse request body for client authentication or form data validation',
       });
 
       return {
@@ -638,13 +639,14 @@ export async function validateOAuthRequest(
         response: NextResponse.json(
           {
             error: OAuth2ErrorTypes.INVALID_REQUEST,
-            error_description: 'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.'
+            error_description:
+              'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.',
           },
           { status: 400 }
-        )
+        ),
       };
     }
-  } else if (request.method === "POST" || request.method === "PUT" || request.method === "PATCH") {
+  } else if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
     const contentType = request.headers.get('content-type');
     if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
       try {
@@ -658,12 +660,12 @@ export async function validateOAuthRequest(
   // 提取参数（从query string或form data）
   if (options.requiredParams || options.paramValidation) {
     const { searchParams } = new URL(request.url);
-    
+
     // 从query parameters提取
     for (const [key, value] of searchParams.entries()) {
       params[key] = value;
     }
-    
+
     // 从form data提取（如果存在）
     if (body) {
       for (const [key, value] of body.entries()) {
@@ -674,8 +676,8 @@ export async function validateOAuthRequest(
 
   // 验证必需参数
   if (options.requiredParams) {
-    const missingParams = options.requiredParams.filter(param => !params[param]);
-    
+    const missingParams = options.requiredParams.filter((param) => !params[param]);
+
     if (missingParams.length > 0) {
       await AuthorizationUtils.logAuditEvent({
         action: `${options.auditAction || 'oauth_request'}_missing_params`,
@@ -691,10 +693,10 @@ export async function validateOAuthRequest(
         response: NextResponse.json(
           {
             error: OAuth2ErrorTypes.INVALID_REQUEST,
-            error_description: `Missing required parameters: ${missingParams.join(', ')}`
+            error_description: `Missing required parameters: ${missingParams.join(', ')}`,
           },
           { status: 400 }
-        )
+        ),
       };
     }
   }
@@ -719,10 +721,10 @@ export async function validateOAuthRequest(
           response: NextResponse.json(
             {
               error: OAuth2ErrorTypes.INVALID_REQUEST,
-              error_description: `Invalid parameter: ${param}`
+              error_description: `Invalid parameter: ${param}`,
             },
             { status: 400 }
-          )
+          ),
         };
       }
     }
@@ -731,27 +733,28 @@ export async function validateOAuthRequest(
   // 客户端认证
   if (options.requireClientAuth) {
     if (!body) {
-       await AuthorizationUtils.logAuditEvent({
+      await AuthorizationUtils.logAuditEvent({
         action: `${options.auditAction || 'oauth_request'}_client_auth_failed`,
         resource: request.url,
         ipAddress,
         userAgent,
         success: false,
-        errorMessage: 'Client authentication requires form data which was not available or parsable.',
+        errorMessage:
+          'Client authentication requires form data which was not available or parsable.',
       });
       return {
         success: false,
         response: NextResponse.json(
-            {
-                error: OAuth2ErrorTypes.INVALID_REQUEST,
-                error_description: 'Client authentication requires form data body.'
-            }, 
-            { status: 400 }
-        )
+          {
+            error: OAuth2ErrorTypes.INVALID_REQUEST,
+            error_description: 'Client authentication requires form data body.',
+          },
+          { status: 400 }
+        ),
       };
     }
     const clientAuth = await ClientAuthUtils.authenticateClient(request, body);
-    
+
     if (!clientAuth.client) {
       await AuthorizationUtils.logAuditEvent({
         action: `${options.auditAction || 'oauth_request'}_client_auth_failed`,
@@ -764,10 +767,10 @@ export async function validateOAuthRequest(
 
       return {
         success: false,
-        response: NextResponse.json(clientAuth.error, { status: 401 })
+        response: NextResponse.json(clientAuth.error, { status: 401 }),
       };
     }
-    
+
     client = clientAuth.client;
   }
 
@@ -778,8 +781,8 @@ export async function validateOAuthRequest(
       client,
       ipAddress,
       userAgent,
-      params
-    }
+      params,
+    },
   };
 }
 
@@ -797,20 +800,20 @@ export async function validateOAuthScopes( // Renamed to avoid conflict if a dif
 ): Promise<{ valid: boolean; response?: NextResponse; validScopes?: string[] }> {
   // Assuming ScopeUtils.validateScopes is available (it's imported)
   const scopeValidation = await ScopeUtils.validateScopes(requestedScopes, client);
-  
+
   if (!scopeValidation.valid) {
     await AuthorizationUtils.logAuditEvent({
       // clientId should be client.id if client is a Prisma model instance
-      clientId: client && typeof client.id === 'string' ? client.id : undefined, 
+      clientId: client && typeof client.id === 'string' ? client.id : undefined,
       action: options.auditAction || 'invalid_scope',
       resource: 'scope_validation',
       ipAddress: options.ipAddress,
       userAgent: options.userAgent,
       success: false,
       errorMessage: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`,
-      metadata: { 
+      metadata: {
         requestedScopes,
-        invalidScopes: scopeValidation.invalidScopes 
+        invalidScopes: scopeValidation.invalidScopes,
       },
     });
 
@@ -819,16 +822,16 @@ export async function validateOAuthScopes( // Renamed to avoid conflict if a dif
       response: NextResponse.json(
         {
           error: OAuth2ErrorTypes.INVALID_SCOPE,
-          error_description: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`
+          error_description: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`,
         },
         { status: 400 }
-      )
+      ),
     };
   }
 
   return {
     valid: true,
-    validScopes: requestedScopes // If all are valid, requestedScopes are the valid ones
+    validScopes: requestedScopes, // If all are valid, requestedScopes are the valid ones
   };
 }
 
@@ -846,10 +849,10 @@ export function validateOAuthRedirectUri( // Renamed
       response: NextResponse.json(
         {
           error: OAuth2ErrorTypes.INVALID_REQUEST,
-          error_description: 'Invalid redirect_uri'
+          error_description: 'Invalid redirect_uri',
         },
         { status: 400 }
-      )
+      ),
     };
   }
 
@@ -863,17 +866,21 @@ export function validateOAuthPKCE( // Renamed
   codeChallenge?: string,
   codeChallengeMethod?: string,
   required = false
-): { valid: boolean; response?: NextResponse; pkceData?: { codeChallenge: string; codeChallengeMethod: string; } } {
+): {
+  valid: boolean;
+  response?: NextResponse;
+  pkceData?: { codeChallenge: string; codeChallengeMethod: string };
+} {
   if (required && !codeChallenge) {
     return {
       valid: false,
       response: NextResponse.json(
         {
           error: OAuth2ErrorTypes.INVALID_REQUEST,
-          error_description: 'PKCE is required for this client'
+          error_description: 'PKCE is required for this client',
         },
         { status: 400 }
-      )
+      ),
     };
   }
 
@@ -884,10 +891,10 @@ export function validateOAuthPKCE( // Renamed
         response: NextResponse.json(
           {
             error: OAuth2ErrorTypes.INVALID_REQUEST,
-            error_description: 'code_challenge_method must be S256'
+            error_description: 'code_challenge_method must be S256',
           },
           { status: 400 }
-        )
+        ),
       };
     }
     // Assuming PKCEUtils.validateCodeChallenge is available
@@ -897,10 +904,10 @@ export function validateOAuthPKCE( // Renamed
         response: NextResponse.json(
           {
             error: OAuth2ErrorTypes.INVALID_REQUEST,
-            error_description: 'Invalid code_challenge format'
+            error_description: 'Invalid code_challenge format',
           },
           { status: 400 }
-        )
+        ),
       };
     }
 
@@ -908,8 +915,8 @@ export function validateOAuthPKCE( // Renamed
       valid: true,
       pkceData: {
         codeChallenge,
-        codeChallengeMethod
-      }
+        codeChallengeMethod,
+      },
     };
   }
 
@@ -920,23 +927,27 @@ export function validateOAuthPKCE( // Renamed
  * 高级中间件装饰器 - OAuth令牌端点
  */
 export function withOAuthTokenValidation(
-  handler: (request: NextRequest, context: OAuthValidationResult['context']) => Promise<NextResponse>
+  handler: (
+    request: NextRequest,
+    context: OAuthValidationResult['context']
+  ) => Promise<NextResponse>
 ) {
-  return async function(request: NextRequest): Promise<NextResponse> {
+  return async function (request: NextRequest): Promise<NextResponse> {
     // First validation: basic parameters and grant_type
     const initialValidation = await validateOAuthRequest(request, {
       rateLimit: {
         maxRequests: 100,
         windowMs: 60000,
-        keyType: 'ip'
+        keyType: 'ip',
       },
       requireClientAuth: true,
       auditAction: 'token_request',
       validateFormData: true,
       requiredParams: ['grant_type'],
       paramValidation: {
-        grant_type: (value) => ['authorization_code', 'refresh_token', 'client_credentials', 'password'].includes(value)
-      }
+        grant_type: (value) =>
+          ['authorization_code', 'refresh_token', 'client_credentials', 'password'].includes(value),
+      },
     });
 
     if (!initialValidation.success || !initialValidation.context) {
@@ -946,7 +957,7 @@ export function withOAuthTokenValidation(
     // Second validation: grant_type specific parameters
     const grantType = initialValidation.context.params?.grant_type;
     let grantSpecificRequiredParams: string[] = [];
-    
+
     switch (grantType) {
       case 'authorization_code':
         grantSpecificRequiredParams = ['code', 'redirect_uri'];
@@ -963,8 +974,10 @@ export function withOAuthTokenValidation(
     }
 
     if (grantSpecificRequiredParams.length > 0) {
-      const missingParams = grantSpecificRequiredParams.filter(param => !initialValidation.context!.params![param]);
-      
+      const missingParams = grantSpecificRequiredParams.filter(
+        (param) => !initialValidation.context!.params![param]
+      );
+
       if (missingParams.length > 0) {
         await AuthorizationUtils.logAuditEvent({
           clientId: initialValidation.context.client?.id,
@@ -979,7 +992,7 @@ export function withOAuthTokenValidation(
         return NextResponse.json(
           {
             error: OAuth2ErrorTypes.INVALID_REQUEST,
-            error_description: `Missing required parameters for ${grantType}: ${missingParams.join(', ')}`
+            error_description: `Missing required parameters for ${grantType}: ${missingParams.join(', ')}`,
           },
           { status: 400 }
         );
@@ -994,14 +1007,17 @@ export function withOAuthTokenValidation(
  * 高级中间件装饰器 - OAuth授权端点
  */
 export function withOAuthAuthorizeValidation(
-  handler: (request: NextRequest, context: OAuthValidationResult['context']) => Promise<NextResponse>
+  handler: (
+    request: NextRequest,
+    context: OAuthValidationResult['context']
+  ) => Promise<NextResponse>
 ) {
-  return async function(request: NextRequest): Promise<NextResponse> {
+  return async function (request: NextRequest): Promise<NextResponse> {
     const validation = await validateOAuthRequest(request, {
       rateLimit: {
         maxRequests: 50,
         windowMs: 60000,
-        keyType: 'ip'
+        keyType: 'ip',
       },
       auditAction: 'authorization_request',
       // Note: client_id is often in query for authorize, but authenticateClient expects it in body for some flows.
@@ -1017,22 +1033,25 @@ export function withOAuthAuthorizeValidation(
       validateFormData: false, // Authorize typically uses query params
       requiredParams: ['client_id', 'redirect_uri', 'response_type'],
       paramValidation: {
-        response_type: (value) => value === 'code'
+        response_type: (value) => value === 'code',
         // client_id and redirect_uri will be validated further within the handler typically
-      }
+      },
     });
 
     if (!validation.success || !validation.context) {
       return validation.response!;
     }
-    
+
     // Additional validation for client based on validated client_id from params
-    const client = await prisma.client.findUnique({ 
-      where: { clientId: validation.context.params?.client_id } 
+    const client = await prisma.client.findUnique({
+      where: { clientId: validation.context.params?.client_id },
     });
 
     if (!client) {
-      return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: "Client not found" }, { status: 401 });
+      return NextResponse.json(
+        { error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client not found' },
+        { status: 401 }
+      );
     }
     validation.context.client = client; // Add client to context
 
@@ -1044,7 +1063,7 @@ export function withOAuthAuthorizeValidation(
     if (!redirectUriValidation.valid) {
       return redirectUriValidation.response!;
     }
-    
+
     return handler(request, validation.context);
   };
 }
@@ -1053,19 +1072,22 @@ export function withOAuthAuthorizeValidation(
  * 高级中间件装饰器 - OAuth令牌撤销端点
  */
 export function withOAuthRevokeValidation(
-  handler: (request: NextRequest, context: OAuthValidationResult['context']) => Promise<NextResponse>
+  handler: (
+    request: NextRequest,
+    context: OAuthValidationResult['context']
+  ) => Promise<NextResponse>
 ) {
-  return async function(request: NextRequest): Promise<NextResponse> {
+  return async function (request: NextRequest): Promise<NextResponse> {
     const validation = await validateOAuthRequest(request, {
       rateLimit: {
         maxRequests: 50,
         windowMs: 60000,
-        keyType: 'ip'
+        keyType: 'ip',
       },
       requireClientAuth: true, // Token revocation requires client auth
       auditAction: 'token_revocation',
       validateFormData: true,
-      requiredParams: ['token']
+      requiredParams: ['token'],
     });
 
     if (!validation.success || !validation.context) {

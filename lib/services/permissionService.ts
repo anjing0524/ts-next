@@ -1,5 +1,6 @@
-import { prisma } from '@/lib/prisma';
 import { Role, UserRole, Permission } from '@prisma/client'; // Ensure these are available if needed by other parts of the class
+
+import { prisma } from '@/lib/prisma';
 
 // Define a type for the structure of permission requests in checkBatchPermissions
 interface PermissionCheckRequest {
@@ -11,13 +12,17 @@ interface PermissionCheckRequest {
 interface BatchPermissionCheckResult {
   id?: string; // Optional request identifier, mirrored from request
   allowed: boolean;
-  reasonCode?: 'PERMISSION_GRANTED' | 'PERMISSION_DENIED' | 'NO_PERMISSIONS' | 'INVALID_REQUEST_FORMAT';
+  reasonCode?:
+    | 'PERMISSION_GRANTED'
+    | 'PERMISSION_DENIED'
+    | 'NO_PERMISSIONS'
+    | 'INVALID_REQUEST_FORMAT';
   message?: string;
 }
 
 export class PermissionService {
   // In-memory cache for user permissions
-  private permissionCache = new Map<string, { permissions: Set<string>, timestamp: number }>();
+  private permissionCache = new Map<string, { permissions: Set<string>; timestamp: number }>();
   private cacheDurationMs = 15 * 60 * 1000; // 15 minutes
 
   // Placeholder for a Redis client if it were available
@@ -43,7 +48,7 @@ export class PermissionService {
 
     // 1. Try fetching from in-memory cache
     const cachedEntry = this.permissionCache.get(cacheKey);
-    if (cachedEntry && (Date.now() - cachedEntry.timestamp < this.cacheDurationMs)) {
+    if (cachedEntry && Date.now() - cachedEntry.timestamp < this.cacheDurationMs) {
       // console.log(`[In-Memory Cache HIT] Permissions for user ${userId}`);
       return new Set(cachedEntry.permissions); // Return a copy to prevent external modification
     }
@@ -75,10 +80,7 @@ export class PermissionService {
           where: {
             role: { isActive: true }, // Ensure role is active
             // 确保用户角色关联未过期 (Ensure user-role assignment is not expired)
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } }
-            ]
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
           },
           include: {
             role: {
@@ -101,14 +103,17 @@ export class PermissionService {
     if (!userWithRoles) {
       // Cache an empty set for users with no roles/permissions to avoid repeated DB queries for them
       const emptyPermissions = new Set<string>();
-      this.permissionCache.set(cacheKey, { permissions: new Set(emptyPermissions), timestamp: Date.now() });
+      this.permissionCache.set(cacheKey, {
+        permissions: new Set(emptyPermissions),
+        timestamp: Date.now(),
+      });
       // if (this.redisClient) { try { await this.redisClient.set(cacheKey, JSON.stringify([]), 'EX', 900); } catch(e){ /* ignore */ } }
       return emptyPermissions;
     }
 
     const effectivePermissions = new Set<string>();
-    userWithRoles.userRoles.forEach(userRole => {
-      userRole.role.rolePermissions.forEach(rolePermission => {
+    userWithRoles.userRoles.forEach((userRole) => {
+      userRole.role.rolePermissions.forEach((rolePermission) => {
         if (rolePermission.permission && rolePermission.permission.name) {
           effectivePermissions.add(rolePermission.permission.name);
         }
@@ -116,7 +121,10 @@ export class PermissionService {
     });
 
     // 3. Store in in-memory cache
-    this.permissionCache.set(cacheKey, { permissions: new Set(effectivePermissions), timestamp: Date.now() });
+    this.permissionCache.set(cacheKey, {
+      permissions: new Set(effectivePermissions),
+      timestamp: Date.now(),
+    });
 
     // TODO: Replace with actual Redis SET call if Redis is available
     // if (this.redisClient) {
@@ -163,8 +171,8 @@ export class PermissionService {
    */
   public async checkPermission(userId: string, requiredPermission: string): Promise<boolean> {
     if (!requiredPermission) {
-        // console.warn('checkPermission called with empty requiredPermission');
-        return false;
+      // console.warn('checkPermission called with empty requiredPermission');
+      return false;
     }
     const userPermissions = await this.getUserEffectivePermissions(userId);
     return userPermissions.has(requiredPermission);
@@ -178,7 +186,10 @@ export class PermissionService {
    * @param requests An array of PermissionCheckRequest objects, each with a 'name' field.
    * @returns A Promise that resolves to an array of BatchPermissionCheckResult objects.
    */
-  public async checkBatchPermissions(userId: string, requests: PermissionCheckRequest[]): Promise<BatchPermissionCheckResult[]> {
+  public async checkBatchPermissions(
+    userId: string,
+    requests: PermissionCheckRequest[]
+  ): Promise<BatchPermissionCheckResult[]> {
     if (!requests || requests.length === 0) {
       return [];
     }
@@ -187,7 +198,8 @@ export class PermissionService {
     const results: BatchPermissionCheckResult[] = [];
 
     for (const req of requests) {
-      if (!req.name) { // Check if the canonical name is provided
+      if (!req.name) {
+        // Check if the canonical name is provided
         results.push({
           id: req.id,
           allowed: false,

@@ -8,7 +8,7 @@ metadata:
   name: redis-pv
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   capacity:
     storage: 5Gi
   local:
@@ -16,11 +16,11 @@ spec:
   nodeAffinity:
     required:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - docker-desktop
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - docker-desktop
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   volumeMode: Filesystem

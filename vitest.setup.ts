@@ -22,7 +22,7 @@ if (!global.fetch) {
 Object.assign(process.env, {
   NODE_ENV: 'test',
   NEXT_PUBLIC_BASE_PATH: '/datamgr_flow',
-  TEST_BASE_URL: 'http://localhost:3000'
+  TEST_BASE_URL: 'http://localhost:3000',
 });
 
 // Mock logger only (但保持其他真实功能)
@@ -38,8 +38,10 @@ vi.mock('@/utils/logger', () => ({
 // Setup and cleanup hooks
 beforeAll(async () => {
   console.log('🧪 测试环境初始化 (使用真实数据库连接和真实API路由)');
-  console.log('🧪 Test environment initialized (using real database connection and real API routes)');
-  
+  console.log(
+    '🧪 Test environment initialized (using real database connection and real API routes)'
+  );
+
   // 确保测试数据库连接
   try {
     const { prisma } = await import('@/lib/prisma');
@@ -62,7 +64,7 @@ afterEach(() => {
 
 afterAll(async () => {
   console.log('🧹 测试环境清理完成 / Test environment cleaned up');
-  
+
   // 断开数据库连接
   try {
     const { prisma } = await import('@/lib/prisma');

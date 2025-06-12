@@ -11,14 +11,15 @@ const NUMBER_CHARACTERS = '0123456789';
 const LOWERCASE_CHARACTERS = 'abcdefghijklmnopqrstuvwxyz';
 const UPPERCASE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-export const PasswordComplexitySchema = z.string()
+export const PasswordComplexitySchema = z
+  .string()
   .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`)
-  .refine(password => {
+  .refine((password) => {
     const categories = [
       /[a-z]/, // lowercase
       /[A-Z]/, // uppercase
       /[0-9]/, // numbers
-      new RegExp(`[${SPECIAL_CHARACTERS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`) // special characters
+      new RegExp(`[${SPECIAL_CHARACTERS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`), // special characters
     ];
     let satisfiedCategories = 0;
     for (const category of categories) {
@@ -34,7 +35,8 @@ export function generateSecurePassword(length: number = 12): string {
     length = PASSWORD_MIN_LENGTH;
   }
 
-  const allChars = LOWERCASE_CHARACTERS + UPPERCASE_CHARACTERS + NUMBER_CHARACTERS + SPECIAL_CHARACTERS;
+  const allChars =
+    LOWERCASE_CHARACTERS + UPPERCASE_CHARACTERS + NUMBER_CHARACTERS + SPECIAL_CHARACTERS;
 
   let password = '';
   // Ensure at least one character from each of two categories initially
@@ -52,7 +54,10 @@ export function generateSecurePassword(length: number = 12): string {
   }
 
   // Shuffle the password to make the position of guaranteed characters random
-  password = password.split('').sort(() => 0.5 - Math.random()).join('');
+  password = password
+    .split('')
+    .sort(() => 0.5 - Math.random())
+    .join('');
 
   // Validate if generated password meets complexity, regenerate if not (rare case for this generator)
   try {
@@ -61,19 +66,33 @@ export function generateSecurePassword(length: number = 12): string {
   } catch (e) {
     // Fallback to a simpler generation if somehow the above fails complexity, though unlikely
     // Or, ideally, loop until a valid one is generated. For now, simple fallback.
-    console.warn("Initial generated password failed complexity check, retrying with simpler logic for safety.");
+    console.warn(
+      'Initial generated password failed complexity check, retrying with simpler logic for safety.'
+    );
     let fallbackPassword = '';
-    const charSets = [LOWERCASE_CHARACTERS, UPPERCASE_CHARACTERS, NUMBER_CHARACTERS, SPECIAL_CHARACTERS];
+    const charSets = [
+      LOWERCASE_CHARACTERS,
+      UPPERCASE_CHARACTERS,
+      NUMBER_CHARACTERS,
+      SPECIAL_CHARACTERS,
+    ];
     fallbackPassword += charSets[0][crypto.randomInt(charSets[0].length)]; // one lowercase
     fallbackPassword += charSets[2][crypto.randomInt(charSets[2].length)]; // one number
     for (let i = 2; i < length; i++) {
-        fallbackPassword += allChars[crypto.randomInt(allChars.length)];
+      fallbackPassword += allChars[crypto.randomInt(allChars.length)];
     }
-    return fallbackPassword.split('').sort(() => 0.5 - Math.random()).join('');
+    return fallbackPassword
+      .split('')
+      .sort(() => 0.5 - Math.random())
+      .join('');
   }
 }
 
-export async function checkPasswordHistory(userId: string, newPasswordRaw: string, historyLimit: number = 5): Promise<boolean> {
+export async function checkPasswordHistory(
+  userId: string,
+  newPasswordRaw: string,
+  historyLimit: number = 5
+): Promise<boolean> {
   const passwordHistory = await prisma.passwordHistory.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },

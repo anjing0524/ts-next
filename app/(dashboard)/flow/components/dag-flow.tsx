@@ -12,7 +12,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { nodeTypes } from './customer-node';
 
-
 /**
  * 计算节点的垂直布局
  * 使用拓扑排序算法将节点按层级布局

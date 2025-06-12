@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { successResponse } from '@/lib/api/apiResponse';
-import { prisma } from '@/lib/prisma';
-import { AuditLogQuerySchema, AuditLogQueryType } from './schemas';
+
 import { Prisma } from '@prisma/client';
+
+import { successResponse } from '@/lib/api/apiResponse';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
+import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
+
+import { AuditLogQuerySchema, AuditLogQueryType } from './schemas';
 
 async function getAuditLogsHandler(request: NextRequest, context: AuthContext) {
   const requestId = (request as any).requestId; // Injected by withErrorHandler
@@ -30,14 +33,19 @@ async function getAuditLogsHandler(request: NextRequest, context: AuthContext) {
 
   if (!validationResult.success) {
     // Flatten Zod errors for a more readable message
-    const errorMessages = validationResult.error.flatten(issue => issue.message).fieldErrors;
+    const errorMessages = validationResult.error.flatten((issue) => issue.message).fieldErrors;
     const combinedErrorMessage = Object.entries(errorMessages)
       .map(([key, messages]) => `${key}: ${messages?.join(', ')}`)
       .join('; ');
-    throw new ApiError(400, `Invalid query parameters: ${combinedErrorMessage}`, 'VALIDATION_ERROR');
+    throw new ApiError(
+      400,
+      `Invalid query parameters: ${combinedErrorMessage}`,
+      'VALIDATION_ERROR'
+    );
   }
 
-  const { page, limit, userId, action, startDate, endDate, success, clientId } = validationResult.data;
+  const { page, limit, userId, action, startDate, endDate, success, clientId } =
+    validationResult.data;
 
   const whereClause: Prisma.AuditLogWhereInput = {};
   if (userId) whereClause.userId = userId;
@@ -79,10 +87,14 @@ async function getAuditLogsHandler(request: NextRequest, context: AuthContext) {
     },
   };
 
-  return NextResponse.json(successResponse(responseData, 200, 'Audit logs retrieved successfully.', requestId));
+  return NextResponse.json(
+    successResponse(responseData, 200, 'Audit logs retrieved successfully.', requestId)
+  );
 }
 
-export const GET = withErrorHandler(withAuth(getAuditLogsHandler, {
-  requiredPermissions: ['admin:audit-logs:read'], // Permission to read audit logs
-  requireUserContext: true, // Ensure an authenticated user/admin is making the request
-}));
+export const GET = withErrorHandler(
+  withAuth(getAuditLogsHandler, {
+    requiredPermissions: ['admin:audit-logs:read'], // Permission to read audit logs
+    requireUserContext: true, // Ensure an authenticated user/admin is making the request
+  })
+);

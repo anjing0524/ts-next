@@ -2,11 +2,12 @@
 // This file may be removed in a future version.
 // /app/api/permissions/check/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+
 import { z } from 'zod';
 
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
-import { PermissionService } from '@/lib/services/permissionService';
 import { AuthorizationUtils } from '@/lib/auth/oauth2'; // Import AuthorizationUtils
+import { PermissionService } from '@/lib/services/permissionService';
 
 const permissionService = new PermissionService();
 
@@ -17,14 +18,22 @@ const IndividualPermissionCheckSchema = z.object({
 
 const BatchCheckRequestBodySchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  requests: z.array(IndividualPermissionCheckSchema).min(1, 'At least one permission request is required'),
+  requests: z
+    .array(IndividualPermissionCheckSchema)
+    .min(1, 'At least one permission request is required'),
 });
 
-async function handlePermissionsCheck(request: NextRequest, authContext: AuthContext) { // authContext provided by withAuth
-  console.warn("DEPRECATION WARNING: /api/permissions/check is deprecated. Use /api/v1/auth/check-batch or /api/v1/auth/check.");
+async function handlePermissionsCheck(request: NextRequest, authContext: AuthContext) {
+  // authContext provided by withAuth
+  console.warn(
+    'DEPRECATION WARNING: /api/permissions/check is deprecated. Use /api/v1/auth/check-batch or /api/v1/auth/check.'
+  );
   const requestUrl = request.url;
   // Prefer 'x-real-ip' if behind a trusted proxy, fallback to 'x-forwarded-for', then to undefined
-  const ipAddress = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || undefined;
+  const ipAddress =
+    request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    undefined;
   const userAgent = request.headers.get('user-agent') || undefined;
 
   try {
@@ -70,7 +79,10 @@ async function handlePermissionsCheck(request: NextRequest, authContext: AuthCon
       },
     });
 
-    const serviceResults = await permissionService.checkBatchPermissions(targetUserId, permissionRequests);
+    const serviceResults = await permissionService.checkBatchPermissions(
+      targetUserId,
+      permissionRequests
+    );
 
     // Optional: Audit log for the outcome of the permission check if specific results need to be audited.
     // For example, if any permission was denied or if critical permissions were checked.
@@ -87,7 +99,6 @@ async function handlePermissionsCheck(request: NextRequest, authContext: AuthCon
     // });
 
     return NextResponse.json({ results: serviceResults });
-
   } catch (error: any) {
     console.error('Permissions check API encountered an error:', error);
 
@@ -113,12 +124,16 @@ async function handlePermissionsCheck(request: NextRequest, authContext: AuthCon
       ipAddress,
       userAgent,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Internal server error during permission check.',
+      errorMessage:
+        error instanceof Error ? error.message : 'Internal server error during permission check.',
       metadata: { targetUserId: targetUserIdForErrorLog, errorDetails: error.toString() },
     });
 
     return NextResponse.json(
-      { error: 'Internal Server Error', message: 'An internal error occurred while processing permission check requests.' },
+      {
+        error: 'Internal Server Error',
+        message: 'An internal error occurred while processing permission check requests.',
+      },
       { status: 500 }
     );
   }

@@ -2,16 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { z } from 'zod';
 
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 import { withAuth, AuthContext } from '@/lib/auth/middleware'; // Assuming this middleware handles auth and permissions
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 
 // Schema for creating a new role (角色创建的校验 Schema)
 const CreateRoleSchema = z.object({
   // 角色唯一名称 (英文、数字、下划线)
-  name: z.string().min(3, 'Role name must be at least 3 characters').max(50)
-    .regex(/^[a-z0-9_]+$/, 'Role name can only contain lowercase letters, numbers, and underscores'),
+  name: z
+    .string()
+    .min(3, 'Role name must be at least 3 characters')
+    .max(50)
+    .regex(
+      /^[a-z0-9_]+$/,
+      'Role name can only contain lowercase letters, numbers, and underscores'
+    ),
   // 角色显示名称 (用于 UI 展示)
   displayName: z.string().min(1, 'Display name is required').max(100),
   // 角色描述 (可选)
@@ -38,29 +44,33 @@ async function createRole(request: NextRequest, authContext: AuthContext) {
 
   // parentId 和 isSystem 字段已从 Schema 和 Role 模型中移除，相关逻辑不再需要
 
-    // 创建角色
-    const newRole = await prisma.role.create({
-      data: {
-        name,
-        displayName,
-        description,
-        isActive, // 根据 CreateRoleSchema 中的定义，可以是 true/false 或依赖 schema 默认值
-        // createdBy: authContext.user_id, // 如果 Role 模型中有 createdBy 字段
-      },
-    });
+  // 创建角色
+  const newRole = await prisma.role.create({
+    data: {
+      name,
+      displayName,
+      description,
+      isActive, // 根据 CreateRoleSchema 中的定义，可以是 true/false 或依赖 schema 默认值
+      // createdBy: authContext.user_id, // 如果 Role 模型中有 createdBy 字段
+    },
+  });
 
-    // 记录审计日志：角色创建成功
-    await AuthorizationUtils.logAuditEvent({
-      userId: authContext.user_id,
-      action: 'role_created',
-      resource: `role:${newRole.id}`,
-      success: true,
-      metadata: { roleName: newRole.name, displayName: newRole.displayName, isActive: newRole.isActive },
-      ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-      userAgent: request.headers.get('user-agent'),
-    });
+  // 记录审计日志：角色创建成功
+  await AuthorizationUtils.logAuditEvent({
+    userId: authContext.user_id,
+    action: 'role_created',
+    resource: `role:${newRole.id}`,
+    success: true,
+    metadata: {
+      roleName: newRole.name,
+      displayName: newRole.displayName,
+      isActive: newRole.isActive,
+    },
+    ipAddress: request.ip || request.headers.get('x-forwarded-for'),
+    userAgent: request.headers.get('user-agent'),
+  });
 
-    return NextResponse.json(newRole, { status: 201 });
+  return NextResponse.json(newRole, { status: 201 });
 }
 
 // GET /api/roles - 列出所有角色
@@ -85,5 +95,9 @@ async function listRoles(request: NextRequest, authContext: AuthContext) {
 
 // 应用认证中间件。用户需要 'system:role:manage' 权限 (示例，具体权限标识符应更新为新格式)
 // 注意: 这里的 'system:role:manage' 权限标识符可能需要根据新的权限命名规范进行调整
-export const POST = withErrorHandler(withAuth(createRole, { requiredPermissions: ['system:role:manage'] }));
-export const GET = withErrorHandler(withAuth(listRoles, { requiredPermissions: ['system:role:manage'] })); // 或更细粒度的读取权限 'system:role:read'
+export const POST = withErrorHandler(
+  withAuth(createRole, { requiredPermissions: ['system:role:manage'] })
+);
+export const GET = withErrorHandler(
+  withAuth(listRoles, { requiredPermissions: ['system:role:manage'] })
+); // 或更细粒度的读取权限 'system:role:read'

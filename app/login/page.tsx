@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -8,23 +8,27 @@ import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authApi, getOAuthRedirectUri, getFullUrl } from '@/lib/api';
 
-
 // Define Zod schema
 const loginSchema = z.object({
-  username: z.string().min(1, { message: "Username is required" }),
-  password: z.string().min(1, { message: "Password is required" }),
+  username: z.string().min(1, { message: 'Username is required' }),
+  password: z.string().min(1, { message: 'Password is required' }),
 });
 
 // PKCE helper functions - Browser compatible
 function base64urlEscape(str: string): string {
-  return str.replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '');
+  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 function generateCodeVerifier(): string {
@@ -45,7 +49,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<any>({}); 
+  const [errors, setErrors] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -93,20 +97,23 @@ export default function LoginPage() {
         // For internal admin access, initiate OAuth flow
         const codeVerifier = generateCodeVerifier();
         const codeChallenge = await generateCodeChallenge(codeVerifier);
-        
+
         // Store code verifier for later use in callback
         sessionStorage.setItem('code_verifier', codeVerifier);
 
         // Generate state using browser crypto
         const stateArray = new Uint8Array(16);
         crypto.getRandomValues(stateArray);
-        const state = Array.from(stateArray, byte => byte.toString(16).padStart(2, '0')).join('');
+        const state = Array.from(stateArray, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
         const authUrl = new URL(getFullUrl('/api/oauth/authorize'));
         authUrl.searchParams.set('client_id', 'auth-center-self');
         authUrl.searchParams.set('redirect_uri', getOAuthRedirectUri());
         authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('scope', 'profile:read users:manage clients:manage permissions:manage audit:read openid email');
+        authUrl.searchParams.set(
+          'scope',
+          'profile:read users:manage clients:manage permissions:manage audit:read openid email'
+        );
         authUrl.searchParams.set('code_challenge', codeChallenge);
         authUrl.searchParams.set('code_challenge_method', 'S256');
         authUrl.searchParams.set('state', state);
@@ -123,11 +130,11 @@ export default function LoginPage() {
       if (scope) oauthUrl.searchParams.set('scope', scope);
       if (state) oauthUrl.searchParams.set('state', state);
       if (codeChallenge) oauthUrl.searchParams.set('code_challenge', codeChallenge);
-      if (codeChallengeMethod) oauthUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
+      if (codeChallengeMethod)
+        oauthUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
       if (nonce) oauthUrl.searchParams.set('nonce', nonce);
 
       window.location.href = oauthUrl.toString();
-
     } catch (error) {
       console.error('Login error:', error);
       setLoginError(error instanceof Error ? error.message : 'An unexpected error occurred');
@@ -143,21 +150,18 @@ export default function LoginPage() {
             {isOAuthFlow ? 'Sign In to Continue' : 'Admin Center Login'}
           </CardTitle>
           <CardDescription className="text-gray-600">
-            {isOAuthFlow 
+            {isOAuthFlow
               ? `Sign in to authorize access for ${clientId}`
-              : 'Sign in to access the OAuth 2.0 Admin Center'
-            }
+              : 'Sign in to access the OAuth 2.0 Admin Center'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loginError && (
             <Alert className="mb-4 border-red-200 bg-red-50">
-              <AlertDescription className="text-red-800">
-                {loginError}
-              </AlertDescription>
+              <AlertDescription className="text-red-800">{loginError}</AlertDescription>
             </Alert>
           )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-medium text-gray-700">
@@ -179,7 +183,7 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                 Password
@@ -200,9 +204,9 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
-            
-            <Button 
-              type="submit" 
+
+            <Button
+              type="submit"
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               disabled={isLoading}
             >
@@ -212,7 +216,10 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-gray-600">
           <p>
-            Don't have an account? <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">Sign up</Link>
+            Don't have an account?{' '}
+            <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+              Sign up
+            </Link>
           </p>
         </CardFooter>
       </Card>

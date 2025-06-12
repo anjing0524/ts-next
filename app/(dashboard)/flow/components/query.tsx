@@ -14,7 +14,6 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-
 interface QueryProps {
   options: string[];
   onSearch?: (date: Date | null, selectedOptions: string[] | null) => Promise<FlowStage[] | null>;

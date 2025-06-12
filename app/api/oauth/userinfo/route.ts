@@ -69,10 +69,9 @@ async function handleUserInfo(request: NextRequest, context: AuthContext): Promi
         'Cache-Control': 'no-store', // UserInfo should not be cached
       },
     });
-
   } catch (error) {
     console.error('Error in UserInfo endpoint:', error);
-    
+
     return NextResponse.json(
       {
         error: 'server_error',
@@ -91,4 +90,4 @@ export const GET = withAuth(handleUserInfo, {
 export const POST = withAuth(handleUserInfo, {
   requiredScopes: ['openid'],
   requireUserContext: true,
-}); 
+});

@@ -18,7 +18,6 @@ import { Separator } from '@/components/ui/separator';
 import { TASK_STATE_MAP } from '../cons';
 import { TaskStateDetailType } from '../types/type';
 
-
 interface TaskDetailProps {
   isOpen: boolean;
   onClose: () => void;

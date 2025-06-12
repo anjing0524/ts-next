@@ -3,36 +3,38 @@ import * as crypto from 'crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
 
+import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
 import { addHours, addDays, isPast } from 'date-fns';
 
+import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
 import { withOAuthTokenValidation, OAuthValidationResult } from '@/lib/auth/middleware';
-import { 
-  JWTUtils, 
-  AuthorizationUtils, 
+import {
+  JWTUtils,
+  AuthorizationUtils,
   OAuth2ErrorTypes,
   ScopeUtils,
-  processRefreshTokenGrantLogic // Import the new function
+  processRefreshTokenGrantLogic, // Import the new function
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
-import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
-import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
 
 // PKCE S256 Verification Helper
 function verifyPkceChallenge(verifier: string, challenge: string): boolean {
   if (!verifier || !challenge) {
-    console.debug("PKCE verifyPkceChallenge: called with empty verifier or challenge.");
+    console.debug('PKCE verifyPkceChallenge: called with empty verifier or challenge.');
     return false;
   }
-  const calculatedChallenge = crypto
-    .createHash('sha256')
-    .update(verifier)
-    .digest('base64url'); 
+  const calculatedChallenge = crypto.createHash('sha256').update(verifier).digest('base64url');
 
-  console.debug(`PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`);
+  console.debug(
+    `PKCE verifyPkceChallenge: Verifier: "${verifier}", Stored Challenge: "${challenge}", Calculated Challenge: "${calculatedChallenge}"`
+  );
   return calculatedChallenge === challenge;
 }
 
-async function handleTokenRequest(request: NextRequest, context: OAuthValidationResult['context']): Promise<NextResponse> {
+async function handleTokenRequest(
+  request: NextRequest,
+  context: OAuthValidationResult['context']
+): Promise<NextResponse> {
   const { body, client, ipAddress, userAgent, params } = context!;
   const grant_type = params!.grant_type;
 
@@ -41,26 +43,25 @@ async function handleTokenRequest(request: NextRequest, context: OAuthValidation
     switch (grant_type) {
       case 'authorization_code':
         return await handleAuthorizationCodeGrant(request, body!, client, ipAddress, userAgent);
-      
+
       case 'refresh_token':
         return await handleRefreshTokenGrant(request, body!, client, ipAddress, userAgent);
-      
+
       case 'client_credentials':
         return await handleClientCredentialsGrant(request, body!, client, ipAddress, userAgent);
-      
+
       default:
         return NextResponse.json(
-          { 
+          {
             error: OAuth2ErrorTypes.UNSUPPORTED_GRANT_TYPE,
-            error_description: 'Grant type not implemented' 
+            error_description: 'Grant type not implemented',
           },
           { status: 400 }
         );
     }
-
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     await AuthorizationUtils.logAuditEvent({
       clientId: client.id,
       action: 'token_issuance_error',
@@ -72,11 +73,11 @@ async function handleTokenRequest(request: NextRequest, context: OAuthValidation
     });
 
     console.error('Error during token issuance:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'An unexpected error occurred' 
+        error_description: 'An unexpected error occurred',
       },
       { status: 500 }
     );
@@ -96,9 +97,9 @@ async function handleAuthorizationCodeGrant(
 
   if (!code || !redirect_uri) {
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_REQUEST,
-        error_description: 'Missing required parameters: code, redirect_uri' 
+        error_description: 'Missing required parameters: code, redirect_uri',
       },
       { status: 400 }
     );
@@ -122,9 +123,9 @@ async function handleAuthorizationCodeGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_GRANT,
-        error_description: 'Invalid authorization code' 
+        error_description: 'Invalid authorization code',
       },
       { status: 400 }
     );
@@ -143,9 +144,9 @@ async function handleAuthorizationCodeGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_GRANT,
-        error_description: 'Authorization code has expired' 
+        error_description: 'Authorization code has expired',
       },
       { status: 400 }
     );
@@ -164,9 +165,9 @@ async function handleAuthorizationCodeGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_GRANT,
-        error_description: 'Authorization code was issued to a different client' 
+        error_description: 'Authorization code was issued to a different client',
       },
       { status: 400 }
     );
@@ -186,9 +187,9 @@ async function handleAuthorizationCodeGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_GRANT,
-        error_description: 'Redirect URI does not match' 
+        error_description: 'Redirect URI does not match',
       },
       { status: 400 }
     );
@@ -198,9 +199,9 @@ async function handleAuthorizationCodeGrant(
   if (authCode.codeChallenge) {
     if (!code_verifier) {
       return NextResponse.json(
-        { 
+        {
           error: OAuth2ErrorTypes.INVALID_REQUEST,
-          error_description: 'Code verifier required for PKCE' 
+          error_description: 'Code verifier required for PKCE',
         },
         { status: 400 }
       );
@@ -220,9 +221,9 @@ async function handleAuthorizationCodeGrant(
       });
 
       return NextResponse.json(
-        { 
+        {
           error: OAuth2ErrorTypes.INVALID_GRANT,
-          error_description: 'PKCE verification failed' 
+          error_description: 'PKCE verification failed',
         },
         { status: 400 }
       );
@@ -314,17 +315,16 @@ async function handleAuthorizationCodeGrant(
       response.scope = authCode.scope;
     }
 
-    return NextResponse.json(response, { 
+    return NextResponse.json(response, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
       },
     });
-
   } catch (error: unknown) {
     console.error('Token generation/storage error:', error);
-    
+
     await AuthorizationUtils.logAuditEvent({
       clientId: client.id as string,
       userId: authCode.userId ?? undefined,
@@ -337,9 +337,9 @@ async function handleAuthorizationCodeGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'Token generation failed' 
+        error_description: 'Token generation failed',
       },
       { status: 500 }
     );
@@ -358,9 +358,9 @@ async function handleRefreshTokenGrant(
 
   if (!refreshTokenValue) {
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.INVALID_REQUEST,
-        error_description: 'Missing required parameter: refresh_token' 
+        error_description: 'Missing required parameter: refresh_token',
       },
       { status: 400 }
     );
@@ -391,13 +391,13 @@ async function handleRefreshTokenGrant(
       status: 200,
       headers: {
         'Cache-Control': 'no-store',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
       },
     });
-
-  } catch (error: any) { // Catch as 'any' to inspect its type
+  } catch (error: any) {
+    // Catch as 'any' to inspect its type
     console.error('Refresh token processing error in handleRefreshTokenGrant:', error);
-    
+
     // If the error is an ApiError from processRefreshTokenGrantLogic, use its properties
     if (error instanceof ApiError) {
       // Audit logging for ApiError is already done within processRefreshTokenGrantLogic usually
@@ -406,7 +406,7 @@ async function handleRefreshTokenGrant(
       return NextResponse.json(
         {
           error: error.errorCode || OAuth2ErrorTypes.INVALID_GRANT, // Use errorCode from ApiError if available
-          error_description: error.message
+          error_description: error.message,
         },
         { status: error.statusCode }
       );
@@ -425,9 +425,9 @@ async function handleRefreshTokenGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'Refresh token processing failed due to an internal error.'
+        error_description: 'Refresh token processing failed due to an internal error.',
       },
       { status: 500 }
     );
@@ -451,8 +451,8 @@ async function handleClientCredentialsGrant(
     const finalScope = scope;
     if (scope) {
       const requestedScopes = ScopeUtils.parseScopes(scope);
-      const clientScopes = ScopeUtils.parseScopes(client.scope as string || '');
-      
+      const clientScopes = ScopeUtils.parseScopes((client.scope as string) || '');
+
       const scopeValidation = ScopeUtils.validateScopes(requestedScopes, clientScopes);
       if (!scopeValidation.valid) {
         await AuthorizationUtils.logAuditEvent({
@@ -466,9 +466,9 @@ async function handleClientCredentialsGrant(
         });
 
         return NextResponse.json(
-          { 
+          {
             error: OAuth2ErrorTypes.INVALID_SCOPE,
-            error_description: 'Requested scope is invalid or exceeds client allowed scope' 
+            error_description: 'Requested scope is invalid or exceeds client allowed scope',
           },
           { status: 400 }
         );
@@ -522,17 +522,16 @@ async function handleClientCredentialsGrant(
       response.scope = finalScope;
     }
 
-    return NextResponse.json(response, { 
+    return NextResponse.json(response, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
       },
     });
-
   } catch (error: unknown) {
     console.error('Client credentials token generation error:', error);
-    
+
     await AuthorizationUtils.logAuditEvent({
       clientId: client.id as string,
       action: 'client_credentials_error',
@@ -544,9 +543,9 @@ async function handleClientCredentialsGrant(
     });
 
     return NextResponse.json(
-      { 
+      {
         error: OAuth2ErrorTypes.SERVER_ERROR,
-        error_description: 'Client credentials token generation failed' 
+        error_description: 'Client credentials token generation failed',
       },
       { status: 500 }
     );

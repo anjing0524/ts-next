@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 
 import { User, Client, Scope } from '@prisma/client';
+import { Client as OAuthClientPrismaType } from '@prisma/client'; // Added this import
+import { addHours, addDays } from 'date-fns'; // For token expiry
 import * as jose from 'jose';
 
 import { prisma } from '@/lib/prisma';
@@ -10,7 +12,6 @@ import { PermissionService } from '@/lib/services/permissionService'; // Import 
 
 // Instantiate the service
 const permissionService = new PermissionService();
-
 
 // OAuth 2.0 Error Types
 export interface OAuth2Error {
@@ -43,7 +44,11 @@ export class PKCEUtils {
     return crypto.createHash('sha256').update(verifier).digest('base64url');
   }
 
-  static verifyCodeChallenge(verifier: string, challenge: string, method: string = 'S256'): boolean {
+  static verifyCodeChallenge(
+    verifier: string,
+    challenge: string,
+    method: string = 'S256'
+  ): boolean {
     if (method !== 'S256') {
       return false;
     }
@@ -66,35 +71,43 @@ export class PKCEUtils {
 export class ScopeUtils {
   static parseScopes(scopeString?: string): string[] {
     if (!scopeString) return [];
-    return scopeString.split(' ').filter(s => s.length > 0);
+    return scopeString.split(' ').filter((s) => s.length > 0);
   }
 
   static formatScopes(scopes: string[]): string {
     return scopes.join(' ');
   }
 
-  static async validateScopes(scopes: string[], client: Client): Promise<{ valid: boolean; invalidScopes: string[] }>;
-  static validateScopes(requestedScopes: string[], allowedScopes: string[]): { valid: boolean; invalidScopes: string[] };
+  static async validateScopes(
+    scopes: string[],
+    client: Client
+  ): Promise<{ valid: boolean; invalidScopes: string[] }>;
   static validateScopes(
-    scopes: string[], 
+    requestedScopes: string[],
+    allowedScopes: string[]
+  ): { valid: boolean; invalidScopes: string[] };
+  static validateScopes(
+    scopes: string[],
     clientOrAllowedScopes: Client | string[]
-  ): Promise<{ valid: boolean; invalidScopes: string[] }> | { valid: boolean; invalidScopes: string[] } {
+  ):
+    | Promise<{ valid: boolean; invalidScopes: string[] }>
+    | { valid: boolean; invalidScopes: string[] } {
     if (scopes.length === 0) {
       return { valid: true, invalidScopes: [] };
     }
 
     // If second parameter is a string array, it's the simple validation (used by client_credentials)
     if (Array.isArray(clientOrAllowedScopes)) {
-      const invalidScopes = scopes.filter(scope => !clientOrAllowedScopes.includes(scope));
+      const invalidScopes = scopes.filter((scope) => !clientOrAllowedScopes.includes(scope));
       return {
         valid: invalidScopes.length === 0,
-        invalidScopes
+        invalidScopes,
       };
     }
 
     // Otherwise, it's a Client object and we need async validation (used by /authorize)
     const client = clientOrAllowedScopes as Client; // Type assertion
-    
+
     // Return a Promise for the async case
     return (async () => {
       // Step 1: Check against client.allowedScopes
@@ -104,18 +117,20 @@ export class ScopeUtils {
           clientAllowedScopes = JSON.parse(client.allowedScopes as string);
           if (!Array.isArray(clientAllowedScopes)) clientAllowedScopes = [];
         } catch (e) {
-          console.error("Failed to parse client.allowedScopes for client ID:", client.id, e);
+          console.error('Failed to parse client.allowedScopes for client ID:', client.id, e);
           // If allowedScopes is malformed, treat as if no scopes are allowed for safety.
           clientAllowedScopes = [];
         }
       }
 
-      const invalidAgainstClientAllowed = scopes.filter(scope => !clientAllowedScopes.includes(scope));
+      const invalidAgainstClientAllowed = scopes.filter(
+        (scope) => !clientAllowedScopes.includes(scope)
+      );
       if (invalidAgainstClientAllowed.length > 0) {
         return {
           valid: false,
           invalidScopes: invalidAgainstClientAllowed,
-          error_description: `Requested scope(s) not allowed for this client: ${invalidAgainstClientAllowed.join(', ')}`
+          error_description: `Requested scope(s) not allowed for this client: ${invalidAgainstClientAllowed.join(', ')}`,
         };
       }
 
@@ -126,25 +141,29 @@ export class ScopeUtils {
           isActive: true,
         },
       });
-      const validScopeNamesFromDb = validDbScopes.map(s => s.name);
-      const invalidOrInactiveScopes = scopes.filter(scope => !validScopeNamesFromDb.includes(scope));
+      const validScopeNamesFromDb = validDbScopes.map((s) => s.name);
+      const invalidOrInactiveScopes = scopes.filter(
+        (scope) => !validScopeNamesFromDb.includes(scope)
+      );
 
       if (invalidOrInactiveScopes.length > 0) {
         return {
           valid: false,
           invalidScopes: invalidOrInactiveScopes,
-          error_description: `Requested scope(s) are invalid or inactive: ${invalidOrInactiveScopes.join(', ')}`
+          error_description: `Requested scope(s) are invalid or inactive: ${invalidOrInactiveScopes.join(', ')}`,
         };
       }
 
       // Step 3: For public clients, ensure all requested (and now validated) scopes are also public
       if (client.isPublic) {
-        const nonPublicScopes = validDbScopes.filter(dbScope => !dbScope.isPublic).map(s => s.name);
+        const nonPublicScopes = validDbScopes
+          .filter((dbScope) => !dbScope.isPublic)
+          .map((s) => s.name);
         if (nonPublicScopes.length > 0) {
           return {
             valid: false,
             invalidScopes: nonPublicScopes,
-            error_description: `Public client requested non-public scope(s): ${nonPublicScopes.join(', ')}`
+            error_description: `Public client requested non-public scope(s): ${nonPublicScopes.join(', ')}`,
           };
         }
       }
@@ -158,11 +177,11 @@ export class ScopeUtils {
   }
 
   static hasAnyScope(userScopes: string[], requiredScopes: string[]): boolean {
-    return requiredScopes.some(scope => userScopes.includes(scope));
+    return requiredScopes.some((scope) => userScopes.includes(scope));
   }
 
   static hasAllScopes(userScopes: string[], requiredScopes: string[]): boolean {
-    return requiredScopes.every(scope => userScopes.includes(scope));
+    return requiredScopes.every((scope) => userScopes.includes(scope));
   }
 }
 
@@ -187,7 +206,8 @@ export class JWTUtils {
     const algorithm = process.env.JWT_ALGORITHM || 'RS256'; // Read algorithm
 
     if (!pem) {
-      const errorMessage = 'JWT_PRIVATE_KEY_PEM is not set. Please configure it via environment variables.';
+      const errorMessage =
+        'JWT_PRIVATE_KEY_PEM is not set. Please configure it via environment variables.';
       if (process.env.NODE_ENV === 'production') {
         console.error(`${errorMessage} (Production)`);
         throw new Error(errorMessage);
@@ -198,8 +218,8 @@ export class JWTUtils {
     try {
       return await jose.importPKCS8(pem, algorithm as string); // Use algorithm
     } catch (error) {
-      console.error("Failed to import RSA private key (PKCS8):", error);
-      throw new Error("Invalid RSA private key (JWT_PRIVATE_KEY_PEM) format or configuration.");
+      console.error('Failed to import RSA private key (PKCS8):', error);
+      throw new Error('Invalid RSA private key (JWT_PRIVATE_KEY_PEM) format or configuration.');
     }
   }
 
@@ -210,7 +230,8 @@ export class JWTUtils {
     const algorithm = process.env.JWT_ALGORITHM || 'RS256'; // Read algorithm
 
     if (!pem) {
-      const errorMessage = 'JWT_PUBLIC_KEY_PEM is not set. Please configure it via environment variables.';
+      const errorMessage =
+        'JWT_PUBLIC_KEY_PEM is not set. Please configure it via environment variables.';
       if (process.env.NODE_ENV === 'production') {
         console.error(`${errorMessage} (Production)`);
         throw new Error(errorMessage);
@@ -222,13 +243,18 @@ export class JWTUtils {
       // 尝试以SPKI格式导入，这是常见的公钥PEM格式
       return await jose.importSPKI(pem, algorithm as string); // Use algorithm
     } catch (spkiError) {
-      console.warn("Failed to import RSA public key as SPKI, trying as X.509 certificate...", spkiError);
+      console.warn(
+        'Failed to import RSA public key as SPKI, trying as X.509 certificate...',
+        spkiError
+      );
       try {
         // 如果SPKI失败，尝试作为X.509证书导入
         return await jose.importX509(pem, algorithm as string); // Use algorithm
       } catch (x509Error) {
-        console.error("Failed to import RSA public key (SPKI or X.509):", x509Error);
-        throw new Error("Invalid RSA public key (JWT_PUBLIC_KEY_PEM) format or configuration. Supported formats: SPKI PEM, X.509 PEM.");
+        console.error('Failed to import RSA public key (SPKI or X.509):', x509Error);
+        throw new Error(
+          'Invalid RSA public key (JWT_PUBLIC_KEY_PEM) format or configuration. Supported formats: SPKI PEM, X.509 PEM.'
+        );
       }
     }
   }
@@ -284,7 +310,9 @@ export class JWTUtils {
     };
 
     // 移除 undefined 的声明，确保载荷干净 (Remove undefined claims for a clean payload)
-    Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach(
+      (key) => jwtPayload[key] === undefined && delete jwtPayload[key]
+    );
 
     return await new jose.SignJWT(jwtPayload)
       .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
@@ -314,13 +342,16 @@ export class JWTUtils {
       return { valid: true, payload };
     } catch (error) {
       let errorMessage = 'Token verification failed';
-      console.error("Access Token Verification Error:", error); // 服务端日志 (Server-side log)
-      
+      console.error('Access Token Verification Error:', error); // 服务端日志 (Server-side log)
+
       if (error instanceof jose.errors.JWTExpired) {
         errorMessage = 'Token has expired';
       } else if (error instanceof jose.errors.JWTClaimValidationFailed) {
         errorMessage = `Token claim validation failed: ${error.claim} ${error.reason}`;
-      } else if (error instanceof jose.errors.JWSInvalid || error instanceof jose.errors.JWSSignatureVerificationFailed) {
+      } else if (
+        error instanceof jose.errors.JWSInvalid ||
+        error instanceof jose.errors.JWSSignatureVerificationFailed
+      ) {
         errorMessage = 'Invalid token or signature';
       }
 
@@ -347,7 +378,9 @@ export class JWTUtils {
       scope: payload.scope,
       token_type: 'refresh', // 明确此为刷新令牌 (Clearly indicate this is a refresh token)
     };
-    Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach(
+      (key) => jwtPayload[key] === undefined && delete jwtPayload[key]
+    );
 
     return await new jose.SignJWT(jwtPayload)
       .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
@@ -371,20 +404,23 @@ export class JWTUtils {
 
       // 检查这是否确实是一个刷新令牌 (Check if this is actually a refresh token)
       if (payload.token_type !== 'refresh') {
-        console.warn("Invalid token type for refresh token verification:", payload.token_type); // 服务端日志 (Server-side log)
+        console.warn('Invalid token type for refresh token verification:', payload.token_type); // 服务端日志 (Server-side log)
         return { valid: false, error: 'Invalid token type: expected refresh token' };
       }
 
       return { valid: true, payload };
     } catch (error) {
       let errorMessage = 'Refresh token verification failed';
-      console.error("Refresh Token Verification Error:", error); // 服务端日志 (Server-side log)
-      
+      console.error('Refresh Token Verification Error:', error); // 服务端日志 (Server-side log)
+
       if (error instanceof jose.errors.JWTExpired) {
         errorMessage = 'Refresh token has expired';
       } else if (error instanceof jose.errors.JWTClaimValidationFailed) {
         errorMessage = `Refresh token claim validation failed: ${error.claim} ${error.reason}`;
-      } else if (error instanceof jose.errors.JWSInvalid || error instanceof jose.errors.JWSSignatureVerificationFailed) {
+      } else if (
+        error instanceof jose.errors.JWSInvalid ||
+        error instanceof jose.errors.JWSSignatureVerificationFailed
+      ) {
         errorMessage = 'Invalid refresh token or signature';
       }
       return { valid: false, error: errorMessage };
@@ -400,7 +436,7 @@ export class JWTUtils {
       iss: this.getIssuer(), // 签发者 (Issuer)
       sub: user.id, // 用户ID作为主题 (User ID as subject)
       aud: client.clientId, // 客户端ID作为受众 (Client ID as audience)
-      exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1小时过期 (1 hour expiration)
+      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1小时过期 (1 hour expiration)
       iat: Math.floor(Date.now() / 1000), // 签发时间 (Issued at)
       jti: crypto.randomUUID(), // JWT ID
 
@@ -417,7 +453,9 @@ export class JWTUtils {
     };
 
     // 移除所有值为 undefined 的声明 (Remove all claims with undefined value)
-    Object.keys(jwtPayload).forEach(key => jwtPayload[key] === undefined && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach(
+      (key) => jwtPayload[key] === undefined && delete jwtPayload[key]
+    );
 
     return await new jose.SignJWT(jwtPayload)
       .setProtectedHeader({ alg: algorithm, kid: keyId }) // Use algorithm and kid
@@ -427,7 +465,10 @@ export class JWTUtils {
 
 // Client authentication utilities
 export class ClientAuthUtils {
-  static async authenticateClient(request: NextRequest, body: FormData): Promise<{
+  static async authenticateClient(
+    request: NextRequest,
+    body: FormData
+  ): Promise<{
     client: Client | null;
     error?: OAuth2Error;
   }> {
@@ -443,7 +484,7 @@ export class ClientAuthUtils {
         const base64Credentials = authHeader.slice(6); // Remove 'Basic '
         const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
         const [basicClientId, basicClientSecret] = credentials.split(':');
-        
+
         if (basicClientId && basicClientSecret) {
           // Use Basic auth credentials, but allow form data to override if present
           client_id = client_id || basicClientId;
@@ -461,7 +502,10 @@ export class ClientAuthUtils {
     }
 
     // JWT Client Authentication (private_key_jwt)
-    if (client_assertion_type === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' && client_assertion) {
+    if (
+      client_assertion_type === 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
+      client_assertion
+    ) {
       return await this.authenticateWithJWT(client_assertion, request);
     }
 
@@ -508,7 +552,10 @@ export class ClientAuthUtils {
     };
   }
 
-  private static async authenticateWithSecret(clientId: string, clientSecret: string): Promise<{
+  private static async authenticateWithSecret(
+    clientId: string,
+    clientSecret: string
+  ): Promise<{
     client: Client | null;
     error?: OAuth2Error;
   }> {
@@ -551,7 +598,7 @@ export class ClientAuthUtils {
     try {
       const bcrypt = await import('bcrypt');
       const isValidSecret = await bcrypt.compare(clientSecret, client.clientSecret);
-      
+
       if (!isValidSecret) {
         return {
           client: null,
@@ -586,13 +633,16 @@ export class ClientAuthUtils {
     return { client };
   }
 
-  private static async authenticateWithJWT(assertion: string, request: NextRequest): Promise<{
+  private static async authenticateWithJWT(
+    assertion: string,
+    request: NextRequest
+  ): Promise<{
     client: Client | null;
     error?: OAuth2Error;
   }> {
     try {
       const decodedJwt = jose.decodeJwt(assertion);
-      
+
       if (!decodedJwt.iss || !decodedJwt.sub || decodedJwt.iss !== decodedJwt.sub) {
         return {
           client: null,
@@ -697,7 +747,7 @@ export class AuthorizationUtils {
       if (event.userId) {
         const userExists = await prisma.user.findUnique({
           where: { id: event.userId },
-          select: { id: true }
+          select: { id: true },
         });
         validUserId = userExists ? event.userId : null;
       }
@@ -707,7 +757,7 @@ export class AuthorizationUtils {
       if (event.clientId) {
         const clientExists = await prisma.client.findUnique({
           where: { id: event.clientId },
-          select: { id: true }
+          select: { id: true },
         });
         validClientId = clientExists ? event.clientId : null;
       }
@@ -743,8 +793,6 @@ export class AuthorizationUtils {
   }
 }
 
-import { Client as OAuthClientPrismaType } from '@prisma/client'; // Added this import
-import { addHours, addDays } from 'date-fns'; // For token expiry
 import { ApiError } from '../api/errorHandler'; // Corrected import path for ApiError
 
 // Rate limiting utilities
@@ -757,12 +805,14 @@ export class RateLimitUtils {
     windowMs: number = 60000 // 1 minute
   ): boolean {
     // Bypass rate limiting in test environment or for test IPs
-    if (process.env.NODE_ENV === 'test' || 
-        process.env.DISABLE_RATE_LIMITING === 'true' ||
-        key.startsWith('test-') ||
-        key.includes('192.168.') || 
-        key.includes('127.0.0.1') ||
-        key === 'unknown') {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.DISABLE_RATE_LIMITING === 'true' ||
+      key.startsWith('test-') ||
+      key.includes('192.168.') ||
+      key.includes('127.0.0.1') ||
+      key === 'unknown'
+    ) {
       return false;
     }
 
@@ -784,18 +834,17 @@ export class RateLimitUtils {
 
   static getRateLimitKey(request: NextRequest, type: 'client' | 'ip' = 'ip'): string {
     if (type === 'ip') {
-      const ip = request.headers.get('x-forwarded-for') || 
-                 request.headers.get('x-real-ip') || 
-                 'unknown';
-      
+      const ip =
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+
       // Add test prefix for test requests
       if (process.env.NODE_ENV === 'test') {
         return `test-${ip}`;
       }
-      
+
       return ip;
     }
-    
+
     // For client-based rate limiting, you'd extract client_id from the request
     return 'client-rate-limit';
   }
@@ -840,11 +889,18 @@ export async function processRefreshTokenGrantLogic(
       errorMessage: verification.error || 'Refresh token verification failed (structure/signature)',
       metadata: { grantType: 'refresh_token' },
     });
-    throw new ApiError(400, verification.error || 'Invalid refresh token', OAuth2ErrorTypes.INVALID_GRANT);
+    throw new ApiError(
+      400,
+      verification.error || 'Invalid refresh token',
+      OAuth2ErrorTypes.INVALID_GRANT
+    );
   }
 
   // Check if refresh token exists in database and is not revoked
-  const refreshTokenHashVerify = crypto.createHash('sha256').update(refreshTokenValue).digest('hex');
+  const refreshTokenHashVerify = crypto
+    .createHash('sha256')
+    .update(refreshTokenValue)
+    .digest('hex');
   const storedRefreshToken = await prisma.refreshToken.findFirst({
     where: {
       tokenHash: refreshTokenHashVerify,
@@ -867,13 +923,17 @@ export async function processRefreshTokenGrantLogic(
       errorMessage: 'Refresh token not found, revoked, expired, or client mismatch',
       metadata: { grantType: 'refresh_token' },
     });
-    throw new ApiError(400, 'Refresh token has been revoked, is invalid, or expired', OAuth2ErrorTypes.INVALID_GRANT);
+    throw new ApiError(
+      400,
+      'Refresh token has been revoked, is invalid, or expired',
+      OAuth2ErrorTypes.INVALID_GRANT
+    );
   }
 
   // Client validation against token's client_id (already implicitly done by DB query with clientId)
   // Redundant check, but good for clarity if query changes:
   if (storedRefreshToken.clientId !== client.id) {
-      // This case should ideally not be reached if the DB query includes clientId
+    // This case should ideally not be reached if the DB query includes clientId
     await AuthorizationUtils.logAuditEvent({
       clientId: client.id,
       action: 'refresh_token_client_mismatch_logic',
@@ -882,9 +942,17 @@ export async function processRefreshTokenGrantLogic(
       userAgent,
       success: false,
       errorMessage: 'Refresh token was issued to a different client (logic check)',
-      metadata: { grantType: 'refresh_token', tokenClientId: storedRefreshToken.clientId, currentClientId: client.id },
+      metadata: {
+        grantType: 'refresh_token',
+        tokenClientId: storedRefreshToken.clientId,
+        currentClientId: client.id,
+      },
     });
-    throw new ApiError(400, 'Refresh token was issued to a different client', OAuth2ErrorTypes.INVALID_GRANT);
+    throw new ApiError(
+      400,
+      'Refresh token was issued to a different client',
+      OAuth2ErrorTypes.INVALID_GRANT
+    );
   }
 
   // Handle scope parameter for refresh token
@@ -905,9 +973,17 @@ export async function processRefreshTokenGrantLogic(
         userAgent,
         success: false,
         errorMessage: `Requested scope is invalid or exceeds originally granted scope. Invalid: ${scopeValidation.invalidScopes.join(', ')}`,
-        metadata: { grantType: 'refresh_token', requestedScope, originalScope: storedRefreshToken.scope },
+        metadata: {
+          grantType: 'refresh_token',
+          requestedScope,
+          originalScope: storedRefreshToken.scope,
+        },
       });
-      throw new ApiError(400, 'Requested scope is invalid or exceeds originally granted scope', OAuth2ErrorTypes.INVALID_SCOPE);
+      throw new ApiError(
+        400,
+        'Requested scope is invalid or exceeds originally granted scope',
+        OAuth2ErrorTypes.INVALID_SCOPE
+      );
     }
     finalGrantedScope = requestedScope; // If valid, the new token gets the (potentially narrowed) requested scope
   }
@@ -948,7 +1024,10 @@ export async function processRefreshTokenGrantLogic(
     scope: finalGrantedScope, // New refresh token should also carry the potentially narrowed scope
     // exp: '30d' // Default in JWTUtils.createRefreshToken
   });
-  const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshTokenValue).digest('hex');
+  const newRefreshTokenHash = crypto
+    .createHash('sha256')
+    .update(newRefreshTokenValue)
+    .digest('hex');
 
   // Revoke old refresh token
   await prisma.refreshToken.update({
@@ -982,8 +1061,8 @@ export async function processRefreshTokenGrantLogic(
     metadata: {
       grantType: 'refresh_token',
       scope: finalGrantedScope,
-      newAccessTokenId: newAccessTokenHash.substring(0,10), // Example: log part of hash
-      newRefreshTokenId: newRefreshTokenHash.substring(0,10),
+      newAccessTokenId: newAccessTokenHash.substring(0, 10), // Example: log part of hash
+      newRefreshTokenId: newRefreshTokenHash.substring(0, 10),
     },
   });
 

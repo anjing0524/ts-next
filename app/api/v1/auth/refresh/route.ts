@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { successResponse } from '@/lib/api/apiResponse';
-import { processRefreshTokenGrantLogic, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // Assuming it's placed here
+
 import { Client as OAuthClientPrismaType } from '@prisma/client'; // Import Prisma type
+
+import { successResponse } from '@/lib/api/apiResponse';
+import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
+import { withOAuthTokenValidation, OAuthValidationContext } from '@/lib/auth/middleware';
+import { processRefreshTokenGrantLogic, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // Assuming it's placed here
 
 // Attempt to reuse the middleware from the existing /oauth/token endpoint
 // This middleware is expected to handle client authentication (e.g., Basic Auth, client_secret_post)
 // and provide 'client', 'ipAddress', 'userAgent', 'body', 'params' in the context.
-import { withOAuthTokenValidation, OAuthValidationContext } from '@/lib/auth/middleware';
 
 // Define the expected context structure after client authentication by the middleware
 interface RefreshAuthContext extends OAuthValidationContext {
@@ -29,8 +31,12 @@ async function refreshTokenHandler(request: NextRequest, context: RefreshAuthCon
   // If not, we might need to parse it here: const body = await request.formData();
   const body = context.body;
   if (!(body instanceof FormData)) {
-      console.error('Request body is not FormData as expected from withOAuthTokenValidation.');
-      throw new ApiError(400, 'Invalid request format. Expected application/x-www-form-urlencoded.', OAuth2ErrorTypes.INVALID_REQUEST);
+    console.error('Request body is not FormData as expected from withOAuthTokenValidation.');
+    throw new ApiError(
+      400,
+      'Invalid request format. Expected application/x-www-form-urlencoded.',
+      OAuth2ErrorTypes.INVALID_REQUEST
+    );
   }
 
   const refreshTokenValue = body.get('refresh_token') as string | undefined;
@@ -50,7 +56,10 @@ async function refreshTokenHandler(request: NextRequest, context: RefreshAuthCon
     context.userAgent
   );
 
-  return NextResponse.json(successResponse(tokenResponse, 200, 'Token refreshed successfully.', requestId), { status: 200 });
+  return NextResponse.json(
+    successResponse(tokenResponse, 200, 'Token refreshed successfully.', requestId),
+    { status: 200 }
+  );
 }
 
 // Wrap with withErrorHandler first (outermost)

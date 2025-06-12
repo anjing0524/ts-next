@@ -7,15 +7,18 @@ import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { generateSecurePassword, SALT_ROUNDS } from '@/lib/auth/passwordUtils';
 import { prisma } from '@/lib/prisma';
 
-
 interface RouteParams {
   params: {
     userId: string;
-  }
+  };
 }
 
 // POST /api/admin/users/{userId}/reset-password
-async function handleAdminResetPassword(request: NextRequest, authContext: AuthContext, routeParams: RouteParams) {
+async function handleAdminResetPassword(
+  request: NextRequest,
+  authContext: AuthContext,
+  routeParams: RouteParams
+) {
   const { userId: targetUserId } = routeParams.params;
   const adminUserId = authContext.user_id; // User performing the action
   const ipAddress = request.headers.get('x-forwarded-for') || undefined;
@@ -32,9 +35,11 @@ async function handleAdminResetPassword(request: NextRequest, authContext: AuthC
         userId: adminUserId,
         action: 'admin_password_reset_user_not_found',
         resource: `admin/users/${targetUserId}/reset-password`,
-        ipAddress, userAgent, success: false,
+        ipAddress,
+        userAgent,
+        success: false,
         errorMessage: 'Target user for password reset not found.',
-        metadata: { targetUserId }
+        metadata: { targetUserId },
       });
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -69,24 +74,30 @@ async function handleAdminResetPassword(request: NextRequest, authContext: AuthC
       userId: adminUserId,
       action: 'admin_password_reset_success',
       resource: `admin/users/${targetUserId}/reset-password`,
-      ipAddress, userAgent, success: true,
+      ipAddress,
+      userAgent,
+      success: true,
       metadata: { targetUserId, adminUserId },
     });
 
     // Response
     return NextResponse.json({ newTemporaryPassword: newTemporaryPassword });
-
   } catch (error) {
     console.error(`Error during admin password reset for user ${targetUserId}:`, error);
     await AuthorizationUtils.logAuditEvent({
       userId: adminUserId,
       action: 'admin_password_reset_error',
       resource: `admin/users/${targetUserId}/reset-password`,
-      ipAddress, userAgent, success: false,
+      ipAddress,
+      userAgent,
+      success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown server error.',
       metadata: { targetUserId },
     });
-    return NextResponse.json({ error: 'Failed to reset user password due to a server error.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to reset user password due to a server error.' },
+      { status: 500 }
+    );
   }
 }
 

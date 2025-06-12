@@ -36,16 +36,18 @@ describe('ScopeUtils.validateScopes', () => {
     // Get the mocked prisma instance and set up its specific method implementations
     const mockedPrisma = vi.mocked(prisma, true); // true for deep mock
 
-    mockedPrisma.scope.findMany.mockImplementation(async (args?: { where?: { name?: { in?: string[] }, isActive?: boolean } }) => {
-      let result = [...allGlobalScopes];
-      if (args?.where?.name?.in) {
-        result = result.filter(scope => args.where!.name!.in!.includes(scope.name));
+    mockedPrisma.scope.findMany.mockImplementation(
+      async (args?: { where?: { name?: { in?: string[] }; isActive?: boolean } }) => {
+        let result = [...allGlobalScopes];
+        if (args?.where?.name?.in) {
+          result = result.filter((scope) => args.where!.name!.in!.includes(scope.name));
+        }
+        if (args?.where?.isActive !== undefined) {
+          result = result.filter((scope) => scope.isActive === args.where!.isActive);
+        }
+        return result; // Prisma findMany returns a Promise
       }
-      if (args?.where?.isActive !== undefined) {
-        result = result.filter(scope => scope.isActive === args.where!.isActive);
-      }
-      return result; // Prisma findMany returns a Promise
-    });
+    );
 
     // Mock $connect and $disconnect if they are called by setup/teardown
     mockedPrisma.$connect.mockResolvedValue(undefined as any);
@@ -53,10 +55,7 @@ describe('ScopeUtils.validateScopes', () => {
   });
 
   // Helper to create a mock Client object
-  const createMockClient = (
-    allowedScopes: string[] | null,
-    isPublic: boolean = false
-  ): Client => ({
+  const createMockClient = (allowedScopes: string[] | null, isPublic: boolean = false): Client => ({
     id: 'test-client-id',
     clientId: 'test-client',
     clientSecret: 'secret',
@@ -82,7 +81,7 @@ describe('ScopeUtils.validateScopes', () => {
 
   // Helper to create mock global Scope records
   const createMockGlobalScopes = (scopes: Partial<Scope>[]): Scope[] => {
-    return scopes.map(s => ({
+    return scopes.map((s) => ({
       id: `scope-${s.name}`,
       name: s.name!,
       description: s.description || null,
@@ -136,7 +135,7 @@ describe('ScopeUtils.validateScopes', () => {
 
     test('should handle malformed client.allowedScopes JSON gracefully (treat as no scopes allowed)', async () => {
       const client = createMockClient(null, false); // Base client
-      client.allowedScopes = "this is not json"; // Override with malformed JSON
+      client.allowedScopes = 'this is not json'; // Override with malformed JSON
 
       const result = await ScopeUtils.validateScopes(['profile'], client);
       expect(result.valid).toBe(false);

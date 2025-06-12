@@ -35,7 +35,10 @@ async function getRolePermissions(
     // 校验路径参数 roleId
     const paramsValidation = RolePermissionParamsSchema.safeParse(params);
     if (!paramsValidation.success) {
-      return NextResponse.json({ error: 'Invalid role ID format', details: paramsValidation.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid role ID format', details: paramsValidation.error.flatten() },
+        { status: 400 }
+      );
     }
     const { roleId } = paramsValidation.data;
 
@@ -61,7 +64,7 @@ async function getRolePermissions(
     }
 
     // 提取权限 ID 列表 (或完整的权限对象列表)
-    const permissionIds = role.rolePermissions.map(rp => rp.permissionId);
+    const permissionIds = role.rolePermissions.map((rp) => rp.permissionId);
     // const permissions = role.rolePermissions.map(rp => rp.permission); // Если включили детали разрешения
 
     // 记录审计日志 (可选，一般读操作不强制审计，除非有特殊需求)
@@ -77,7 +80,8 @@ async function getRolePermissions(
       action: 'role_permissions_fetch_failed_exception',
       resource: `role:${params.roleId}/permissions`,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while fetching role permissions',
+      errorMessage:
+        error instanceof Error ? error.message : 'Unknown error while fetching role permissions',
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
@@ -95,7 +99,10 @@ async function assignPermissionsToRole(
     // 1. 校验路径参数 roleId
     const paramsValidation = RolePermissionParamsSchema.safeParse(params);
     if (!paramsValidation.success) {
-      return NextResponse.json({ error: 'Invalid role ID format', details: paramsValidation.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid role ID format', details: paramsValidation.error.flatten() },
+        { status: 400 }
+      );
     }
     const { roleId } = paramsValidation.data;
 
@@ -103,7 +110,10 @@ async function assignPermissionsToRole(
     const body = await request.json();
     const bodyValidation = ManageRolePermissionsSchema.safeParse(body);
     if (!bodyValidation.success) {
-      return NextResponse.json({ error: 'Validation failed for request body', details: bodyValidation.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Validation failed for request body', details: bodyValidation.error.flatten() },
+        { status: 400 }
+      );
     }
     const { permissionIds } = bodyValidation.data;
 
@@ -123,23 +133,26 @@ async function assignPermissionsToRole(
       if (validPermissionsCount !== permissionIds.length) {
         // 找出无效的 Permission ID (用于更详细的错误信息)
         const validPermissions = await prisma.permission.findMany({
-            where: { id: { in: permissionIds } },
-            select: { id: true }
+          where: { id: { in: permissionIds } },
+          select: { id: true },
         });
-        const validPermissionIdSet = new Set(validPermissions.map(p => p.id));
-        const invalidPermissionIds = permissionIds.filter(id => !validPermissionIdSet.has(id));
+        const validPermissionIdSet = new Set(validPermissions.map((p) => p.id));
+        const invalidPermissionIds = permissionIds.filter((id) => !validPermissionIdSet.has(id));
 
         await AuthorizationUtils.logAuditEvent({
-            userId: authContext.user_id,
-            action: 'role_permissions_assign_failed_invalid_permissions',
-            resource: `role:${roleId}/permissions`,
-            success: false,
-            errorMessage: 'One or more provided permission IDs are invalid.',
-            metadata: { invalidPermissionIds },
-            ipAddress: request.ip || request.headers.get('x-forwarded-for'),
-            userAgent: request.headers.get('user-agent'),
+          userId: authContext.user_id,
+          action: 'role_permissions_assign_failed_invalid_permissions',
+          resource: `role:${roleId}/permissions`,
+          success: false,
+          errorMessage: 'One or more provided permission IDs are invalid.',
+          metadata: { invalidPermissionIds },
+          ipAddress: request.ip || request.headers.get('x-forwarded-for'),
+          userAgent: request.headers.get('user-agent'),
         });
-        return NextResponse.json({ error: 'One or more provided permission IDs are invalid.', invalidPermissionIds }, { status: 400 });
+        return NextResponse.json(
+          { error: 'One or more provided permission IDs are invalid.', invalidPermissionIds },
+          { status: 400 }
+        );
       }
     }
 
@@ -169,15 +182,21 @@ async function assignPermissionsToRole(
       action: 'role_permissions_assigned',
       resource: `role:${roleId}/permissions`,
       success: true,
-      metadata: { roleName: role.name, assignedPermissionIds: permissionIds, count: permissionIds.length },
+      metadata: {
+        roleName: role.name,
+        assignedPermissionIds: permissionIds,
+        count: permissionIds.length,
+      },
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
 
     // 返回成功响应，可以是被更新后的权限列表或简单的成功消息
     // 为了与 GET 请求保持一致，可以返回新分配的权限 ID 列表
-    return NextResponse.json({ message: 'Permissions assigned successfully.', permissionIds }, { status: 200 });
-
+    return NextResponse.json(
+      { message: 'Permissions assigned successfully.', permissionIds },
+      { status: 200 }
+    );
   } catch (error) {
     console.error(`Error assigning permissions to role ${params.roleId}:`, error);
     // 确保在异常情况下记录审计日志
@@ -187,7 +206,8 @@ async function assignPermissionsToRole(
       action: 'role_permissions_assign_failed_exception',
       resource: `role:${params.roleId}/permissions`,
       success: false,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error while assigning role permissions',
+      errorMessage:
+        error instanceof Error ? error.message : 'Unknown error while assigning role permissions',
       ipAddress: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent'),
     });
@@ -198,7 +218,9 @@ async function assignPermissionsToRole(
 // 应用认证中间件。用户需要 'system:role:manage' 权限 (示例，具体权限标识符应更新为新格式)
 // 注意: 这里的 'system:role:manage' 权限标识符可能需要根据新的权限命名规范进行调整
 export const GET = withAuth(getRolePermissions, { requiredPermissions: ['system:role:manage'] }); // 或更细粒度的读取权限
-export const POST = withAuth(assignPermissionsToRole, { requiredPermissions: ['system:role:manage'] });
+export const POST = withAuth(assignPermissionsToRole, {
+  requiredPermissions: ['system:role:manage'],
+});
 
 // PUT /api/roles/{roleId}/permissions - 通常用于完全替换资源，POST 已实现此逻辑。
 // 如果需要明确区分 PUT 和 POST，PUT 也可以实现与 POST 相同的“替换全部”逻辑。

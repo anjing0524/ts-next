@@ -15,17 +15,20 @@ import logger from '@/utils/logger';
 const ClientRegisterSchema = z.object({
   name: z.string().min(1).max(255, 'Client name must be between 1 and 255 characters'),
   description: z.string().max(500, 'Description must be less than 500 characters').optional(),
-  redirectUris: z.array(z.string().url('Each redirect URI must be a valid URL')).min(1, 'At least one redirect URI is required'),
-  grantTypes: z.array(z.enum(['authorization_code', 'client_credentials', 'refresh_token']))
+  redirectUris: z
+    .array(z.string().url('Each redirect URI must be a valid URL'))
+    .min(1, 'At least one redirect URI is required'),
+  grantTypes: z
+    .array(z.enum(['authorization_code', 'client_credentials', 'refresh_token']))
     .min(1, 'At least one grant type is required')
     .default(['authorization_code', 'refresh_token']),
-  responseTypes: z.array(z.enum(['code', 'token', 'id_token']))
-    .default(['code']),
+  responseTypes: z.array(z.enum(['code', 'token', 'id_token'])).default(['code']),
   scope: z.string().optional(),
   isPublic: z.boolean().default(false),
   requirePkce: z.boolean().default(true),
   requireConsent: z.boolean().default(true),
-  tokenEndpointAuthMethod: z.enum(['client_secret_basic', 'client_secret_post', 'none'])
+  tokenEndpointAuthMethod: z
+    .enum(['client_secret_basic', 'client_secret_post', 'none'])
     .default('client_secret_basic'),
   jwksUri: z.string().url('JWKS URI must be a valid URL').optional(),
   logoUri: z.string().url('Logo URI must be a valid URL').optional(),
@@ -34,7 +37,10 @@ const ClientRegisterSchema = z.object({
 });
 
 // POST /api/clients/register - Register new OAuth 2.0 client (admin only)
-async function handleClientRegistration(request: NextRequest, context: AuthContext): Promise<NextResponse> {
+async function handleClientRegistration(
+  request: NextRequest,
+  context: AuthContext
+): Promise<NextResponse> {
   try {
     const body = await request.json();
     const validatedData = ClientRegisterSchema.parse(body);
@@ -61,7 +67,7 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
       });
 
       return NextResponse.json(
-        { 
+        {
           error: 'client_already_exists',
           error_description: 'A client with this name already exists',
         },
@@ -71,7 +77,9 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
 
     // Generate OAuth 2.0 compliant client credentials
     const clientId = `oauth2_${crypto.randomBytes(16).toString('hex')}`;
-    const clientSecret = validatedData.isPublic ? null : crypto.randomBytes(32).toString('base64url');
+    const clientSecret = validatedData.isPublic
+      ? null
+      : crypto.randomBytes(32).toString('base64url');
     let plainTextSecret: string | null = null;
     let hashedSecret: string | null = null;
 
@@ -81,7 +89,10 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
     }
 
     // Validate grant types and response types compatibility
-    if (validatedData.grantTypes.includes('authorization_code') && !validatedData.responseTypes.includes('code')) {
+    if (
+      validatedData.grantTypes.includes('authorization_code') &&
+      !validatedData.responseTypes.includes('code')
+    ) {
       return NextResponse.json(
         {
           error: 'invalid_client_metadata',
@@ -188,20 +199,19 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
     };
 
     // Remove null values
-    Object.keys(response).forEach(key => {
+    Object.keys(response).forEach((key) => {
       if (response[key as keyof typeof response] === null) {
         delete response[key as keyof typeof response];
       }
     });
 
-    return NextResponse.json(response, { 
+    return NextResponse.json(response, {
       status: 201,
       headers: {
         'Cache-Control': 'no-store',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
       },
     });
-
   } catch (error) {
     console.error('Client registration error:', error);
 
@@ -224,7 +234,7 @@ async function handleClientRegistration(request: NextRequest, context: AuthConte
         {
           error: 'invalid_client_metadata',
           error_description: 'Invalid client registration data',
-          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+          details: error.errors.map((e) => `${e.path.join('.')}: ${e.message}`),
         },
         { status: 400 }
       );

@@ -53,7 +53,7 @@ async function authenticateIntrospectingClient(request: NextRequest): Promise<Cl
     }
     return client;
   } catch (error) {
-    console.error("Error during introspecting client authentication:", error);
+    console.error('Error during introspecting client authentication:', error);
     return null;
   }
 }
@@ -85,18 +85,18 @@ function buildIntrospectionResponse(
   // Add username if user_id is present in subject (for user-bound tokens)
   // This part might need adjustment based on how 'sub' and 'username' are structured
   if (jwtPayload.sub && tokenData.userId && tokenType === 'access_token') {
-     // Assuming we might fetch the user if username is needed and not in JWT
-     // For now, if jwtPayload has username, use it.
-     if (jwtPayload.username) {
-        response.username = jwtPayload.username;
-     } else if ((tokenData as AccessToken).user?.username) { // If user was included in tokenData
-        response.username = (tokenData as AccessToken).user.username;
-     }
+    // Assuming we might fetch the user if username is needed and not in JWT
+    // For now, if jwtPayload has username, use it.
+    if (jwtPayload.username) {
+      response.username = jwtPayload.username;
+    } else if ((tokenData as AccessToken).user?.username) {
+      // If user was included in tokenData
+      response.username = (tokenData as AccessToken).user.username;
+    }
   }
 
   return response;
 }
-
 
 export async function POST(request: NextRequest) {
   const introspectingClient = await authenticateIntrospectingClient(request);
@@ -110,7 +110,10 @@ export async function POST(request: NextRequest) {
       success: false,
       errorMessage: 'Introspecting client authentication failed.',
     });
-    return NextResponse.json({ error: 'Unauthorized client' }, { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="token introspection"' }});
+    return NextResponse.json(
+      { error: 'Unauthorized client' },
+      { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="token introspection"' } }
+    );
   }
 
   let tokenValue: string | null = null;
@@ -123,18 +126,23 @@ export async function POST(request: NextRequest) {
     tokenValue = formData.get('token') as string | null;
     tokenTypeHint = formData.get('token_type_hint') as string | null;
   } else {
-     await AuthorizationUtils.logAuditEvent({
+    await AuthorizationUtils.logAuditEvent({
       clientId: introspectingClient.id,
       action: 'token_introspection_invalid_request_content_type',
       ipAddress: request.headers.get('x-forwarded-for') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
       success: false,
       errorMessage: 'Invalid content type. Expected application/x-www-form-urlencoded.',
-      metadata: { receivedContentType: contentType }
+      metadata: { receivedContentType: contentType },
     });
-    return NextResponse.json({ error: 'Invalid content_type', error_description: 'Content-Type must be application/x-www-form-urlencoded.' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: 'Invalid content_type',
+        error_description: 'Content-Type must be application/x-www-form-urlencoded.',
+      },
+      { status: 400 }
+    );
   }
-
 
   if (!tokenValue) {
     await AuthorizationUtils.logAuditEvent({
@@ -145,7 +153,13 @@ export async function POST(request: NextRequest) {
       success: false,
       errorMessage: 'Token parameter was missing from the request.',
     });
-    return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: 'Token parameter is required.' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: OAuth2ErrorTypes.INVALID_REQUEST,
+        error_description: 'Token parameter is required.',
+      },
+      { status: 400 }
+    );
   }
 
   let responseData: IntrospectionResponse = { active: false };
@@ -161,9 +175,9 @@ export async function POST(request: NextRequest) {
           // token: tokenValue, // Using JTI is better if tokens are hashed in DB, but JWTUtils verifies signature
           clientId: payload.client_id as string, // Ensure client_id from JWT matches
           revoked: false,
-          expiresAt: { gt: new Date() }
+          expiresAt: { gt: new Date() },
         },
-        include: { user: { select: { username: true } } } // Include username if available
+        include: { user: { select: { username: true } } }, // Include username if available
       });
 
       if (dbToken) {
@@ -185,9 +199,9 @@ export async function POST(request: NextRequest) {
           jti: payload.jti,
           clientId: payload.client_id as string,
           revoked: false,
-          expiresAt: { gt: new Date() }
+          expiresAt: { gt: new Date() },
         },
-         include: { user: { select: { username: true } } }
+        include: { user: { select: { username: true } } },
       });
       if (dbToken) {
         // For refresh tokens, typically less info is exposed.
@@ -195,7 +209,7 @@ export async function POST(request: NextRequest) {
         responseData = buildIntrospectionResponse(dbToken, payload, true, 'refresh_token');
         tokenProcessed = true;
       } else if (error) {
-         console.debug(`Refresh token JWT verification failed or DB lookup failed: ${error}`);
+        console.debug(`Refresh token JWT verification failed or DB lookup failed: ${error}`);
       }
     }
   }
@@ -211,8 +225,8 @@ export async function POST(request: NextRequest) {
       token_active: responseData.active,
       introspected_token_client_id: responseData.client_id,
       introspected_token_sub: responseData.sub,
-    }
+    },
   });
 
-  return NextResponse.json(responseData, { headers: { 'Content-Type': 'application/json' }});
+  return NextResponse.json(responseData, { headers: { 'Content-Type': 'application/json' } });
 }

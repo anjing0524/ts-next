@@ -15,8 +15,8 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: {
       forks: {
-        singleFork: true
-      }
+        singleFork: true,
+      },
     },
     coverage: {
       enabled: true,
@@ -28,7 +28,7 @@ export default defineConfig({
         'app/api/**/*.{ts,tsx}',
         'lib/**/*.{ts,tsx}',
         'hooks/**/*.{ts,tsx}',
-        'utils/**/*.{ts,tsx}'
+        'utils/**/*.{ts,tsx}',
       ],
       exclude: [
         'node_modules/**',
@@ -44,17 +44,17 @@ export default defineConfig({
         '**/*.stories.{ts,tsx}',
         'coverage/**',
         'build/**',
-        '.next/**'
+        '.next/**',
       ],
       thresholds: {
         global: {
           branches: 70,
           functions: 70,
           lines: 70,
-          statements: 70
-        }
-      }
-    }
+          statements: 70,
+        },
+      },
+    },
   },
   resolve: {
     alias: {
@@ -64,5 +64,5 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify('test'),
-  }
-}); 
+  },
+});

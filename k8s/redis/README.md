@@ -37,6 +37,7 @@ kubectl get pods -l app=redis -n ts-next-template
 ## 🔧 配置说明
 
 ### Redis 配置
+
 - **镜像**: `redis:7-alpine`
 - **端口**: `6379`
 - **NodePort**: `30379`
@@ -45,6 +46,7 @@ kubectl get pods -l app=redis -n ts-next-template
 - **存储**: 5Gi 本地存储
 
 ### 资源限制
+
 - **CPU 请求**: 0.1 核
 - **CPU 限制**: 0.3 核
 - **内存请求**: 128Mi
@@ -53,12 +55,14 @@ kubectl get pods -l app=redis -n ts-next-template
 ## 🔗 连接 Redis
 
 ### 从集群内部连接
+
 ```bash
 # 进入 Redis 容器
 kubectl exec -it deployment/redis -n ts-next-template -- redis-cli -a redis123
 ```
 
 ### 从本地连接
+
 ```bash
 # 使用 redis-cli（需要本地安装 Redis 客户端）
 redis-cli -h localhost -p 30379 -a redis123
@@ -69,13 +73,14 @@ redis-cli -a redis123
 ```
 
 ### 在应用中连接
+
 ```javascript
 // Node.js 示例
 const redis = require('redis');
 const client = redis.createClient({
   host: 'localhost',
   port: 30379,
-  password: 'redis123'
+  password: 'redis123',
 });
 ```
 
@@ -115,6 +120,7 @@ kubectl delete pv redis-pv
 ## 🛠️ 故障排除
 
 ### Pod 无法启动
+
 ```bash
 # 查看 Pod 详细信息
 kubectl describe pod -l app=redis -n ts-next-template
@@ -124,6 +130,7 @@ kubectl get events -n ts-next-template --sort-by='.lastTimestamp'
 ```
 
 ### 持久化卷问题
+
 ```bash
 # 检查 PV 和 PVC 状态
 kubectl get pv,pvc -n ts-next-template
@@ -134,6 +141,7 @@ sudo chmod 777 /var/lib/docker/data/redis-data
 ```
 
 ### 连接问题
+
 ```bash
 # 检查 Service 端点
 kubectl get endpoints redis -n ts-next-template

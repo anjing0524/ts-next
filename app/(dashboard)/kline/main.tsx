@@ -287,7 +287,7 @@ export default function Main() {
     sendMessageToWorker({
       type: 'mouseleave',
     });
-    
+
     // 记录鼠标已离开canvas，但不立即重置isDragging状态
     // 让window事件处理程序来管理拖动结束
   }, [sendMessageToWorker]);
@@ -406,7 +406,7 @@ export default function Main() {
           x: -1, // 使用-1表示canvas外的位置
           y: -1,
         });
-        
+
         // 直接重置拖动状态
         setIsDragging(false);
       }
@@ -417,16 +417,14 @@ export default function Main() {
       if (isDragging && canvasRef.current) {
         // 获取canvas位置
         const rect = canvasRef.current.getBoundingClientRect();
-        
+
         // 计算相对于canvas的坐标
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // 判断鼠标是否在canvas内
-        const isInCanvas = 
-          x >= 0 && x <= rect.width && 
-          y >= 0 && y <= rect.height;
-        
+        const isInCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+
         if (isInCanvas) {
           // 如果在canvas内，发送正常的拖动事件
           sendMessageToWorker({

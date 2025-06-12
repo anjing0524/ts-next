@@ -1,27 +1,45 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input'; // Using Input instead of Textarea
 import { Label } from '@/components/ui/label';
 import { adminApi } from '@/lib/api';
 
 // Zod schema for client registration (matches backend)
 const clientRegisterSchema = z.object({
-  name: z.string().min(1, { message: "Client name is required" }),
-  redirectUris: z.string().min(1, { message: "At least one redirect URI is required" })
-                   .refine(value => {
-                     const uris = value.split(',').map(uri => uri.trim());
-                     return uris.every(uri => {
-                       if (uri === '') return false;
-                       return z.string().url({ message: `Invalid URL: ${uri}` }).safeParse(uri).success;
-                     });
-                   }, { message: "One or more redirect URIs are invalid. Ensure they are valid URLs and comma-separated if multiple." }),
-  jwksUri: z.string().url({ message: "JWKS URI must be a valid URL" }).optional().or(z.literal('')),
+  name: z.string().min(1, { message: 'Client name is required' }),
+  redirectUris: z
+    .string()
+    .min(1, { message: 'At least one redirect URI is required' })
+    .refine(
+      (value) => {
+        const uris = value.split(',').map((uri) => uri.trim());
+        return uris.every((uri) => {
+          if (uri === '') return false;
+          return z
+            .string()
+            .url({ message: `Invalid URL: ${uri}` })
+            .safeParse(uri).success;
+        });
+      },
+      {
+        message:
+          'One or more redirect URIs are invalid. Ensure they are valid URLs and comma-separated if multiple.',
+      }
+    ),
+  jwksUri: z.string().url({ message: 'JWKS URI must be a valid URL' }).optional().or(z.literal('')),
 });
 
 export default function ClientRegisterPage() {
@@ -29,12 +47,16 @@ export default function ClientRegisterPage() {
   const [redirectUris, setRedirectUris] = useState('');
   const [jwksUri, setJwksUri] = useState(''); // 1. Update State
   const [errors, setErrors] = useState<any>({});
-  const [apiResponse, setApiResponse] = useState<{ type: 'success' | 'error'; message: string; data?: any } | null>(null);
+  const [apiResponse, setApiResponse] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    data?: any;
+  } | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setApiResponse(null); // Clear previous API response
-    setErrors({});      // Clear previous Zod errors
+    setErrors({}); // Clear previous Zod errors
 
     // 4. Update handleSubmit Function (safeParse)
     const validation = clientRegisterSchema.safeParse({ name, redirectUris, jwksUri });
@@ -59,10 +81,13 @@ export default function ClientRegisterPage() {
       });
       // Optionally clear form: setName(''); setRedirectUris('');
     } catch (error) {
-      console.error("Client registration request failed:", error);
-      setApiResponse({ 
-        type: 'error', 
-        message: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' 
+      console.error('Client registration request failed:', error);
+      setApiResponse({
+        type: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred. Please try again.',
       });
     }
   };
@@ -79,7 +104,9 @@ export default function ClientRegisterPage() {
         <CardContent className="space-y-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium text-gray-700">Application Name</Label>
+              <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                Application Name
+              </Label>
               <Input
                 id="name"
                 type="text"
@@ -89,10 +116,16 @@ export default function ClientRegisterPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 aria-describedby="name-error"
               />
-              {errors.name && <p id="name-error" className="text-sm text-red-600 pt-1">{errors.name}</p>}
+              {errors.name && (
+                <p id="name-error" className="text-sm text-red-600 pt-1">
+                  {errors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="redirectUris" className="text-sm font-medium text-gray-700">Redirect URIs</Label>
+              <Label htmlFor="redirectUris" className="text-sm font-medium text-gray-700">
+                Redirect URIs
+              </Label>
               <Input
                 id="redirectUris"
                 type="text"
@@ -102,14 +135,20 @@ export default function ClientRegisterPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 aria-describedby="redirectUris-error"
               />
-              {errors.redirectUris && <p id="redirectUris-error" className="text-sm text-red-600 pt-1">{errors.redirectUris}</p>}
+              {errors.redirectUris && (
+                <p id="redirectUris-error" className="text-sm text-red-600 pt-1">
+                  {errors.redirectUris}
+                </p>
+              )}
               <p className="text-xs text-gray-500 pt-1">
                 Comma-separated list of valid OAuth redirect URIs.
               </p>
             </div>
             {/* 3. Add Input Field */}
             <div className="space-y-2">
-              <Label htmlFor="jwksUri" className="text-sm font-medium text-gray-700">JWKS URI (Optional)</Label>
+              <Label htmlFor="jwksUri" className="text-sm font-medium text-gray-700">
+                JWKS URI (Optional)
+              </Label>
               <Input
                 id="jwksUri"
                 type="text"
@@ -119,13 +158,17 @@ export default function ClientRegisterPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 aria-describedby="jwksUri-error"
               />
-              {errors.jwksUri && <p id="jwksUri-error" className="text-sm text-red-600 pt-1">{errors.jwksUri}</p>}
-               <p className="text-xs text-gray-500 pt-1">
+              {errors.jwksUri && (
+                <p id="jwksUri-error" className="text-sm text-red-600 pt-1">
+                  {errors.jwksUri}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 pt-1">
                 The URL to your JSON Web Key Set (JWKS) for public key client authentication.
               </p>
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               onClick={handleSubmit} // Keep onClick for form submission if not relying solely on form's onSubmit
             >
@@ -135,21 +178,43 @@ export default function ClientRegisterPage() {
         </CardContent>
         <CardFooter className="flex flex-col items-center pt-6">
           {apiResponse && (
-            <div className={`p-4 rounded-md w-full text-sm ${apiResponse.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
-              <p className={`font-bold text-lg mb-2 ${apiResponse.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
-                {apiResponse.type === 'success' ? 'Registration Successful!' : 'Registration Failed!'}
+            <div
+              className={`p-4 rounded-md w-full text-sm ${apiResponse.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}
+            >
+              <p
+                className={`font-bold text-lg mb-2 ${apiResponse.type === 'success' ? 'text-green-700' : 'text-red-700'}`}
+              >
+                {apiResponse.type === 'success'
+                  ? 'Registration Successful!'
+                  : 'Registration Failed!'}
               </p>
               <p className="mb-3">{apiResponse.message}</p>
               {apiResponse.type === 'success' && apiResponse.data && (
                 <div className="mt-3 text-sm bg-slate-50 p-3 rounded-md border border-slate-200 space-y-2">
                   <p className="font-semibold text-slate-700">Your New Credentials:</p>
                   <div>
-                    <Label htmlFor="clientIdDisplay" className="font-medium text-slate-600">Client ID:</Label>
-                    <Input id="clientIdDisplay" type="text" value={apiResponse.data.clientId} readOnly className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"/>
+                    <Label htmlFor="clientIdDisplay" className="font-medium text-slate-600">
+                      Client ID:
+                    </Label>
+                    <Input
+                      id="clientIdDisplay"
+                      type="text"
+                      value={apiResponse.data.clientId}
+                      readOnly
+                      className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"
+                    />
                   </div>
                   <div>
-                    <Label htmlFor="clientSecretDisplay" className="font-medium text-slate-600">Client Secret:</Label>
-                    <Input id="clientSecretDisplay" type="text" value={apiResponse.data.clientSecret} readOnly className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"/>
+                    <Label htmlFor="clientSecretDisplay" className="font-medium text-slate-600">
+                      Client Secret:
+                    </Label>
+                    <Input
+                      id="clientSecretDisplay"
+                      type="text"
+                      value={apiResponse.data.clientSecret}
+                      readOnly
+                      className="w-full mt-1 bg-slate-100 border-slate-300 text-slate-700"
+                    />
                   </div>
                   <p className="text-xs text-red-600 mt-2 font-medium">
                     Important: Copy your client secret now. You will not be able to see it again.

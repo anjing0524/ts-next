@@ -49,6 +49,7 @@ pub use render::ChartRenderer;          // 渲染管理
 ```
 
 **特性**:
+
 - 设置 panic hook 用于调试
 - 统一对外 API 接口
 - 模块间依赖管理
@@ -67,6 +68,7 @@ pub struct KlineProcess {
 ```
 
 **核心功能**:
+
 - 📊 **数据管理**: WASM 内存读取、FlatBuffers 解析、数据验证
 - 🎨 **渲染控制**: 三层 Canvas 管理、统一绘制接口
 - 🖱️ **交互处理**: 鼠标事件、滚轮缩放、点击切换
@@ -99,6 +101,7 @@ pub struct DataManager {
 ```
 
 **核心特性**:
+
 - 🔍 **数据索引**: 高效的时间序列数据查找
 - 📈 **统计缓存**: 可见区域数据统计（最高价、最低价、成交量等）
 - 🎯 **范围管理**: 可见数据范围计算和边界检查
@@ -117,6 +120,7 @@ pub struct VisibleRange {
 ```
 
 **算法特性**:
+
 - 📏 **边界检查**: 防止越界访问，确保数据安全
 - 🔍 **范围计算**: 高效计算可见区域数据边界
 - 📊 **缩放支持**: 鼠标滚轮缩放时的范围调整
@@ -147,13 +151,13 @@ render/
 pub struct ChartRenderer {
     // 三层Canvas上下文
     base_context: OffscreenCanvasRenderingContext2d,    // 静态层
-    main_context: OffscreenCanvasRenderingContext2d,    // 数据层  
+    main_context: OffscreenCanvasRenderingContext2d,    // 数据层
     overlay_context: OffscreenCanvasRenderingContext2d, // 交互层
-    
+
     // 布局和数据
     layout: ChartLayout,
     data_manager: DataManager,
-    
+
     // 子渲染器
     axis_renderer: AxisRenderer,
     price_renderer: PriceRenderer,
@@ -166,12 +170,14 @@ pub struct ChartRenderer {
 **渲染策略**:
 
 1. **Base Layer (静态层)**:
+
    - 🏗️ 坐标轴、网格线
    - 🎨 背景色、边框
    - 🏷️ 标签文字
    - **更新频率**: 仅在布局变化时重绘
 
 2. **Main Layer (数据层)**:
+
    - 📊 K线图形
    - 📈 成交量柱状图
    - 🔥 热图渲染
@@ -209,6 +215,7 @@ pub enum ColorMapping {
 ```
 
 **性能优化**:
+
 - 🚀 **SIMD加速**: 利用向量指令并行计算
 - 🗄️ **颜色缓存**: 256级颜色预计算缓存
 - 📊 **智能聚合**: 支持成交量加权、时间衰减等算法
@@ -228,6 +235,7 @@ pub struct BookRenderer {
 ```
 
 **可视化特性**:
+
 - 📊 **深度图**: 买卖盘堆积面积图
 - 🎨 **颜色区分**: 买盘绿色，卖盘红色
 - ⚡ **实时更新**: 跟随鼠标显示对应时间点订单簿
@@ -265,6 +273,7 @@ pub struct ResponsiveConfig {
 **布局策略**:
 
 1. **设备断点**:
+
    - 📱 **Mobile** (`< 768px`): 简化UI，隐藏订单簿，触摸优化
    - 📟 **Tablet** (`768px - 1024px`): 平衡布局，适中信息密度
    - 💻 **Desktop** (`1024px - 1440px`): 完整功能，标准比例
@@ -304,12 +313,12 @@ impl ChartLayout {
         self.update_breakpoint();
         self.recalculate_areas();
     }
-    
+
     // 智能断点选择
     pub fn select_breakpoint(&self) -> &LayoutBreakpoint {
         // 基于 canvas 尺寸自动选择最佳布局配置
     }
-    
+
     // 性能优化模式
     pub fn adjust_for_performance(&mut self, target_fps: f64) {
         if target_fps < 45.0 {
@@ -336,7 +345,7 @@ canvas/
 ```rust
 pub struct CanvasManager {
     base_canvas: OffscreenCanvas,
-    main_canvas: OffscreenCanvas, 
+    main_canvas: OffscreenCanvas,
     overlay_canvas: OffscreenCanvas,
     layer_dirty_flags: LayerDirtyFlags,
 }
@@ -349,6 +358,7 @@ pub enum CanvasLayerType {
 ```
 
 **优化特性**:
+
 - 🏷️ **脏标记系统**: 只重绘变化的图层
 - 🎨 **离屏渲染**: 利用 OffscreenCanvas 提升性能
 - 📐 **尺寸同步**: 自动同步三层 Canvas 尺寸
@@ -400,6 +410,7 @@ pub struct RenderCache {
 ```
 
 **收益**:
+
 - 🚀 减少 60-80% 的重绘操作
 - 📊 提升交互响应速度 50%
 - 💾 优化内存使用 40%
@@ -442,6 +453,7 @@ impl AdaptiveQuality {
 ### 4. 内存管理优化
 
 **技术**:
+
 - 🗄️ **对象池**: 复用 Canvas ImageData 对象
 - 📦 **数据压缩**: FlatBuffers 零拷贝反序列化
 - 🔄 **增量更新**: 只处理变化的数据部分
@@ -480,7 +492,7 @@ impl KlineProcess {
             // 只重绘 Overlay 层，优化性能
         }
     }
-    
+
     // 滚轮缩放: 调整可见数据范围
     pub fn handle_wheel(&self, delta: f64, x: f64, y: f64) {
         if let Some(renderer) = &self.chart_renderer {
@@ -488,7 +500,7 @@ impl KlineProcess {
             // 重绘 Main 层和 Overlay 层
         }
     }
-    
+
     // 点击切换: K线图 ↔ 热图模式
     pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
         if let Some(renderer) = &self.chart_renderer {
@@ -588,7 +600,7 @@ impl DataManager {
         if !self.validate_new_data(new_kline) {
             return false;
         }
-        
+
         // 2. 更新最新数据
         if let Some(latest) = self.get_latest_kline_mut() {
             if latest.timestamp == new_kline.timestamp {
@@ -599,10 +611,10 @@ impl DataManager {
                 self.append_kline(new_kline);
             }
         }
-        
+
         // 3. 缓存失效
         self.invalidate_cache();
-        
+
         // 4. 触发重绘
         true
     }
@@ -616,6 +628,7 @@ impl DataManager {
 ### 构建配置
 
 **Cargo.toml 关键配置**:
+
 ```toml
 [lib]
 crate-type = ["cdylib"]  # 生成动态链接库供 WASM 使用
@@ -626,6 +639,7 @@ lto = true             # 链接时优化
 ```
 
 **关键依赖**:
+
 - `wasm-bindgen`: Rust ↔ JavaScript 绑定
 - `web-sys`: Web API 绑定
 - `flatbuffers`: 高性能序列化
@@ -662,38 +676,34 @@ echo "✅ 构建完成!"
 import init, { KlineProcess } from './pkg/kline_processor.js';
 
 async function initChart() {
-    // 1. 初始化 WASM 模块
-    await init();
-    
-    // 2. 创建 OffscreenCanvas
-    const baseCanvas = new OffscreenCanvas(800, 600);
-    const mainCanvas = new OffscreenCanvas(800, 600);
-    const overlayCanvas = new OffscreenCanvas(800, 600);
-    
-    // 3. 准备数据 (FlatBuffers格式)
-    const klineData = prepareKlineData();
-    
-    // 4. 创建处理器实例
-    const processor = new KlineProcess(
-        WebAssembly.memory,
-        klineData.ptr,
-        klineData.length
-    );
-    
-    // 5. 设置画布
-    processor.set_canvases(baseCanvas, mainCanvas, overlayCanvas);
-    
-    // 6. 绘制图表
-    processor.draw_all();
-    
-    // 7. 绑定事件处理
-    canvas.addEventListener('mousemove', (e) => {
-        processor.handle_mouse_move(e.offsetX, e.offsetY);
-    });
-    
-    canvas.addEventListener('wheel', (e) => {
-        processor.handle_wheel(e.deltaY, e.offsetX, e.offsetY);
-    });
+  // 1. 初始化 WASM 模块
+  await init();
+
+  // 2. 创建 OffscreenCanvas
+  const baseCanvas = new OffscreenCanvas(800, 600);
+  const mainCanvas = new OffscreenCanvas(800, 600);
+  const overlayCanvas = new OffscreenCanvas(800, 600);
+
+  // 3. 准备数据 (FlatBuffers格式)
+  const klineData = prepareKlineData();
+
+  // 4. 创建处理器实例
+  const processor = new KlineProcess(WebAssembly.memory, klineData.ptr, klineData.length);
+
+  // 5. 设置画布
+  processor.set_canvases(baseCanvas, mainCanvas, overlayCanvas);
+
+  // 6. 绘制图表
+  processor.draw_all();
+
+  // 7. 绑定事件处理
+  canvas.addEventListener('mousemove', (e) => {
+    processor.handle_mouse_move(e.offsetX, e.offsetY);
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    processor.handle_wheel(e.deltaY, e.offsetX, e.offsetY);
+  });
 }
 ```
 
@@ -704,11 +714,13 @@ async function initChart() {
 ### 短期目标 (1-3个月)
 
 1. **性能深度优化**
+
    - WebWorker 多线程渲染
    - WebGL 硬件加速渲染
    - 更智能的缓存策略
 
 2. **功能完善**
+
    - 更多技术指标 (MACD, KDJ, RSI)
    - 绘图工具系统 (趋势线, 斐波那契)
    - 数据导出功能
@@ -721,11 +733,13 @@ async function initChart() {
 ### 中期目标 (3-6个月)
 
 1. **高级分析功能**
+
    - 机器学习异常检测
    - 订单流分析
    - 流动性聚类检测
 
 2. **多市场支持**
+
    - 多交易对同时显示
    - 跨市场套利监控
    - 市场相关性分析
@@ -738,11 +752,13 @@ async function initChart() {
 ### 长期愿景 (6个月+)
 
 1. **云端集成**
+
    - 实时数据推送
    - 云端配置同步
    - 协作分析功能
 
 2. **移动端适配**
+
    - PWA 支持
    - 原生移动应用
    - 离线数据支持
@@ -758,13 +774,13 @@ async function initChart() {
 
 ### 当前性能指标
 
-| 指标 | 目标值 | 实际值 | 状态 |
-|------|--------|--------|------|
-| 渲染帧率 | 60 FPS | 55-60 FPS | ✅ 达标 |
-| 初始加载时间 | < 200ms | ~150ms | ✅ 优秀 |
-| 内存占用 | < 100MB | ~72MB | ✅ 优秀 |
-| 交互响应延迟 | < 50ms | ~30-50ms | ✅ 优秀 |
-| WASM 包体积 | < 1MB | ~800KB | ✅ 优秀 |
+| 指标         | 目标值  | 实际值    | 状态    |
+| ------------ | ------- | --------- | ------- |
+| 渲染帧率     | 60 FPS  | 55-60 FPS | ✅ 达标 |
+| 初始加载时间 | < 200ms | ~150ms    | ✅ 优秀 |
+| 内存占用     | < 100MB | ~72MB     | ✅ 优秀 |
+| 交互响应延迟 | < 50ms  | ~30-50ms  | ✅ 优秀 |
+| WASM 包体积  | < 1MB   | ~800KB    | ✅ 优秀 |
 
 ### 压力测试结果
 

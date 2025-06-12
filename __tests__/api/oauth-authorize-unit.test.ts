@@ -1,61 +1,67 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { TestHttpClient, TestDataManager } from '../utils/test-helpers'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { TestHttpClient, TestDataManager } from '../utils/test-helpers';
 
 describe('OAuth Authorize API 单元测试', () => {
-  let httpClient: TestHttpClient
-  let dataManager: TestDataManager
+  let httpClient: TestHttpClient;
+  let dataManager: TestDataManager;
 
   beforeEach(async () => {
-    httpClient = new TestHttpClient()
-    dataManager = new TestDataManager()
-    await dataManager.clearDatabase()
-  })
+    httpClient = new TestHttpClient();
+    dataManager = new TestDataManager();
+    await dataManager.clearDatabase();
+  });
 
   afterEach(async () => {
-    await dataManager.clearDatabase()
-  })
+    await dataManager.clearDatabase();
+  });
 
   describe('GET /api/oauth/authorize', () => {
     it('应该拒绝缺少response_type参数的请求', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize?client_id=test_client', {
-        method: 'GET'
-      })
+        method: 'GET',
+      });
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data).toHaveProperty('error', 'invalid_request')
-      expect(data).toHaveProperty('error_description')
-    })
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data).toHaveProperty('error', 'invalid_request');
+      expect(data).toHaveProperty('error_description');
+    });
 
     it('应该拒绝不支持的response_type', async () => {
-      const response = await httpClient.makeRequest('/api/oauth/authorize?response_type=unsupported&client_id=test_client', {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        '/api/oauth/authorize?response_type=unsupported&client_id=test_client',
+        {
+          method: 'GET',
+        }
+      );
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data).toHaveProperty('error', 'invalid_request')
-    })
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data).toHaveProperty('error', 'invalid_request');
+    });
 
     it('应该拒绝缺少client_id参数的请求', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize?response_type=code', {
-        method: 'GET'
-      })
+        method: 'GET',
+      });
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data).toHaveProperty('error', 'invalid_request')
-    })
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data).toHaveProperty('error', 'invalid_request');
+    });
 
     it('应该拒绝无效的client_id', async () => {
-      const response = await httpClient.makeRequest('/api/oauth/authorize?response_type=code&client_id=invalid_client', {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        '/api/oauth/authorize?response_type=code&client_id=invalid_client',
+        {
+          method: 'GET',
+        }
+      );
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data).toHaveProperty('error', 'invalid_request')
-    })
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data).toHaveProperty('error', 'invalid_request');
+    });
 
     it('应该拒绝缺少redirect_uri参数的请求', async () => {
       // 先创建一个有效的客户端
@@ -67,17 +73,20 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const response = await httpClient.makeRequest(`/api/oauth/authorize?response_type=code&client_id=${client.clientId}`, {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        `/api/oauth/authorize?response_type=code&client_id=${client.clientId}`,
+        {
+          method: 'GET',
+        }
+      );
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data).toHaveProperty('error', 'invalid_request')
-    })
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data).toHaveProperty('error', 'invalid_request');
+    });
 
     it('应该拒绝无效的redirect_uri', async () => {
       const client = await dataManager.createClient({
@@ -88,18 +97,21 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const response = await httpClient.makeRequest(`/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://malicious.com/callback`, {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        `/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://malicious.com/callback`,
+        {
+          method: 'GET',
+        }
+      );
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
+      expect(response.status).toBe(400);
+      const data = await response.json();
       // 实际API可能返回invalid_request而不是invalid_redirect_uri
-      expect(data).toHaveProperty('error', 'invalid_request')
-    })
+      expect(data).toHaveProperty('error', 'invalid_request');
+    });
 
     it('应该拒绝无效的scope', async () => {
       const client = await dataManager.createClient({
@@ -110,23 +122,26 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid profile',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const response = await httpClient.makeRequest(`/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=invalid_scope`, {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        `/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=invalid_scope`,
+        {
+          method: 'GET',
+        }
+      );
 
       // 如果端点未实现，可能返回404
       if (response.status === 404) {
-        console.log('OAuth authorize endpoint not yet implemented')
-        expect(response.status).toBe(404)
+        console.log('OAuth authorize endpoint not yet implemented');
+        expect(response.status).toBe(404);
       } else {
-        expect(response.status).toBe(400)
-        const data = await response.json()
-        expect(data).toHaveProperty('error', 'invalid_scope')
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data).toHaveProperty('error', 'invalid_scope');
       }
-    })
+    });
 
     it('应该处理PKCE相关参数', async () => {
       const client = await dataManager.createClient({
@@ -138,51 +153,54 @@ describe('OAuth Authorize API 单元测试', () => {
         scope: 'openid',
         isPublic: true,
         requirePkce: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
       // 测试缺少code_challenge的请求
-      const response = await httpClient.makeRequest(`/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=openid`, {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        `/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=openid`,
+        {
+          method: 'GET',
+        }
+      );
 
       // 如果端点未实现，可能返回404
       if (response.status === 404) {
-        console.log('OAuth authorize endpoint not yet implemented')
-        expect(response.status).toBe(404)
+        console.log('OAuth authorize endpoint not yet implemented');
+        expect(response.status).toBe(404);
       } else if (response.status === 400) {
-        const data = await response.json()
-        expect(data).toHaveProperty('error')
+        const data = await response.json();
+        expect(data).toHaveProperty('error');
       } else {
         // 如果PKCE验证还未实现，至少确保请求被处理
-        expect([200, 302, 400, 401]).toContain(response.status)
+        expect([200, 302, 400, 401]).toContain(response.status);
       }
-    })
+    });
 
     it('应该正确处理OPTIONS请求', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize', {
-        method: 'OPTIONS'
-      })
+        method: 'OPTIONS',
+      });
 
-      expect([200, 204]).toContain(response.status)
-    })
+      expect([200, 204]).toContain(response.status);
+    });
 
     it('应该拒绝不支持的HTTP方法', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize', {
-        method: 'DELETE'
-      })
+        method: 'DELETE',
+      });
 
-      expect(response.status).toBe(405)
-    })
+      expect(response.status).toBe(405);
+    });
 
     it('应该返回正确的Content-Type头', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize?response_type=code', {
-        method: 'GET'
-      })
+        method: 'GET',
+      });
 
-      expect(response.headers.get('content-type')).toContain('application/json')
-    })
-  })
+      expect(response.headers.get('content-type')).toContain('application/json');
+    });
+  });
 
   describe('POST /api/oauth/authorize', () => {
     it('应该处理用户授权决定', async () => {
@@ -194,20 +212,20 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid profile',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
       const response = await httpClient.makeRequest('/api/oauth/authorize', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&decision=allow`
-      })
+        body: `client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&decision=allow`,
+      });
 
       // 应该处理POST请求，即使用户未认证
-      expect([200, 302, 400, 401]).toContain(response.status)
-    })
+      expect([200, 302, 400, 401]).toContain(response.status);
+    });
 
     it('应该拒绝用户拒绝授权的请求', async () => {
       const client = await dataManager.createClient({
@@ -218,21 +236,21 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
       const response = await httpClient.makeRequest('/api/oauth/authorize', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&decision=deny`
-      })
+        body: `client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&decision=deny`,
+      });
 
       // 用户拒绝授权应该重定向到客户端并带有error参数
-      expect([302, 400]).toContain(response.status)
-    })
-  })
+      expect([302, 400]).toContain(response.status);
+    });
+  });
 
   describe('有效客户端和用户测试', () => {
     it('应该处理有效的授权请求', async () => {
@@ -241,8 +259,8 @@ describe('OAuth Authorize API 单元测试', () => {
         email: 'authorize@example.com',
         password: 'TestPass123!',
         firstName: 'Authorize',
-        lastName: 'User'
-      })
+        lastName: 'User',
+      });
 
       const client = await dataManager.createClient({
         clientId: 'valid-authorize-client',
@@ -252,21 +270,24 @@ describe('OAuth Authorize API 单元测试', () => {
         responseTypes: ['code'],
         scope: 'openid profile email',
         isPublic: true,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const response = await httpClient.makeRequest(`/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=openid&state=test_state`, {
-        method: 'GET'
-      })
+      const response = await httpClient.makeRequest(
+        `/api/oauth/authorize?response_type=code&client_id=${client.clientId}&redirect_uri=http://localhost:3000/callback&scope=openid&state=test_state`,
+        {
+          method: 'GET',
+        }
+      );
 
       // 应该返回授权页面或重定向
-      expect([200, 302, 401]).toContain(response.status)
-      
+      expect([200, 302, 401]).toContain(response.status);
+
       if (response.status === 302) {
         // 如果是重定向，检查Location头
-        const location = response.headers.get('location')
-        expect(location).toBeTruthy()
+        const location = response.headers.get('location');
+        expect(location).toBeTruthy();
       }
-    })
-  })
-}) 
+    });
+  });
+});

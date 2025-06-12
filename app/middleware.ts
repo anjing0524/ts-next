@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
 
   // Paths to protect
   const protectedPaths = ['/dashboard', '/flow'];
-  const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
+  const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (!isProtectedPath) {
     return NextResponse.next();
@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || undefined,
       success: false,
       errorMessage: 'JWT_ACCESS_TOKEN_SECRET is not set.',
-      metadata: { attemptedPath: pathname }
+      metadata: { attemptedPath: pathname },
     });
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect_uri', pathname);
@@ -79,20 +79,17 @@ export async function middleware(request: NextRequest) {
   try {
     // Use a type assertion for the return value of jwtVerify if needed,
     // or handle the payload type more explicitly.
-    const verificationResult = await jwtVerify(
-      token,
-      new TextEncoder().encode(secret),
-      {
-        issuer: issuer,
-        audience: audience,
-      }
-    );
+    const verificationResult = await jwtVerify(token, new TextEncoder().encode(secret), {
+      issuer: issuer,
+      audience: audience,
+    });
     payload = verificationResult.payload; // Assign to outer scope payload
     logger.info(`[Middleware] Token verified successfully. Payload: ${JSON.stringify(payload)}`);
 
     // 3. Extract user scopes/permissions from JWT payload
     let userScopes: string[] = [];
-    if (payload) { // Check if payload is defined
+    if (payload) {
+      // Check if payload is defined
       if (Array.isArray(payload.permissions) && payload.permissions.length > 0) {
         userScopes = payload.permissions as string[];
       } else if (typeof payload.scope === 'string') {
@@ -105,14 +102,20 @@ export async function middleware(request: NextRequest) {
     const isAdminPath = pathname.startsWith('/dashboard') || pathname.startsWith('/flow');
 
     if (isAdminPath) {
-      const adminRequiredScopes: string[] = ['users:manage', 'clients:manage', 'permissions:manage'];
-      const hasAdminAccess = adminRequiredScopes.some(scope => userScopes.includes(scope));
+      const adminRequiredScopes: string[] = [
+        'users:manage',
+        'clients:manage',
+        'permissions:manage',
+      ];
+      const hasAdminAccess = adminRequiredScopes.some((scope) => userScopes.includes(scope));
 
       if (hasAdminAccess) {
         logger.info(`[Middleware] User has required admin scope for ${pathname}. Allowing access.`);
         return NextResponse.next();
       } else {
-        logger.warn(`[Middleware] User does NOT have required admin scope for ${pathname}. Redirecting to /unauthorized.`);
+        logger.warn(
+          `[Middleware] User does NOT have required admin scope for ${pathname}. Redirecting to /unauthorized.`
+        );
         await AuthorizationUtils.logAuditEvent({
           userId: payload?.sub || undefined,
           action: 'middleware_permission_denied',
@@ -124,8 +127,8 @@ export async function middleware(request: NextRequest) {
           metadata: {
             requiredScopes: adminRequiredScopes,
             userScopes: userScopes,
-            attemptedPath: pathname
-          }
+            attemptedPath: pathname,
+          },
         });
         const unauthorizedUrl = new URL('/unauthorized', request.url);
         unauthorizedUrl.searchParams.set('required_permission', adminRequiredScopes.join(' or '));
@@ -175,14 +178,17 @@ export async function middleware(request: NextRequest) {
       // Or another path defined in config.matcher that doesn't have a rule.
       // For now, we allow it if it wasn't caught by admin path logic.
       // You might want to deny by default if a path is in `protectedPaths` but has no explicit rule.
-      logger.info(`[Middleware] Path ${pathname} is protected but has no specific rule after admin check. Allowing by default for now.`);
+      logger.info(
+        `[Middleware] Path ${pathname} is protected but has no specific rule after admin check. Allowing by default for now.`
+      );
       return NextResponse.next();
     }
 
     // Fallback for any other case (should ideally not be reached if matcher is specific)
-    logger.info(`[Middleware] Path ${pathname} does not require specific permissions or is not explicitly protected. Allowing.`);
+    logger.info(
+      `[Middleware] Path ${pathname} does not require specific permissions or is not explicitly protected. Allowing.`
+    );
     return NextResponse.next();
-
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
     logger.error(`[Middleware] Token verification failed: ${errorMessage}`, error);
@@ -194,7 +200,7 @@ export async function middleware(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || undefined,
       success: false,
       errorMessage: `Token verification failed: ${errorMessage}`,
-      metadata: { error: error.name, tokenUsed: token ? 'present' : 'absent' }
+      metadata: { error: error.name, tokenUsed: token ? 'present' : 'absent' },
     });
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect_uri', pathname);

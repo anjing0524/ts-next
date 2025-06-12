@@ -29,13 +29,10 @@ const basePath = getBasePath();
  * Custom fetch wrapper that automatically adds basePath for API calls
  * and handles common error scenarios
  */
-export async function apiFetch(
-  url: string, 
-  options: RequestInit = {}
-): Promise<Response> {
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   // Add basePath to URL if it's a relative API path
   const fullUrl = url.startsWith('/') ? `${basePath}${url}` : url;
-  
+
   // Set default headers
   const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -52,7 +49,11 @@ export async function apiFetch(
 
   if (token && !options.headers) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
-  } else if (token && options.headers && !(options.headers as Record<string, string>)['Authorization']) {
+  } else if (
+    token &&
+    options.headers &&
+    !(options.headers as Record<string, string>)['Authorization']
+  ) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
@@ -66,7 +67,7 @@ export async function apiFetch(
 
   try {
     const response = await fetch(fullUrl, mergedOptions);
-    
+
     // Handle 401 unauthorized - redirect to login
     if (response.status === 401 && typeof window !== 'undefined') {
       sessionStorage.removeItem('access_token');
@@ -85,15 +86,14 @@ export async function apiFetch(
 /**
  * Convenience wrapper for JSON API calls
  */
-export async function apiRequest<T = any>(
-  url: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function apiRequest<T = any>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await apiFetch(url, options);
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(errorData.error_description || errorData.message || errorData.error || 'Request failed');
+    throw new Error(
+      errorData.error_description || errorData.message || errorData.error || 'Request failed'
+    );
   }
 
   return response.json();
@@ -159,7 +159,8 @@ export const adminApi = {
     return apiRequest(`/api/users?limit=${limit}`);
   },
 
-  getClients: async (limit = 10) => { // Ensure this returns comprehensive details
+  getClients: async (limit = 10) => {
+    // Ensure this returns comprehensive details
     return apiRequest(`/api/clients?limit=${limit}`);
   },
 
@@ -293,4 +294,4 @@ export function getFullUrl(path: string): string {
 export function getOAuthRedirectUri(): string {
   if (typeof window === 'undefined') return '';
   return `${window.location.origin}${basePath}/auth/callback`;
-} 
+}

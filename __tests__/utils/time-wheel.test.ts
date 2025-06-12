@@ -97,7 +97,7 @@ describe('TimeWheel', () => {
     // 执行6次循环，但任务应该只执行5次
     for (let i = 1; i <= 6; i++) {
       advanceTimeAndRunTimers(50);
-      
+
       if (i <= 5) {
         expect(mockCallback).toHaveBeenCalledTimes(i);
       } else {
@@ -222,7 +222,7 @@ describe('TimeWheel', () => {
 
   test('应该正确记录任务执行时的错误信息', () => {
     const timeWheel = new TimeWheel(8, 100); // 增加槽位数量避免冲突
-    
+
     // Test Error object handling - covers line 154-158
     const errorObjectCallback = vi.fn(() => {
       throw new Error('Specific error message');
@@ -233,7 +233,7 @@ describe('TimeWheel', () => {
       throw 'String error message';
     });
 
-    // Test undefined error handling 
+    // Test undefined error handling
     const undefinedErrorCallback = vi.fn(() => {
       throw undefined;
     });
@@ -281,7 +281,7 @@ describe('TimeWheel', () => {
   test('应该能在重复任务执行中处理错误', () => {
     const timeWheel = new TimeWheel(4, 100);
     let callCount = 0;
-    
+
     const errorOnSecondCallCallback = vi.fn(() => {
       callCount++;
       if (callCount === 2) {
@@ -357,19 +357,19 @@ describe('TimeWheel', () => {
     // 尝试移除不存在的任务
     const removedAgain = timeWheel.removeTask('non-existent-id');
     expect(removedAgain).toBe(false);
-    
+
     timeWheel.stop();
   });
 
   test('应该能启动和停止时间轮', () => {
     const timeWheel = new TimeWheel(4, 100);
-    
+
     // 测试手动启动
     timeWheel.start();
-    
+
     // 测试停止功能
     timeWheel.stop();
-    
+
     // 多次停止不应该抛错
     expect(() => timeWheel.stop()).not.toThrow();
   });
@@ -472,7 +472,7 @@ describe('TimeWheel', () => {
 
     // 执行一次，确保触发重复添加的日志
     advanceTimeAndRunTimers(100);
-    
+
     expect(mockCallback).toHaveBeenCalledTimes(1);
     timeWheel.removeTask(taskId);
     timeWheel.stop();
@@ -481,9 +481,9 @@ describe('TimeWheel', () => {
   test('应该测试任务执行时序和槽位计算', () => {
     const timeWheel = new TimeWheel(4, 100);
     const callbacks = [
-      vi.fn(() => console.log('Task 1 (100ms) executed')), 
-      vi.fn(() => console.log('Task 2 (200ms) executed')), 
-      vi.fn(() => console.log('Task 3 (300ms) executed'))
+      vi.fn(() => console.log('Task 1 (100ms) executed')),
+      vi.fn(() => console.log('Task 2 (200ms) executed')),
+      vi.fn(() => console.log('Task 3 (300ms) executed')),
     ];
 
     // 添加任务到不同时间点
@@ -495,7 +495,7 @@ describe('TimeWheel', () => {
     });
 
     timeWheel.addTask({
-      delay: 200, // 槽位2  
+      delay: 200, // 槽位2
       callback: callbacks[1],
       repeat: false,
     });
@@ -511,7 +511,9 @@ describe('TimeWheel', () => {
     vi.advanceTimersByTime(100);
     vi.runOnlyPendingTimers();
     vi.runOnlyPendingTimers(); // 额外的 runOnlyPendingTimers
-    console.log(`At 100ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`);
+    console.log(
+      `At 100ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`
+    );
     expect(callbacks[0]).toHaveBeenCalledTimes(1);
     expect(callbacks[1]).toHaveBeenCalledTimes(0);
     expect(callbacks[2]).toHaveBeenCalledTimes(0);
@@ -520,7 +522,9 @@ describe('TimeWheel', () => {
     // 200ms: 第2个任务执行 - 再推进100ms
     vi.advanceTimersByTime(100);
     vi.runOnlyPendingTimers();
-    console.log(`At 200ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`);
+    console.log(
+      `At 200ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`
+    );
     expect(callbacks[0]).toHaveBeenCalledTimes(1);
     expect(callbacks[1]).toHaveBeenCalledTimes(1);
     expect(callbacks[2]).toHaveBeenCalledTimes(0);
@@ -530,7 +534,9 @@ describe('TimeWheel', () => {
     vi.advanceTimersByTime(100);
     vi.runOnlyPendingTimers();
     vi.runOnlyPendingTimers(); // 额外的 runOnlyPendingTimers
-    console.log(`At 300ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`);
+    console.log(
+      `At 300ms: Task1=${callbacks[0].mock.calls.length}, Task2=${callbacks[1].mock.calls.length}, Task3=${callbacks[2].mock.calls.length}`
+    );
     expect(callbacks[0]).toHaveBeenCalledTimes(1);
     expect(callbacks[1]).toHaveBeenCalledTimes(1);
     expect(callbacks[2]).toHaveBeenCalledTimes(1);
@@ -540,7 +546,7 @@ describe('TimeWheel', () => {
 
   test('应该验证同一槽位多个任务的错误隔离性', () => {
     const timeWheel = new TimeWheel(4, 100);
-    
+
     // 创建多个回调函数，其中一些会抛错
     const successCallback1 = vi.fn(() => {
       console.log('successCallback1 called');
@@ -597,12 +603,12 @@ describe('TimeWheel', () => {
 
   test('应该验证同一槽位重复任务的错误隔离性', () => {
     const timeWheel = new TimeWheel(4, 100);
-    
+
     // 创建一个成功的重复任务和一个在第2次执行时失败的重复任务
     const alwaysSuccessCallback = vi.fn(() => {
       return 'always success';
     });
-    
+
     let failingTaskCallCount = 0;
     const sometimesFailCallback = vi.fn(() => {
       failingTaskCallCount++;
@@ -634,7 +640,7 @@ describe('TimeWheel', () => {
     for (let i = 0; i < 8; i++) {
       advanceTimeAndRunTimers(100);
     }
-    
+
     // 验证两个任务都执行了预期的次数
     expect(alwaysSuccessCallback).toHaveBeenCalledTimes(3);
     expect(sometimesFailCallback).toHaveBeenCalledTimes(3);

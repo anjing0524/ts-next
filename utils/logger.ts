@@ -6,7 +6,7 @@ import fs from 'fs';
 // 确保日志目录存在
 const logDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true }); 
+  fs.mkdirSync(logDir, { recursive: true });
 }
 
 // 定义文件日志格式

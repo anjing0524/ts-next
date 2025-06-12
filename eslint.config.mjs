@@ -13,7 +13,6 @@ import { FlatCompat } from '@eslint/eslintrc';
 // (User needs to install this plugin manually: npm install eslint-plugin-import --save-dev or yarn add eslint-plugin-import --dev)
 import importPlugin from 'eslint-plugin-import';
 
-
 // 获取当前文件的完整路径 (Get the full path of the current file)
 const __filename = fileURLToPath(import.meta.url);
 // 获取当前文件所在目录的路径 (Get the path of the directory where the current file is located)
@@ -39,11 +38,20 @@ const eslintConfig = [
     },
     rules: {
       // import 插件的推荐规则 (Recommended rules for the import plugin)
-      'import/order': [ // 控制导入语句的顺序 (Control the order of import statements)
+      'import/order': [
+        // 控制导入语句的顺序 (Control the order of import statements)
         'warn', // 将此规则级别设置为警告 (Set this rule level to warning)
         {
-          groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'object', 'type'],
-          pathGroups: [ // 为特定路径模式定义分组 (Define groups for specific path patterns)
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            ['parent', 'sibling', 'index'],
+            'object',
+            'type',
+          ],
+          pathGroups: [
+            // 为特定路径模式定义分组 (Define groups for specific path patterns)
             {
               pattern: '{react,react-dom/**,next,next/**}', // React 和 Next.js 相关模块 (React and Next.js related modules)
               group: 'external',
@@ -56,20 +64,15 @@ const eslintConfig = [
           ],
           pathGroupsExcludedImportTypes: ['react', 'type'], // 这些类型导入不应用路径分组 (These import types do not apply path grouping)
           'newlines-between': 'always', // 不同组之间总是需要换行 (Always require newlines between different groups)
-          alphabetize: { // 按字母顺序排列每个组内的导入 (Alphabetize imports within each group)
+          alphabetize: {
+            // 按字母顺序排列每个组内的导入 (Alphabetize imports within each group)
             order: 'asc',
             caseInsensitive: true,
           },
         },
       ],
       'import/no-unresolved': 'off', // 关闭对未解析路径的检查，TypeScript 通常会处理 (Turn off check for unresolved paths, TypeScript usually handles this)
-      'import/named': 'warn', // 检查命名导入是否在导出中存在 (Check if named imports exist in exports)
-      'import/namespace': 'warn', // 检查命名空间导入 (Check namespace imports)
-      'import/default': 'warn', // 检查默认导入 (Check default imports)
-      'import/export': 'warn', // 检查导出语句 (Check export statements)
       'import/no-duplicates': 'warn', // 禁止重复导入 (Prohibit duplicate imports)
-      // 可以根据需要添加更多 import 插件的规则
-      // (More rules from the import plugin can be added as needed)
     },
     settings: {
       // 配置 import 插件以识别 TypeScript 文件
@@ -82,9 +85,9 @@ const eslintConfig = [
       },
       'import/parsers': {
         '@typescript-eslint/parser': ['.ts', '.tsx'], // 使用 TypeScript 解析器解析 .ts 和 .tsx 文件
-                                                    // (Use TypeScript parser for .ts and .tsx files)
+        // (Use TypeScript parser for .ts and .tsx files)
       },
-    }
+    },
   },
 
   // 扩展 Prettier 规则，确保它覆盖 ESLint 的格式化规则，避免冲突

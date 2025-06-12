@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -7,7 +7,6 @@ import { Terminal } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { authApi, getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
-
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -71,10 +70,11 @@ export default function AuthCallbackPage() {
         // For now, redirecting to /dashboard
         const redirectTo = searchParams.get('redirect_uri_after_login') || '/dashboard';
         router.push(redirectTo);
-
       } catch (err) {
         console.error('Token exchange error:', err);
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred during token exchange.');
+        setError(
+          err instanceof Error ? err.message : 'An unexpected error occurred during token exchange.'
+        );
         setIsLoading(false);
       }
     };
