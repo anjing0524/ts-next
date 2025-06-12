@@ -28,8 +28,8 @@ interface RoleRouteParams {
 // GET /api/roles/{roleId} - 获取角色详情 (已重构)
 async function getRole(
   request: NextRequest,
-  { params }: RoleRouteParams,
-  authContext: AuthContext
+  { params }: RoleRouteParams
+  // authContext: AuthContext // Removed as it's not used
 ) {
   const roleId = params.roleId;
   // Prisma 会自动处理无效 CUID 格式的查询（通常返回 null），所以特定格式校验已移除。

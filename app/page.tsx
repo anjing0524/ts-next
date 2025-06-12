@@ -3,10 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-import { Shield, Key, Users, Lock } from 'lucide-react';
+import { Shield, Key, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
   const router = useRouter();

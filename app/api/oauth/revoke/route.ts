@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { withOAuthRevokeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import {
-  ClientAuthUtils,
   AuthorizationUtils,
   OAuth2ErrorTypes,
-  RateLimitUtils,
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 

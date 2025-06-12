@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { successResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { withAuth } from '@/lib/auth/middleware';
 import { PermissionService } from '@/lib/services/permissionService';
 
-import { SinglePermissionCheckRequestSchema, SinglePermissionCheckRequestType } from './schemas'; // Path relative to current dir
+import { SinglePermissionCheckRequestSchema } from './schemas'; // Path relative to current dir
 
 const permissionService = new PermissionService();
 
-async function checkSinglePermissionHandler(request: NextRequest, context: AuthContext) {
+async function checkSinglePermissionHandler(request: NextRequest) {
   const requestId = (request as { requestId?: string }).requestId; // From withErrorHandler
   const body = await request.json();
 

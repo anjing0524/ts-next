@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { addMinutes } from 'date-fns';
+import { jwtVerify, JWTPayload } from 'jose';
 
 import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import {
@@ -9,7 +10,6 @@ import {
   ScopeUtils,
   AuthorizationUtils,
   OAuth2ErrorTypes,
-  RateLimitUtils,
 } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
 
@@ -300,8 +300,6 @@ async function handleAuthorizeRequest(
 
 // 移除基于 session 的用户认证，改为依赖JWT进行身份验证
 // Removed session-based user authentication, changed to rely on JWT for identity verification.
-import { jwtVerify } from 'jose'; // 用于JWT验证
-import { JWTPayload } from 'jose'; // JWT Payload 类型
 
 // 假设JWT密钥等环境变量已定义
 // Assuming JWT secret and other environment variables are defined
@@ -457,7 +455,7 @@ async function checkConsentRequired(
   try {
     grantedScopes = JSON.parse(existingConsent.scopes);
     if (!Array.isArray(grantedScopes)) grantedScopes = [];
-  } catch (e) {
+  } catch {
     // Invalid JSON in DB, treat as no scopes granted or log error
     console.error('Invalid JSON in ConsentGrant.scopes for grant ID:', existingConsent.id);
     return true; // Requires re-consent if scopes are malformed

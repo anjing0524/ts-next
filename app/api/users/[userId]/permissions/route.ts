@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
-import { AuthorizationUtils } from '@/lib/auth/oauth2';
+import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 // Assuming a Redis client setup, e.g., import { redis } from '@/lib/redis';
 // For now, we'll simulate cache logic and focus on permission calculation.
@@ -30,8 +29,7 @@ async function getRoleHierarchy(
 // GET /api/users/{userId}/permissions - List all effective permissions for a user
 async function getUserEffectivePermissions(
   request: NextRequest,
-  { params }: UserPermissionsRouteParams,
-  authContext: AuthContext
+  { params }: UserPermissionsRouteParams
 ) {
   try {
     const userId = params.userId;

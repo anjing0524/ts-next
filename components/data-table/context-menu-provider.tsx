@@ -1,8 +1,8 @@
 'use client';
 
+import { Copy, Filter, Download, Clipboard, ArrowUpDown, Settings } from 'lucide-react';
 import { Menu, Item, Separator, Submenu } from 'react-contexify';
 import 'react-contexify/ReactContexify.css';
-import { Copy, Filter, Download, Clipboard, ArrowUpDown, Settings } from 'lucide-react';
 
 export const MENU_ID = 'data-table-context-menu';
 

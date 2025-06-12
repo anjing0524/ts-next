@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withCORS } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 // import { validateSession, destroySession } from '@/lib/auth/session'; // 移除 session 管理相关导入
-import { prisma } from '@/lib/prisma';
 
 // Helper function to revoke tokens
 const revokeToken = async (
@@ -78,7 +77,7 @@ async function handleLogout(request: NextRequest): Promise<NextResponse> {
         refreshTokenFromBody = body.refresh_token;
         // Potentially extract userId from access token if needed for logging before revocation
         // For example: const decoded = jwt.decode(accessTokenFromBody || accessTokenFromCookie); userIdFromToken = decoded.sub;
-      } catch (e) {
+      } catch {
         // Not a JSON body or no tokens, ignore
       }
     }

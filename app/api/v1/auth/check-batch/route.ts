@@ -7,7 +7,6 @@ import { PermissionService } from '@/lib/services/permissionService';
 
 import {
   BatchPermissionCheckRequestSchema,
-  BatchPermissionCheckRequestType,
   BatchIndividualCheckRequestType,
 } from './schemas'; // Path relative to current dir
 
@@ -20,7 +19,7 @@ interface PermissionServiceRequest {
   // Add other attributes if your PermissionService.checkBatchPermissions expects more
 }
 
-async function checkBatchPermissionHandler(request: NextRequest, context: AuthContext) {
+async function checkBatchPermissionHandler(request: NextRequest) {
   const requestId = (request as { requestId?: string }).requestId; // Overall requestId for this batch operation from withErrorHandler
   const body = await request.json();
 

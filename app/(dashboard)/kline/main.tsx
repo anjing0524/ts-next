@@ -255,7 +255,7 @@ export default function Main() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [setupWorkerMessageHandler, updatePerformanceMetrics]);
+  }, [setupWorkerMessageHandler, updatePerformanceMetrics, basePath]);
 
   // 使用useCallback优化鼠标移动事件处理函数，移除防抖以提高响应速度
   const handleMouseMove = useCallback(
@@ -396,7 +396,7 @@ export default function Main() {
     if (typeof window === 'undefined') return;
 
     // 处理全局鼠标释放事件，用于捕获canvas外的释放
-    const handleGlobalMouseUp = (e: MouseEvent) => {
+    const handleGlobalMouseUp = () => {
       if (isDragging) {
         // 当在canvas外释放鼠标时，需要通知worker结束拖动
         sendMessageToWorker({

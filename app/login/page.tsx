@@ -45,7 +45,6 @@ async function generateCodeChallenge(codeVerifier: string): Promise<string> {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -216,7 +215,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-gray-600">
           <p>
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
               Sign up
             </Link>

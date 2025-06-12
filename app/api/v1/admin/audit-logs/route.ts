@@ -4,12 +4,12 @@ import { Prisma } from '@prisma/client';
 
 import { successResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { withAuth, AuthContext } from '@/lib/auth/middleware';
+import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
 
-import { AuditLogQuerySchema, AuditLogQueryType } from './schemas';
+import { AuditLogQuerySchema } from './schemas';
 
-async function getAuditLogsHandler(request: NextRequest, context: AuthContext) {
+async function getAuditLogsHandler(request: NextRequest) {
   const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
   const { searchParams } = new URL(request.url);
 

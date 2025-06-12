@@ -112,7 +112,7 @@ async function handlePermissionsCheck(request: NextRequest, authContext: AuthCon
       if (parsedBodyForError.success) {
         targetUserIdForErrorLog = parsedBodyForError.data.userId;
       }
-    } catch (parseError) {
+    } catch {
       // Ignore if parsing body for error logging fails
     }
 

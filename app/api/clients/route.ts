@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as bcrypt from 'bcrypt';
 import { z } from 'zod';
 
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
+import { withErrorHandler } from '@/lib/api/errorHandler';
 import { withAuth, AuthContext } from '@/lib/auth/middleware';
 import { AuthorizationUtils } from '@/lib/auth/oauth2';
 import { prisma } from '@/lib/prisma';
@@ -44,22 +44,6 @@ const CreateClientSchema = z.object({
   tokenEndpointAuthMethod: z
     .enum(['client_secret_basic', 'client_secret_post', 'none'])
     .default('client_secret_basic'),
-});
-
-const UpdateClientSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  description: z.string().max(500).optional(),
-  redirectUris: z.array(z.string().url()).optional(),
-  grantTypes: z
-    .array(z.enum(['authorization_code', 'client_credentials', 'refresh_token']))
-    .optional(),
-  responseTypes: z.array(z.enum(['code', 'token', 'id_token'])).optional(),
-  scope: z.string().optional(),
-  isPublic: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-  requirePkce: z.boolean().optional(),
-  requireConsent: z.boolean().optional(),
-  tokenEndpointAuthMethod: z.enum(['client_secret_basic', 'client_secret_post', 'none']).optional(),
 });
 
 // GET /api/clients - List OAuth clients (admin only)

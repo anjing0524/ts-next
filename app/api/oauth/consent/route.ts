@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   try {
     const rawFormData = await request.formData();
     formData = Object.fromEntries(rawFormData.entries()) as unknown as ConsentFormData;
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
   }
 
