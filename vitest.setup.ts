@@ -46,6 +46,13 @@ if (!process.env.JWT_ISSUER) {
 if (!process.env.JWT_AUDIENCE) {
   process.env.JWT_AUDIENCE = "api_resource_dev"; // Default test audience
 }
+if (!process.env.JWKS_URI) {
+  process.env.JWKS_URI = "http://localhost/.well-known/jwks.json"; // Dummy JWKS URI for testing
+  console.warn(
+    "⚠️ WARNING: JWKS_URI was not set. Using a placeholder for testing. " +
+    "Actual JWT validation against a remote JWKS will not occur without further mocking if fetch is called."
+  );
+}
 
 
 // Setup environment variables for testing

@@ -748,10 +748,24 @@ export class AuthorizationUtils {
         validClientId = clientExists ? event.clientId : null;
       }
 
+      let actorType: string = 'SYSTEM'; // Default to SYSTEM
+      let actorId: string | null = null;
+
+      if (validUserId) {
+        actorType = 'USER';
+        actorId = validUserId;
+      } else if (validClientId) {
+        actorType = 'CLIENT';
+        // Assuming validClientId is the string identifier like "my-app"
+        // and actorId in AuditLog is intended to store this.
+        // If actorId must be the Client table's UUID PK, this needs adjustment.
+        actorId = validClientId;
+      }
+
       await prisma.auditLog.create({
         data: {
           userId: validUserId,
-          clientId: validClientId,
+          clientId: validClientId, // This is the client's string ID, e.g. "my-app"
           action: event.action,
           resource: event.resource || null,
           ipAddress: event.ipAddress || null,
@@ -759,6 +773,8 @@ export class AuthorizationUtils {
           success: event.success,
           errorMessage: event.errorMessage || null,
           metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+          actorType: actorType,
+          actorId: actorId,
         },
       });
     } catch (error) {
