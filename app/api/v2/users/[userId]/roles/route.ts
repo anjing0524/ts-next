@@ -1,82 +1,114 @@
 // 文件路径: app/api/v2/users/[userId]/roles/route.ts
-// 描述: 管理特定用户的角色分配 (List roles for a user, Assign roles to a user)
+// 描述: 此文件处理特定用户角色分配的 API 请求。
+// 包括获取用户当前拥有的角色列表 (GET) 和为用户分配一个或多个角色 (POST)。
+// 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { Role, Prisma } from '@prisma/client'; // User, UserRole types not directly used in handlers after refactor
-// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED
-import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
+import prisma from '@/lib/prisma'; // Prisma ORM 客户端。
+import { Role, Prisma } from '@prisma/client'; // Prisma 生成的角色类型和高级查询类型。
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 认证由中间件处理。
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件。
 
-// --- 辅助函数 (Copied/adapted from other user management routes) ---
-function errorResponse(message: string, status: number, errorCode?: string) {
+// --- 辅助函数 ---
+
+/**
+ * 创建并返回一个标准化的 JSON 错误响应。
+ * @param message - 错误描述信息。
+ * @param status - HTTP 状态码。
+ * @param errorCode - (可选) 应用特定的错误代码字符串。
+ * @returns NextResponse 对象。
+ */
+function errorResponse(message: string, status: number, errorCode?: string): NextResponse {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-// isUserAdmin function is no longer needed.
+// `isUserAdmin` 函数已移除，权限由 `requirePermission` 统一管理。
 
+// 定义路由上下文接口，用于从动态路由参数中获取 userId。
 interface RouteContextGetPost {
   params: {
-    userId: string; // 目标用户的ID (ID of the target user)
+    userId: string; // 目标用户的ID。
   };
 }
 
 // --- GET /api/v2/users/{userId}/roles (获取用户拥有的角色列表) ---
-async function listUserRolesHandler(req: AuthenticatedRequest, context: RouteContextGetPost) {
-  const { params } = context;
-  const targetUserId = params.userId;
-  const performingAdmin = req.user;
-  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing roles for user ${targetUserId}.`);
+// 此处理函数用于获取指定用户当前被分配的所有激活的角色。
+// 受到 `requirePermission('users:roles:read')` (或类似权限) 的保护。
+async function listUserRolesHandler(req: AuthenticatedRequest, context: RouteContextGetPost): Promise<NextResponse> {
+  const { params } = context; // 从路由上下文中获取路径参数。
+  const targetUserId = params.userId; // 目标用户的ID。
+
+  // `req.user` 由 `requirePermission` 中间件填充，包含执行操作的已认证用户信息。
+  const performingUser = req.user;
+  // 日志记录操作。
+  console.log(`User ${performingUser?.id} (ClientID: ${performingUser?.clientId}) listing roles for user ${targetUserId}.`);
 
   try {
-    // 1. 检查目标用户是否存在 (Check if target user exists) - Was step 2
+    // 步骤 1: 检查目标用户是否存在。
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
-    if (!targetUser) return errorResponse('User not found.', 404, 'user_not_found');
+    if (!targetUser) {
+      return errorResponse('User not found, cannot list roles.', 404, 'user_not_found');
+    }
 
-    // 2. 获取用户的角色 (Fetch user's roles) - Was step 3
+    // 步骤 2: 从数据库获取用户的角色分配记录。
+    // `include: { role: true }` 会同时加载每个 UserRole 记录关联的完整 Role 对象。
+    // `where` 条件确保只获取那些关联的角色本身是激活 (`role: { isActive: true }`) 的分配。
     const userRoles = await prisma.userRole.findMany({
       where: {
-        userId: targetUserId,
-        role: { isActive: true }, // 只获取与激活角色关联的分配 (Only fetch assignments linked to active roles)
-        // 可根据 UserRole 自身的 'expiresAt' 或其他状态字段进行过滤 (Can filter by UserRole's own 'expiresAt' or other status fields)
+        userId: targetUserId,       // 筛选特定用户的角色
+        role: { isActive: true }, // (重要) 只获取那些当前处于“激活”状态的角色
+                                  // 这防止了返回已被逻辑删除或禁用的角色。
+        // 根据业务需求，还可以添加对 UserRole 记录本身状态的过滤，
+        // 例如，如果 UserRole 有自己的 `isActive` 或 `expiresAt` 字段。
         // e.g. AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }]
       },
       include: {
-        role: true, // 包含完整的角色信息 (Include full role information)
+        role: true, // 包含关联的 Role 对象的完整信息。
       },
-      orderBy: { role: { name: 'asc' } } // 按角色名称排序 (Order by role name)
+      orderBy: { role: { name: 'asc' } } // 按角色名称升序排序，便于展示。
     });
 
-    // 格式化响应 (Format response)
+    // 步骤 3: 格式化响应数据。
+    // 从 UserRole 记录中提取 Role 对象，并选择性地构造返回给客户端的角色信息。
     const rolesToReturn = userRoles
-      .map(ur => ur.role) // 直接取 role 对象 (Directly take the role object)
-      .filter(role => role != null) // 确保 role 对象存在 (Ensure role object exists)
-      .map(role => ({ // 显式选择要返回的字段 (Explicitly select fields to return)
+      .map(ur => ur.role) // 从每个 UserRole 对象中提取关联的 Role 对象。
+      .filter(role => role != null) // 确保 Role 对象存在 (理论上 `include` 会保证，但作为防御性检查)。
+      .map(role => ({ // 为每个 Role 对象构造一个更简洁的返回结构。
         id: role.id,
         name: role.name,
         displayName: role.displayName,
         description: role.description,
-        isActive: role.isActive, // 也返回角色是否激活的状态 (Also return role's active status)
-        // assignedAt: ur.assignedAt, // 如果需要分配时的特定信息 (If specific info from assignment time is needed)
+        isActive: role.isActive, // 包含角色本身的激活状态。
+        // 如果需要 UserRole 分配记录的特定信息 (例如分配时间)，可以从 `ur` 中获取并添加到这里。
+        // assignedAt: ur.assignedAt,
       }));
 
+    // 返回包含角色列表的 JSON 响应。
     return NextResponse.json({ roles: rolesToReturn }, { status: 200 });
 
   } catch (error) {
-    console.error(`Error fetching roles for user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
+    // 错误处理：记录未知错误，并返回500服务器错误。
+    console.error(`Error fetching roles for user ${targetUserId} by user ${performingUser?.id}:`, error);
     return errorResponse('An unexpected error occurred while fetching user roles.', 500, 'server_error');
   }
 }
+// 将 listUserRolesHandler 与 'users:roles:read' 权限绑定，并导出为 GET 请求的处理函数。
 export const GET = requirePermission('users:roles:read', listUserRolesHandler);
 
 
 // --- POST /api/v2/users/{userId}/roles (为用户分配一个或多个角色) ---
-async function assignRolesToUserHandler(req: AuthenticatedRequest, context: RouteContextGetPost) {
+// 此处理函数用于为一个指定用户分配新的角色。通常是覆盖式分配或增量分配，具体取决于实现策略。
+// 当前实现更接近于增量分配，但会跳过已存在的分配 (幂等性)。
+// 受到 `requirePermission('users:roles:assign')` (或类似权限) 的保护。
+async function assignRolesToUserHandler(req: AuthenticatedRequest, context: RouteContextGetPost): Promise<NextResponse> {
   const { params } = context;
-  const targetUserId = params.userId;
-  const performingAdmin = req.user;
+  const targetUserId = params.userId; // 目标用户ID。
+
+  const performingAdmin = req.user; // 执行操作的管理员。
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) assigning roles to user ${targetUserId}.`);
 
-  // 1. 解析请求体 (Parse request body) - Was step 2
+  // 步骤 1: 解析请求体。
+  // 期望请求体是一个 JSON 对象，包含一个 `roleIds` 数组，其中每个元素是角色ID字符串。
   let requestBody;
   try {
     requestBody = await req.json();
@@ -84,83 +116,103 @@ async function assignRolesToUserHandler(req: AuthenticatedRequest, context: Rout
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
-  const { roleIds } = requestBody; // 期望是一个角色ID的数组: { "roleIds": ["id1", "id2"] } (Expect an array of role IDs)
+  const { roleIds } = requestBody; // 从请求体中解构出 roleIds。
+  // 验证 `roleIds` 是否是一个非空的字符串数组成员。
   if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0 || !roleIds.every(id => typeof id === 'string')) {
-    return errorResponse('Invalid request: "roleIds" must be a non-empty array of strings.', 400, 'validation_error_roleIds');
+    return errorResponse('Invalid request: "roleIds" must be a non-empty array of strings representing role IDs.', 400, 'validation_error_roleIds');
   }
 
   try {
-    // 2. 检查目标用户是否存在 (Check if target user exists) - Was step 3
+    // 步骤 2: 检查目标用户是否存在。
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
-    if (!targetUser) return errorResponse('User not found, cannot assign roles.', 404, 'user_not_found');
+    if (!targetUser) {
+      return errorResponse('User not found, cannot assign roles.', 404, 'user_not_found');
+    }
 
-    // 3. 处理角色分配 (Process role assignments) - Was step 4
-    const successfullyAssignedRoles: Partial<Role>[] = [];
-    const assignmentErrors: { roleId: string, message: string }[] = [];
+    // 步骤 3: 处理角色分配。
+    const successfullyAssignedRoles: Partial<Role>[] = []; // 存储成功分配的角色信息。
+    const assignmentErrors: { roleId: string, message: string }[] = []; // 存储分配失败的角色及原因。
 
-    // 获取用户已有的角色ID，用于幂等性检查 (Get user's existing role IDs for idempotency check)
+    // 为了实现幂等性 (重复请求不会产生不同效果) 并避免重复创建 UserRole 记录，
+    // 首先获取用户当前已拥有的所有角色ID。
     const existingUserRoles = await prisma.userRole.findMany({
         where: { userId: targetUserId },
-        select: { roleId: true }
+        select: { roleId: true } // 只需要 roleId 用于比较。
     });
-    const existingRoleIdsSet = new Set(existingUserRoles.map(ur => ur.roleId));
+    const existingRoleIdsSet = new Set(existingUserRoles.map(ur => ur.roleId)); // 将已有角色ID存入 Set 以快速查找。
 
+    // 遍历请求中提供的每个 roleId。
     for (const roleId of roleIds) {
-      // 检查角色是否存在且激活 (Check if role exists and is active)
+      // 检查要分配的角色是否存在于数据库中且处于激活状态。
+      // 不应允许分配不存在或已禁用的角色。
       const roleToAssign = await prisma.role.findUnique({
         where: { id: roleId, isActive: true },
       });
 
       if (!roleToAssign) {
+        // 如果角色不存在或未激活，则记录错误。
         assignmentErrors.push({ roleId, message: 'Role not found or is not active.' });
-        continue;
+        continue; // 继续处理下一个 roleId。
       }
 
-      // 检查用户是否已被分配此角色 (Check if user already has this role)
+      // 检查用户是否已经拥有此角色。
       if (existingRoleIdsSet.has(roleId)) {
+        // 如果用户已拥有此角色，则跳过创建，并将此视为一次成功的“分配”(保持幂等性)。
         console.log(`User ${targetUserId} already has role ${roleId} (${roleToAssign.name}). Skipping assignment, considering as success.`);
         successfullyAssignedRoles.push({ id: roleToAssign.id, name: roleToAssign.name, displayName: roleToAssign.displayName });
         continue;
       }
 
-      // 创建 UserRole 记录 (Create UserRole record)
+      // 如果角色有效且用户尚未拥有，则在 UserRole 中间表中创建新的分配记录。
       await prisma.userRole.create({
         data: {
-          userId: targetUserId,
-          roleId: roleId,
-          assignedBy: performingAdmin?.id, // 可选：记录操作的管理员 (Optional: record the admin performing action)
-          // context, expiresAt can also be set here if applicable
+          userId: targetUserId,        // 目标用户ID。
+          roleId: roleId,              // 要分配的角色ID。
+          assignedBy: performingAdmin?.id, // (可选) 记录执行此分配操作的管理员ID，用于审计。
+          // context 和 expiresAt 字段可以根据业务需求在此处设置。
         },
       });
+      // 将成功分配的角色信息添加到列表中。
       successfullyAssignedRoles.push({ id: roleToAssign.id, name: roleToAssign.name, displayName: roleToAssign.displayName });
     }
 
-    // 4. 返回响应 (Return response) - Was step 5
+    // 步骤 4: 返回响应。
+    // 根据分配过程中是否发生错误，返回不同的状态码和消息。
     if (assignmentErrors.length > 0) {
-      const status = successfullyAssignedRoles.length > 0 ? 207 : 400; // 207 Multi-Status if partial success, 400 if all failed
+      // 如果有部分角色分配成功，部分失败，则返回 207 Multi-Status。
+      // 如果所有请求的角色都分配失败，则返回 400 Bad Request。
+      const status = successfullyAssignedRoles.length > 0 ? 207 : 400;
       return NextResponse.json({
-        message: status === 207 ? 'Some roles assigned with errors.' : 'Failed to assign roles.',
-        assignedRoles: successfullyAssignedRoles,
-        errors: assignmentErrors
+        message: status === 207 ? 'Some roles were assigned successfully, but others failed.' : 'Failed to assign one or more roles.',
+        assignedRoles: successfullyAssignedRoles, // 列出成功分配的角色。
+        errors: assignmentErrors                 // 列出分配失败的角色及其原因。
       }, { status });
     }
 
+    // 如果所有角色都成功分配 (或已存在)。
+    // HTTP 200 OK 或 201 Created 都可以。201 更侧重于新资源的创建 (UserRole记录)。
+    // 此处使用 200 OK 表示请求已成功处理。
     return NextResponse.json({
-        message: 'Roles assigned successfully.',
+        message: 'Roles assigned successfully to the user.',
         assignedRoles: successfullyAssignedRoles
-    }, { status: 200 }); // Or 201 if treating as new resource creation (UserRole records)
+    }, { status: 200 });
 
   } catch (error: any) {
-    // 处理 Prisma 已知错误，例如外键约束 (Handle Prisma known errors, e.g., foreign key constraint)
+    // 错误处理：
+    // 捕获 Prisma 特定的已知请求错误。
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2003') { // Foreign key constraint failed (e.g., roleId doesn't exist on roles table)
-             return errorResponse('Role assignment failed: One or more role IDs are invalid.', 400, 'validation_error_fk');
+        // P2003: 外键约束失败 (例如，提供的 roleId 在 Role 表中不存在，尽管上面的检查应已捕获此情况)。
+        if (error.code === 'P2003') {
+             return errorResponse('Role assignment failed: One or more role IDs are invalid or do not exist.', 400, 'validation_error_fk_constraint');
         }
     }
+    // 记录其他未知错误。
     console.error(`Error assigning roles to user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
-    return errorResponse('An unexpected error occurred while assigning roles.', 500, 'server_error');
+    return errorResponse('An unexpected error occurred while assigning roles to the user.', 500, 'server_error');
   }
 }
+// 将 assignRolesToUserHandler 与 'users:roles:assign' 权限绑定，并导出为 POST 请求的处理函数。
 export const POST = requirePermission('users:roles:assign', assignRolesToUserHandler);
 
+// JWTUtils 的声明不再需要，因为认证已由中间件处理。
 // Declaration for JWTUtils is no longer needed.
