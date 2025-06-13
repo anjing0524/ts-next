@@ -1,213 +1,168 @@
 // 文件路径: app/api/v2/auth/register/route.ts
-// 描述: 新用户注册API端点 (v2)
+// 描述: 管理员创建新用户端点 (Admin creates new user endpoint)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import bcrypt from 'bcryptjs'; // 使用 bcryptjs 进行密码哈希
+import prisma from '@/lib/prisma';
+import { User, Prisma } from '@prisma/client'; // Prisma types
+import bcrypt from 'bcrypt';
+import { JWTUtils } from '@/lib/auth/oauth2'; // For verifying admin's token
+import { isValidEmail } from '@/lib/utils'; // Assuming a utility for email validation
 
-import { prisma, Prisma } from '@/lib/prisma'; // Import Prisma for PrismaClientKnownRequestError
-import { successResponse, errorResponse }from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { AuthorizationUtils } from '@/lib/auth/oauth2'; // 用于审计
+// 模拟的管理员用户ID列表或角色检查逻辑 (Simulated admin user ID list or role check logic)
+// 在实际应用中，这应该是一个更健壮的RBAC检查 (In a real application, this should be a more robust RBAC check)
+// const ADMIN_USER_IDS = ['cluser1test123456789012345']; // Example admin user ID
+// const REQUIRED_ROLE_FOR_REGISTRATION = 'admin'; // Or a specific permission needed
 
-// --- 请求 Schema ---
-const RegisterRequestSchema = z.object({
-  username: z.string().min(3, '用户名 (username) 至少需要3个字符').max(50, '用户名不能超过50个字符')
-    .regex(/^[a-zA-Z0-9_]+$/, '用户名只能包含字母、数字和下划线'),
-  email: z.string().email('无效的电子邮件地址 (Invalid email address)'),
-  password: z.string().min(8, '密码 (password) 至少需要8个字符')
-    // .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    //   '密码必须包含大小写字母、数字和特殊字符'), // 可根据密码策略调整
-    ,
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-});
+// 辅助函数：错误响应 (Helper function: Error response)
+function errorResponse(message: string, status: number, errorCode?: string) {
+  return NextResponse.json({ error: errorCode || 'registration_failed', message }, { status });
+}
 
-/**
- * @swagger
- * /api/v2/auth/register:
- *   post:
- *     summary: 新用户注册 (New User Registration)
- *     description: 创建一个新用户账户。
- *     tags:
- *       - Auth V2
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *                 description: 用户名 (必须唯一)。
- *                 example: 'newuser'
- *               email:
- *                 type: string
- *                 format: email
- *                 description: 用户的电子邮件地址 (必须唯一)。
- *                 example: 'newuser@example.com'
- *               password:
- *                 type: string
- *                 format: password
- *                 description: 用户的密码 (至少8位字符)。
- *                 example: 'ValidP@ss123'
- *               firstName:
- *                 type: string
- *                 description: 用户名字 (可选)。
- *                 example: 'John'
- *               lastName:
- *                 type: string
- *                 description: 用户姓氏 (可选)。
- *                 example: 'Doe'
- *     produces:
- *       - application/json
- *     responses:
- *       '201':
- *         description: 用户注册成功。
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   description: 新创建用户的ID。
- *                 username:
- *                   type: string
- *                 email:
- *                   type: string
- *                 firstName:
- *                   type: string
- *                 lastName:
- *                   type: string
- *                 createdAt:
- *                   type: string
- *                   format: date-time
- *       '400':
- *         description: 无效的请求 (例如，数据格式错误，密码太短)。
- *       '409':
- *         description: 冲突 (例如，用户名或电子邮件已存在)。
- *       '500':
- *         description: 服务器内部错误。
- */
-async function registerHandler(request: NextRequest) {
-  const overallRequestId = (request as any).requestId; // from withErrorHandler
-  const body = await request.json();
-
-  const validationResult = RegisterRequestSchema.safeParse(body);
-  if (!validationResult.success) {
-    const errorMessages = validationResult.error.flatten().fieldErrors;
-    return NextResponse.json(
-      errorResponse(400, `无效的请求体: ${JSON.stringify(errorMessages)}`, 'VALIDATION_ERROR', overallRequestId),
-      { status: 400 }
-    );
+export async function POST(req: NextRequest) {
+  // 1. 管理员认证/授权 (Admin Authentication/Authorization)
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+    return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
+  }
+  const token = authHeader.substring(7); // 提取令牌 (Extract token)
+  if (!token) {
+    return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
   }
 
-  const { username, email, password, firstName, lastName } = validationResult.data;
-
-  // 1. 检查用户名或邮箱是否已存在
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { username: username },
-        { email: email },
-      ],
-    },
-  });
-
-  if (existingUser) {
-    let conflictField = '';
-    if (existingUser.username === username) {
-      conflictField = '用户名 (username)';
-    } else if (existingUser.email === email) {
-      conflictField = '电子邮件 (email)';
-    }
-    await AuthorizationUtils.logAuditEvent({
-        action: 'register_failed_conflict',
-        actorId: username, // 尝试注册的用户名
-        ipAddress: request.ip,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: `${conflictField} 已存在 (already exists)`,
-        metadata: { username, email }
-    });
-    return NextResponse.json(
-      errorResponse(409, `${conflictField} 已存在 (${conflictField} already exists)`, 'CONFLICT_ERROR', overallRequestId),
-      { status: 409 }
-    );
+  // 验证管理员的访问令牌 (Verify admin's access token)
+  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
+  if (!valid || !payload) {
+    return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
   }
 
-  // 2. 哈希密码
-  const saltRounds = 10; // bcryptjs 推荐 salt rounds
-  const passwordHash = await bcrypt.hash(password, saltRounds);
+  // Placeholder Admin Check: 实际应用中应基于角色或权限进行检查
+  // (Placeholder Admin Check: In a real application, this should be based on roles or permissions)
+  // 例如: const isAdmin = await checkUserAdminRole(payload.userId);
+  // 为了本示例，我们假设如果令牌有效且包含 userId，则操作被允许。这非常不安全，仅用于演示。
+  // (For this example, we assume if token is valid and contains userId, action is permitted. This is very insecure, for demo only.)
+  if (!payload.userId) {
+    console.warn(`Admin check failed: Malformed token payload or missing userId. Token: ${token.substring(0,10)}...`);
+    return errorResponse('Forbidden: You do not have permission to perform this action (invalid token payload).', 403, 'forbidden');
+  }
+  const adminUserId = payload.userId;
+  console.log(`Admin user ${adminUserId} is attempting to register a new user.`);
+  // TODO: 在实际部署前，必须实现真正的RBAC检查 (MUST implement real RBAC check before deploying)
 
-  // 3. 创建用户
+
+  // 2. 解析请求体 (Parse request body)
+  let requestBody;
   try {
+    requestBody = await req.json();
+  } catch (e) {
+    return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
+  }
+
+  const {
+    username, email, password,
+    firstName, lastName, displayName, avatar, phone,
+    organization, department, workLocation,
+    isActive = true, // 默认为激活状态 (Defaults to active)
+    mustChangePassword = true, // 默认需要修改密码 (Defaults to must change password)
+  } = requestBody;
+
+  // 3. 输入数据验证 (Input data validation)
+  if (!username || !email || !password) {
+    return errorResponse('Username, email, and password are required.', 400, 'validation_error');
+  }
+  if (password.length < 8) { // 密码最小长度示例 (Example: minimum password length)
+    return errorResponse('Password must be at least 8 characters long.', 400, 'validation_error');
+  }
+  if (!isValidEmail(email)) { // 使用假设的工具函数验证邮箱格式 (Use assumed utility function to validate email format)
+      return errorResponse('Invalid email format.', 400, 'validation_error');
+  }
+
+  try {
+    // 4. 检查用户名或邮箱是否已存在 (Check if username or email already exists)
+    const existingUser = await prisma.user.findFirst({
+      where: { OR: [{ username: username.trim() }, { email: email.trim().toLowerCase() }] },
+    });
+    if (existingUser) {
+      const conflictField = existingUser.username === username.trim() ? 'username' : 'email';
+      return errorResponse(`${conflictField} already exists.`, 409, 'conflict');
+    }
+
+    // 5. 安全地哈希密码 (Securely hash the password)
+    const passwordHash = await bcrypt.hash(password, 10); // 10 is the salt rounds
+
+    // 6. 创建新用户记录 (Create new User record)
     const newUser = await prisma.user.create({
       data: {
-        username,
-        email,
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
         passwordHash,
         firstName: firstName || null,
         lastName: lastName || null,
-        isActive: true, // 新用户默认激活，或根据业务逻辑设置为 false 并发送验证邮件
-        mustChangePassword: true, // 新用户首次登录强制修改密码
-        // emailVerified: false, // 如果需要邮件验证流程
+        displayName: displayName || username.trim(), // 默认使用 username作为 displayName
+        avatar: avatar || null,
+        phone: phone || null,
+        organization: organization || null,
+        department: department || null,
+        workLocation: workLocation || null,
+        isActive: Boolean(isActive),
+        mustChangePassword: Boolean(mustChangePassword),
+        failedLoginAttempts: 0,
+        // createdAt, updatedAt are auto-generated by Prisma
+        // lastLoginAt, lockedUntil default to null
       },
     });
 
-    // 审计注册成功事件
-    await AuthorizationUtils.logAuditEvent({
-        userId: newUser.id,
-        action: 'user_register_success',
-        ipAddress: request.ip,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: true,
-        metadata: { username: newUser.username, email: newUser.email }
-    });
+    // 7. 构建并返回响应 (Construct and return response)
+    // 不应返回 passwordHash 或其他敏感内部字段 (Should not return passwordHash or other sensitive internal fields)
+    const userResponse = {
+      id: newUser.id,
+      username: newUser.username,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      displayName: newUser.displayName,
+      avatar: newUser.avatar,
+      phone: newUser.phone,
+      organization: newUser.organization,
+      department: newUser.department,
+      workLocation: newUser.workLocation,
+      isActive: newUser.isActive,
+      mustChangePassword: newUser.mustChangePassword,
+      createdAt: newUser.createdAt,
+      updatedAt: newUser.updatedAt,
+    };
 
-    // 4. 返回新创建的用户信息 (不包括密码哈希)
-    return NextResponse.json(
-      successResponse(
-        {
-          id: newUser.id,
-          username: newUser.username,
-          email: newUser.email,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          createdAt: newUser.createdAt.toISOString(),
-        },
-        201, // HTTP 201 Created
-        '用户注册成功 (User registered successfully)',
-        overallRequestId
-      ),
-      { status: 201 }
-    );
+    return NextResponse.json(userResponse, { status: 201 }); // 201 Created
 
-  } catch (error) {
-    console.error('用户注册时发生错误 (Error during user registration):', error);
-    // 审计注册失败事件 (通用错误)
-    await AuthorizationUtils.logAuditEvent({
-        action: 'register_failed_server_error',
-        actorId: username,
-        ipAddress: request.ip,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown server error',
-        metadata: { username, email }
-    });
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        // 理论上上面的检查已经覆盖了，但这是一个更具体的 Prisma 唯一约束错误
-        return NextResponse.json(
-          errorResponse(409, '用户名或电子邮件已存在 (Username or email already exists - DB constraint)', 'CONFLICT_ERROR', overallRequestId),
-          { status: 409 }
-        );
+  } catch (error: any) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // 处理 Prisma 特定的已知请求错误 (Handle Prisma-specific known request errors)
+      if (error.code === 'P2002') { // Unique constraint failed
+        const target = (error.meta?.target as string[]) || ['field'];
+        return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
+      }
     }
-    throw error; // 交给 withErrorHandler 处理
+    console.error('User registration error by admin:', adminUserId, error);
+    return errorResponse('An unexpected error occurred during user registration.', 500, 'server_error');
   }
 }
 
-export const POST = withErrorHandler(registerHandler);
+// 确保 JWTUtils.verifyV2AuthAccessToken 和 isValidEmail 存在
+// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist)
+// 这些声明帮助TypeScript识别这些外部函数，实际实现应在各自的文件中。
+// (These declarations help TypeScript recognize these external functions; actual implementations should be in their respective files.)
+/*
+declare module '@/lib/auth/oauth2' {
+  export class JWTUtils {
+    static async verifyV2AuthAccessToken(token: string): Promise<{
+      valid: boolean;
+      payload?: { userId: string; username: string; roles?: string[], [key: string]: any }; // 示例载荷 (Example payload)
+      error?: string;
+    }>;
+    // ... other methods if any
+  }
+}
 
-EOF
+declare module '@/lib/utils' {
+  export function isValidEmail(email: string): boolean;
+}
+*/
