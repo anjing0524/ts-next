@@ -25,15 +25,10 @@ model User {
   lastLoginAt  DateTime?
 
   // 用户基本信息
-  email        String    @unique // Added: Email address
-  firstName    String? // Added: First name
-  lastName     String? // Added: Last name
   displayName  String? // 显示名称
   avatar       String? // 头像URL
-  phone        String? // 手机号
   organization String? // 用户所属组织
   department   String? // 用户所属部门
-  workLocation String? // 用户工作地点
   mustChangePassword Boolean @default(true) // 是否需要在下次登录时强制修改密码
   failedLoginAttempts Int      @default(0)
   lockedUntil         DateTime?
@@ -45,17 +40,8 @@ model User {
   refreshTokens      RefreshToken[]
   auditLogs          AuditLog[]
   passwordHistories  PasswordHistory[]
-  consentGrants      ConsentGrant[] // Added relation to ConsentGrant
-  passwordResetRequests PasswordResetRequest[] // Relation to password reset requests
-  emailVerificationRequests EmailVerificationRequest[] // Relation to email verification requests
-
-  // 用户邮箱验证状态 (User email verification status)
-  emailVerified      Boolean   @default(false)
-  // 用户手机验证状态 (User phone verification status)
-  phoneVerified      Boolean   @default(false)
-
-  phoneVerificationRequests PhoneVerificationRequest[] // Relation to phone verification requests
-  revokedAuthJtis    RevokedAuthJti[] // Relation to revoked V2 Auth JTIs
+  consentGrants      ConsentGrant[]
+  revokedAuthJtis    RevokedAuthJti[]
 
   @@index([username])
   @@index([isActive])
@@ -449,65 +435,9 @@ model ConsentGrant {
 }
 
 // =======================================
-// Password Reset Request (密码重置请求)
+// 内网环境下不需要邮箱和手机验证功能
+// 用户由管理员直接创建和管理
 // =======================================
-model PasswordResetRequest {
-  id        String   @id @default(cuid())
-  userId    String   // 关联的用户ID (Associated User ID)
-  token     String   @unique // 重置令牌，实际发送给用户的值 (Reset token, the actual value sent to the user)
-  expiresAt DateTime // 令牌过期时间 (Token expiration time)
-  createdAt DateTime @default(now()) // 创建时间 (Creation time)
-  isUsed    Boolean  @default(false) // 令牌是否已被使用 (Whether the token has been used)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联到用户 (Relation to User)
-
-  @@index([userId]) // 为用户ID创建索引 (Index for userId)
-  // token is already unique, which creates an index.
-  @@map("password_reset_requests") // 数据库表名 (Database table name)
-}
-
-// =======================================
-// Email Verification Request (邮箱验证请求)
-// =======================================
-model EmailVerificationRequest {
-  id        String   @id @default(cuid())
-  userId    String   // 关联的用户ID (Associated User ID)
-  email     String   // 待验证的邮箱地址 (Email address to be verified)
-  token     String   @unique // 验证令牌 (Verification token)
-  expiresAt DateTime // 令牌过期时间 (Token expiration time)
-  createdAt DateTime @default(now()) // 创建时间 (Creation time)
-  isUsed    Boolean  @default(false) // 令牌是否已被使用 (Whether the token has been used)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联到用户 (Relation to User)
-
-  @@index([userId])
-  @@index([email])
-  // token is already unique, which creates an index.
-  @@map("email_verification_requests") // 数据库表名 (Database table name)
-}
-
-// =======================================
-// Phone Verification Request (手机验证请求)
-// =======================================
-model PhoneVerificationRequest {
-  id        String   @id @default(cuid())
-  userId    String   // 关联的用户ID (Associated User ID)
-  phone     String   // 待验证的手机号 (Phone number to be verified)
-  token     String   // 验证令牌/OTP (Verification token/OTP) - 注意：对于OTP，此字段可能不需要@unique，取决于查找策略
-                     // (Note: For OTP, this field might not need @unique, depending on lookup strategy)
-  expiresAt DateTime // 令牌过期时间 (Token expiration time)
-  createdAt DateTime @default(now()) // 创建时间 (Creation time)
-  isUsed    Boolean  @default(false) // 令牌是否已被使用 (Whether the token has been used)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联到用户 (Relation to User)
-
-  @@index([userId])
-  @@index([phone])
-  @@index([userId, phone, token]) // 复合索引用于查找特定用户、手机和OTP的组合 (Compound index for user, phone, token lookup)
-  @@index([token]) // 如果OTP需要通过token直接查找（例如，如果token是长随机字符串）
-                   // (Index token if OTPs are directly looked up by token, e.g. if token is a long random string)
-  @@map("phone_verification_requests") // 数据库表名 (Database table name)
-}
 
 // =======================================
 // Revoked V2 Auth JWTIs (已撤销的V2认证JTI)
