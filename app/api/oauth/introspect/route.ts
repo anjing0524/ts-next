@@ -1,232 +1,98 @@
+// app/api/oauth/introspect/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma'; // 导入 Prisma 客户端 (Import Prisma client)
 
-import { Client, AccessToken, RefreshToken } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+// 临时资源服务器认证API密钥 (Temporary Resource Server Authentication API Key)
+const RESOURCE_SERVER_API_KEY = 'temp-resource-server-api-key';
+// 你的认证服务器的颁发者URL (Your auth server's issuer URL)
+const ISSUER_URL = process.env.ISSUER_URL || 'https://your-auth-server.com/oauth';
 
-import { JWTUtils, AuthorizationUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2';
-import { prisma } from '@/lib/prisma';
 
-// const SALT_ROUNDS = 10; // Should be consistent if used, though not directly for token introspection logic itself
-
-interface IntrospectionResponse {
-  active: boolean;
-  scope?: string;
-  client_id?: string;
-  username?: string; // Typically from user associated with token
-  token_type?: 'access_token' | 'refresh_token'; // Not standard, but can be useful
-  exp?: number; // Expiration Unix timestamp
-  iat?: number; // Issued at Unix timestamp
-  nbf?: number; // Not before Unix timestamp
-  sub?: string; // Subject (user_id or client_id)
-  aud?: string | string[]; // Audience
-  iss?: string; // Issuer
-  jti?: string; // JWT ID
-}
-
-async function authenticateIntrospectingClient(request: NextRequest): Promise<Client | null> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('basic ')) {
-    return null;
+export async function POST(req: NextRequest) {
+  // 验证资源服务器 (Authenticate the resource server)
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // 根据 RFC 7662，如果资源服务器认证失败，应该返回401或403，但响应体不应包含 active: false
+    // RFC 7662 states that if resource server authentication fails, it should return 401 or 403,
+    // but the response body should not include active: false.
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+  const apiKey = authHeader.substring(7); // 从 "Bearer " 后提取API密钥 (Extract API key after "Bearer ")
+  if (apiKey !== RESOURCE_SERVER_API_KEY) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
-    const base64Credentials = authHeader.slice(6); // Remove 'Basic '
-    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-    const [clientId, clientSecret] = credentials.split(':');
+    const formData = await req.formData();
+    const token = formData.get('token') as string;
+    const tokenTypeHint = formData.get('token_type_hint') as string | undefined;
 
-    if (!clientId || !clientSecret) {
-      return null;
+    if (!token) {
+      // RFC 7662: "The request is missing a required parameter, includes an
+      // unsupported parameter or parameter value, repeats a parameter,
+      // includes multiple credentials, utilizes more than one mechanism for
+      // authenticating the client, or is otherwise malformed."
+      // For missing token, return active: false directly.
+      return NextResponse.json({ active: false, error: 'token_missing' }, { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const client = await prisma.client.findUnique({
-      where: { clientId: clientId, isActive: true },
-    });
+    let dbToken = null;
+    let tokenType = ''; // 'access_token' or 'refresh_token'
 
-    if (!client || client.isPublic || !client.clientSecret) {
-      // Must be a confidential client with a secret
-      return null;
+    // 根据 token_type_hint 或同时检查 AccessToken 和 RefreshToken 表
+    // (Check AccessToken and RefreshToken tables based on token_type_hint or both)
+    if (tokenTypeHint === 'access_token' || !tokenTypeHint) {
+      dbToken = await prisma.accessToken.findUnique({
+        where: { token },
+        include: { user: true, client: true }, // 包含关联的 User 和 Client (Include related User and Client)
+      });
+      if (dbToken) tokenType = 'access_token';
     }
 
-    const isValidSecret = await bcrypt.compare(clientSecret, client.clientSecret);
-    if (!isValidSecret) {
-      return null;
+    if (!dbToken && (tokenTypeHint === 'refresh_token' || !tokenTypeHint)) {
+      dbToken = await prisma.refreshToken.findUnique({
+        where: { token },
+        include: { user: true, client: true }, // 包含关联的 User 和 Client (Include related User and Client)
+      });
+      if (dbToken) tokenType = 'refresh_token';
     }
-    return client;
+
+    // 验证令牌是否存在、是否过期、是否已被撤销
+    // (Verify if the token exists, is expired, and is not revoked)
+    if (!dbToken || dbToken.expiresAt < new Date() || dbToken.isRevoked) { // Changed revokedAt to isRevoked
+      return NextResponse.json({ active: false }, { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // 令牌有效，构建响应 (Token is valid, construct the response)
+    const responseBody: Record<string, any> = {
+      active: true,
+      scope: dbToken.scope, // Changed scopes.join(' ') to scope
+      client_id: dbToken.clientId,
+      exp: Math.floor(dbToken.expiresAt.getTime() / 1000),
+      iat: Math.floor(dbToken.createdAt.getTime() / 1000),
+      iss: ISSUER_URL,
+    };
+
+    if (dbToken.userId) {
+      responseBody.sub = dbToken.userId;
+      // 假设 User 模型中有 username 字段 (Assume User model has a username field)
+      if (dbToken.user && dbToken.user.email) { // Accessing email as username, adjust if your schema is different
+        responseBody.username = dbToken.user.email;
+      }
+    }
+
+    // 根据令牌类型添加特定声明 (Add claims specific to token type if necessary)
+    // For example, 'jti' (JWT ID) could be added if it's stored with the token
+    // responseBody.jti = dbToken.id; // Assuming 'id' is the JWT ID
+
+    return NextResponse.json(responseBody, { status: 200, headers: { 'Content-Type': 'application/json' } });
+
   } catch (error) {
-    console.error('Error during introspecting client authentication:', error);
-    return null;
+    console.error('Introspection error:', error);
+    // RFC 7662 doesn't explicitly define server error response format, but returning active:false is safest.
+    // However, a 500 status code is more appropriate for server errors.
+    // Consider if active:false should be returned here or just an error object.
+    // For now, returning a generic error to avoid leaking token status on internal errors.
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
-}
-
-function buildIntrospectionResponse(
-  tokenData: AccessToken | RefreshToken,
-  jwtPayload: Record<string, unknown>,
-  isActive: boolean,
-  tokenType: 'access_token' | 'refresh_token'
-): IntrospectionResponse {
-  if (!isActive || !jwtPayload) {
-    return { active: false };
-  }
-
-  const response: IntrospectionResponse = {
-    active: true,
-    scope: jwtPayload.scope,
-    client_id: jwtPayload.client_id, // client_id of the token owner
-    sub: jwtPayload.sub,
-    exp: jwtPayload.exp,
-    iat: jwtPayload.iat,
-    nbf: jwtPayload.nbf,
-    iss: jwtPayload.iss,
-    aud: jwtPayload.aud,
-    jti: jwtPayload.jti,
-    token_type: tokenType,
-  };
-
-  // Add username if user_id is present in subject (for user-bound tokens)
-  // This part might need adjustment based on how 'sub' and 'username' are structured
-  if (jwtPayload.sub && tokenData.userId && tokenType === 'access_token') {
-    // Assuming we might fetch the user if username is needed and not in JWT
-    // For now, if jwtPayload has username, use it.
-    if (jwtPayload.username) {
-      response.username = jwtPayload.username;
-    } else if ((tokenData as AccessToken).user?.username) {
-      // If user was included in tokenData
-      response.username = (tokenData as AccessToken).user.username;
-    }
-  }
-
-  return response;
-}
-
-export async function POST(request: NextRequest) {
-  const introspectingClient = await authenticateIntrospectingClient(request);
-  // const requestBaseUrl = request.nextUrl.origin; // For constructing issuer/audience if needed
-
-  if (!introspectingClient) {
-    await AuthorizationUtils.logAuditEvent({
-      action: 'token_introspection_unauthorized_client',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: 'Introspecting client authentication failed.',
-    });
-    return NextResponse.json(
-      { error: 'Unauthorized client' },
-      { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="token introspection"' } }
-    );
-  }
-
-  let tokenValue: string | null = null;
-  let tokenTypeHint: string | null = null;
-
-  // RFC 7662 specifies application/x-www-form-urlencoded
-  const contentType = request.headers.get('content-type');
-  if (contentType === 'application/x-www-form-urlencoded') {
-    const formData = await request.formData();
-    tokenValue = formData.get('token') as string | null;
-    tokenTypeHint = formData.get('token_type_hint') as string | null;
-  } else {
-    await AuthorizationUtils.logAuditEvent({
-      clientId: introspectingClient.id,
-      action: 'token_introspection_invalid_request_content_type',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: 'Invalid content type. Expected application/x-www-form-urlencoded.',
-      metadata: { receivedContentType: contentType },
-    });
-    return NextResponse.json(
-      {
-        error: 'Invalid content_type',
-        error_description: 'Content-Type must be application/x-www-form-urlencoded.',
-      },
-      { status: 400 }
-    );
-  }
-
-  if (!tokenValue) {
-    await AuthorizationUtils.logAuditEvent({
-      clientId: introspectingClient.id,
-      action: 'token_introspection_missing_token',
-      ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: false,
-      errorMessage: 'Token parameter was missing from the request.',
-    });
-    return NextResponse.json(
-      {
-        error: OAuth2ErrorTypes.INVALID_REQUEST,
-        error_description: 'Token parameter is required.',
-      },
-      { status: 400 }
-    );
-  }
-
-  let responseData: IntrospectionResponse = { active: false };
-  let tokenProcessed = false;
-
-  // Try as Access Token
-  if (!tokenTypeHint || tokenTypeHint === 'access_token') {
-    const { valid, payload, error } = await JWTUtils.verifyAccessToken(tokenValue);
-    if (valid && payload && payload.jti) {
-      const dbToken = await prisma.accessToken.findFirst({
-        where: {
-          jti: payload.jti,
-          // token: tokenValue, // Using JTI is better if tokens are hashed in DB, but JWTUtils verifies signature
-          clientId: payload.client_id as string, // Ensure client_id from JWT matches
-          revoked: false,
-          expiresAt: { gt: new Date() },
-        },
-        include: { user: { select: { username: true } } }, // Include username if available
-      });
-
-      if (dbToken) {
-        responseData = buildIntrospectionResponse(dbToken, payload, true, 'access_token');
-        tokenProcessed = true;
-      } else if (error) {
-        // Log JWT verification error if needed, but active:false is the main outcome
-        console.debug(`Access token JWT verification failed or DB lookup failed: ${error}`);
-      }
-    }
-  }
-
-  // Try as Refresh Token if not processed and hint allows or is not specific
-  if (!tokenProcessed && (!tokenTypeHint || tokenTypeHint === 'refresh_token')) {
-    const { valid, payload, error } = await JWTUtils.verifyRefreshToken(tokenValue);
-    if (valid && payload && payload.jti) {
-      const dbToken = await prisma.refreshToken.findFirst({
-        where: {
-          jti: payload.jti,
-          clientId: payload.client_id as string,
-          revoked: false,
-          expiresAt: { gt: new Date() },
-        },
-        include: { user: { select: { username: true } } },
-      });
-      if (dbToken) {
-        // For refresh tokens, typically less info is exposed.
-        // The `buildIntrospectionResponse` can be adjusted or a separate one made if needed.
-        responseData = buildIntrospectionResponse(dbToken, payload, true, 'refresh_token');
-        tokenProcessed = true;
-      } else if (error) {
-        console.debug(`Refresh token JWT verification failed or DB lookup failed: ${error}`);
-      }
-    }
-  }
-
-  await AuthorizationUtils.logAuditEvent({
-    clientId: introspectingClient.id,
-    action: 'token_introspection_attempt',
-    ipAddress: request.headers.get('x-forwarded-for') || undefined,
-    userAgent: request.headers.get('user-agent') || undefined,
-    success: true, // The introspection call itself was successful
-    metadata: {
-      token_type_hint: tokenTypeHint,
-      token_active: responseData.active,
-      introspected_token_client_id: responseData.client_id,
-      introspected_token_sub: responseData.sub,
-    },
-  });
-
-  return NextResponse.json(responseData, { headers: { 'Content-Type': 'application/json' } });
 }

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 import { NextRequest } from 'next/server';
 
-import { User, Client } from '@prisma/client';
+import { User, OAuthClient as Client } from '@prisma/client'; // Renamed Client to OAuthClient
 import { addHours, addDays } from 'date-fns'; // For token expiry
 import * as jose from 'jose';
 
@@ -502,7 +502,7 @@ export class ClientAuthUtils {
 
     // Public client (no authentication)
     if (client_id && !client_secret) {
-      const client = await prisma.client.findUnique({
+      const client = await prisma.oAuthClient.findUnique({ // Changed to oAuthClient
         where: { clientId: client_id, isActive: true },
       });
 
@@ -542,10 +542,10 @@ export class ClientAuthUtils {
     clientId: string,
     clientSecret: string
   ): Promise<{
-    client: Client | null;
+    client: Client | null; // Client is now an alias for OAuthClient
     error?: OAuth2Error;
   }> {
-    const client = await prisma.client.findUnique({
+    const client = await prisma.oAuthClient.findUnique({ // Changed to oAuthClient
       where: { clientId, isActive: true },
     });
 
@@ -640,7 +640,7 @@ export class ClientAuthUtils {
       }
 
       const clientId = decodedJwt.iss;
-      const client = await prisma.client.findUnique({
+      const client = await prisma.oAuthClient.findUnique({ // Changed to oAuthClient
         where: { clientId, isActive: true },
       });
 
@@ -741,8 +741,11 @@ export class AuthorizationUtils {
       // Validate clientId exists if provided
       let validClientId: string | null = null;
       if (event.clientId) {
-        const clientExists = await prisma.client.findUnique({
-          where: { id: event.clientId },
+        // Assuming event.clientId is the string `clientId` like "my-app", not the UUID `id`
+        // If it's the UUID, this query is fine. If it's the string clientId, it should be:
+        // where: { clientId: event.clientId }
+        const clientExists = await prisma.oAuthClient.findUnique({ // Changed to oAuthClient
+          where: { id: event.clientId }, // This assumes event.clientId is the UUID primary key
           select: { id: true },
         });
         validClientId = clientExists ? event.clientId : null;
@@ -868,7 +871,7 @@ export class RateLimitUtils {
 export async function processRefreshTokenGrantLogic(
   refreshTokenValue: string,
   requestedScope: string | undefined,
-  client: Client, // Use imported Prisma type
+  client: Client, // Client is an alias for OAuthClient
   ipAddress?: string,
   userAgent?: string
 ): Promise<{
@@ -906,7 +909,7 @@ export async function processRefreshTokenGrantLogic(
   const storedRefreshToken = await prisma.refreshToken.findFirst({
     where: {
       tokenHash: refreshTokenHashVerify,
-      revoked: false,
+        isRevoked: false, // Corrected from revoked to isRevoked
       expiresAt: {
         gt: new Date(),
       },
@@ -1034,7 +1037,7 @@ export async function processRefreshTokenGrantLogic(
   // Revoke old refresh token
   await prisma.refreshToken.update({
     where: { id: storedRefreshToken.id },
-    data: { revoked: true, revokedAt: new Date(), replacedByTokenId: newRefreshTokenHash }, // Optional: link to new token
+      data: { isRevoked: true, revokedAt: new Date(), replacedByTokenId: newRefreshTokenHash }, // Corrected to isRevoked
   });
 
   // Store new refresh token
@@ -1046,7 +1049,7 @@ export async function processRefreshTokenGrantLogic(
       userId: storedRefreshToken.userId ?? undefined,
       scope: finalGrantedScope,
       expiresAt: addDays(new Date(), 30), // Consistent with JWTUtils default
-      revoked: false,
+        isRevoked: false, // Corrected to isRevoked
       previousTokenId: storedRefreshToken.id, // Optional: link to old token
     },
   });

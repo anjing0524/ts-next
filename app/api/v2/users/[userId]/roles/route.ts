@@ -1,5 +1,199 @@
-// app/api/v2/users/[userId]/roles/route.ts (Placeholder)
+// 文件路径: app/api/v2/users/[userId]/roles/route.ts
+// 描述: 管理特定用户的角色分配 (List roles for a user, Assign roles to a user)
+
 import { NextRequest, NextResponse } from 'next/server';
-interface RouteContext { params: { userId: string }; }
-export async function GET(request: NextRequest, context: RouteContext) { return NextResponse.json({ message: `GET /api/v2/users/${context.params.userId}/roles - List User Roles (Placeholder)` }); }
-export async function POST(request: NextRequest, context: RouteContext) { return NextResponse.json({ message: `POST /api/v2/users/${context.params.userId}/roles - Assign Role to User (Placeholder)` }); }
+import prisma from '@/lib/prisma';
+import { User, Role, UserRole, Prisma } from '@prisma/client';
+import { JWTUtils } from '@/lib/auth/oauth2';
+
+// --- 辅助函数 (Copied/adapted from other user management routes) ---
+function errorResponse(message: string, status: number, errorCode?: string) {
+  return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
+}
+
+async function isUserAdmin(userId: string): Promise<boolean> {
+  // TODO: Implement real RBAC check.
+  const userWithRoles = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { userRoles: { include: { role: true } } }
+  });
+  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
+}
+
+interface RouteContextGetPost {
+  params: {
+    userId: string; // 目标用户的ID (ID of the target user)
+  };
+}
+
+// --- GET /api/v2/users/{userId}/roles (获取用户拥有的角色列表) ---
+export async function GET(req: NextRequest, context: RouteContextGetPost) {
+  const { params } = context;
+  const targetUserId = params.userId;
+
+  // 1. 管理员认证 (Admin Authentication)
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
+  const token = authHeader.substring(7);
+  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
+
+  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
+  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
+  const adminUserId = payload.userId as string | undefined;
+  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
+  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to view user roles.', 403, 'forbidden');
+
+  try {
+    // 2. 检查目标用户是否存在 (Check if target user exists)
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) return errorResponse('User not found.', 404, 'user_not_found');
+
+    // 3. 获取用户的角色 (Fetch user's roles)
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        userId: targetUserId,
+        role: { isActive: true }, // 只获取与激活角色关联的分配 (Only fetch assignments linked to active roles)
+        // 可根据 UserRole 自身的 'expiresAt' 或其他状态字段进行过滤 (Can filter by UserRole's own 'expiresAt' or other status fields)
+        // e.g. AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }]
+      },
+      include: {
+        role: true, // 包含完整的角色信息 (Include full role information)
+      },
+      orderBy: { role: { name: 'asc' } } // 按角色名称排序 (Order by role name)
+    });
+
+    // 格式化响应 (Format response)
+    const rolesToReturn = userRoles
+      .map(ur => ur.role) // 直接取 role 对象 (Directly take the role object)
+      .filter(role => role != null) // 确保 role 对象存在 (Ensure role object exists)
+      .map(role => ({ // 显式选择要返回的字段 (Explicitly select fields to return)
+        id: role.id,
+        name: role.name,
+        displayName: role.displayName,
+        description: role.description,
+        isActive: role.isActive, // 也返回角色是否激活的状态 (Also return role's active status)
+        // assignedAt: ur.assignedAt, // 如果需要分配时的特定信息 (If specific info from assignment time is needed)
+      }));
+
+    return NextResponse.json({ roles: rolesToReturn }, { status: 200 });
+
+  } catch (error) {
+    console.error(`Error fetching roles for user ${targetUserId} by admin ${adminUserId}:`, error);
+    return errorResponse('An unexpected error occurred while fetching user roles.', 500, 'server_error');
+  }
+}
+
+// --- POST /api/v2/users/{userId}/roles (为用户分配一个或多个角色) ---
+export async function POST(req: NextRequest, context: RouteContextGetPost) {
+  const { params } = context;
+  const targetUserId = params.userId;
+
+  // 1. 管理员认证 (Admin Authentication)
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
+  const token = authHeader.substring(7);
+  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
+  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
+  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
+  const adminUserId = payload.userId as string | undefined;
+  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
+  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to assign roles.', 403, 'forbidden');
+
+  // 2. 解析请求体 (Parse request body)
+  let requestBody;
+  try {
+    requestBody = await req.json();
+  } catch (e) {
+    return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
+  }
+
+  const { roleIds } = requestBody; // 期望是一个角色ID的数组: { "roleIds": ["id1", "id2"] } (Expect an array of role IDs)
+  if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0 || !roleIds.every(id => typeof id === 'string')) {
+    return errorResponse('Invalid request: "roleIds" must be a non-empty array of strings.', 400, 'validation_error_roleIds');
+  }
+
+  try {
+    // 3. 检查目标用户是否存在 (Check if target user exists)
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) return errorResponse('User not found, cannot assign roles.', 404, 'user_not_found');
+
+    // 4. 处理角色分配 (Process role assignments)
+    const successfullyAssignedRoles: Partial<Role>[] = [];
+    const assignmentErrors: { roleId: string, message: string }[] = [];
+
+    // 获取用户已有的角色ID，用于幂等性检查 (Get user's existing role IDs for idempotency check)
+    const existingUserRoles = await prisma.userRole.findMany({
+        where: { userId: targetUserId },
+        select: { roleId: true }
+    });
+    const existingRoleIdsSet = new Set(existingUserRoles.map(ur => ur.roleId));
+
+    for (const roleId of roleIds) {
+      // 检查角色是否存在且激活 (Check if role exists and is active)
+      const roleToAssign = await prisma.role.findUnique({
+        where: { id: roleId, isActive: true },
+      });
+
+      if (!roleToAssign) {
+        assignmentErrors.push({ roleId, message: 'Role not found or is not active.' });
+        continue;
+      }
+
+      // 检查用户是否已被分配此角色 (Check if user already has this role)
+      if (existingRoleIdsSet.has(roleId)) {
+        console.log(`User ${targetUserId} already has role ${roleId} (${roleToAssign.name}). Skipping assignment, considering as success.`);
+        successfullyAssignedRoles.push({ id: roleToAssign.id, name: roleToAssign.name, displayName: roleToAssign.displayName });
+        continue;
+      }
+
+      // 创建 UserRole 记录 (Create UserRole record)
+      await prisma.userRole.create({
+        data: {
+          userId: targetUserId,
+          roleId: roleId,
+          // assignedBy: adminUserId, // 可选：记录操作的管理员 (Optional: record the admin performing action)
+          // context, expiresAt can also be set here if applicable
+        },
+      });
+      successfullyAssignedRoles.push({ id: roleToAssign.id, name: roleToAssign.name, displayName: roleToAssign.displayName });
+    }
+
+    // 5. 返回响应 (Return response)
+    if (assignmentErrors.length > 0) {
+      const status = successfullyAssignedRoles.length > 0 ? 207 : 400; // 207 Multi-Status if partial success, 400 if all failed
+      return NextResponse.json({
+        message: status === 207 ? 'Some roles assigned with errors.' : 'Failed to assign roles.',
+        assignedRoles: successfullyAssignedRoles,
+        errors: assignmentErrors
+      }, { status });
+    }
+
+    return NextResponse.json({
+        message: 'Roles assigned successfully.',
+        assignedRoles: successfullyAssignedRoles
+    }, { status: 200 }); // Or 201 if treating as new resource creation (UserRole records)
+
+  } catch (error: any) {
+    // 处理 Prisma 已知错误，例如外键约束 (Handle Prisma known errors, e.g., foreign key constraint)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2003') { // Foreign key constraint failed (e.g., roleId doesn't exist on roles table)
+             return errorResponse('Role assignment failed: One or more role IDs are invalid.', 400, 'validation_error_fk');
+        }
+    }
+    console.error(`Error assigning roles to user ${targetUserId} by admin ${adminUserId}:`, error);
+    return errorResponse('An unexpected error occurred while assigning roles.', 500, 'server_error');
+  }
+}
+
+// 声明JWTUtils中期望的方法 (Declare expected methods in JWTUtils)
+/*
+declare module '@/lib/auth/oauth2' {
+  export class JWTUtils {
+    static async verifyV2AuthAccessToken(token: string): Promise<{
+      valid: boolean;
+      payload?: { userId: string; [key: string]: any };
+      error?: string;
+    }>;
+  }
+}
+*/
