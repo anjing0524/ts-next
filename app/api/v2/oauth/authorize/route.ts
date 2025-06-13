@@ -7,26 +7,31 @@ import prisma from '@/lib/prisma';
 import { OAuthClient, User } from '@prisma/client'; // Prisma-generated types
 import { addMinutes } from 'date-fns'; // For setting expiry
 import crypto from 'crypto';
-import { PKCEUtils, ScopeUtils } from '@/lib/auth/oauth2'; // Assuming these utils are in lib/auth/oauth2.ts
+import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@/lib/auth/oauth2'; // Assuming these utils are in lib/auth/oauth2.ts
+import * as jose from 'jose'; // For standard OAuth token validation
 
-// 模拟已认证的用户ID (Simulated authenticated user ID)
-const SIMULATED_USER_ID = 'cluser1test123456789012345'; // Replace with a valid User ID from your seed data or test setup
+// 认证中心UI相关的常量 (Constants related to Auth Center UI)
+const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login'; // 认证中心的登录页面
+const CONSENT_API_URL = '/api/v2/oauth/consent'; // 同意API端点
+const AUTH_CENTER_UI_AUDIENCE = process.env.AUTH_CENTER_UI_AUDIENCE || 'urn:auth-center:ui'; // 令牌的预期受众，用于认证中心UI会话
+const AUTH_CENTER_UI_CLIENT_ID = process.env.AUTH_CENTER_UI_CLIENT_ID || 'auth-center-admin-client'; // 用于认证中心UI登录流程的OAuth客户端ID
+
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   // 1. 从查询参数中检索参数 (Retrieve parameters from query string)
-  const clientId = searchParams.get('client_id');
+  const clientId = searchParams.get('client_id'); // For the third-party client
   const redirectUri = searchParams.get('redirect_uri');
   const responseType = searchParams.get('response_type');
-  const scope = searchParams.get('scope'); // 客户端请求的范围 (Scopes requested by the client)
+  const scope = searchParams.get('scope');
   const state = searchParams.get('state');
   const codeChallenge = searchParams.get('code_challenge');
   const codeChallengeMethod = searchParams.get('code_challenge_method');
 
   // 构建错误重定向URL的辅助函数 (Helper function to build error redirect URL)
   const buildErrorRedirect = (baseRedirectUri: string | null, error: string, description: string, originalState?: string | null) => {
-    if (!baseRedirectUri) { // 如果 redirect_uri 本身无效或未提供 (If redirect_uri itself is invalid or not provided)
+    if (!baseRedirectUri) {
       return NextResponse.json({ error, error_description: description, state: originalState }, { status: 400 });
     }
     const errorUrl = new URL(baseRedirectUri);
@@ -38,95 +43,142 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(errorUrl.toString(), 302);
   };
 
-  // 2. 参数验证 (Parameter Validation)
+  // 2. 参数验证 (Parameter Validation for the third-party client request)
   if (!clientId || !redirectUri || !responseType || !codeChallenge || !codeChallengeMethod) {
     return buildErrorRedirect(redirectUri, 'invalid_request', 'Missing required parameters (client_id, redirect_uri, response_type, code_challenge, code_challenge_method).', state);
   }
-
   if (responseType !== 'code') {
     return buildErrorRedirect(redirectUri, 'unsupported_response_type', 'response_type must be "code".', state);
   }
-
-  // 验证 code_challenge_method (Validate code_challenge_method)
   if (codeChallengeMethod !== 'S256') {
-    // OAuth 2.1 推荐仅支持 S256 (OAuth 2.1 recommends supporting only S256)
     return buildErrorRedirect(redirectUri, 'invalid_request', 'code_challenge_method must be "S256".', state);
   }
-
-  // 验证 code_challenge 格式 (Validate code_challenge format - RFC 7636 Appendix A)
   if (!PKCEUtils.validateCodeChallenge(codeChallenge)) {
      return buildErrorRedirect(redirectUri, 'invalid_request', 'Invalid code_challenge format.', state);
   }
 
-
-  // 3. 客户端验证 (Client Validation)
-  const client = await prisma.oAuthClient.findUnique({ where: { clientId: clientId } });
-  if (!client || !client.isActive) {
-    // 不重定向到 redirect_uri，因为客户端未知或无效 (Do not redirect to redirect_uri as client is unknown/invalid)
+  // 3. 第三方客户端验证 (Third-party Client Validation)
+  const thirdPartyClient = await prisma.oAuthClient.findUnique({ where: { clientId: clientId } });
+  if (!thirdPartyClient || !thirdPartyClient.isActive) {
     return NextResponse.json({ error: 'invalid_client', error_description: 'Client not found or not active.' }, { status: 400 });
   }
-
-  // 验证 redirect_uri (Validate redirect_uri)
   let registeredRedirectUris: string[] = [];
   try {
-    registeredRedirectUris = JSON.parse(client.redirectUris);
+    registeredRedirectUris = JSON.parse(thirdPartyClient.redirectUris as string);
   } catch (e) {
-    console.error("Failed to parse client's redirectUris:", client.redirectUris);
+    console.error("Failed to parse third-party client's redirectUris:", thirdPartyClient.redirectUris);
     return NextResponse.json({ error: 'server_error', error_description: 'Invalid client configuration for redirectUris.' }, { status: 500 });
   }
   if (!Array.isArray(registeredRedirectUris) || !registeredRedirectUris.includes(redirectUri)) {
-    // 不重定向，因为提供的 redirect_uri 与注册的不匹配 (Do not redirect as provided redirect_uri does not match registered ones)
     return NextResponse.json({ error: 'invalid_request', error_description: 'Invalid redirect_uri.' }, { status: 400 });
   }
 
-  // 4. 范围验证 (Scope Validation - OIDC spec requires scope parameter)
+  // 4. 范围验证 (Scope Validation for the third-party client request)
   if (!scope) {
       return buildErrorRedirect(redirectUri, 'invalid_scope', 'Scope parameter is required.', state);
   }
-  const requestedScopes = ScopeUtils.parseScopes(scope); // 使用 lib/auth/oauth2.ts 中的 ScopeUtils
-
-  // 对请求的范围进行全面验证 (Perform full validation of requested scopes)
-  // 这会检查客户端是否允许这些范围，以及这些范围是否是系统中已定义的有效范围
-  // (This checks if the client is allowed these scopes and if they are valid, defined scopes in the system)
-  const scopeValidationResult = await ScopeUtils.validateScopes(requestedScopes, client);
+  const requestedScopes = ScopeUtils.parseScopes(scope);
+  const scopeValidationResult = await ScopeUtils.validateScopes(requestedScopes, thirdPartyClient);
   if (!scopeValidationResult.valid) {
     const errorDescription = scopeValidationResult.error_description ||
                              `Invalid or not allowed scope(s): ${scopeValidationResult.invalidScopes.join(', ')}.`;
     return buildErrorRedirect(redirectUri, 'invalid_scope', errorDescription, state);
   }
-  // 使用经过验证和可能已过滤/排序的范围 (Use validated and potentially filtered/sorted scopes if ScopeUtils.validateScopes modifies them)
-  // 当前 ScopeUtils.validateScopes 返回原始请求的子集或完全相同的有效范围
-  // (Currently ScopeUtils.validateScopes returns a subset of original requests or identical valid scopes)
-  const validatedScopes = requestedScopes; // Assuming validateScopes doesn't alter the array structure if valid, just confirms validity.
+  const validatedScopes = requestedScopes;
 
-  // 5. 用户认证和同意 (User Authentication & Consent - Simulated)
-  // TODO: 此处应重定向到登录和同意页面 (Redirect to login and consent page here)
-  // 模拟用户已认证 (Simulate user is authenticated)
-  const user = await prisma.user.findUnique({ where: { id: SIMULATED_USER_ID, isActive: true }});
-  if (!user) {
-      // This is a server configuration/simulation issue
-      console.error(`Simulated user with ID ${SIMULATED_USER_ID} not found or inactive.`);
-      return buildErrorRedirect(redirectUri, 'server_error', 'User authentication failed (simulated).', state);
+
+  // 5. 用户认证 (User Authentication - for Auth Center UI session)
+  // 用户必须已登录到认证中心才能授权第三方应用
+  // (User must be logged into the Auth Center to authorize third-party apps)
+  let user: User | null = null;
+  const internalAuthToken = req.cookies.get('auth_center_session_token')?.value; // Example: Get token from HttpOnly cookie
+
+  if (internalAuthToken) {
+    try {
+      const jwksUriString = process.env.JWKS_URI;
+      if (!jwksUriString) throw new Error('JWKS_URI not configured for internal auth.');
+      const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
+      const expectedIssuer = process.env.JWT_ISSUER;
+      if (!expectedIssuer) throw new Error('JWT_ISSUER not configured for internal auth.');
+
+      const { payload: internalAuthTokenPayload } = await jose.jwtVerify(internalAuthToken, JWKS, {
+        issuer: expectedIssuer,
+        audience: AUTH_CENTER_UI_AUDIENCE, // Specific audience for Auth Center UI tokens
+        algorithms: ['RS256'],
+      });
+
+      if (internalAuthTokenPayload && internalAuthTokenPayload.sub) {
+        user = await prisma.user.findUnique({ where: { id: internalAuthTokenPayload.sub, isActive: true }});
+      }
+    } catch (error) {
+      console.warn('Auth Center UI session token verification failed during /authorize:', (error as Error).message);
+    }
   }
-  // 模拟用户同意所有请求的范围 (Simulate user consents to all requested scopes)
+
+  if (!user) {
+    // 用户未登录认证中心，重定向到认证中心的登录流程 (User not logged into Auth Center, redirect to its login flow)
+    // 这个登录流程会为认证中心UI自身创建一个OAuth会话
+    // (This login flow creates an OAuth session for the Auth Center UI itself)
+    const authCenterLoginUrl = new URL(AUTH_CENTER_LOGIN_PAGE_URL, req.nextUrl.origin);
+    const paramsForUiLogin = new URLSearchParams({
+      client_id: AUTH_CENTER_UI_CLIENT_ID, // The Auth Center's own UI client
+      redirect_uri: req.nextUrl.href, // Important: Redirect back to this /authorize URL with all original 3rd-party params
+      response_type: 'code',
+      scope: 'openid profile email auth-center:interact', // Scopes needed for the Auth Center UI session
+      // state: crypto.randomBytes(16).toString('hex'), // Optional: internal state for this first-party login
+    });
+    authCenterLoginUrl.search = paramsForUiLogin.toString();
+
+    console.log(`User not authenticated with Auth Center. Redirecting to Auth Center login: ${authCenterLoginUrl.toString()}`);
+    return NextResponse.redirect(authCenterLoginUrl.toString(), 302);
+  }
+  console.log(`User ${user.id} authenticated to Auth Center UI. Continuing /authorize flow for client ${clientId}.`);
 
 
-  // 6. 生成并存储授权码 (Generate and Store Authorization Code)
-  const authorizationCodeValue = crypto.randomBytes(32).toString('hex');
-  const codeExpiresAt = addMinutes(new Date(), 10); // 授权码10分钟后过期 (Authorization code expires in 10 minutes)
+  // 6. 同意检查 (Consent Check for the third-party client)
+  const existingConsent = await prisma.consentGrant.findFirst({
+    where: { userId: user.id, clientId: thirdPartyClient.id },
+  });
+  let hasFullConsent = false;
+  if (existingConsent) {
+    const grantedScopes = ScopeUtils.parseScopes(existingConsent.scopes);
+    hasFullConsent = validatedScopes.every(scope => grantedScopes.includes(scope));
+  }
+
+  if (!hasFullConsent) {
+    // 重定向到同意页面API (Redirect to consent page API)
+    const consentUrl = new URL(CONSENT_API_URL, req.nextUrl.origin);
+    consentUrl.searchParams.set('client_id', clientId); // Third-party client_id
+    consentUrl.searchParams.set('redirect_uri', redirectUri);
+    consentUrl.searchParams.set('scope', ScopeUtils.formatScopes(validatedScopes));
+    if (state) consentUrl.searchParams.set('state', state);
+    consentUrl.searchParams.set('response_type', responseType);
+    if (codeChallenge) consentUrl.searchParams.set('code_challenge', codeChallenge);
+    if (codeChallengeMethod) consentUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
+
+    console.log(`Redirecting user ${user.id} to consent page for client ${thirdPartyClient.clientId}`);
+    // The consent page will be protected by `requirePermission('auth-center:interact')`
+    // which expects the `auth_center_session_token` (or equivalent) to be present.
+    return NextResponse.redirect(consentUrl.toString(), 302);
+  }
+
+  console.log(`User ${user.id} already consented for client ${thirdPartyClient.clientId}. Issuing code.`);
+
+  // 7. 生成并存储授权码 (Generate and Store Authorization Code for the third-party client)
+  const authorizationCodeValue = AuthorizationUtils.generateAuthorizationCode(); // Use helper
+  const codeExpiresAt = addMinutes(new Date(), 10);
 
   try {
     await prisma.authorizationCode.create({
       data: {
         code: authorizationCodeValue,
         userId: user.id,
-        clientId: client.id, // 使用数据库中的客户端ID (Use client ID from database)
-        redirectUri: redirectUri, // 存储用于验证令牌请求中的 redirect_uri (Store for validating redirect_uri in token request)
-        scope: ScopeUtils.formatScopes(validatedScopes), // 存储已验证和授予的范围 (Store validated and granted scopes)
+        clientId: thirdPartyClient.id, // Use DB CUID for relations
+        redirectUri: redirectUri,
+        scope: ScopeUtils.formatScopes(validatedScopes),
         expiresAt: codeExpiresAt,
         codeChallenge: codeChallenge,
         codeChallengeMethod: codeChallengeMethod,
-        // isUsed: false by default
       },
     });
   } catch (dbError) {
@@ -134,7 +186,7 @@ export async function GET(req: NextRequest) {
     return buildErrorRedirect(redirectUri, 'server_error', 'Could not generate authorization code.', state);
   }
 
-  // 7. 重定向到客户端 (Redirect to client)
+  // 8. 重定向到第三方客户端 (Redirect to third-party client)
   const successUrl = new URL(redirectUri);
   successUrl.searchParams.set('code', authorizationCodeValue);
   if (state) {

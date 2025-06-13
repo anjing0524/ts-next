@@ -3,22 +3,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Prisma } from '@prisma/client';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification
+import { User, Prisma } from '@prisma/client'; // User is used by excludeSensitiveUserFields
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 
 // --- 辅助函数 (Copied from other user management routes) ---
 function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: Implement real RBAC check.
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
-  });
-  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
-}
+// isUserAdmin function is no longer needed.
 
 function excludeSensitiveUserFields(user: User | Partial<User> | null): Partial<User> | null {
   if (!user) return null;
@@ -32,42 +26,41 @@ interface RouteContext {
   };
 }
 // --- 主处理函数 ---
-export async function POST(req: NextRequest, context: RouteContext) {
+async function unlockUserHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user;
 
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: Not an admin.', 403, 'forbidden');
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to UNLOCK user ${targetUserId}.`);
 
   try {
-    // 2. 检查目标用户是否存在 (Check if target user exists)
+    // 1. 检查用户是否存在 (Check if user exists) - Was step 2
     const userToUnlock = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!userToUnlock) return errorResponse('User not found to unlock.', 404, 'user_not_found');
 
-    // 3. 执行解锁操作 (Perform unlock operation)
+    // 2. 执行解锁操作 (Perform unlock operation) - Was step 3
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
+        isActive: true,            // 将用户标记为活动状态 (Mark user as active)
         lockedUntil: null,         // 设置为 null 以解锁 (Set to null to unlock)
         failedLoginAttempts: 0,    // 重置登录失败尝试次数 (Reset failed login attempts)
         updatedAt: new Date(),      // 手动更新时间戳 (Manually update timestamp)
       },
     });
 
-    // 4. 返回更新后的用户信息 (Return updated user information)
-    return NextResponse.json(excludeSensitiveUserFields(updatedUser), { status: 200 });
+    // 3. 返回更新后的用户信息或成功消息 (Return updated user information or success message) - Was step 4
+    // return NextResponse.json(excludeSensitiveUserFields(updatedUser), { status: 200 });
+    return new NextResponse(null, { status: 204 }); // 204 No Content is common for such actions
 
   } catch (error: any) {
-    console.error(`Error unlocking user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error unlocking user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') { // Record to update not found
+        return errorResponse('User not found to unlock.', 404, 'user_not_found_on_update');
+      }
+    }
     return errorResponse('An unexpected error occurred while unlocking the user account.', 500, 'server_error');
   }
 }
+export const POST = requirePermission('users:unlock', unlockUserHandler);

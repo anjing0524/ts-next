@@ -3,13 +3,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Prisma } from '@prisma/client'; // Prisma types
+import { Prisma } from '@prisma/client'; // Prisma types, User type not directly used
 import bcrypt from 'bcrypt';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For verifying admin's token
+// import { verifyV2SessionAccessToken, V2AccessTokenPayload } from '@/lib/auth/v2AuthUtils'; // REMOVED
 import { isValidEmail } from '@/lib/utils'; // Assuming a utility for email validation
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission (Import requirePermission)
 
 // 模拟的管理员用户ID列表或角色检查逻辑 (Simulated admin user ID list or role check logic)
 // 在实际应用中，这应该是一个更健壮的RBAC检查 (In a real application, this should be a more robust RBAC check)
+// This will be handled by requirePermission now.
 // const ADMIN_USER_IDS = ['cluser1test123456789012345']; // Example admin user ID
 // const REQUIRED_ROLE_FOR_REGISTRATION = 'admin'; // Or a specific permission needed
 
@@ -18,38 +20,17 @@ function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'registration_failed', message }, { status });
 }
 
-export async function POST(req: NextRequest) {
-  // 1. 管理员认证/授权 (Admin Authentication/Authorization)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  }
-  const token = authHeader.substring(7); // 提取令牌 (Extract token)
-  if (!token) {
-    return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  }
+// 使用 requirePermission 包装原始的 POST 处理函数
+// (Wrap the original POST handler with requirePermission)
+// The 'event' parameter is not strictly needed here for basic Next.js route handlers but included for HOF consistency
+async function registerUserHandler(req: AuthenticatedRequest, event?: any) {
+  // 管理员认证和权限检查已由 requirePermission 处理
+  // (Admin authentication and permission check is handled by requirePermission)
+  // req.user now contains the OAuth Access Token payload for the admin
+  const adminUser = req.user;
+  console.log(`Admin (ID: ${adminUser?.id}, ClientID: ${adminUser?.clientId}) is registering a new user (permission 'auth:register' granted).`);
 
-  // 验证管理员的访问令牌 (Verify admin's access token)
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) {
-    return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  }
-
-  // Placeholder Admin Check: 实际应用中应基于角色或权限进行检查
-  // (Placeholder Admin Check: In a real application, this should be based on roles or permissions)
-  // 例如: const isAdmin = await checkUserAdminRole(payload.userId);
-  // 为了本示例，我们假设如果令牌有效且包含 userId，则操作被允许。这非常不安全，仅用于演示。
-  // (For this example, we assume if token is valid and contains userId, action is permitted. This is very insecure, for demo only.)
-  if (!payload.userId) {
-    console.warn(`Admin check failed: Malformed token payload or missing userId. Token: ${token.substring(0,10)}...`);
-    return errorResponse('Forbidden: You do not have permission to perform this action (invalid token payload).', 403, 'forbidden');
-  }
-  const adminUserId = payload.userId;
-  console.log(`Admin user ${adminUserId} is attempting to register a new user.`);
-  // TODO: 在实际部署前，必须实现真正的RBAC检查 (MUST implement real RBAC check before deploying)
-
-
-  // 2. 解析请求体 (Parse request body)
+  // 1. 解析请求体 (Parse request body) - (Was step 2)
   let requestBody;
   try {
     requestBody = await req.json();
@@ -141,28 +122,22 @@ export async function POST(req: NextRequest) {
         return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
       }
     }
-    console.error('User registration error by admin:', adminUserId, error);
+    console.error('User registration error by admin:', adminUser?.id, error); // 使用从req.user获取的adminId
     return errorResponse('An unexpected error occurred during user registration.', 500, 'server_error');
   }
 }
 
+// 将包装后的处理函数导出为 POST
+// (Export the wrapped handler as POST)
+export const POST = requirePermission('auth:register')(registerUserHandler);
+
 // 确保 JWTUtils.verifyV2AuthAccessToken 和 isValidEmail 存在
-// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist)
+// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist) - NO LONGER NEEDED for JWTUtils
 // 这些声明帮助TypeScript识别这些外部函数，实际实现应在各自的文件中。
 // (These declarations help TypeScript recognize these external functions; actual implementations should be in their respective files.)
 /*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; username: string; roles?: string[], [key: string]: any }; // 示例载荷 (Example payload)
-      error?: string;
-    }>;
-    // ... other methods if any
-  }
-}
-
-declare module '@/lib/utils' {
+declare module '@/lib/utils' { // Assuming isValidEmail is still in lib/utils
   export function isValidEmail(email: string): boolean;
 }
 */
+// User type is not explicitly used in this file, Prisma types are used for operations.

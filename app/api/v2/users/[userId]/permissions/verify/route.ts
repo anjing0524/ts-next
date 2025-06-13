@@ -1,181 +1,90 @@
 // 文件路径: app/api/v2/users/[userId]/permissions/verify/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
+// 描述: 管理员验证特定用户是否拥有某些权限 (Admin verifies if a specific user possesses certain permissions)
 
-import { successResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { withAuth } from '@/lib/auth/middleware'; // 假设的认证中间件
-import { PermissionService } from '@/lib/services/permissionService';
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma'; // Prisma client
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // Middleware for auth
+import { PermissionService } from '@/lib/services/permissionService'; // Actual PermissionService
 
-// 初始化权限服务
-const permissionService = new PermissionService();
+const permissionServiceInstance = new PermissionService();
 
-// 定义请求体 Schema (与 v1/auth/check 类似，但不包含 userId，因为它从路径获取)
-const PermissionVerifyRequestSchema = z.object({
-  resourceAttributes: z.object({
-    resourceId: z.string().min(1, '资源ID不能为空'), // 例如：'document:123'
-    // 根据需要可以添加更多资源相关属性
-    // resourceType: z.string().optional(),
-  }),
-  action: z.object({
-    type: z.string().min(1, '操作类型不能为空'), // 例如：'read', 'write'
-    // 根据需要可以添加更多操作相关属性
-    // context: z.record(z.any()).optional(),
-  }),
-  // subjectAttributes 将从路径参数 userId 和认证上下文获取，不再从 body 中读取
-});
-
-// 定义路径参数 Schema
-const PathParamsSchema = z.object({
-  userId: z.string().min(1, '用户ID不能为空'),
-});
-
-/**
- * @swagger
- * /api/v2/users/{userId}/permissions/verify:
- *   post:
- *     summary: 验证用户单个权限 (Verify a single permission for a user)
- *     description: 根据用户ID、资源属性和操作类型验证用户是否拥有特定权限。
- *     tags:
- *       - Permissions V2
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         description: 需要验证权限的用户ID。
- *         schema:
- *           type: string
- *           example: 'user_clerk_123abc'
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               resourceAttributes:
- *                 type: object
- *                 properties:
- *                   resourceId:
- *                     type: string
- *                     description: 资源的唯一标识符。
- *                     example: 'document:123'
- *                 required:
- *                   - resourceId
- *               action:
- *                 type: object
- *                 properties:
- *                   type:
- *                     type: string
- *                     description: 对资源执行的操作类型。
- *                     example: 'read'
- *                 required:
- *                   - type
- *             required:
- *               - resourceAttributes
- *               - action
- *     responses:
- *       '200':
- *         description: 权限验证成功。
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 status:
- *                   type: integer
- *                   example: 200
- *                 message:
- *                   type: string
- *                   example: 'Permission check completed.'
- *                 requestId:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     allowed:
- *                       type: boolean
- *                       description: 是否允许操作。
- *                     reasonCode:
- *                       type: string
- *                       description: 允许或拒绝的原因代码。
- *                     message:
- *                       type: string
- *                       description: 详细信息。
- *       '400':
- *         description: 无效的请求体或路径参数。
- *       '401':
- *         description: 未经授权。
- *       '403':
- *         description: 禁止访问（例如，调用此API的权限不足）。
- *       '404':
- *         description: 用户未找到。
- *       '500':
- *         description: 服务器内部错误。
- */
-async function verifySinglePermissionHandler(
-  request: NextRequest,
-  context: { params: { userId: string } } // Next.js 动态路由的上下文
-) {
-  const requestId = (request as any).requestId; // 由 withErrorHandler 中间件注入
-  const { userId } = context.params; // 从路径中获取 userId
-
-  // 验证路径参数
-  const pathParamsValidation = PathParamsSchema.safeParse({ userId });
-  if (!pathParamsValidation.success) {
-    const errorMessages = pathParamsValidation.error.flatten().fieldErrors;
-    throw new ApiError(400, `无效的路径参数: ${JSON.stringify(errorMessages)}`, 'VALIDATION_ERROR');
-  }
-  const targetUserId = pathParamsValidation.data.userId;
-
-  // 解析请求体
-  const body = await request.json();
-
-  // 验证请求体
-  const validationResult = PermissionVerifyRequestSchema.safeParse(body);
-  if (!validationResult.success) {
-    const errorMessages = validationResult.error.flatten().fieldErrors;
-    throw new ApiError(400, `无效的请求体: ${JSON.stringify(errorMessages)}`, 'VALIDATION_ERROR');
-  }
-
-  const { resourceAttributes, action } = validationResult.data;
-
-  // 构建权限名称，例如："resourceId:actionType"
-  // 注意：这里的构建方式需要与 PermissionService 中的期望一致
-  const permissionName = `${resourceAttributes.resourceId}:${action.type}`;
-
-  // 调用权限服务进行验证
-  // 假设 PermissionService.checkPermission 需要用户ID和权限字符串
-  const hasPermission = await permissionService.checkPermission(
-    targetUserId,
-    permissionName
-    // 如果需要，可以传递更多上下文信息，例如 action.context
-  );
-
-  // 构建响应数据
-  const decision = {
-    allowed: hasPermission,
-    reasonCode: hasPermission ? 'PERMISSION_GRANTED' : 'PERMISSION_DENIED',
-    message: hasPermission ? '权限已授予 (Permission granted).' : '权限被拒绝 (Permission denied).',
-  };
-
-  // 返回成功响应
-  return NextResponse.json(
-    successResponse(decision, 200, '权限验证完成 (Permission check completed).', requestId),
-    { status: 200 }
-  );
+// 辅助函数：错误响应 (Helper function: Error response)
+function errorResponse(message: string, status: number, errorCode?: string) {
+  return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-// 使用错误处理和认证中间件包装处理函数
-// 注意: requiredPermissions 可能需要调整为适合 v2 API 的权限
-export const POST = withErrorHandler(
-  withAuth(verifySinglePermissionHandler, {
-    // 根据您的设计，调用此API可能需要特定的权限
-    // 例如: 'permissions:v2:verify' 或针对特定用户的 'user:permissions:verify'
-    requiredPermissions: ['permissions.verify'], // 示例权限
-    requireUserContext: true, // 通常，验证他人权限的操作需要调用者是认证用户或服务
-  })
-);
+interface RouteContext {
+  params: {
+    userId: string; // 目标用户的ID (ID of the target user)
+  };
+}
+
+interface VerifyPermissionsRequestBody {
+  permissions: string[]; // 需要验证的权限名称数组, e.g., ["users:create", "posts:read"]
+                         // (Array of permission names to verify)
+}
+
+// --- POST /api/v2/users/{userId}/permissions/verify (验证用户权限列表) ---
+// (Verify a list of permissions for a user)
+async function verifyUserPermissionsHandler(req: AuthenticatedRequest, context: RouteContext) {
+  const { params } = context;
+  const targetUserId = params.userId;
+  const performingAdmin = req.user; // Admin user performing the action, from requirePermission middleware
+
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to VERIFY PERMISSIONS for user ${targetUserId}.`);
+
+  let requestBody: VerifyPermissionsRequestBody;
+  try {
+    requestBody = await req.json();
+  } catch (e) {
+    return errorResponse('无效的JSON请求体 (Invalid JSON request body).', 400, 'invalid_request_body');
+  }
+
+  const { permissions: permissionsToVerify } = requestBody;
+
+  // 验证请求体中的权限列表 (Validate the permissions list in the request body)
+  if (!permissionsToVerify || !Array.isArray(permissionsToVerify) || permissionsToVerify.some(p => typeof p !== 'string')) {
+    return errorResponse('无效请求："permissions" 必须是一个字符串数组。(Invalid request: "permissions" must be an array of strings.)', 400, 'validation_error_permissions_format');
+  }
+  if (permissionsToVerify.length === 0) {
+    return errorResponse('无效请求："permissions" 数组不能为空。(Invalid request: "permissions" array cannot be empty.)', 400, 'validation_error_permissions_empty');
+  }
+
+  try {
+    // 1. 检查目标用户是否存在 (Check if target user exists)
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, isActive: true } // 只需ID和状态 (Only need ID and status)
+    });
+
+    if (!targetUser) {
+      return errorResponse('目标用户未找到 (Target user not found).', 404, 'user_not_found');
+    }
+    // （可选）如果用户非激活，权限校验可能需要特殊处理
+    // (Optional: if user is inactive, permission check might need special handling)
+    // if (!targetUser.isActive) {
+    //   return errorResponse('目标用户非活动状态 (Target user is not active).', 400, 'user_inactive');
+    // }
+
+    // 2. 使用 PermissionService 批量校验权限
+    // (Use PermissionService to batch check permissions)
+    // PermissionService.checkBatchPermissions expects an array of objects like { name: "perm_name" }
+    const permissionCheckRequests = permissionsToVerify.map(pName => ({ name: pName }));
+
+    const results = await permissionServiceInstance.checkBatchPermissions(targetUserId, permissionCheckRequests);
+
+    // 3. 返回校验结果 (Return verification results)
+    return NextResponse.json({
+      userId: targetUserId,
+      results: results, // results from PermissionService.checkBatchPermissions
+    }, { status: 200 });
+
+  } catch (error: any) {
+    console.error(`管理员 ${performingAdmin?.id} 在为用户 ${targetUserId} 验证权限时出错: (Error verifying permissions for user ${targetUserId} by admin ${performingAdmin?.id}:)`, error);
+    return errorResponse('验证用户权限时发生意外错误。(An unexpected error occurred while verifying user permissions.)', 500, 'server_error');
+  }
+}
+
+// 使用 'users:permissions:verify' 权限保护此端点
+// (Protect this endpoint with 'users:permissions:verify' permission)
+export const POST = requirePermission('users:permissions:verify', verifyUserPermissionsHandler);

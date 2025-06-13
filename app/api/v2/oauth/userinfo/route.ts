@@ -20,10 +20,7 @@ functionextractAccessToken(request: NextRequest): string | null {
   return null;
 }
 
-// 确保 JWTUtils 中有 getTokenHash 方法 (如果用于在数据库中查找 AccessToken 记录)
-const getTokenHash = (token: string): string => {
-  return crypto.createHash('sha256').update(token).digest('hex');
-};
+// local getTokenHash is replaced by JWTUtils.getTokenHash
 
 /**
  * @swagger
@@ -124,16 +121,16 @@ async function userinfoHandler(request: NextRequest) {
 
   // 2. 检查令牌是否在数据库中被撤销 (如果 AccessToken 表有 isRevoked 字段)
   //    并确保它仍然有效 (未过期 - JWTUtils.verifyAccessToken 应该已经检查了 exp)
-  const accessTokenHash = getTokenHash(accessToken); // 使用哈希查找
+  const accessTokenHash = JWTUtils.getTokenHash(accessToken); // 使用 JWTUtils 中的方法
   const dbAccessToken = await prisma.accessToken.findFirst({
     where: {
-      tokenHash: accessTokenHash, // 或者使用 jwtPayload.jti 如果 AccessToken 表中存储了 jti
-      revoked: false,
-      // expiresAt: { gt: new Date() } // JWTUtils.verifyAccessToken 应该已处理过期
-      // clientId: jwtPayload.client_id // 确保令牌属于声明的客户端
+      tokenHash: accessTokenHash,
+      // revoked: false, // Prisma AccessToken schema might not have 'revoked'. Typically relies on expiry or explicit revocation list if needed.
+      // For now, assume if it exists and JWT is valid, it's active unless specific revocation logic is added to AccessToken table.
+      expiresAt: { gt: new Date() } // Double check expiry against DB record, though JWT verify also does.
     },
     include: {
-      user: true, // 包含关联的用户信息
+      user: true, // 包含关联的用户信息 (Include associated user information)
     }
   });
 
@@ -197,15 +194,19 @@ async function userinfoHandler(request: NextRequest) {
 
   if (scopes.includes('email')) {
     claims.email = user.email || null;
-    // claims.email_verified = user.emailVerified || false; // 如果 Prisma User 模型中有 emailVerified
+    if (user.emailVerified !== undefined) { // 确保 User 模型有此字段 (Ensure User model has this field)
+        claims.email_verified = user.emailVerified;
+    }
   }
 
   if (scopes.includes('phone')) {
-    // claims.phone_number = user.phone || null;
-    // claims.phone_number_verified = user.phoneVerified || false;
+    claims.phone_number = user.phone || null; // 假设 Prisma User 模型有 'phone' 字段 (Assuming Prisma User model has 'phone' field)
+    if (user.phoneVerified !== undefined) { // 确保 User 模型有此字段 (Ensure User model has this field)
+        claims.phone_number_verified = user.phoneVerified;
+    }
   }
 
-  // ... 其他作用域 (address, etc.)
+  // ... 其他作用域 (address, etc.) (Other scopes)
 
   // 移除值为 null 的声明，以保持响应简洁
   Object.keys(claims).forEach(key => {

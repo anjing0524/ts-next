@@ -93,6 +93,12 @@ model OAuthClient {
   accessTokens       AccessToken[]
   refreshTokens      RefreshToken[]
   consentGrants      ConsentGrant[] // Added relation to ConsentGrant
+  accessTokenLifetime Int? // 访问令牌生命周期（秒）
+  refreshTokenLifetime Int? // 刷新令牌生命周期（秒）
+  authorizationCodeLifetime Int? // 授权码生命周期（秒）
+  strictRedirectUriMatching Boolean @default(true) // 严格重定向URI匹配
+  allowLocalhostRedirect Boolean @default(false) // 允许localhost重定向 (开发时可能有用)
+  requireHttpsRedirect Boolean @default(true) // 要求HTTPS重定向
 
   @@index([clientId])
   @@index([isActive])
@@ -135,44 +141,52 @@ model AuthorizationCode {
 // 访问令牌表
 model AccessToken {
   id        String   @id @default(cuid())
-  token     String   @unique
-  tokenHash String?  @unique // Added: Hash of the token for secure lookup
-  userId    String
+  token     String   @unique // This field might be removed if only tokenHash is stored
+  tokenHash String?  @unique // Hash of the token for secure lookup
+  userId    String?  // Optional: if token is not user-specific (e.g. client_credentials)
   clientId  String
   scope     String   // JSON字符串存储权限范围
   expiresAt DateTime
-  isRevoked Boolean  @default(false)
+  // isRevoked Boolean  @default(false) // Access tokens are typically not revoked, rely on short expiry. Consider if this field is truly needed.
+  // revokedAt DateTime?
   createdAt DateTime @default(now())
 
   // 关联关系
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@index([token])
+  @@index([tokenHash]) // Index on tokenHash
   @@index([userId])
   @@index([clientId])
   @@index([expiresAt])
-  @@index([isRevoked])
+  // @@index([isRevoked])
   @@map("access_tokens")
 }
 
 // 刷新令牌表
 model RefreshToken {
   id        String   @id @default(cuid())
-  token     String   @unique
-  tokenHash String?  @unique // Added: Hash of the token for secure lookup
+  token     String   @unique // This field might be removed if only tokenHash is stored
+  tokenHash String?  @unique // Hash of the token for secure lookup
   userId    String
   clientId  String
   scope     String   // JSON字符串存储权限范围
   expiresAt DateTime
   isRevoked Boolean  @default(false)
+  revokedAt DateTime? // Timestamp of revocation
   createdAt DateTime @default(now())
+  previousTokenId String? @unique // Optional: To link rotated refresh tokens for advanced detection
+                                 // If used, ensure it has a relation or is just an ID.
+  // replacedByTokenId String? @unique // Optional: ID of the token that replaced this one.
 
   // 关联关系
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // previousToken RefreshToken? @relation("RefreshTokenRotation", fields: [previousTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // nextToken     RefreshToken? @relation("RefreshTokenRotation", fields: [replacedByTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([token])
+
+  @@index([tokenHash]) // Index on tokenHash
   @@index([userId])
   @@index([clientId])
   @@index([expiresAt])
@@ -357,28 +371,28 @@ model RolePermission {
 // ===== 审计与监控 =====
 // 审计日志表
 model AuditLog {
-  id           String   @id @default(uuid())
+  id           String   @id @default(uuid()) // Using uuid() for AuditLog for broader compatibility
   timestamp    DateTime @default(now())
   userId       String? // 操作用户ID
-  actorType    String // 操作者类型
-  actorId      String // 操作者ID
-  action       String // 执行的操作
-  resourceType String? // 操作的资源类型
+  actorType    String // 操作者类型 (e.g., USER, SYSTEM, CLIENT_APP)
+  actorId      String // 操作者ID (userId, system_process_id, clientId)
+  action       String // 执行的操作 (e.g., LOGIN, USER_CREATE, ARTICLE_DELETE)
+  resourceType String? // 操作的资源类型 (e.g., User, Article, Order)
   resourceId   String? // 操作的资源ID
-  details      String? // 操作详情
-  status       String // 操作状态
+  details      String? // 操作详情 (JSON string for structured details)
+  status       String // 操作状态 (e.g., SUCCESS, FAILURE, PENDING)
   ipAddress    String? // IP地址
   userAgent    String? // 用户代理
-  sessionId    String? // 会话ID
+  sessionId    String? // 会话ID (If applicable)
 
-  user User? @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // SetNull to keep audit logs if user is deleted
 
   @@index([timestamp])
   @@index([userId])
   @@index([action])
   @@index([resourceType, resourceId])
   @@index([status])
-  @@index([userId, timestamp])
+  @@index([userId, timestamp]) // For user-specific audit trails
   @@map("audit_logs")
 }
 
@@ -421,14 +435,14 @@ model Scope {
 model ConsentGrant {
   id        String   @id @default(cuid())
   userId    String
-  clientId  String
+  clientId  String   // This should be the Prisma CUID of the OAuthClient
   scopes    String   // JSON array of granted scope strings e.g., ["openid", "profile", "order:read"]
   issuedAt  DateTime @default(now())
   expiresAt DateTime? // Optional: if consents can expire
   revokedAt DateTime? // If consent is explicitly revoked
 
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade) // clientId here refers to OAuthClient.id (CUID)
 
   @@unique([userId, clientId]) // A user typically has one active consent grant per client
   @@map("consent_grants")
@@ -510,4 +524,64 @@ model RevokedAuthJti {
   @@index([userId])
   @@index([expiresAt]) // For cleaning up expired JTIs
   @@map("revoked_auth_jtis")
+}
+
+// 登录尝试记录
+model LoginAttempt {
+  id          String   @id @default(cuid()) // 主键
+  userId      String?  // 用户ID (如果尝试与已知用户关联)
+  username    String   // 尝试登录的用户名
+  ipAddress   String?  // IP地址
+  userAgent   String?  // 用户代理
+  timestamp   DateTime @default(now()) // 尝试时间
+  successful  Boolean  // 是否成功
+  failureReason String? // 失败原因 (e.g., WRONG_PASSWORD, USER_NOT_FOUND, ACCOUNT_LOCKED)
+
+  // 关联用户 (可选，如果需要从用户导航到登录尝试)
+  // user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([username])
+  @@index([ipAddress])
+  @@index([timestamp])
+  @@map("login_attempts") // 数据库表名
+}
+
+// 系统配置
+model SystemConfiguration {
+  id          String   @id @default(cuid()) // 主键
+  key         String   @unique // 配置键
+  value       String   // 配置值 (建议存储为JSON字符串以支持复杂类型)
+  description String?  // 配置描述
+  type        String   @default("string") // 值类型: string, number, boolean, json
+  isEditable  Boolean  @default(true)  // 是否可通过API编辑
+  createdAt   DateTime @default(now()) // 创建时间
+  updatedAt   DateTime @updatedAt // 更新时间
+
+  @@map("system_configurations") // 数据库表名
+}
+
+// 安全策略
+model SecurityPolicy {
+  id        String   @id @default(cuid()) // 主键
+  name      String   @unique //策略名称, 例如 "PasswordStrength", "LoginSecurity"
+  type      PolicyType      // 策略类型
+  policy    Json     // JSON对象，包含具体策略配置
+  isActive  Boolean  @default(true) // 是否激活
+  createdAt DateTime @default(now()) // 创建时间
+  updatedAt DateTime @updatedAt // 更新时间
+
+  @@index([name, type])
+  @@map("security_policies") // 数据库表名
+}
+
+// 策略类型枚举
+enum PolicyType {
+  PASSWORD_STRENGTH    // 密码强度策略
+  PASSWORD_HISTORY     // 密码历史策略
+  PASSWORD_EXPIRATION  // 密码过期策略
+  LOGIN_SECURITY       // 登录安全策略
+  ACCESS_CONTROL       // 访问控制策略
+  CLIENT_SECURITY      // OAuth客户端安全策略
+  SCOPE_SECURITY       // OAuth作用域安全策略
 }

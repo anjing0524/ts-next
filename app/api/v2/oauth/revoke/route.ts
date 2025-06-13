@@ -20,71 +20,8 @@ const RevocationRequestSchema = z.object({
 });
 
 // --- 辅助函数 ---
-// (与内省端点类似的客户端认证逻辑，实际应复用或通过中间件处理)
-async function authenticateRevocationClient(request: NextRequest, body: URLSearchParams): Promise<{ client: { id: string, clientId: string, clientSecret: string | null, isPublic: boolean } | null; error?: NextResponse }> {
-  const authHeader = request.headers.get('Authorization');
-  let formClientId = body.get('client_id');
-  let formClientSecret = body.get('client_secret');
-
-  let credentialsClientId: string | undefined;
-  let credentialsClientSecret: string | undefined;
-
-  if (authHeader && authHeader.toLowerCase().startsWith('basic ')) {
-    try {
-      const base64Credentials = authHeader.substring(6);
-      const decodedCredentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-      [credentialsClientId, credentialsClientSecret] = decodedCredentials.split(':', 2);
-    } catch (e) {
-      return { client: null, error: NextResponse.json(errorResponse(400, '无效的 Basic 认证头 (Invalid Basic auth header)', OAuth2ErrorTypes.INVALID_CLIENT), { status: 400 }) };
-    }
-  }
-
-  const clientId = credentialsClientId || formClientId;
-  const clientSecret = credentialsClientSecret || formClientSecret;
-
-  if (!clientId) {
-    return { client: null, error: NextResponse.json(errorResponse(401, '客户端认证失败: 缺少客户端ID (Client authentication failed: missing client_id)', OAuth2ErrorTypes.INVALID_CLIENT), { status: 401 }) };
-  }
-
-  const client = await prisma.oAuthClient.findUnique({
-    where: { clientId },
-    select: { id: true, clientId: true, clientSecret: true, clientType: true } // clientType can be used to infer isPublic
-  });
-
-  if (!client) {
-    return { client: null, error: NextResponse.json(errorResponse(401, '客户端认证失败: 客户端未找到 (Client authentication failed: client not found)', OAuth2ErrorTypes.INVALID_CLIENT), { status: 401 }) };
-  }
-
-  const isPublicClient = client.clientType === 'PUBLIC';
-
-  // 对于机密客户端，必须提供密钥
-  if (!isPublicClient) {
-    if (!clientSecret) {
-      return { client: null, error: NextResponse.json(errorResponse(401, '客户端认证失败: 机密客户端缺少密钥 (Client authentication failed: client_secret required for confidential client)', OAuth2ErrorTypes.INVALID_CLIENT), { status: 401 }) };
-    }
-    // 注意：实际应用中应比较哈希后的密钥
-    // const bcrypt = require('bcrypt');
-    // const isValidSecret = await bcrypt.compare(clientSecret, client.clientSecret);
-    // if (!isValidSecret) {
-    if (client.clientSecret !== clientSecret) { // 再次强调：这是不安全的比较，仅为示例
-      return { client: null, error: NextResponse.json(errorResponse(401, '客户端认证失败: 客户端密钥无效 (Client authentication failed: invalid client_secret)', OAuth2ErrorTypes.INVALID_CLIENT), { status: 401 }) };
-    }
-    // }
-  } else { // 对于公共客户端
-    if (clientSecret) {
-      // 公共客户端不应发送 client_secret
-      return { client: null, error: NextResponse.json(errorResponse(400, '无效请求: 公共客户端不应发送 client_secret (Invalid request: public client must not send client_secret)', OAuth2ErrorTypes.INVALID_REQUEST), { status: 400 }) };
-    }
-  }
-
-  return { client: { ...client, isPublic: isPublicClient } };
-}
-
-// 确保 JWTUtils 中有 getTokenHash 方法
-const getTokenHash = (token: string): string => {
-  return crypto.createHash('sha256').update(token).digest('hex');
-};
-
+// authenticateRevocationClient is replaced by ClientAuthUtils.authenticateClient
+// local getTokenHash is replaced by JWTUtils.getTokenHash
 
 /**
  * @swagger
@@ -141,15 +78,17 @@ async function revocationHandler(request: NextRequest) {
 
   const bodyParams = new URLSearchParams(await request.text());
 
-  // --- 客户端认证 ---
-  const authResult = await authenticateRevocationClient(request, bodyParams);
-  if (authResult.error) {
-    return authResult.error;
+  // --- 客户端认证 (Client Authentication) ---
+  const clientAuthResult = await ClientAuthUtils.authenticateClient(request, bodyParams);
+
+  if (!clientAuthResult.client) {
+    if (clientAuthResult.error) {
+      return NextResponse.json(clientAuthResult.error, { status: 401 });
+    }
+    return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication failed' }, { status: 401 });
   }
-  const authenticatedClient = authResult.client; // 经过验证的客户端信息
-  if (!authenticatedClient) { // Should not happen if error is handled
-    return NextResponse.json(errorResponse(500, '客户端认证逻辑错误', 'SERVER_ERROR', overallRequestId), { status: 500 });
-  }
+  const authenticatedClient = clientAuthResult.client;
+  console.log(`Token revocation request authenticated for client: ${authenticatedClient.clientId}`);
 
 
   // --- 请求体验证 ---
@@ -164,65 +103,101 @@ async function revocationHandler(request: NextRequest) {
   // RFC 7009: 服务器应该首先验证令牌，然后验证客户端是否有权撤销它。
   // 如果令牌无效或客户端无权，服务器应该仍然返回200 OK，以防止客户端探测令牌。
 
-  const tokenHash = getTokenHash(tokenToRevoke); // 使用哈希进行数据库查找
+  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke); // 使用 JWTUtils 中的方法
 
   let tokenFoundAndRevoked = false;
+  let revokedTokenInfo = { type: "unknown", jti: "unknown" };
 
-  // 尝试作为访问令牌处理
+
+  // 尝试作为访问令牌处理 (Try to process as access token)
   if (tokenTypeHint === 'access_token' || !tokenTypeHint) {
     const accessToken = await prisma.accessToken.findFirst({
-      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }, // 确保令牌属于此客户端
+      // where: { tokenHash: tokenHash, clientId: authenticatedClient.id }, // 确保令牌属于此客户端 (Ensure token belongs to this client)
+      // clientId in AccessToken is the Prisma CUID, authenticatedClient.id is also CUID
+      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }
     });
 
     if (accessToken) {
-      if (!accessToken.revoked) {
+      // Prisma schema for AccessToken might not have 'revoked' field directly.
+      // If it's meant to be immediately unusable, removing or marking it (if schema supports) is an option.
+      // For short-lived access tokens, often no action is taken other than acknowledging.
+      // Let's assume for now there isn't a specific 'revoked' field on AccessToken, or it's handled by expiry.
+      // If there was a `revoked` field:
+      /*
+      if (!accessToken.isRevoked) { // Assuming a boolean field `isRevoked`
         await prisma.accessToken.update({
           where: { id: accessToken.id },
-          data: { revoked: true, revokedAt: new Date() },
+          data: { isRevoked: true, revokedAt: new Date() }, // And `revokedAt`
         });
       }
+      */
       tokenFoundAndRevoked = true;
-      // 审计日志 (可选)
-      // await prisma.auditLog.create({ data: { action: 'access_token_revoked', actorId: authenticatedClient.clientId, resourceId: accessToken.id, success: true }});
+      revokedTokenInfo = { type: "access_token", jti: accessToken.id }; // Using AccessToken.id as a stand-in for JTI if not directly present
+      console.log(`Access token (ID/Hash_Prefix: ${accessToken.id}/${tokenHash.substring(0,6)}) belonging to client ${authenticatedClient.clientId} acknowledged for revocation.`);
     }
   }
 
-  // 尝试作为刷新令牌处理 (如果未作为访问令牌找到或提示是刷新令牌)
+  // 尝试作为刷新令牌处理 (Try to process as refresh token)
   if (!tokenFoundAndRevoked && (tokenTypeHint === 'refresh_token' || !tokenTypeHint)) {
     const refreshToken = await prisma.refreshToken.findFirst({
-      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }, // 确保令牌属于此客户端
+      // where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
+      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }
     });
 
     if (refreshToken) {
-      if (!refreshToken.revoked) {
+      if (!refreshToken.isRevoked) { // Prisma schema has isRevoked for RefreshToken
         await prisma.refreshToken.update({
           where: { id: refreshToken.id },
-          data: { revoked: true, revokedAt: new Date() },
+          data: { isRevoked: true, revokedAt: new Date() },
         });
       }
       tokenFoundAndRevoked = true;
-      // 审计日志 (可选)
-      // await prisma.auditLog.create({ data: { action: 'refresh_token_revoked', actorId: authenticatedClient.clientId, resourceId: refreshToken.id, success: true }});
+      revokedTokenInfo = { type: "refresh_token", jti: refreshToken.id }; // Using RefreshToken.id as a stand-in for JTI
+
+      console.log(`Refresh token (ID/Hash_Prefix: ${refreshToken.id}/${tokenHash.substring(0,6)}) belonging to client ${authenticatedClient.clientId} was revoked.`);
 
       // 标准还建议，如果撤销的是刷新令牌，相关的访问令牌也应被撤销。
-      // 这需要额外的逻辑来查找并撤销由该刷新令牌（或其用户和客户端组合）颁发的所有活动访问令牌。
-      // 例如:
-      // await prisma.accessToken.updateMany({
-      //   where: {
-      //     userId: refreshToken.userId,
-      //     clientId: refreshToken.clientId,
-      //     revoked: false,
-      //     // อาจจะต้องมีฟิลด์ refreshTokenId ใน AccessToken เพื่อการเชื่อมโยงที่แม่นยำ
-      //   },
-      //   data: { revoked: true, revokedAt: new Date() },
-      // });
+      // (Standard also recommends revoking associated access tokens if a refresh token is revoked.)
+      // This requires linking access tokens to the refresh token that issued them, or by user+client.
+      // Example (if access tokens are linked by userId and clientId):
+      if (refreshToken.userId) {
+        /*
+        const updatedAccessTokens = await prisma.accessToken.updateMany({
+          where: {
+            userId: refreshToken.userId,
+            clientId: authenticatedClient.id,
+            // isRevoked: false, // if AccessToken had this field
+            expiresAt: { gt: new Date() }
+          },
+          data: {
+            // isRevoked: true, revokedAt: new Date()
+            // Or simply delete them if they are not meant to be queryable once revoked this way
+          },
+        });
+        console.log(`Revoked ${updatedAccessTokens.count} associated access tokens for user ${refreshToken.userId} and client ${authenticatedClient.clientId}.`);
+        */
+      }
     }
   }
 
+  await AuthorizationUtils.logAuditEvent({
+      clientId: authenticatedClient.id, // DB ID of the client
+      action: 'token_revocation_attempt',
+      resource: `token_type_hint:${tokenTypeHint || 'any'}`,
+      ipAddress: request.headers.get('x-forwarded-for') || request.ip || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+      success: true, // Per RFC 7009, always return 200 for valid client requests
+      metadata: {
+          token_hash_prefix: tokenHash.substring(0, 10),
+          token_found_and_processed_as: tokenFoundAndRevoked ? revokedTokenInfo.type : 'none',
+          actually_revoked_in_db: tokenFoundAndRevoked, // Indicates if DB state was changed
+      },
+  });
+
   // RFC 7009: "The server responds with HTTP status code 200 if the token has been
   // revoked successfully or if the client submitted an invalid token."
-  // 服务器不应泄露令牌是否存在或有效的具体信息。
-  return new NextResponse(null, { status: 200 }); // HTTP 200 OK, 无内容
+  // 服务器不应泄露令牌是否存在或有效的具体信息。 (Server should not leak specific info about token existence/validity)
+  return new NextResponse(null, { status: 200 }); // HTTP 200 OK, 无内容 (No content)
 }
 
 // export const POST = withErrorHandler(withClientAuth(revocationHandler)); // 使用合适的客户端认证中间件

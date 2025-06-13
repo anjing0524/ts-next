@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, PasswordResetRequest, PasswordHistory, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client'; // User, PasswordResetRequest, PasswordHistory not directly used as types
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 import bcrypt from 'bcrypt';
 
 const MIN_PASSWORD_LENGTH = 8; // 密码最小长度 (Minimum password length)
@@ -14,7 +15,13 @@ function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'password_reset_failed', message }, { status });
 }
 
-export async function POST(req: NextRequest) {
+// 包装原始的 POST 处理函数 (Wrap original POST handler)
+async function resetPasswordHandler(req: AuthenticatedRequest, event?: any) {
+  // 管理员认证和权限检查已由 requirePermission 处理
+  // (Admin authentication and permission check is handled by requirePermission)
+  const adminUser = req.user;
+  console.log(`Admin user ${adminUser?.userId} (username: ${adminUser?.username}) is attempting to reset a password using a token (permission 'auth:password:reset' granted).`);
+
   let requestBody;
   try {
     requestBody = await req.json();
@@ -128,11 +135,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Password reset successfully. You can now log in with your new password.' }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Password reset error for token ${token}:`, error);
+    console.error(`Password reset error for token ${token} (admin: ${adminUser?.userId}):`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
         // 处理特定的 Prisma 错误 (Handle specific Prisma errors)
-         console.error(`Prisma error during password reset for token ${token}:`, error.code, error.meta);
+         console.error(`Prisma error during password reset for token ${token} (admin: ${adminUser?.userId}):`, error.code, error.meta);
     }
     return errorResponse('An unexpected error occurred while resetting password.', 500, 'server_error');
   }
 }
+
+export const POST = requirePermission('auth:password:reset')(resetPasswordHandler);

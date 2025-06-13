@@ -3,11 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User } from '@prisma/client'; // Prisma User type
+// import { User } from '@prisma/client'; // Prisma User type - Not directly used, updatedUser is typed via Prisma.UserUpdateInput
 import bcrypt from 'bcrypt'; // For password comparison
-import { addMinutes, addHours } from 'date-fns'; // For time manipulation
-import { JWTUtils } from '@/lib/auth/oauth2'; // Assuming JWTUtils for token generation
-import crypto from 'crypto'; // For potential future use with refresh token (e.g. jti)
+import { addMinutes } from 'date-fns'; // For time manipulation. addHours is not used.
+// import { JWTUtils } from '@/lib/auth/oauth2'; // Replaced with v2AuthUtils
+// import { createV2SessionAccessToken, createV2SessionRefreshToken } from '@/lib/auth/v2AuthUtils'; // REMOVED: No longer issuing V2 session tokens
+// import crypto from 'crypto'; // nanoid was used in v2AuthUtils for JTI
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5; // 最大登录失败次数 (Max failed login attempts)
 const LOCKOUT_DURATION_MINUTES = 15; // 账户锁定时间（分钟）(Account lockout duration in minutes)
@@ -102,26 +103,13 @@ export async function POST(req: NextRequest) {
 
     // 6. 生成JWT令牌 (Generate JWT tokens)
     // 这些是用于API v2自身认证的会话令牌，应区别于OAuth令牌
-    // (These are session tokens for API v2's own auth, distinct from OAuth tokens)
+    // (These are session tokens for API v2's own auth, distinct from OAuth tokens) - V2 Session tokens are removed.
+    // This login endpoint will now primarily serve as a credential check.
+    // Actual token issuance for an admin UI would happen via an OAuth flow using an admin client.
+    // For now, successful login will return user information. A frontend could use this
+    // success to then initiate an OAuth flow if needed, or manage a simple cookie if same-site.
 
-    // 访问令牌 (Access Token - short-lived)
-    const accessTokenPayload = {
-      userId: updatedUser.id,
-      username: updatedUser.username,
-      // aud: 'urn:api:v2:session', // 建议使用audience区分令牌类型 (Recommended to use audience to differentiate token types)
-      // roles: updatedUser.roles.map(role => role.name) // 假设角色信息已加载或可获取 (Assuming roles are loaded or fetchable)
-    };
-    // 假设JWTUtils有专门为此类令牌设计的方法 (Assuming JWTUtils has methods designed for such tokens)
-    // 这些方法可能使用不同的签名密钥或有不同的声明 (e.g., 'aud')
-    const accessToken = await JWTUtils.createV2AuthAccessToken(accessTokenPayload);
-    const accessTokenExpiresIn = 3600; // 1小时 (1 hour)
-
-    // 刷新令牌 (Refresh Token - long-lived)
-    const refreshTokenPayload = {
-      userId: updatedUser.id,
-      // jti: crypto.randomBytes(16).toString('hex'), // 可选：为刷新令牌添加 JTI (Optional: add JTI for refresh token)
-    };
-    const refreshToken = await JWTUtils.createV2AuthRefreshToken(refreshTokenPayload);
+    // 6. (No tokens issued directly from this endpoint anymore)
 
     // 7. 构建响应 (Construct response)
     const userResponse = {
@@ -137,10 +125,11 @@ export async function POST(req: NextRequest) {
     };
 
     return NextResponse.json({
-      accessToken,
-      refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: accessTokenExpiresIn,
+      // accessToken, // REMOVED
+      // refreshToken, // REMOVED
+      // tokenType: 'Bearer', // REMOVED
+      // expiresIn: accessTokenExpiresIn, // REMOVED
+      message: 'Login successful. User authenticated.', // New success message
       user: userResponse,
     });
 
@@ -155,13 +144,13 @@ export async function POST(req: NextRequest) {
 // For Prisma.UserUpdateInput
 import { Prisma } from '@prisma/client';
 
-// 声明 JWTUtils 中期望的方法 (Declare expected methods in JWTUtils)
+// 声明 JWTUtils 中期望的方法 (Declare expected methods in JWTUtils) - NO LONGER NEEDED due to v2AuthUtils
 // 实际实现应在 lib/auth/oauth2.ts 中
 // (Actual implementation should be in lib/auth/oauth2.ts)
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async createV2AuthAccessToken(payload: { userId: string; username: string; aud?: string; roles?: string[] }): Promise<string>;
-    static async createV2AuthRefreshToken(payload: { userId: string; jti?: string }): Promise<string>;
-    // ... other existing JWTUtils methods
-  }
-}
+// declare module '@/lib/auth/oauth2' {
+//   export class JWTUtils {
+//     static async createV2AuthAccessToken(payload: { userId: string; username: string; aud?: string; roles?: string[] }): Promise<string>;
+//     static async createV2AuthRefreshToken(payload: { userId: string; jti?: string }): Promise<string>;
+//     // ... other existing JWTUtils methods
+//   }
+// }
