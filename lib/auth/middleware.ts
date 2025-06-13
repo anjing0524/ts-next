@@ -40,7 +40,7 @@ export interface AuthContext {
   client_id: string;
   scopes: string[];
   permissions: string[];
-  payload: Record<string, unknown>;
+  tokenPayload: Record<string, unknown>; // Renamed from payload
 }
 
 export interface AuthOptions {
@@ -61,13 +61,21 @@ export async function authenticateBearer(
   context?: AuthContext;
   response?: NextResponse;
 }> {
+  // 从请求头中获取 Authorization 信息
+  // (Token extraction from the Authorization header)
   const authorization = request.headers.get('authorization');
 
+  // 如果 Authorization 头不存在或格式不正确 (例如，不是以 "Bearer " 开头)
+  // (If the Authorization header is missing or not correctly formatted (e.g., does not start with "Bearer "))
   if (!authorization || !authorization.startsWith('Bearer ')) {
+    // 如果允许公共访问，则直接返回成功
+    // (If public access is allowed, return success directly)
     if (options.allowPublicAccess) {
       return { success: true };
     }
 
+    // 否则，返回401未授权错误
+    // (Otherwise, return a 401 Unauthorized error)
     return {
       success: false,
       response: NextResponse.json(
@@ -78,29 +86,43 @@ export async function authenticateBearer(
         {
           status: 401,
           headers: {
-            'WWW-Authenticate': 'Bearer realm="API"',
+            'WWW-Authenticate': 'Bearer realm="API"', // WWW-Authenticate 头指示客户端如何进行认证
           },
         }
       ),
     };
   }
 
-  const token = authorization.substring(7); // 移除 "Bearer " 前缀 (Remove "Bearer " prefix)
-  let payload: jose.JWTPayload; // 定义payload变量 (Define payload variable)
+  // 提取JWT令牌字符串 (移除 "Bearer " 前缀)
+  // (Extract the JWT string by removing the "Bearer " prefix)
+  const token = authorization.substring(7);
+  let jwtValidatedPayload: jose.JWTPayload; // 用于存储验证后的JWT载荷 (To store the validated JWT payload)
 
   try {
-    // 从环境变量或配置中获取JWKS端点URI (Get JWKS endpoint URI from environment variable or configuration)
+    // 步骤 1: 获取JWKS (JSON Web Key Set) URI
+    // (Step 1: Get JWKS (JSON Web Key Set) URI)
+    // JWKS URI 通常存储在环境变量中，用于获取公钥以验证JWT签名
+    // (The JWKS URI is typically stored in an environment variable and is used to fetch public keys for JWT signature verification)
     const jwksUriString = process.env.JWKS_URI;
     if (!jwksUriString) {
       console.error('JWKS_URI 环境变量未设置 (JWKS_URI environment variable is not set)');
-      // 对于配置错误，通常返回500 (For configuration errors, typically return 500)
-      // 但在认证流程中，任何使token无法验证的问题都应导致401 (But in auth flow, any issue preventing token validation should lead to 401)
+      // 配置错误，无法继续验证令牌
+      // (Configuration error, cannot proceed with token validation)
       throw new Error('JWKS_URI not configured, cannot validate token.');
     }
-    // 创建一个远程JWKSet实例，它会自动缓存JWKS响应 (Create a remote JWKSet instance, which automatically caches JWKS responses)
+
+    // 步骤 2: 创建远程JWKSet实例
+    // (Step 2: Create a remote JWKSet instance)
+    // jose.createRemoteJWKSet 用于从指定的URI获取JWKS。
+    // 它会自动处理JWKS的获取、缓存和刷新，这对于性能和可靠性非常重要。
+    // (jose.createRemoteJWKSet is used to fetch the JWKS from the specified URI.)
+    // (It automatically handles fetching, caching, and refreshing of the JWKS, which is important for performance and reliability.)
     const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
 
-    // 从环境变量或配置中获取预期的签发者和受众 (Get expected issuer and audience from environment variables or configuration)
+    // 步骤 3: 获取预期的签发者 (Issuer) 和受众 (Audience)
+    // (Step 3: Get the expected Issuer and Audience)
+    // 这些值也通常存储在环境变量中，用于验证JWT中的 'iss' 和 'aud' 声明
+    // (These values are also typically stored in environment variables and are used to validate the 'iss' and 'aud' claims in the JWT)
     const expectedIssuer = process.env.JWT_ISSUER;
     const expectedAudience = process.env.JWT_AUDIENCE;
 
@@ -108,44 +130,72 @@ export async function authenticateBearer(
       console.error(
         'JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)'
       );
+      // 配置错误，无法继续验证令牌
+      // (Configuration error, cannot proceed with token validation)
       throw new Error('JWT issuer or audience not configured, cannot validate token.');
     }
 
-    // 验证JWT (Verify the JWT)
-    // jose.jwtVerify 会自动处理签名验证、exp、nbf、iss、aud等声明的验证
-    // (jose.jwtVerify automatically handles signature verification and validation of claims like exp, nbf, iss, aud)
+    // 步骤 4: 验证JWT
+    // (Step 4: Verify the JWT)
+    // jose.jwtVerify 函数执行以下关键验证:
+    // 1. 签名验证: 使用从JWKS获取的公钥验证JWT的签名是否有效。
+    // 2. 标准声明验证:
+    //    - 'exp' (Expiration Time): 检查令牌是否已过期。
+    //    - 'nbf' (Not Before): 检查令牌是否已生效。
+    //    - 'iss' (Issuer): 检查令牌的签发者是否与预期匹配 (expectedIssuer)。
+    //    - 'aud' (Audience): 检查令牌的受众是否与预期匹配 (expectedAudience)。
+    // 3. 算法验证: 确保令牌使用的签名算法与期望的算法列表 ('RS256') 中的一个匹配。
+    // (The jose.jwtVerify function performs the following key validations:)
+    // (1. Signature Verification: Verifies if the JWT's signature is valid using the public key obtained from JWKS.)
+    // (2. Standard Claim Validation:)
+    // (   - 'exp' (Expiration Time): Checks if the token has expired.)
+    // (   - 'nbf' (Not Before): Checks if the token is already active.)
+    // (   - 'iss' (Issuer): Checks if the token's issuer matches the expectedIssuer.)
+    // (   - 'aud' (Audience): Checks if the token's audience matches the expectedAudience.)
+    // (3. Algorithm Verification: Ensures the signing algorithm used by the token matches one from the expected list (e.g., 'RS256').)
     const verificationResult = await jose.jwtVerify(token, JWKS, {
       issuer: expectedIssuer,
       audience: expectedAudience,
-      algorithms: ['RS256'], // 明确指定期望的算法 (Explicitly specify expected algorithms)
+      algorithms: ['RS256'], // 明确指定期望的签名算法 (Explicitly specify the expected signing algorithm)
     });
-    payload = verificationResult.payload; // 将验证后的载荷赋值给payload (Assign the verified payload to the payload variable)
+    jwtValidatedPayload = verificationResult.payload; // 将验证成功后的JWT载荷赋值给 jwtValidatedPayload
+                                         // (Assign the successfully validated JWT payload to jwtValidatedPayload)
   } catch (err) {
-    // 处理JWT验证错误 (例如，令牌过期，签名无效，声明不匹配等)
-    // (Handle JWT verification errors - e.g., token expired, invalid signature, claims mismatch, etc.)
-    console.error('JWT 验证失败 (JWT validation failed):', err); // 服务端日志 (Server-side log)
+    // 步骤 5: 处理JWT验证过程中发生的各种错误
+    // (Step 5: Handle various errors that occur during JWT validation)
+    // 例如: 令牌过期、签名无效、声明不匹配 (iss, aud)、JWKS获取失败等
+    // (For example: token expired, invalid signature, claims mismatch (iss, aud), JWKS fetch failure, etc.)
+    console.error('JWT 验证失败 (JWT validation failed):', err); // 在服务端记录详细错误日志 (Log detailed error on the server-side)
 
-    let errorDescription = 'Token validation failed';
+    let errorDescription = 'Token validation failed'; // 默认错误描述 (Default error description)
+    // 根据错误类型提供更具体的错误信息
+    // (Provide more specific error messages based on the error type)
     if (err instanceof jose.errors.JWTExpired) {
+      // JWT已过期 (JWT has expired)
       errorDescription = `Token expired at ${new Date((err.payload.exp as number) * 1000).toISOString()}`;
     } else if (err instanceof jose.errors.JWTClaimValidationFailed) {
+      // JWT声明验证失败 (e.g., 'iss' or 'aud' mismatch)
+      // (JWT claim validation failed (e.g., 'iss' or 'aud' mismatch))
       errorDescription = `Token claim validation failed: ${err.claim} ${err.reason}`;
     } else if (
-      err instanceof jose.errors.JOSENotSupported ||
-      err instanceof jose.errors.JWKInvalid
+      err instanceof jose.errors.JOSENotSupported || // 例如，不支持的算法 (e.g., unsupported algorithm)
+      err instanceof jose.errors.JWKInvalid // JWK无效 (JWK is invalid)
     ) {
       errorDescription = 'Invalid token algorithm or key issue.';
     } else if (
       err instanceof Error &&
       (err.message.includes('JWKS') || err.message.includes('configured'))
     ) {
-      // 对于配置或JWKS获取问题，虽然仍在401路径，但错误消息可以更具体
-      // (For configuration or JWKS fetch issues, while still on 401 path, error message can be more specific)
+      // JWKS URI配置错误或获取JWKS失败
+      // (JWKS URI configuration error or failure to fetch JWKS)
       errorDescription = `Token validation setup error: ${err.message}`;
     }
+    // 其他类型的 jose 错误 (如签名验证失败 jose.errors.JWSSignatureVerificationFailed) 会被通用错误消息捕获
+    // (Other types of jose errors (like signature verification failure jose.errors.JWSSignatureVerificationFailed) will be caught by the generic error message)
 
+    // 记录失败的认证尝试事件 (Log the failed authentication attempt event)
     await AuthorizationUtils.logAuditEvent({
-      action: 'token_verification_failed_jwks', // 新的审计动作类型 (New audit action type)
+      action: 'token_verification_failed_jwks',
       resource: request.url,
       ipAddress: request.headers.get('x-forwarded-for') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
@@ -203,16 +253,31 @@ export async function authenticateBearer(
   //   };
   // }
 
-  // 从JWT载荷中提取上下文信息 (Extract context from JWT payload)
+  // 步骤 6: 从成功验证的JWT载荷中提取信息并构建 AuthContext
+  // (Step 6: Extract information from the successfully validated JWT payload and construct AuthContext)
   const context: AuthContext = {
-    user_id: payload.sub !== payload.client_id ? (payload.sub as string) : undefined,
-    client_id: payload.client_id as string, // client_id 应始终存在于Access Token中 (client_id should always be in Access Token)
-    scopes: ScopeUtils.parseScopes(payload.scope as string | undefined), // scope可能是可选的 (scope might be optional)
-    permissions: (payload.permissions as string[] | undefined) || [], // permissions可能是可选的 (permissions might be optional)
-    payload, // 存储完整的payload以供后续使用 (Store the full payload for later use)
+    // 'sub' (Subject) 声明通常代表用户ID。如果 'sub' 与 'client_id' 不同，则认为是用户ID。
+    // (The 'sub' (Subject) claim usually represents the user ID. If 'sub' is different from 'client_id', it's considered the user ID.)
+    user_id: jwtValidatedPayload.sub !== jwtValidatedPayload.client_id ? (jwtValidatedPayload.sub as string) : undefined,
+
+    // 'client_id' 声明代表进行调用的客户端应用程序。
+    // (The 'client_id' claim represents the client application making the call.)
+    client_id: jwtValidatedPayload.client_id as string, // Access Token 中应始终包含 client_id (client_id should always be present in an Access Token)
+
+    // 'scope' 声明（如果存在）定义了授予此令牌的范围。
+    // (The 'scope' claim (if present) defines the scopes granted to this token.)
+    scopes: ScopeUtils.parseScopes(jwtValidatedPayload.scope as string | undefined), // scope 可能是空格分隔的字符串，需要解析 (scope might be a space-separated string and needs parsing)
+
+    // 'permissions' 声明（如果存在且是数组）定义了授予此令牌的直接权限。
+    // (The 'permissions' claim (if present and is an array) defines direct permissions granted to this token.)
+    permissions: (jwtValidatedPayload.permissions as string[] | undefined) || [], // permissions 可能是可选的，默认为空数组 (permissions might be optional, default to an empty array)
+
+    // 存储完整的已验证JWT载荷，以供后续可能的高级检查或使用。
+    // (Store the complete validated JWT payload for potential advanced checks or usage later.)
+    tokenPayload: jwtValidatedPayload,
   };
 
-  // 检查是否需要用户上下文 (Check if user context is required)
+  // 检查是否需要用户上下文 (Check if user context is required for this specific route/action)
   if (options.requireUserContext && !context.user_id) {
     return {
       success: false,
@@ -600,72 +665,125 @@ export interface OAuthValidationResult {
  * @returns 一个包装函数，它接收实际的路由处理器并返回一个新的、受保护的处理器
  *          (A wrapper function that takes the actual route handler and returns a new, protected handler)
  */
+// requirePermission HOF (Higher-Order Function) 的主要作用是:
+// 1. 确保请求来自经过身份验证的用户 (通过验证JWT)。
+// 2. 检查该用户是否具有执行操作所需的特定权限。
+// 3. 如果身份验证失败或用户缺少权限，则拒绝访问。
+// 4. 如果验证通过且权限满足，则将用户信息附加到请求对象，并执行实际的路由处理器。
+// (The main roles of the requirePermission HOF are:)
+// (1. Ensure the request comes from an authenticated user (by validating the JWT).)
+// (2. Check if this user has the specific permission required to perform the action.)
+// (3. Deny access if authentication fails or the user lacks the permission.)
+// (4. If validation passes and permission is met, attach user information to the request object and execute the actual route handler.)
 export function requirePermission(requiredPermission: string) {
-  // 返回一个接收实际处理器的函数 (Return a function that accepts the actual handler)
+  // 返回一个接收实际处理器的函数
+  // (Return a function that accepts the actual handler)
   return function <T extends (request: AuthenticatedRequest, ...args: any[]) => Promise<Response | NextResponse>>(
     actualHandler: T
   ) {
-    // 返回最终的异步请求处理函数 (Return the final async request handler function)
+    // 返回最终的异步请求处理函数
+    // (Return the final async request handler function)
     return async function (request: AuthenticatedRequest, ...args: any[]): Promise<Response | NextResponse> {
+      // 从请求头中提取 Authorization Bearer Token
+      // (Extract Authorization Bearer Token from request headers)
       const authHeader = request.headers.get('Authorization');
 
       if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+        // 如果没有提供Token或格式不正确，返回401未授权
+        // (If no token is provided or it's incorrectly formatted, return 401 Unauthorized)
         return NextResponse.json({ message: '未授权: 缺少或无效的 Authorization header (Unauthorized: Missing or invalid Authorization header)' }, { status: 401 });
       }
 
-      const token = authHeader.substring(7); // 提取 "Bearer " 后的令牌部分
+      const token = authHeader.substring(7); // 提取 "Bearer " 后的令牌部分 (Extract the token part after "Bearer ")
       if (!token) {
+        // 如果令牌为空，返回401未授权
+        // (If the token is empty, return 401 Unauthorized)
         return NextResponse.json({ message: '未授权: 缺少令牌 (Unauthorized: Missing token)' }, { status: 401 });
       }
 
       let oauthTokenPayload: jose.JWTPayload;
       try {
-        // 使用OAuth 2.0 Bearer Token验证逻辑 (Use OAuth 2.0 Bearer Token validation logic)
+        // **JWT 验证逻辑**
+        // (JWT Validation Logic)
+        // 此处重复了 `authenticateBearer` 中的部分JWT验证逻辑。
+        // 理想情况下，如果 `authenticateBearer` (或类似的全局认证中间件) 能保证在 `requirePermission` 之前运行，
+        // 并且已经验证了JWT并将结果 (如用户ID和权限) 附加到请求对象 (例如 `request.user`)，
+        // 那么这里的重新验证可能是多余的。可以考虑在未来的重构中优化这一点，以避免重复验证。
+        // (This section repeats some JWT validation logic found in `authenticateBearer`.)
+        // (Ideally, if `authenticateBearer` (or a similar global authentication middleware) is guaranteed to run before `requirePermission`
+        // and has already validated the JWT and attached the results (like user ID and permissions) to the request object (e.g., `request.user`),
+        // then the re-validation here might be redundant. This could be optimized in future refactoring to avoid duplicate validation.)
+
+        // 获取JWKS URI用于获取公钥
+        // (Get JWKS URI to fetch public keys)
         const jwksUriString = process.env.JWKS_URI;
         if (!jwksUriString) {
           console.error('JWKS_URI 环境变量未设置 (JWKS_URI environment variable is not set)');
           throw new Error('认证服务配置错误 (Authentication service configuration error).');
         }
+        // 创建远程JWKSet实例，用于获取和缓存公钥
+        // (Create a remote JWKSet instance for fetching and caching public keys)
         const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
 
+        // 获取预期的JWT签发者和受众
+        // (Get the expected JWT issuer and audience)
         const expectedIssuer = process.env.JWT_ISSUER;
-        const expectedAudience = process.env.JWT_AUDIENCE; // 通常是API的受众 (Usually the API's audience)
+        const expectedAudience = process.env.JWT_AUDIENCE;
         if (!expectedIssuer || !expectedAudience) {
           console.error('JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)');
           throw new Error('认证服务配置错误 (Authentication service configuration error).');
         }
 
+        // 使用 jose.jwtVerify 验证令牌签名、有效期、签发者和受众
+        // (Use jose.jwtVerify to validate the token's signature, expiration, issuer, and audience)
         const { payload } = await jose.jwtVerify(token, JWKS, {
           issuer: expectedIssuer,
           audience: expectedAudience,
           algorithms: ['RS256'], // 假设管理后台使用的OAuth令牌是RS256 (Assuming OAuth tokens for admin UI use RS256)
         });
-        oauthTokenPayload = payload;
+        oauthTokenPayload = payload; // 存储验证后的载荷 (Store the validated payload)
       } catch (error: any) {
+        // 如果JWT验证失败 (例如，过期、签名无效、声明不匹配)
+        // (If JWT validation fails (e.g., expired, invalid signature, claims mismatch))
         console.warn('requirePermission: OAuth Access Token 验证失败 (OAuth Access Token verification failed).', error.message);
         return NextResponse.json({ message: `未授权: ${error.message || '无效的OAuth令牌 (Invalid OAuth token)'}` }, { status: 401 });
       }
 
-      const userId = oauthTokenPayload.sub; // 'sub' claim 通常是用户ID (The 'sub' claim is typically the user ID)
+      // 从JWT载荷中提取用户ID ('sub' 声明)
+      // (Extract user ID ('sub' claim) from the JWT payload)
+      const userId = oauthTokenPayload.sub;
       if (!userId || typeof userId !== 'string') {
+        // 如果用户ID无效，返回401
+        // (If the user ID is invalid, return 401)
         return NextResponse.json({ message: '未授权: 无效的令牌载荷 (无效的sub声明) (Unauthorized: Invalid token payload (missing or invalid sub claim for user ID))' }, { status: 401 });
       }
 
-      // 权限检查策略 (Permission checking strategy)
+      // **权限检查逻辑**
+      // (Permission Checking Logic)
       let hasPermission = false;
+      // 尝试从令牌的 'permissions' 声明中获取权限列表
+      // (Try to get the list of permissions from the 'permissions' claim in the token)
       const tokenPermissions = oauthTokenPayload.permissions as string[] | undefined;
 
       if (tokenPermissions && Array.isArray(tokenPermissions)) {
-        // 1. 优先使用令牌中的 'permissions' 声明 (Prioritize 'permissions' claim in token)
+        // 1. 如果令牌中直接包含 'permissions' 声明，则基于此声明检查权限。
+        //    这是一种常见的做法，可以将权限信息直接嵌入到JWT中，避免额外的数据库查询。
+        // (1. If the token directly contains a 'permissions' claim, check permission based on this claim.)
+        // (   This is a common practice to embed permission information directly into the JWT, avoiding additional database queries.)
         hasPermission = tokenPermissions.includes(requiredPermission);
         console.log(`requirePermission: 用户 '${userId}' 通过令牌声明检查权限 '${requiredPermission}'。结果: ${hasPermission} (User '${userId}' checking permission '${requiredPermission}' via token claims. Result: ${hasPermission})`);
       } else {
-        // 2. 如果声明不存在，则调用 PermissionService 进行数据库检查 (If claim doesn't exist, call PermissionService for DB check)
+        // 2. 如果令牌中没有 'permissions' 声明，则回退到通过 PermissionService (通常是查询数据库) 来检查用户权限。
+        //    这提供了更大的灵活性，允许在不重新签发JWT的情况下更改用户权限。
+        // (2. If the token does not have a 'permissions' claim, fall back to checking user permissions via PermissionService (typically by querying the database).)
+        // (   This provides greater flexibility, allowing changes to user permissions without reissuing JWTs.)
         console.log(`requirePermission: 用户 '${userId}' 的令牌中无 'permissions' 声明。通过 PermissionService 检查权限 '${requiredPermission}'。(No 'permissions' claim in token for user '${userId}'. Checking permission '${requiredPermission}' via PermissionService.)`);
         hasPermission = await permissionServiceInstance.checkPermission(userId, requiredPermission);
       }
 
       if (!hasPermission) {
+        // 如果用户没有所需权限，返回403禁止访问
+        // (If the user does not have the required permission, return 403 Forbidden)
         console.warn(`requirePermission: 用户 ${userId} 无权限 '${requiredPermission}'。(User ${userId} does not have permission '${requiredPermission}'.)`);
         return NextResponse.json(
           { message: `禁止访问: 您没有 '${requiredPermission}' 权限访问此资源。(Forbidden: You do not have permission '${requiredPermission}' to access this resource.)` },
@@ -673,17 +791,19 @@ export function requirePermission(requiredPermission: string) {
         );
       }
 
-      // 将用户信息和权限附加到请求对象 (Attach user information and permissions to request object)
+      // 将用户信息（从JWT中提取）和权限附加到请求对象，以便后续的处理器可以使用。
+      // (Attach user information (extracted from JWT) and permissions to the request object so that subsequent handlers can use it.)
       request.user = {
-        id: userId, // 'sub' claim
+        id: userId, // 'sub' 声明作为主要用户标识符 (The 'sub' claim as the primary user identifier)
         userId: userId, // 为内部一致性明确添加userId (Explicitly add userId for internal consistency)
-        username: oauthTokenPayload.username as string || oauthTokenPayload.preferred_username as string || undefined, // 可选的用户名声明 (Optional username claim)
-        clientId: oauthTokenPayload.client_id as string || undefined, // 'client_id' claim from token
-        permissions: tokenPermissions || [], // 如果令牌中有，则使用；否则为空数组 (Use if in token, else empty array)
-        ...oauthTokenPayload // 附加所有其他声明 (Attach all other claims)
+        username: oauthTokenPayload.username as string || oauthTokenPayload.preferred_username as string || undefined, // 从 'username' 或 'preferred_username' 声明获取用户名 (Get username from 'username' or 'preferred_username' claim)
+        clientId: oauthTokenPayload.client_id as string || undefined, // 从 'client_id' 声明获取客户端ID (Get client ID from 'client_id' claim)
+        permissions: tokenPermissions || [], // 使用令牌中的权限列表，如果不存在则为空数组 (Use the permission list from the token, or an empty array if not present)
+        ...oauthTokenPayload // 附加所有其他JWT声明到 request.user，以备不时之需 (Attach all other JWT claims to request.user for potential use)
       };
 
-      // 执行实际的路由处理器 (Execute the actual route handler)
+      // 如果用户通过身份验证且拥有所需权限，则执行实际的路由处理器。
+      // (If the user is authenticated and has the required permission, execute the actual route handler.)
       // The 'args' will correctly pass { params } for dynamic routes.
       return actualHandler(request, ...args);
     };
