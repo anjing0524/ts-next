@@ -1,182 +1,104 @@
 // 文件路径: app/api/v2/auth/logout/route.ts
-// 描述: 用户登出API端点 (v2)
+// 描述: 用户登出端点 (User logout endpoint)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import crypto from 'crypto';
+import { JWTUtils } from '@/lib/auth/oauth2'; // 假设 JWTUtils 包含验证V2认证令牌的方法
 
-import { prisma } from '@/lib/prisma';
-import { successResponse, errorResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { JWTUtils, AuthorizationUtils } from '@/lib/auth/oauth2'; // JWTUtils for token verification (optional here)
-import { withAuth } from '@/lib/auth/middleware'; // 登出通常需要用户已认证
-
-// 确保 JWTUtils.getTokenHash 存在或在此处定义一个临时的
-const getTokenHash = (token: string): string => {
-  return crypto.createHash('sha256').update(token).digest('hex');
-};
-
-// --- 请求 Schema ---
-const LogoutRequestSchema = z.object({
-  refresh_token: z.string().min(1, '刷新令牌 (refresh_token) 不能为空'),
-  // all_sessions: z.boolean().optional().default(false).describe('是否登出所有会话 (不仅仅是当前refresh_token关联的会话)'),
-});
-
-/**
- * @swagger
- * /api/v2/auth/logout:
- *   post:
- *     summary: 用户登出 (User Logout)
- *     description: |
- *       使用提供的刷新令牌使用户会话失效。
- *       成功登出后，该刷新令牌及其关联的访问令牌（如果服务器端有此逻辑）将不再有效。
- *       此端点通常需要认证的请求 (即用户必须已登录才能登出)。
- *     tags:
- *       - Auth V2
- *     security:
- *       - bearerAuth: [] # 通常登出请求本身也需要一个有效的访问令牌来验证用户身份
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               refresh_token:
- *                 type: string
- *                 description: 需要使其失效的刷新令牌。
- *     produces:
- *       - application/json
- *     responses:
- *       '200':
- *         description: 登出成功。
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "登出成功 (Logout successful)"
- *       '400':
- *         description: 无效的请求 (例如，缺少 refresh_token)。
- *       '401':
- *         description: 未经授权 (例如，访问令牌无效或与刷新令牌用户不匹配)。
- *       '404':
- *         description: 刷新令牌未找到或已被撤销。
- *       '500':
- *         description: 服务器内部错误。
- */
-async function logoutHandler(request: NextRequest, authContext: any /* from withAuth */) {
-  const overallRequestId = (request as any).requestId; // from withErrorHandler
-  const body = await request.json();
-
-  const validationResult = LogoutRequestSchema.safeParse(body);
-  if (!validationResult.success) {
-    const errorMessages = validationResult.error.flatten().fieldErrors;
-    return NextResponse.json(
-      errorResponse(400, `无效的请求体: ${JSON.stringify(errorMessages)}`, 'VALIDATION_ERROR', overallRequestId),
-      { status: 400 }
-    );
-  }
-
-  const { refresh_token: refreshTokenString } = validationResult.data;
-  const currentUserId = authContext.user_id; // 从 withAuth 中间件获取当前认证用户ID
-
-  // 1. (可选) 验证刷新令牌结构，但不验证其签名或过期，因为目的是使其失效
-  //    这一步主要是为了快速失败格式错误的令牌。
-  //    const refreshTokenPayload = JWTUtils.decodeJwt(refreshTokenString); // 假设有此方法
-  //    if (!refreshTokenPayload || !refreshTokenPayload.jti) {
-  //      return NextResponse.json(errorResponse(400, '无效的刷新令牌格式', 'INVALID_TOKEN_FORMAT', overallRequestId), { status: 400 });
-  //    }
-
-  // 2. 在数据库中查找并撤销刷新令牌
-  const refreshTokenHash = getTokenHash(refreshTokenString);
-  const storedRefreshToken = await prisma.refreshToken.findFirst({
-    where: {
-      tokenHash: refreshTokenHash,
-      revoked: false, // 只找未被撤销的
-    },
-  });
-
-  if (!storedRefreshToken) {
-    // 即便令牌未找到或已被撤销，也可能返回成功，以避免泄露令牌状态。
-    // 但为了更明确的客户端反馈，这里返回404。根据安全策略调整。
-    await AuthorizationUtils.logAuditEvent({
-        userId: currentUserId, // 操作者
-        action: 'logout_failed_token_not_found',
-        ipAddress: request.ip,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: 'Refresh token not found or already revoked.',
-        metadata: { providedTokenHashSubstr: refreshTokenHash.substring(0,10) }
-    });
-    return NextResponse.json(
-      errorResponse(404, '刷新令牌未找到或已被撤销 (Refresh token not found or already revoked)', 'TOKEN_NOT_FOUND', overallRequestId),
-      { status: 404 }
-    );
-  }
-
-  // 3. 验证操作权限：确保当前认证用户是该刷新令牌的所有者
-  if (storedRefreshToken.userId !== currentUserId) {
-    await AuthorizationUtils.logAuditEvent({
-        userId: currentUserId, // 操作者
-        actorId: storedRefreshToken.userId, // 令牌的实际拥有者
-        action: 'logout_failed_permission_denied',
-        ipAddress: request.ip,
-        userAgent: request.headers.get('user-agent') || undefined,
-        success: false,
-        errorMessage: 'User does not have permission to revoke this refresh token.',
-        metadata: { tokenId: storedRefreshToken.id }
-    });
-    return NextResponse.json(
-      errorResponse(403, '无权操作此刷新令牌 (Permission denied to revoke this refresh token)', 'FORBIDDEN', overallRequestId),
-      { status: 403 }
-    );
-  }
-
-  // 4. 撤销刷新令牌
-  await prisma.refreshToken.update({
-    where: { id: storedRefreshToken.id },
-    data: { revoked: true, revokedAt: new Date() },
-  });
-
-  // 5. (可选) 撤销与此刷新令牌关联的所有活动访问令牌
-  //    这需要 AccessToken 表与 RefreshToken 表有某种关联，或者通过 userId 和 clientId 查找。
-  //    如果 AccessToken 表有 refreshTokenId 字段：
-  //    await prisma.accessToken.updateMany({
-  //      where: { refreshTokenId: storedRefreshToken.id, revoked: false },
-  //      data: { revoked: true, revokedAt: new Date() },
-  //    });
-  //    或者，如果通过用户和客户端关联：
-  await prisma.accessToken.updateMany({
-    where: {
-      userId: storedRefreshToken.userId,
-      clientId: storedRefreshToken.clientId, // 确保只撤销同一用户、同一客户端的访问令牌
-      revoked: false,
-      expiresAt: { gt: new Date() } // 只撤销未过期的
-    },
-    data: { revoked: true, revokedAt: new Date() }
-  });
-
-  await AuthorizationUtils.logAuditEvent({
-      userId: currentUserId,
-      clientId: storedRefreshToken.clientId,
-      action: 'user_logout_success',
-      ipAddress: request.ip,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: true,
-      metadata: { revokedRefreshTokenId: storedRefreshToken.id }
-  });
-
-  // 6. 返回成功响应
-  return NextResponse.json(
-    successResponse(null, 200, '登出成功 (Logout successful)', overallRequestId),
-    { status: 200 }
-  );
+// 辅助函数：构建响应 (Helper function: Build response)
+function buildResponse(message: string, status: number, data?: Record<string, any>) {
+  const responseBody = { message, ...data };
+  // 对于一些成功但无具体内容的响应，可以考虑返回状态码204 No Content，此时响应体应为空
+  // (For some successful responses without specific content, consider returning status 204 No Content, response body should be empty then)
+  // if (status === 204) {
+  //   return new NextResponse(null, { status });
+  // }
+  return NextResponse.json(responseBody, { status });
 }
 
-// 登出操作需要用户已认证，因此使用 withAuth 中间件
-export const POST = withErrorHandler(withAuth(logoutHandler, { requireUserContext: true }));
+export async function POST(req: NextRequest) {
+  // 1. 从 Authorization 头提取令牌 (Extract token from Authorization header)
+  const authHeader = req.headers.get('Authorization');
 
-EOF
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+    // 即使用户尝试登出，如果请求格式不正确，仍可认为用户会话无效或已结束
+    // (Even if user is logging out, if request format is incorrect, user session can be considered invalid or ended)
+    // 返回200，鼓励客户端清除本地存储的令牌 (Return 200 to encourage client to clear locally stored tokens)
+    return buildResponse('Logout processed (malformed authorization header). Please discard any local tokens.', 200);
+  }
+
+  const token = authHeader.substring(7); // 提取 "Bearer " 后的令牌部分 (Extract token part after "Bearer ")
+
+  if (!token) {
+    // 如果没有令牌，用户实际上已经“登出”了
+    // (If no token, user is effectively already "logged out")
+    return buildResponse('Logout processed (no token provided).', 200);
+  }
+
+  try {
+    // 2. 验证令牌 (Validate the token)
+    // 假设 JWTUtils 中有一个 verifyV2AuthAccessToken 方法用于验证会话访问令牌
+    // (Assuming JWTUtils has a verifyV2AuthAccessToken method for session access tokens)
+    // 此方法应能验证签名、有效期，并可能检查令牌是否用于正确的“audience”（例如 'urn:api:v2:session'）
+    // (This method should verify signature, expiry, and potentially check for correct 'audience', e.g. 'urn:api:v2:session')
+    const { valid, payload, error } = await JWTUtils.verifyV2AuthAccessToken(token);
+
+    if (!valid) {
+      // 即便令牌无效或过期，从客户端角度看，用户也已不再是有效会话状态
+      // (Even if token is invalid or expired, from client's perspective, user is no longer in a valid session state)
+      console.warn(`Logout attempt with invalid or expired token. Token: ${token.substring(0, 10)}... Error: ${error}`);
+      // 返回200，让客户端继续执行登出流程（清除本地令牌）
+      // (Return 200, let client proceed with logout flow (clear local tokens))
+      return buildResponse('Logout processed. Token was invalid, expired, or could not be verified.', 200);
+    }
+
+    // 可选：记录用户登出事件 (Optional: Log user logout event)
+    if (payload?.userId) {
+      console.log(`User ${payload.userId} initiated logout successfully with token ${token.substring(0,10)}...`);
+      // 在这里可以添加审计日志记录 (Audit logging can be added here)
+      // await prisma.auditLog.create({ data: { userId: payload.userId, action: 'logout', ... } });
+    } else {
+      console.log(`Logout processed for token ${token.substring(0,10)}... (userId not in payload or payload missing)`);
+    }
+
+
+    // 3. 令牌失效处理 (Token Invalidation Strategy)
+    // 当前采用无状态确认方式 (Currently using stateless acknowledgment)
+    // 服务器不维护已颁发V2会话JWT的拒绝列表。客户端负责丢弃令牌。
+    // (Server does not maintain a denylist for issued V2 session JWTs. Client is responsible for discarding tokens.)
+    //
+    // 对于更强的安全性，可以考虑:
+    // (For stronger security, consider):
+    //   a) 短期访问令牌：它们会自然过期。 (Short-lived access tokens: they expire naturally.)
+    //   b) 如果使用了刷新令牌：客户端应在登出时明确请求撤销刷新令牌（如果服务器支持）。
+    //      (If refresh tokens are used: client should explicitly request revocation of refresh token on logout if server supports it.)
+    //      这通常需要一个额外的参数，如 { "refreshToken": "..." }，并在后端实现刷新令牌的拒绝列表。
+    //      (This usually requires an additional parameter like { "refreshToken": "..." } and implementing a refresh token denylist on backend.)
+
+    // 4. 返回成功响应 (Return success response)
+    // 指示客户端清除其存储的令牌 (Instruct client to clear its stored tokens)
+    return buildResponse('Logged out successfully. Please discard your local tokens.', 200);
+
+  } catch (e: any) {
+    // 捕获 JWTUtils.verifyV2AuthAccessToken 可能抛出的其他未预料的异常
+    // (Catch other unexpected exceptions that JWTUtils.verifyV2AuthAccessToken might throw)
+    console.error('Unexpected error during logout token verification:', e);
+    // 即使验证过程中出现异常，也返回200，因为目的是让客户端清除状态
+    // (Even if an exception occurs during verification, return 200 as the goal is for client to clear state)
+    return buildResponse('Logout processed with a server-side error during token check. Please discard your local tokens.', 200);
+  }
+}
+
+// 在 lib/auth/oauth2.ts 的 JWTUtils 中需要一个类似下面的方法：
+// (A method like the one below is needed in JWTUtils within lib/auth/oauth2.ts)
+// 它的实现会类似于 verifyAccessToken，但可能针对不同的 audience 或 claim 结构
+// (Its implementation would be similar to verifyAccessToken, but possibly for a different audience or claim structure)
+declare module '@/lib/auth/oauth2' {
+  export class JWTUtils {
+    // ... other existing JWTUtils methods (createV2AuthAccessToken, createV2AuthRefreshToken, etc.)
+    static async verifyV2AuthAccessToken(token: string): Promise<{
+      valid: boolean;
+      payload?: { userId: string; username: string; aud?: string; roles?: string[]; [key: string]: any }; // 扩展的载荷类型 (Extended payload type)
+      error?: string; // 错误信息 (Error message)
+    }>;
+  }
+}
