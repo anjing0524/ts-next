@@ -3,22 +3,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Role, Permission, UserRole, RolePermission, Prisma } from '@prisma/client';
-import { JWTUtils } from '@/lib/auth/oauth2';
+import { Permission } from '@prisma/client'; // User, Role, UserRole, RolePermission, Prisma types not directly used in handler after refactor
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 
 // --- 辅助函数 (Copied/adapted from other user management routes) ---
 function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: Implement real RBAC check.
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
-  });
-  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
-}
+// isUserAdmin function is no longer needed.
 
 interface RouteContext {
   params: {
@@ -89,56 +83,34 @@ async function getUserEffectivePermissions(targetUserId: string): Promise<Effect
 
 
 // --- GET /api/v2/users/{userId}/permissions (获取用户的有效权限列表) ---
-export async function GET(req: NextRequest, context: RouteContext) {
+async function listUserPermissionsHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
-
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: Not an admin.', 403, 'forbidden');
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing permissions for user ${targetUserId}.`);
 
   try {
-    // 2. 检查目标用户是否存在 (Check if target user exists)
+    // 1. 检查目标用户是否存在 (Check if target user exists) - Was step 2
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) return errorResponse('User not found.', 404, 'user_not_found');
 
-    // (可选) 如果需要，检查目标用户是否激活。通常获取非激活用户的权限列表也是有意义的。
-    // (Optional) Check if target user is active if required. Usually, getting permissions for inactive users can also be meaningful.
+    // (可选) 检查目标用户是否激活 - Was optional comment
     // if (!targetUser.isActive) return errorResponse('Target user account is inactive.', 403, 'target_user_inactive');
 
-
-    // 3. 获取用户的有效权限 (Fetch user's effective permissions)
+    // 2. 获取用户的有效权限 (Fetch user's effective permissions) - Was step 3
     const effectivePermissions = await getUserEffectivePermissions(targetUserId);
 
-    // 4. 返回响应 (Return response)
+    // 3. 返回响应 (Return response) - Was step 4
     return NextResponse.json({
       permissions: effectivePermissions,
       count: effectivePermissions.length
     }, { status: 200 });
 
   } catch (error) {
-    console.error(`Error fetching permissions for user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error fetching permissions for user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while fetching user permissions.', 500, 'server_error');
   }
 }
+export const GET = requirePermission('users:permissions:read', listUserPermissionsHandler);
 
-// 声明JWTUtils中期望的方法 (Declare expected methods in JWTUtils)
-/*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; [key: string]: any };
-      error?: string;
-    }>;
-  }
-}
-*/
+// Declaration for JWTUtils is no longer needed.

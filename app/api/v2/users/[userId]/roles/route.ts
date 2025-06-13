@@ -3,22 +3,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Role, UserRole, Prisma } from '@prisma/client';
-import { JWTUtils } from '@/lib/auth/oauth2';
+import { Role, Prisma } from '@prisma/client'; // User, UserRole types not directly used in handlers after refactor
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 
 // --- 辅助函数 (Copied/adapted from other user management routes) ---
 function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: Implement real RBAC check.
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
-  });
-  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
-}
+// isUserAdmin function is no longer needed.
 
 interface RouteContextGetPost {
   params: {
@@ -27,28 +21,18 @@ interface RouteContextGetPost {
 }
 
 // --- GET /api/v2/users/{userId}/roles (获取用户拥有的角色列表) ---
-export async function GET(req: NextRequest, context: RouteContextGetPost) {
+async function listUserRolesHandler(req: AuthenticatedRequest, context: RouteContextGetPost) {
   const { params } = context;
   const targetUserId = params.userId;
-
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to view user roles.', 403, 'forbidden');
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing roles for user ${targetUserId}.`);
 
   try {
-    // 2. 检查目标用户是否存在 (Check if target user exists)
+    // 1. 检查目标用户是否存在 (Check if target user exists) - Was step 2
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) return errorResponse('User not found.', 404, 'user_not_found');
 
-    // 3. 获取用户的角色 (Fetch user's roles)
+    // 2. 获取用户的角色 (Fetch user's roles) - Was step 3
     const userRoles = await prisma.userRole.findMany({
       where: {
         userId: targetUserId,
@@ -78,28 +62,21 @@ export async function GET(req: NextRequest, context: RouteContextGetPost) {
     return NextResponse.json({ roles: rolesToReturn }, { status: 200 });
 
   } catch (error) {
-    console.error(`Error fetching roles for user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error fetching roles for user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while fetching user roles.', 500, 'server_error');
   }
 }
+export const GET = requirePermission('users:roles:read', listUserRolesHandler);
+
 
 // --- POST /api/v2/users/{userId}/roles (为用户分配一个或多个角色) ---
-export async function POST(req: NextRequest, context: RouteContextGetPost) {
+async function assignRolesToUserHandler(req: AuthenticatedRequest, context: RouteContextGetPost) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) assigning roles to user ${targetUserId}.`);
 
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to assign roles.', 403, 'forbidden');
-
-  // 2. 解析请求体 (Parse request body)
+  // 1. 解析请求体 (Parse request body) - Was step 2
   let requestBody;
   try {
     requestBody = await req.json();
@@ -113,11 +90,11 @@ export async function POST(req: NextRequest, context: RouteContextGetPost) {
   }
 
   try {
-    // 3. 检查目标用户是否存在 (Check if target user exists)
+    // 2. 检查目标用户是否存在 (Check if target user exists) - Was step 3
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) return errorResponse('User not found, cannot assign roles.', 404, 'user_not_found');
 
-    // 4. 处理角色分配 (Process role assignments)
+    // 3. 处理角色分配 (Process role assignments) - Was step 4
     const successfullyAssignedRoles: Partial<Role>[] = [];
     const assignmentErrors: { roleId: string, message: string }[] = [];
 
@@ -151,14 +128,14 @@ export async function POST(req: NextRequest, context: RouteContextGetPost) {
         data: {
           userId: targetUserId,
           roleId: roleId,
-          // assignedBy: adminUserId, // 可选：记录操作的管理员 (Optional: record the admin performing action)
+          assignedBy: performingAdmin?.id, // 可选：记录操作的管理员 (Optional: record the admin performing action)
           // context, expiresAt can also be set here if applicable
         },
       });
       successfullyAssignedRoles.push({ id: roleToAssign.id, name: roleToAssign.name, displayName: roleToAssign.displayName });
     }
 
-    // 5. 返回响应 (Return response)
+    // 4. 返回响应 (Return response) - Was step 5
     if (assignmentErrors.length > 0) {
       const status = successfullyAssignedRoles.length > 0 ? 207 : 400; // 207 Multi-Status if partial success, 400 if all failed
       return NextResponse.json({
@@ -180,20 +157,10 @@ export async function POST(req: NextRequest, context: RouteContextGetPost) {
              return errorResponse('Role assignment failed: One or more role IDs are invalid.', 400, 'validation_error_fk');
         }
     }
-    console.error(`Error assigning roles to user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error assigning roles to user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while assigning roles.', 500, 'server_error');
   }
 }
+export const POST = requirePermission('users:roles:assign', assignRolesToUserHandler);
 
-// 声明JWTUtils中期望的方法 (Declare expected methods in JWTUtils)
-/*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; [key: string]: any };
-      error?: string;
-    }>;
-  }
-}
-*/
+// Declaration for JWTUtils is no longer needed.

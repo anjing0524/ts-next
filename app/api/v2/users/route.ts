@@ -3,10 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Prisma } from '@prisma/client';
+import { User, Prisma } from '@prisma/client'; // User type is used for excludeSensitiveUserFields helper
 import bcrypt from 'bcrypt';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: No longer using V2 session tokens
 import { isValidEmail } from '@/lib/utils';   // For email validation
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 
 const MIN_PASSWORD_LENGTH = 8; // 密码最小长度 (Minimum password length)
 const DEFAULT_PAGE_SIZE = 10;  // 列表分页的默认页面大小 (Default page size for listing)
@@ -25,37 +26,7 @@ function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-/**
- * 模拟管理员检查 (Simulated Admin Check)
- * 在实际应用中，这里应进行基于角色/权限的检查
- * @param userId 要检查的用户ID
- * @returns Promise<boolean> 如果是管理员则为true
- */
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: 实现真正的RBAC检查。例如，查询用户角色并检查是否包含管理员角色。
-  // (TODO: Implement real RBAC check. E.g., query user roles and check for admin role.)
-  // 这是一个非常基础的占位符，假设特定用户ID是管理员。极不安全！
-  // (This is a very basic placeholder assuming specific user ID is admin. Highly insecure!)
-  // const adminUserIds = ['cluser1test123456789012345']; // 从配置或数据库中获取 (Get from config or DB)
-  // if (adminUserIds.includes(userId)) {
-  //   return true;
-  // }
-  // 尝试从数据库获取用户角色 (Attempt to fetch user roles from DB)
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      userRoles: {
-        include: {
-          role: true
-        }
-      }
-    }
-  });
-  if (userWithRoles?.userRoles.some(ur => ur.role.name === 'admin')) {
-    return true;
-  }
-  return false; // 默认非管理员 (Default to not admin)
-}
+// isUserAdmin function is no longer needed, permission is handled by requirePermission middleware.
 
 /**
  * 从用户对象中排除敏感字段
@@ -69,33 +40,14 @@ function excludeSensitiveUserFields(user: User | Partial<User>): Partial<User> {
 
 
 // --- POST /api/v2/users (管理员创建用户) ---
-export async function POST(req: NextRequest) {
-  // 1. 管理员认证和授权 (Admin Authentication and Authorization)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  }
-  const token = authHeader.substring(7);
-  if (!token) {
-    return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  }
+// Wrapped with requirePermission for 'users:create'
+async function createUserHandler(req: AuthenticatedRequest) {
+  // 管理员认证和权限检查已由 requirePermission 处理
+  // (Admin authentication and permission check is handled by requirePermission)
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to create a new user.`);
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) {
-    return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  }
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) {
-    return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  }
-
-  // 执行管理员检查 (Perform admin check)
-  if (!(await isUserAdmin(adminUserId))) {
-    return errorResponse('Forbidden: You do not have permission to create users.', 403, 'forbidden');
-  }
-  console.log(`Admin user ${adminUserId} attempting to create a new user.`);
-
-  // 2. 解析请求体 (Parse request body)
+  // 1. 解析请求体 (Parse request body) - Was step 2
   let requestBody;
   try {
     requestBody = await req.json();
@@ -164,37 +116,21 @@ export async function POST(req: NextRequest) {
       const target = (error.meta?.target as string[]) || ['field'];
       return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
     }
-    console.error(`Admin user creation error by ${adminUserId}:`, error);
+    console.error(`Admin user creation error by ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred during user creation.', 500, 'server_error');
   }
 }
+export const POST = requirePermission('users:create', createUserHandler);
 
 
 // --- GET /api/v2/users (管理员获取用户列表) ---
-export async function GET(req: NextRequest) {
-  // 1. 管理员认证和授权 (Admin Authentication and Authorization)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  }
-  const token = authHeader.substring(7);
-  if (!token) {
-    return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  }
+// Wrapped with requirePermission for 'users:list'
+async function listUsersHandler(req: AuthenticatedRequest) {
+  // 管理员认证和权限检查已由 requirePermission 处理
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing users.`);
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) {
-    return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  }
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) {
-    return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  }
-  if (!(await isUserAdmin(adminUserId))) {
-    return errorResponse('Forbidden: You do not have permission to list users.', 403, 'forbidden');
-  }
-
-  // 2. 处理查询参数 (Process query parameters for pagination, filtering, sorting)
+  // 1. 处理查询参数 (Process query parameters for pagination, filtering, sorting) - Was step 2
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') || '1', 10);
   let pageSize = parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10);
@@ -228,7 +164,7 @@ export async function GET(req: NextRequest) {
   const orderBy: Prisma.UserOrderByWithRelationInput = { [safeSortBy]: sortOrder };
 
   try {
-    // 3. 获取用户列表和总数 (Fetch users list and total count)
+    // 2. 获取用户列表和总数 (Fetch users list and total count) - Was step 3
     const users = await prisma.user.findMany({
       where,
       orderBy,
@@ -237,7 +173,7 @@ export async function GET(req: NextRequest) {
     });
     const totalUsers = await prisma.user.count({ where });
 
-    // 4. 返回响应 (Return response)
+    // 3. 返回响应 (Return response) - Was step 4
     return NextResponse.json({
       users: users.map(user => excludeSensitiveUserFields(user)), // 确保排除敏感字段
       total: totalUsers,
@@ -247,24 +183,14 @@ export async function GET(req: NextRequest) {
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Admin user listing error by ${adminUserId}:`, error);
+    console.error(`Admin user listing error by ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while listing users.', 500, 'server_error');
   }
 }
+export const GET = requirePermission('users:list', listUsersHandler);
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 和 isValidEmail 存在
-// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist)
-/*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; [key: string]: any }; // 确保 userId 在载荷中 (Ensure userId is in payload)
-      error?: string;
-    }>;
-  }
-}
-declare module '@/lib/utils' {
-  export function isValidEmail(email: string): boolean;
-}
-*/
+
+// Declaration for isValidEmail from lib/utils if not globally available or via specific import type
+// declare module '@/lib/utils' {
+//   export function isValidEmail(email: string): boolean;
+// }

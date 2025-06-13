@@ -185,9 +185,10 @@ async function handleRefreshTokenGrant(formData: FormData, client: OAuthClient):
   }
 
   // 查找并验证刷新令牌 (Find and validate refresh token)
-  // 注意: 实际应用中可能需要查找 tokenHash (For actual applications, might need to find by tokenHash)
+  // 使用 tokenHash 进行查找 (Use tokenHash for lookup)
+  const refreshTokenHash = JWTUtils.getTokenHash(refreshTokenValue);
   const storedRefreshToken = await prisma.refreshToken.findUnique({
-    where: { token: refreshTokenValue }, // 或者使用 tokenHash (Or use tokenHash)
+    where: { tokenHash: refreshTokenHash },
   });
 
   if (!storedRefreshToken) {
@@ -233,30 +234,63 @@ async function handleRefreshTokenGrant(formData: FormData, client: OAuthClient):
   });
 
   // 存储新的访问令牌 (Store new Access Token)
-  const accessTokenExpiresIn = 3600; // 1 hour
+  const accessTokenExpiresIn = 3600; // 1 小时 (1 hour)
+  const newAccessTokenHash = JWTUtils.getTokenHash(newAccessTokenString);
   await prisma.accessToken.create({
     data: {
-      token: newAccessTokenString,
-      tokenHash: crypto.createHash('sha256').update(newAccessTokenString).digest('hex'),
+      // token: newAccessTokenString, // Storing full token can be a security risk if DB is compromised
+      tokenHash: newAccessTokenHash,
       userId: storedRefreshToken.userId,
       clientId: client.id,
       scope: grantedScope,
       expiresAt: addHours(new Date(), 1),
-      isRevoked: false,
+      isRevoked: false, // 访问令牌通常不单独撤销，依赖有效期 (Access tokens usually not revoked individually, rely on expiry)
     },
   });
 
-  // RFC 6749 对于刷新令牌是否轮换是可选的。此处不实现轮换。
-  // (RFC 6749 refresh token rotation is optional. Rotation is not implemented here.)
-  // 如果实现轮换，需要生成新的刷新令牌并撤销旧的。
-  // (If rotation is implemented, generate a new refresh token and revoke the old one.)
+  // --- Refresh Token Rotation ---
+  // 1. 将旧的刷新令牌标记为已撤销 (Mark the old refresh token as revoked)
+  await prisma.refreshToken.update({
+    where: { id: storedRefreshToken.id },
+    data: {
+      isRevoked: true,
+      revokedAt: new Date(),
+      // replacedByTokenId: newRefreshTokenHash // 可选：如果想追踪替换链 (Optional: if you want to track replacement chain)
+    },
+  });
+
+  // 2. 生成新的刷新令牌 (Generate a new refresh token)
+  const newRefreshTokenString = await JWTUtils.createRefreshToken({
+    client_id: client.clientId,
+    user_id: storedRefreshToken.userId,
+    scope: grantedScope, // 新的刷新令牌继承计算后的范围 (New refresh token inherits the calculated scope)
+  });
+  const newRefreshTokenHash = JWTUtils.getTokenHash(newRefreshTokenString);
+  const newRefreshTokenExpiresAt = addDays(new Date(), 30); // 假设刷新令牌有效期为30天 (Assume refresh token expiry is 30 days)
+
+  // 3. 存储新的刷新令牌 (Store the new refresh token)
+  await prisma.refreshToken.create({
+    data: {
+      // token: newRefreshTokenString, // Avoid storing full token
+      tokenHash: newRefreshTokenHash,
+      userId: storedRefreshToken.userId,
+      clientId: client.id,
+      scope: grantedScope,
+      expiresAt: newRefreshTokenExpiresAt,
+      isRevoked: false,
+      previousTokenId: storedRefreshToken.id, // 链接到旧令牌ID，用于追踪 (Link to old token ID for tracking)
+    },
+  });
+
+  console.log(`Refresh token rotated for user ${storedRefreshToken.userId}, client ${client.clientId}. Old JTI (from token, if any): ${JWTUtils.decodeJwt(refreshTokenValue)?.jti}, New JTI (from token): ${JWTUtils.decodeJwt(newRefreshTokenString)?.jti}`);
+
 
   return NextResponse.json({
     access_token: newAccessTokenString,
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
+    refresh_token: newRefreshTokenString, // 返回新的刷新令牌 (Return the new refresh token)
     scope: grantedScope,
-    // refresh_token: newRefreshTokenString, // 如果实现了轮换 (If rotation is implemented)
   });
 }
 
@@ -288,7 +322,7 @@ async function handleClientCredentialsGrant(formData: FormData, client: OAuthCli
     // For client_credentials, often the token's scope is what the client is *allowed* to do generally.
     // If `client.allowedScopes` is a JSON array string:
     try {
-        const clientScopes = client.allowedScopes ? JSON.parse(client.allowedScopes) : [];
+        const clientScopes = client.allowedScopes ? JSON.parse(client.allowedScopes as string) : []; // Added 'as string'
         if (Array.isArray(clientScopes) && clientScopes.length > 0) {
             grantedScope = ScopeUtils.formatScopes(clientScopes); // Grant all allowed scopes by default
         }
@@ -307,17 +341,18 @@ async function handleClientCredentialsGrant(formData: FormData, client: OAuthCli
     permissions: [], // 客户端凭据通常不直接关联用户权限 (Client credentials usually not directly tied to user permissions)
                       // 但可以有客户端自身的权限 (But can have client's own permissions)
   });
+  const accessTokenHash = JWTUtils.getTokenHash(accessTokenString);
 
   const accessTokenExpiresIn = 3600; // 1 hour
   await prisma.accessToken.create({
     data: {
-      token: accessTokenString,
-      tokenHash: crypto.createHash('sha256').update(accessTokenString).digest('hex'),
+      // token: accessTokenString,
+      tokenHash: accessTokenHash,
       // userId: null, // No user
       clientId: client.id,
       scope: grantedScope,
       expiresAt: addHours(new Date(), 1),
-      isRevoked: false,
+      isRevoked: false, // 通常不单独撤销 (Usually not revoked individually)
     },
   });
 

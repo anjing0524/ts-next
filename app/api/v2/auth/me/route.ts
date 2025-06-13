@@ -3,63 +3,50 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { JWTUtils } from '@/lib/auth/oauth2'; // 假设 JWTUtils 包含验证V2认证令牌的方法
+// import { verifyV2SessionAccessToken, V2AccessTokenPayload } from '@/lib/auth/v2AuthUtils'; // REMOVED
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 
-// 辅助函数：错误响应 (Helper function: Error response)
-function errorResponse(message: string, status: number, errorCode?: string) {
-  return NextResponse.json({ error: errorCode || 'unauthorized', message }, { status });
-}
+// 辅助函数：错误响应 (Helper function: Error response) - Can be removed if requirePermission handles all errors
+// function errorResponse(message: string, status: number, errorCode?: string) {
+//   return NextResponse.json({ error: errorCode || 'unauthorized', message }, { status });
+// }
 
-export async function GET(req: NextRequest) {
-  // 1. 提取并验证 Authorization header (Extract and validate Authorization header)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return errorResponse('Missing or invalid Authorization header.', 401, 'invalid_request');
+async function getMeHandler(req: AuthenticatedRequest, event?: any) {
+  // 用户认证和权限检查已由 requirePermission 处理
+  // (User authentication and permission check is handled by requirePermission)
+  const authenticatedUserPayload = req.user; // 从 AuthenticatedRequest 获取用户信息 (Get user info from AuthenticatedRequest)
+
+  if (!authenticatedUserPayload || !authenticatedUserPayload.id) {
+    // 这理论上不应发生，因为 requirePermission 应该已验证
+    // (This should theoretically not happen as requirePermission should have validated)
+    console.error('/me handler: req.user is not populated correctly by requirePermission.');
+    return NextResponse.json({ error: 'server_error', message: 'User context not available after auth.' }, { status: 500 });
   }
 
-  const token = authHeader.substring(7); // 提取令牌 (Extract token)
-  if (!token) {
-    return errorResponse('Access token is missing.', 401, 'invalid_token');
-  }
+  const userId = authenticatedUserPayload.id; // 'id' is the 'sub' claim (user ID)
+  console.log(`Fetching /me data for authenticated user ID: ${userId}`);
 
   try {
-    // 2. 验证访问令牌 (Verify access token)
-    // 假设 JWTUtils.verifyV2AuthAccessToken 用于验证此特定类型的令牌
-    // (Assuming JWTUtils.verifyV2AuthAccessToken is used for this specific type of token)
-    const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-
-    if (!valid || !payload) {
-      console.warn(`Token verification failed for /me endpoint. Error: ${tokenError || 'No payload'}`);
-      return errorResponse(`Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-    }
-
-    // 3. 从令牌中获取 userId (Get userId from token)
-    const userId = payload.userId as string | undefined; // 确保类型正确 (Ensure correct type)
-    if (!userId) {
-      console.warn('User ID (userId) not found in token payload for /me endpoint.');
-      return errorResponse('Invalid token: User ID missing.', 401, 'invalid_token_payload');
-    }
-
-    // 4. 使用 userId 从数据库检索用户 (Retrieve user from database using userId)
+    // 使用 userId 从数据库检索用户 (Retrieve user from database using userId)
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
       // 如果令牌有效但用户在数据库中不存在 (If token is valid but user does not exist in DB)
-      console.warn(`User with ID ${userId} from token not found in database.`);
-      return errorResponse('User associated with this token not found.', 401, 'user_not_found');
+      console.warn(`User with ID ${userId} from token not found in database for /me endpoint.`);
+      // requirePermission should ideally prevent this if token sub is validated against DB user existence,
+      // but an explicit check here is safer.
+      return NextResponse.json({ error: 'user_not_found', message: 'User associated with this token not found.' }, { status: 404 });
     }
 
-    // 5. 检查用户是否仍处于活动状态 (Check if user is still active)
-    // 虽然令牌可能仍然有效，但用户状态可能已更改 (While token might be valid, user status could have changed)
+    // 检查用户是否仍处于活动状态 (Check if user is still active)
     if (!user.isActive) {
-        console.warn(`User ${userId} is inactive.`);
-        return errorResponse('User account is inactive.', 403, 'account_inactive'); // 403 Forbidden might be more appropriate here
+        console.warn(`User ${userId} is inactive for /me endpoint.`);
+        return NextResponse.json({ error: 'account_inactive', message: 'User account is inactive.' }, { status: 403 });
     }
 
-
-    // 6. 构建并返回用户信息 (Construct and return user information)
+    // 构建并返回用户信息 (Construct and return user information)
     // 排除敏感信息，如 passwordHash (Exclude sensitive information like passwordHash)
     const userResponse = {
       id: user.id,
@@ -78,31 +65,20 @@ export async function GET(req: NextRequest) {
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      // 可以根据需要添加角色和权限信息，但这需要额外的查询或已包含在令牌中并进行验证
-      // (Roles and permissions can be added if needed, but this requires extra queries or inclusion in token and validation)
-      // roles: await getUserRoles(user.id),
+      // 令牌中包含的权限 (Permissions included in the token)
+      permissions: authenticatedUserPayload.permissions || [],
+      // 令牌中包含的客户端ID (ClientID included in the token)
+      client_id: authenticatedUserPayload.clientId,
     };
 
     return NextResponse.json(userResponse, { status: 200 });
 
   } catch (error: any) {
-    console.error('/me endpoint error:', error);
-    // 避免在生产中泄露敏感错误信息 (Avoid leaking sensitive error info in production)
-    return errorResponse('An unexpected error occurred while retrieving user information.', 500, 'server_error');
+    console.error(`/me endpoint error for user ${userId}:`, error);
+    return NextResponse.json({ error: 'server_error', message: 'An unexpected error occurred while retrieving user information.'}, { status: 500 });
   }
 }
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 在 lib/auth/oauth2.ts 中声明或实现
-// (Ensure JWTUtils.verifyV2AuthAccessToken is declared or implemented in lib/auth/oauth2.ts)
-/*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; username: string; roles?: string[], aud?: string, [key: string]: any }; // 示例载荷 (Example payload)
-      error?: string;
-    }>;
-    // ... other methods
-  }
-}
-*/
+// 使用 'auth:me:read' 权限保护此端点
+// (Protect this endpoint with 'auth:me:read' permission)
+export const GET = requirePermission('auth:me:read', getMeHandler);

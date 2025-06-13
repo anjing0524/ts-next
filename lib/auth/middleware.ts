@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, NextFetchEvent } from 'next/server';
+import type { NextApiRequest, NextApiResponse } from 'next'; // For type hints if used with older Next.js API routes
 
-import { Client } from '@prisma/client';
+import { Client, User as PrismaUser } from '@prisma/client'; // PrismaUser for request augmentation
 import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
 
 import { prisma } from '@/lib/prisma';
@@ -13,6 +14,26 @@ import {
   OAuth2ErrorTypes,
   PKCEUtils,
 } from './oauth2';
+// import { verifyV2SessionAccessToken, V2AccessTokenPayload } from './v2AuthUtils'; // REMOVED: No longer using V2 session tokens here
+import { PermissionService } from '@/lib/services/permissionService'; // 使用真实的权限服务 (Using actual PermissionService)
+
+// 实例化真实权限服务 (Instantiate actual PermissionService)
+const permissionServiceInstance = new PermissionService();
+
+
+// 为 requirePermission 定义请求类型扩展 (Define request type extension for requirePermission)
+// 这允许我们将用户信息附加到 NextRequest (This allows attaching user info to NextRequest)
+export interface AuthenticatedRequest extends NextRequest {
+  user?: { // 基于标准OAuth Access Token的载荷结构调整 (Adjusted based on standard OAuth Access Token payload structure)
+    id: string; // 通常是 'sub' claim (Usually the 'sub' claim)
+    userId?: string; // 'sub' claim, often aliased as userId for internal consistency
+    username?: string; // 可选，可能在令牌中 (Optional, might be in token)
+    clientId?: string; // 'client_id' claim from token
+    permissions?: string[]; // 'permissions' claim from token
+    [key: string]: any; // 允许其他声明 (Allow other claims)
+  };
+}
+
 
 export interface AuthContext {
   user_id?: string;
@@ -569,6 +590,106 @@ export interface OAuthValidationResult {
     params?: Record<string, string>;
   };
 }
+
+
+/**
+ * 高阶函数 (Higher-Order Function - HOF) 用于创建需要特定权限的路由处理器。
+ * (HOF to create route handlers that require specific permissions for Admin/Internal UI using OAuth tokens.)
+ *
+ * @param requiredPermission - 需要的权限名称 (The name of the required permission, e.g., "user:create")
+ * @returns 一个包装函数，它接收实际的路由处理器并返回一个新的、受保护的处理器
+ *          (A wrapper function that takes the actual route handler and returns a new, protected handler)
+ */
+export function requirePermission(requiredPermission: string) {
+  // 返回一个接收实际处理器的函数 (Return a function that accepts the actual handler)
+  return function <T extends (request: AuthenticatedRequest, ...args: any[]) => Promise<Response | NextResponse>>(
+    actualHandler: T
+  ) {
+    // 返回最终的异步请求处理函数 (Return the final async request handler function)
+    return async function (request: AuthenticatedRequest, ...args: any[]): Promise<Response | NextResponse> {
+      const authHeader = request.headers.get('Authorization');
+
+      if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+        return NextResponse.json({ message: '未授权: 缺少或无效的 Authorization header (Unauthorized: Missing or invalid Authorization header)' }, { status: 401 });
+      }
+
+      const token = authHeader.substring(7); // 提取 "Bearer " 后的令牌部分
+      if (!token) {
+        return NextResponse.json({ message: '未授权: 缺少令牌 (Unauthorized: Missing token)' }, { status: 401 });
+      }
+
+      let oauthTokenPayload: jose.JWTPayload;
+      try {
+        // 使用OAuth 2.0 Bearer Token验证逻辑 (Use OAuth 2.0 Bearer Token validation logic)
+        const jwksUriString = process.env.JWKS_URI;
+        if (!jwksUriString) {
+          console.error('JWKS_URI 环境变量未设置 (JWKS_URI environment variable is not set)');
+          throw new Error('认证服务配置错误 (Authentication service configuration error).');
+        }
+        const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
+
+        const expectedIssuer = process.env.JWT_ISSUER;
+        const expectedAudience = process.env.JWT_AUDIENCE; // 通常是API的受众 (Usually the API's audience)
+        if (!expectedIssuer || !expectedAudience) {
+          console.error('JWT_ISSUER 或 JWT_AUDIENCE 环境变量未设置 (JWT_ISSUER or JWT_AUDIENCE environment variable is not set)');
+          throw new Error('认证服务配置错误 (Authentication service configuration error).');
+        }
+
+        const { payload } = await jose.jwtVerify(token, JWKS, {
+          issuer: expectedIssuer,
+          audience: expectedAudience,
+          algorithms: ['RS256'], // 假设管理后台使用的OAuth令牌是RS256 (Assuming OAuth tokens for admin UI use RS256)
+        });
+        oauthTokenPayload = payload;
+      } catch (error: any) {
+        console.warn('requirePermission: OAuth Access Token 验证失败 (OAuth Access Token verification failed).', error.message);
+        return NextResponse.json({ message: `未授权: ${error.message || '无效的OAuth令牌 (Invalid OAuth token)'}` }, { status: 401 });
+      }
+
+      const userId = oauthTokenPayload.sub; // 'sub' claim 通常是用户ID (The 'sub' claim is typically the user ID)
+      if (!userId || typeof userId !== 'string') {
+        return NextResponse.json({ message: '未授权: 无效的令牌载荷 (无效的sub声明) (Unauthorized: Invalid token payload (missing or invalid sub claim for user ID))' }, { status: 401 });
+      }
+
+      // 权限检查策略 (Permission checking strategy)
+      let hasPermission = false;
+      const tokenPermissions = oauthTokenPayload.permissions as string[] | undefined;
+
+      if (tokenPermissions && Array.isArray(tokenPermissions)) {
+        // 1. 优先使用令牌中的 'permissions' 声明 (Prioritize 'permissions' claim in token)
+        hasPermission = tokenPermissions.includes(requiredPermission);
+        console.log(`requirePermission: 用户 '${userId}' 通过令牌声明检查权限 '${requiredPermission}'。结果: ${hasPermission} (User '${userId}' checking permission '${requiredPermission}' via token claims. Result: ${hasPermission})`);
+      } else {
+        // 2. 如果声明不存在，则调用 PermissionService 进行数据库检查 (If claim doesn't exist, call PermissionService for DB check)
+        console.log(`requirePermission: 用户 '${userId}' 的令牌中无 'permissions' 声明。通过 PermissionService 检查权限 '${requiredPermission}'。(No 'permissions' claim in token for user '${userId}'. Checking permission '${requiredPermission}' via PermissionService.)`);
+        hasPermission = await permissionServiceInstance.checkPermission(userId, requiredPermission);
+      }
+
+      if (!hasPermission) {
+        console.warn(`requirePermission: 用户 ${userId} 无权限 '${requiredPermission}'。(User ${userId} does not have permission '${requiredPermission}'.)`);
+        return NextResponse.json(
+          { message: `禁止访问: 您没有 '${requiredPermission}' 权限访问此资源。(Forbidden: You do not have permission '${requiredPermission}' to access this resource.)` },
+          { status: 403 }
+        );
+      }
+
+      // 将用户信息和权限附加到请求对象 (Attach user information and permissions to request object)
+      request.user = {
+        id: userId, // 'sub' claim
+        userId: userId, // 为内部一致性明确添加userId (Explicitly add userId for internal consistency)
+        username: oauthTokenPayload.username as string || oauthTokenPayload.preferred_username as string || undefined, // 可选的用户名声明 (Optional username claim)
+        clientId: oauthTokenPayload.client_id as string || undefined, // 'client_id' claim from token
+        permissions: tokenPermissions || [], // 如果令牌中有，则使用；否则为空数组 (Use if in token, else empty array)
+        ...oauthTokenPayload // 附加所有其他声明 (Attach all other claims)
+      };
+
+      // 执行实际的路由处理器 (Execute the actual route handler)
+      // The 'args' will correctly pass { params } for dynamic routes.
+      return actualHandler(request, ...args);
+    };
+  };
+}
+
 
 /**
  * 通用OAuth 2.0验证中间件

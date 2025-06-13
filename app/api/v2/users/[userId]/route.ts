@@ -3,9 +3,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { User, Prisma } from '@prisma/client';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification
+import { User, Prisma } from '@prisma/client'; // User type is used for excludeSensitiveUserFields
+// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED
 import { isValidEmail } from '@/lib/utils';   // For email validation
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission
 // bcrypt for potential password updates (though generally not recommended here for PUT/PATCH)
 // import bcrypt from 'bcrypt';
 
@@ -22,21 +23,7 @@ function errorResponse(message: string, status: number, errorCode?: string) {
   return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
 }
 
-/**
- * 模拟管理员检查 (Simulated Admin Check)
- * 在实际应用中，这里应进行基于角色/权限的检查
- * @param userId 要检查的用户ID
- * @returns Promise<boolean> 如果是管理员则为true
- */
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: 实现真正的RBAC检查。
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
-  });
-  // 检查用户是否具有名为 'admin' 的角色 (Check if user has a role named 'admin')
-  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
-}
+// isUserAdmin function is no longer needed.
 
 /**
  * 从用户对象中排除敏感字段 (Exclude sensitive fields from user object)
@@ -58,54 +45,33 @@ interface RouteContext {
 }
 
 // --- GET /api/v2/users/{userId} (获取用户详情) ---
-export async function GET(req: NextRequest, context: RouteContext) {
+async function getUserByIdHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user;
 
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to GET user ${targetUserId}.`);
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-
-  // 执行管理员检查 (Perform admin check)
-  if (!(await isUserAdmin(adminUserId))) {
-    return errorResponse('Forbidden: You do not have permission to view user details.', 403, 'forbidden');
-  }
-
-  // 2. 获取用户 (Fetch user)
+  // 1. 获取用户 (Fetch user) - Was step 2
   try {
     const user = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!user) return errorResponse('User not found.', 404, 'user_not_found');
     return NextResponse.json(excludeSensitiveUserFields(user), { status: 200 });
   } catch (error) {
-    console.error(`Error fetching user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error fetching user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while fetching user details.', 500, 'server_error');
   }
 }
+export const GET = requirePermission('users:read', getUserByIdHandler);
 
 // --- PUT /api/v2/users/{userId} (全量更新用户信息) ---
-export async function PUT(req: NextRequest, context: RouteContext) {
+async function updateUserHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PUT user ${targetUserId}.`);
 
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to update users.', 403, 'forbidden');
-
-  // 2. 解析请求体 (Parse request body)
+  // 1. 解析请求体 (Parse request body) - Was step 2
   let requestBody: Omit<User, 'id' | 'passwordHash' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'failedLoginAttempts' | 'lockedUntil'> & Partial<Pick<User, 'isActive' | 'mustChangePassword' | 'emailVerified' | 'phoneVerified'>>;
   try {
     requestBody = await req.json();
@@ -175,28 +141,20 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return errorResponse('Conflict: Username or email already exists.', 409, 'conflict_unique');
     }
-    console.error(`Error updating user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error updating user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while updating user.', 500, 'server_error');
   }
 }
+export const PUT = requirePermission('users:update', updateUserHandler);
 
 // --- PATCH /api/v2/users/{userId} (部分更新用户信息) ---
-export async function PATCH(req: NextRequest, context: RouteContext) {
+async function patchUserHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PATCH user ${targetUserId}.`);
 
-  // 1. 管理员认证 (Admin Authentication - similar to PUT/GET)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to partially update users.', 403, 'forbidden');
-
-  // 2. 解析请求体 (Parse request body)
+  // 1. 解析请求体 (Parse request body) - Was step 2
   let requestBody: Partial<Omit<User, 'id' | 'passwordHash' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'failedLoginAttempts' | 'lockedUntil'>>;
   try {
     requestBody = await req.json();
@@ -266,49 +224,37 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
        const target = (error.meta?.target as string[]) || ['field'];
       return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict_unique');
     }
-    console.error(`Error partially updating user ${targetUserId} by admin ${adminUserId}:`, error);
+    console.error(`Error partially updating user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while partially updating user.', 500, 'server_error');
   }
 }
+export const PATCH = requirePermission('users:update', patchUserHandler);
 
 // --- DELETE /api/v2/users/{userId} (删除用户) ---
-export async function DELETE(req: NextRequest, context: RouteContext) {
+async function deleteUserHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { params } = context;
   const targetUserId = params.userId;
+  const performingAdmin = req.user; // Authenticated admin from requirePermission
+  console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to DELETE user ${targetUserId}.`);
 
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing or invalid Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid or expired token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin User ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: You do not have permission to delete users.', 403, 'forbidden');
-
-  // 2. 防止自我删除 (Prevent self-deletion)
-  if (targetUserId === adminUserId) {
+  // 1. 防止自我删除 (Prevent self-deletion) - Was step 2
+  if (targetUserId === performingAdmin?.id) {
     return errorResponse('Action not allowed: Administrators cannot delete their own account.', 400, 'self_deletion_not_allowed');
   }
 
   try {
-    // 3. 检查用户是否存在 (Check if user exists - Prisma delete throws error if not found, but explicit check is clearer)
+    // 2. 检查用户是否存在 (Check if user exists) - Was step 3
     const userToDelete = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!userToDelete) return errorResponse('User not found to delete.', 404, 'user_not_found');
 
-    // 4. 删除用户 (Delete user)
-    // Prisma的级联删除规则将处理关联数据（如果schema中已配置 onDelete: Cascade）
-    // (Prisma's cascading delete rules will handle related data if configured with onDelete: Cascade in schema)
+    // 3. 删除用户 (Delete user) - Was step 4
     await prisma.user.delete({ where: { id: targetUserId } });
 
-    // 5. 返回响应 (Return response)
+    // 4. 返回响应 (Return response) - Was step 5
     return new NextResponse(null, { status: 204 }); // 204 No Content
 
   } catch (error: any) {
-    console.error(`Error deleting user ${targetUserId} by admin ${adminUserId}:`, error);
-    // 处理可能的Prisma错误，例如外键约束（如果未设置为级联删除或相关记录阻止删除）
-    // (Handle potential Prisma errors, e.g., foreign key constraints if not set to cascade or related records prevent deletion)
+    console.error(`Error deleting user ${targetUserId} by admin ${performingAdmin?.id}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003') { // Foreign key constraint failure
             return errorResponse('Cannot delete user: They are still referenced by other records.', 409, 'conflict_foreign_key');
@@ -319,20 +265,9 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     return errorResponse('An unexpected error occurred while deleting user.', 500, 'server_error');
   }
 }
+export const DELETE = requirePermission('users:delete', deleteUserHandler);
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 和 isValidEmail 存在
-// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist)
-/*
-declare module '@/lib/auth/oauth2' {
-  export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
-      valid: boolean;
-      payload?: { userId: string; [key: string]: any };
-      error?: string;
-    }>;
-  }
-}
-declare module '@/lib/utils' {
-  export function isValidEmail(email: string): boolean;
-}
-*/
+// Declaration for isValidEmail from lib/utils if not globally available or via specific import type
+// declare module '@/lib/utils' {
+//   export function isValidEmail(email: string): boolean;
+// }

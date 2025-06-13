@@ -311,6 +311,15 @@ export class JWTUtils {
       .sign(await this.getRSAPrivateKeyForSigning()); // 使用RSA私钥签名 (Sign with RSA private key)
   }
 
+  /**
+   * 为令牌生成SHA256哈希值 (Generates a SHA256 hash for a token)
+   * @param token - The token string
+   * @returns The hex digest of the token hash
+   */
+  static getTokenHash(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
   static async verifyAccessToken(token: string): Promise<{
     valid: boolean;
     payload?: jose.JWTPayload;
