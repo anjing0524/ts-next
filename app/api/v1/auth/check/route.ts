@@ -1,3 +1,4 @@
+
 // 文件路径: app/api/v1/auth/check/route.ts
 // 版本: v1 - 重定向
 // 目标: 此端点 (原 /api/v1/auth/permissions/check) 现在重定向到 /api/permissions/check。
@@ -78,3 +79,4 @@ export const POST = redirectToUnifiedCheckHandler;
 //     },
 //   });
 // }
+

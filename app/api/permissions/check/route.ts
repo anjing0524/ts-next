@@ -35,7 +35,6 @@ const V1SinglePermissionCheckRequestSchema = z.object({
   requestId: z.string().optional().describe('客户端请求ID (requestId)'),
 });
 
-
 /**
  * @swagger
  * /api/permissions/check:
@@ -110,7 +109,10 @@ const V1SinglePermissionCheckRequestSchema = z.object({
  *       '500':
  *         description: 服务器内部错误。
  */
-async function v1CompatSinglePermissionCheckHandler(request: NextRequest, authContext: AuthContext) {
+async function v1CompatSinglePermissionCheckHandler(
+  request: NextRequest,
+  authContext: AuthContext
+) {
   const overallRequestId = (request as any).requestId; // from withErrorHandler
   console.warn(
     '警告 (Warning): /api/permissions/check (v1 - single check compat layer) 正在被调用。推荐迁移到 /api/v2/users/{userId}/permissions/verify。'
@@ -122,21 +124,27 @@ async function v1CompatSinglePermissionCheckHandler(request: NextRequest, authCo
   if (!validationResult.success) {
     const errorMessages = validationResult.error.flatten().fieldErrors;
     return NextResponse.json(
-        errorResponse(400, `无效的请求体 (Invalid request body): ${JSON.stringify(errorMessages)}`, 'VALIDATION_ERROR', overallRequestId),
-        { status: 400 }
+      errorResponse(
+        400,
+        `无效的请求体 (Invalid request body): ${JSON.stringify(errorMessages)}`,
+        'VALIDATION_ERROR'
+      ),
+      { status: 400 }
     );
   }
 
-  const { userId: targetUserId, resourceAttributes, action, requestId: clientRequestId } = validationResult.data;
+  const {
+    userId: targetUserId,
+    resourceAttributes,
+    action,
+    requestId: clientRequestId,
+  } = validationResult.data;
 
   // 构建权限名称，与 v2 单个验证的逻辑一致
   const permissionName = `${resourceAttributes.resourceId}:${action.type}`;
 
   // 调用核心权限服务进行单个验证 (与 v2 单个验证端点使用相同的服务调用)
-  const hasPermission = await permissionService.checkPermission(
-    targetUserId,
-    permissionName
-  );
+  const hasPermission = await permissionService.checkPermission(targetUserId, permissionName);
 
   // 构建与 v2 类似的响应数据，但可能需要调整以匹配 v1 客户端的期望
   const decision = {
