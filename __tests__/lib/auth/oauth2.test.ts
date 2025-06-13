@@ -1,18 +1,15 @@
-import { ScopeUtils } from '@/lib/auth/oauth2'; // Adjust path as necessary
-import { Client } from '@prisma/client'; // Assuming Client and Scope types are from Prisma
+import { ScopeUtils } from '@/lib/auth/oauth2';
+import { Client } from '@prisma/client';
 import { TestDataManager, TestScope, TestClient } from '__tests__/utils/test-helpers';
 import { vi } from 'vitest';
 
-// vi.mock('@/lib/prisma'); // REMOVED: We are using a real database connection
-
-describe('ScopeUtils.validateScopes', () => {
+describe('OAuth2 核心逻辑库 - ScopeUtils.validateScopes / OAuth2 Core Library - ScopeUtils.validateScopes', () => {
   let testDataManager: TestDataManager;
 
   beforeAll(() => {
-    testDataManager = new TestDataManager('oauth2-scope-utils-test'); // Reverted: No longer passing prisma
+    testDataManager = new TestDataManager('oauth2-scope-utils-test');
   });
 
-  // Define a base set of scope properties for tests
   const globalScopeDefinitions: Partial<TestScope>[] = [
     { name: 'profile', isActive: true, isPublic: true, description: 'Profile scope' },
     { name: 'email', isActive: true, isPublic: true, description: 'Email scope' },
@@ -34,88 +31,56 @@ describe('ScopeUtils.validateScopes', () => {
   });
 
   afterAll(async () => {
-    await testDataManager.cleanup(); // Clean up all data created by this test suite
+    await testDataManager.cleanup();
   });
 
-  // Helper to create a Client object in the DB
-  const createDbClient = async (
-    allowedScopes: string[] | null,
-    isPublic: boolean = false,
-    clientOverrides: Partial<TestClient> = {}
-  ): Promise<Client> => {
+  const createDbClient = async (allowedScopes: string[] | null, isPublic: boolean = false, clientOverrides: Partial<TestClient> = {}): Promise<Client> => {
     const clientData: Partial<TestClient> = {
-      clientId: `test-client-${Date.now()}-${Math.random()}`, // Ensure unique clientId
-      name: 'Test Client',
-      redirectUris: ['http://localhost:3000/callback'],
-      grantTypes: ['authorization_code'],
-      responseTypes: ['code'],
-      scope: allowedScopes || [], // TestDataManager expects string[]
-      isPublic,
-      isActive: true,
-      ...clientOverrides,
+      clientId: `test-client-${Date.now()}-${Math.random()}`, name: 'Test Client', redirectUris: ['http://localhost:3000/callback'],
+      grantTypes: ['authorization_code'], responseTypes: ['code'], scope: allowedScopes || [], isPublic, isActive: true, ...clientOverrides,
     };
-    // Type assertion because TestDataManager returns its own TestClient,
-    // but ScopeUtils.validateScopes expects a Prisma Client.
-    // The structures should be compatible enough for the function's needs.
-    // If not, a more specific mapping or adjustment in ScopeUtils might be needed.
     return (await testDataManager.createClient(clientData)) as unknown as Client;
   };
 
-  test('should pass if requested scopes are empty', async () => {
+  it('TC_LAO_001_001: 如果请求的作用域为空，则应通过 / Should pass if requested scopes are empty', async () => {
     const client = await createDbClient(['profile', 'email'], false);
     const result = await ScopeUtils.validateScopes([], client);
     expect(result.valid).toBe(true);
     expect(result.invalidScopes).toEqual([]);
   });
 
-  describe('Client Allowed Scopes Validation', () => {
-    test('should pass if all requested scopes are in client.allowedScopes and valid globally', async () => {
+  describe('客户端允许的作用域验证 / Client Allowed Scopes Validation', () => {
+    it('TC_LAO_002_001: 如果所有请求的作用域都在客户端allowedScopes中且全局有效，则应通过 / Should pass if all requested scopes are in client.allowedScopes and valid globally', async () => {
       const client = await createDbClient(['profile', 'email'], false);
       const result = await ScopeUtils.validateScopes(['profile', 'email'], client);
       expect(result.valid).toBe(true);
     });
 
-    test('should fail if a requested scope is NOT in client.allowedScopes', async () => {
-      const client = await createDbClient(['profile'], false); // Only 'profile' allowed
+    it('TC_LAO_002_002: 如果请求的作用域不在客户端allowedScopes中，则应失败 / Should fail if a requested scope is NOT in client.allowedScopes', async () => {
+      const client = await createDbClient(['profile'], false);
       const result = await ScopeUtils.validateScopes(['profile', 'email'], client);
       expect(result.valid).toBe(false);
       expect(result.invalidScopes).toEqual(['email']);
       expect(result.error_description).toContain('not allowed for this client');
     });
 
-    test('should fail if client.allowedScopes is empty and scopes are requested', async () => {
+    it('TC_LAO_002_003: 如果客户端allowedScopes为空且请求了作用域，则应失败 / Should fail if client.allowedScopes is empty and scopes are requested', async () => {
       const client = await createDbClient([], false);
       const result = await ScopeUtils.validateScopes(['profile'], client);
       expect(result.valid).toBe(false);
       expect(result.invalidScopes).toEqual(['profile']);
     });
 
-    test('should fail if client.allowedScopes is null (empty array from helper) and scopes are requested', async () => {
-      // TestDataManager's createClient converts null scope to [], so this tests empty allowedScopes
+    it('TC_LAO_002_004: 如果客户端allowedScopes为null且请求了作用域，则应失败 / Should fail if client.allowedScopes is null and scopes are requested', async () => {
       const client = await createDbClient(null, false);
       const result = await ScopeUtils.validateScopes(['profile'], client);
       expect(result.valid).toBe(false);
       expect(result.invalidScopes).toEqual(['profile']);
     });
 
-    test('should handle malformed client.allowedScopes JSON gracefully (treat as no scopes allowed)', async () => {
-      // To test this, we need to create a client with valid scopes, then manually update it to have malformed JSON.
-      // However, `ScopeUtils` expects a Prisma `Client` type, which has `allowedScopes` as `string | null`.
-      // `TestDataManager.createClient` stores it as a JSON string internally.
-      // The `validateScopes` function parses this JSON string.
-      // For this specific test, we'll create a client and then simulate the malformed part.
-      // This is tricky because the TestDataManager correctly creates JSON.
-      // We'll assume that if `client.allowedScopes` was somehow set to invalid JSON, it would be caught.
-      // The existing logic in `validateScopes` for parsing `client.allowedScopes` should handle this.
-      // Let's simulate by creating a client with specific valid scopes, then overriding that property on the fetched object.
+    it('TC_LAO_002_005: 应优雅处理格式错误的client.allowedScopes JSON（视为无允许作用域）/ Should handle malformed client.allowedScopes JSON gracefully (treat as no scopes allowed)', async () => {
       const clientWithValidScopes = await createDbClient(['valid'], false);
-
-      // Simulate malformed JSON for allowedScopes. This is what would happen if the DB had bad data.
-      const malformedClient = {
-        ...clientWithValidScopes,
-        allowedScopes: 'this is not json string', // Prisma Client type is `string | null` for allowedScopes
-      };
-
+      const malformedClient = { ...clientWithValidScopes, allowedScopes: 'this is not json string' };
       const result = await ScopeUtils.validateScopes(['profile'], malformedClient as Client);
       expect(result.valid).toBe(false);
       expect(result.invalidScopes).toEqual(['profile']);
@@ -123,8 +88,8 @@ describe('ScopeUtils.validateScopes', () => {
     });
   });
 
-  describe('Global Scope Validity (existence and isActive)', () => {
-    test('should fail if a scope allowed by client is NOT in global Scope table', async () => {
+  describe('全局作用域有效性（存在性和isActive）/ Global Scope Validity (existence and isActive)', () => {
+    it('TC_LAO_003_001: 如果客户端允许的作用域在全局Scope表中不存在，则应失败 / Should fail if a scope allowed by client is NOT in global Scope table', async () => {
       const client = await createDbClient(['profile', 'nonexistent_scope_xyz123'], false);
       const result = await ScopeUtils.validateScopes(['profile', 'nonexistent_scope_xyz123'], client);
       expect(result.valid).toBe(false);
@@ -132,88 +97,82 @@ describe('ScopeUtils.validateScopes', () => {
       expect(result.error_description).toContain('invalid or inactive');
     });
 
-    test('should fail if a scope allowed by client is globally isActive=false', async () => {
+    it('TC_LAO_003_002: 如果客户端允许的作用域全局isActive=false，则应失败 / Should fail if a scope allowed by client is globally isActive=false', async () => {
       const client = await createDbClient(['profile', 'inactive_scope'], false);
       const result = await ScopeUtils.validateScopes(['profile', 'inactive_scope'], client);
       expect(result.valid).toBe(false);
-      // The current implementation of ScopeUtils.validateScopes fetches scopes that are active.
-      // If 'inactive_scope' is requested and it's inactive, it won't be found by the query.
-      // Thus, it's treated as an invalid/non-existent scope.
       expect(result.invalidScopes).toEqual(['inactive_scope']);
       expect(result.error_description).toContain('invalid or inactive');
     });
   });
 
-  describe('Public Client Scope Restrictions', () => {
-    test('public client: should pass if all requested scopes are client-allowed, globally valid, and public', async () => {
-      const client = await createDbClient(['profile', 'another_public_scope'], true); // Public client
+  describe('公共客户端作用域限制 / Public Client Scope Restrictions', () => {
+    it('TC_LAO_004_001: 公共客户端：如果所有请求的作用域都得到客户端允许、全局有效且公开，则应通过 / Public client: should pass if all requested scopes are client-allowed, globally valid, and public', async () => {
+      const client = await createDbClient(['profile', 'another_public_scope'], true);
       const result = await ScopeUtils.validateScopes(['profile', 'another_public_scope'], client);
       expect(result.valid).toBe(true);
     });
 
-    test('public client: should fail if a requested scope (client-allowed, globally valid) is NOT globally isPublic=true', async () => {
-      const client = await createDbClient(['profile', 'orders'], true); // Public client, 'orders' is isPublic: false
+    it('TC_LAO_004_002: 公共客户端：如果请求的作用域（客户端允许、全局有效）全局isPublic=false，则应失败 / Public client: should fail if a requested scope (client-allowed, globally valid) is NOT globally isPublic=true', async () => {
+      const client = await createDbClient(['profile', 'orders'], true);
       const result = await ScopeUtils.validateScopes(['profile', 'orders'], client);
       expect(result.valid).toBe(false);
-      // 'orders' is the non-public scope.
       expect(result.invalidScopes).toEqual(['orders']);
       expect(result.error_description).toContain('requested non-public scope(s)');
     });
 
-    test('confidential client: should pass with mix of public/non-public scopes (if client-allowed and globally valid)', async () => {
-      const client = await createDbClient(['profile', 'orders'], false); // Confidential client
+    it('TC_LAO_004_003: 机密客户端：应通过公共/非公共作用域的混合（如果客户端允许且全局有效）/ Confidential client: should pass with mix of public/non-public scopes (if client-allowed and globally valid)', async () => {
+      const client = await createDbClient(['profile', 'orders'], false);
       const result = await ScopeUtils.validateScopes(['profile', 'orders'], client);
       expect(result.valid).toBe(true);
     });
   });
 
-  describe('Simple string array validation (for client_credentials)', () => {
-    test('should pass if all requested scopes are in the allowed list', () => {
+  describe('简单字符串数组验证（用于client_credentials）/ Simple string array validation (for client_credentials)', () => {
+    it('TC_LAO_005_001: 如果所有请求的作用域都在允许列表中，则应通过 / Should pass if all requested scopes are in the allowed list', () => {
       const allowed = ['scope1', 'scope2'];
       const requested = ['scope1'];
       const result = ScopeUtils.validateScopes(requested, allowed);
       expect(result.valid).toBe(true);
     });
 
-    test('should fail if a requested scope is not in the allowed list', () => {
+    it('TC_LAO_005_002: 如果请求的作用域不在允许列表中，则应失败 / Should fail if a requested scope is not in the allowed list', () => {
       const allowed = ['scope1', 'scope2'];
       const requested = ['scope1', 'scope3'];
       const result = ScopeUtils.validateScopes(requested, allowed);
       expect(result.valid).toBe(false);
       expect(result.invalidScopes).toEqual(['scope3']);
-      // error_description is not set in this overload, so the check is removed.
-      // The core validation (valid: false, invalidScopes: ['scope3']) is what matters here.
     });
   });
 });
 
-describe('Other ScopeUtils functions (basic checks)', () => {
-  test('parseScopes correctly splits and filters scope string', () => {
+describe('OAuth2 核心逻辑库 - 其他ScopeUtils函数 / OAuth2 Core Library - Other ScopeUtils functions', () => {
+  it('TC_LAO_006_001: parseScopes应正确拆分和过滤作用域字符串 / parseScopes correctly splits and filters scope string', () => {
     expect(ScopeUtils.parseScopes('profile email phone')).toEqual(['profile', 'email', 'phone']);
-    expect(ScopeUtils.parseScopes('profile  email')).toEqual(['profile', 'email']); // Handles multiple spaces
+    expect(ScopeUtils.parseScopes('profile  email')).toEqual(['profile', 'email']);
     expect(ScopeUtils.parseScopes('')).toEqual([]);
     expect(ScopeUtils.parseScopes(undefined)).toEqual([]);
     expect(ScopeUtils.parseScopes('single')).toEqual(['single']);
   });
 
-  test('formatScopes correctly joins scopes array', () => {
+  it('TC_LAO_006_002: formatScopes应正确连接作用域数组 / formatScopes correctly joins scopes array', () => {
     expect(ScopeUtils.formatScopes(['profile', 'email', 'phone'])).toBe('profile email phone');
     expect(ScopeUtils.formatScopes([])).toBe('');
   });
 
-  test('hasScope works correctly', () => {
+  it('TC_LAO_006_003: hasScope应正确工作 / hasScope works correctly', () => {
     const userScopes = ['profile', 'email'];
     expect(ScopeUtils.hasScope(userScopes, 'email')).toBe(true);
     expect(ScopeUtils.hasScope(userScopes, 'address')).toBe(false);
   });
 
-  test('hasAnyScope works correctly', () => {
+  it('TC_LAO_006_004: hasAnyScope应正确工作 / hasAnyScope works correctly', () => {
     const userScopes = ['profile', 'email'];
     expect(ScopeUtils.hasAnyScope(userScopes, ['email', 'address'])).toBe(true);
     expect(ScopeUtils.hasAnyScope(userScopes, ['orders', 'address'])).toBe(false);
   });
 
-  test('hasAllScopes works correctly', () => {
+  it('TC_LAO_006_005: hasAllScopes应正确工作 / hasAllScopes works correctly', () => {
     const userScopes = ['profile', 'email', 'phone'];
     expect(ScopeUtils.hasAllScopes(userScopes, ['email', 'profile'])).toBe(true);
     expect(ScopeUtils.hasAllScopes(userScopes, ['email', 'address'])).toBe(false);

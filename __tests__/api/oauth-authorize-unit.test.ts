@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestHttpClient, TestDataManager, TEST_CLIENTS } from '../utils/test-helpers';
-import { OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // Import error types
+import { OAuth2ErrorTypes } from '@/lib/auth/oauth2';
 
 // Helper function to parse URL query parameters
 function parseQuery(url: string): Record<string, string> {
@@ -15,8 +15,7 @@ function parseQuery(url: string): Record<string, string> {
   return query;
 }
 
-
-describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
+describe('OAuth授权端点单元测试 / OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
   let httpClient: TestHttpClient;
   let dataManager: TestDataManager;
   let testClient: any;
@@ -42,8 +41,8 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
     await dataManager.clearDatabase();
   });
 
-  describe('GET /api/oauth/authorize - Initial Parameter Validation', () => {
-    it('should return 400 for missing response_type', async () => {
+  describe('GET /api/oauth/authorize - 初始参数验证 / Initial Parameter Validation', () => {
+    it('TC_AU_001: 应该因缺少response_type返回400错误 / Should return 400 for missing response_type', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize?client_id=any_client&state=123', {
         method: 'GET',
       });
@@ -53,13 +52,12 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(data.error_description).toContain('response_type');
     });
 
-    it('should return 400 for unsupported response_type', async () => {
+    it('TC_AU_002: 应该因不支持的response_type重定向并附带错误 / Should redirect with error for unsupported response_type', async () => {
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=unsupported&client_id=${testClient.clientId}&redirect_uri=${testClient.redirectUris[0]}&state=123`,
         { method: 'GET', }
       );
-      // This should redirect to the client's redirect_uri with error in query
-      expect(response.status).toBe(302);
+      expect(response.status).toBe(302); // Expect redirect
       const location = response.headers.get('location');
       expect(location).toBeTruthy();
       const query = parseQuery(location!);
@@ -67,7 +65,7 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(query.state).toBe('123');
     });
 
-    it('should return 400 for missing client_id', async () => {
+    it('TC_AU_003: 应该因缺少client_id返回400错误 / Should return 400 for missing client_id', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize?response_type=code&state=123', {
         method: 'GET',
       });
@@ -77,58 +75,44 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(data.error_description).toContain('client_id');
     });
 
-    it('should return 400 for invalid client_id (not found)', async () => {
+    it('TC_AU_004: 应该因无效client_id返回400错误 / Should return 400 for invalid client_id (not found)', async () => {
       const response = await httpClient.makeRequest(
         '/api/oauth/authorize?response_type=code&client_id=invalid-client-id&redirect_uri=http://any.uri/cb&state=123',
         { method: 'GET', }
       );
-      // No redirect because client cannot be identified
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(400); // No redirect because client cannot be identified
       const data = await response.json();
-      expect(data.error).toBe(OAuth2ErrorTypes.INVALID_CLIENT); // Or INVALID_REQUEST if client_id format is wrong
+      expect(data.error).toBe(OAuth2ErrorTypes.INVALID_CLIENT);
     });
 
-    it('should return 400 for missing redirect_uri when client has multiple or requires it', async () => {
+    it('TC_AU_005: 当客户端有多个redirect_uri或需要时，应该因缺少redirect_uri返回400错误 / Should return 400 for missing redirect_uri when client has multiple or requires it', async () => {
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&state=123`,
         { method: 'GET', }
       );
-       // No redirect because redirect_uri cannot be validated
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(400); // No redirect because redirect_uri cannot be validated
       const data = await response.json();
       expect(data.error).toBe(OAuth2ErrorTypes.INVALID_REQUEST);
       expect(data.error_description).toContain('redirect_uri');
     });
 
-    it('should redirect with error for unregistered redirect_uri', async () => {
+    it('TC_AU_006: 应该对未注册的redirect_uri重定向并附带错误 / Should redirect with error for unregistered redirect_uri', async () => {
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&redirect_uri=http://unregistered.uri/cb&state=xyz`,
         { method: 'GET', }
       );
-      // According to spec, SHOULD NOT redirect to the invalid URI.
-      // Instead, show an error to the resource owner or use a pre-registered default if absolutely unambiguous.
-      // For this unit test, expecting a 400 if no safe redirect can be made.
-      // However, if the endpoint logic *does* redirect to a *valid* client URI with error, that's also testable.
-      // The current route logic might try to redirect to a default client URI if one could be inferred,
-      // but if the provided one is simply not in the list, it should be an error displayed to user, or 400.
-      // Let's assume it redirects to the *first registered* URI of the client with an error.
-      // This needs to be confirmed with actual route behavior.
-      // For now, let's assume the route handler identifies the client, sees the redirect_uri is bad,
-      // and redirects to the primary registered redirect_uri of that client with an error.
-      // If the client is identifiable, it MUST NOT redirect to the malicious URI.
-      // If the client itself cannot be identified, it's a 400.
       // If client identified, redirect_uri invalid -> redirect to *valid* client uri with error.
       expect(response.status).toBe(302); // Redirecting to a valid client URI
       const location = response.headers.get('location');
       expect(location).toBeTruthy();
       expect(location).toContain(testClient.redirectUris[0]); // Redirects to a known valid URI
       const query = parseQuery(location!);
-      expect(query.error).toBe(OAuth2ErrorTypes.INVALID_REQUEST); // Or a more specific error
-      expect(query.error_description).toContain('redirect_uri');
+      expect(query.error).toBe(OAuth2ErrorTypes.INVALID_REQUEST);
+      expect(query.error_description).toContain('redirect_uri'); // Specific error description
       expect(query.state).toBe('xyz');
     });
 
-    it('should redirect with error for invalid scope (not allowed by client)', async () => {
+    it('TC_AU_007: 应该对客户端不允许的无效scope重定向并附带错误 / Should redirect with error for invalid scope (not allowed by client)', async () => {
       const client = await dataManager.createClient({
         ...TEST_CLIENTS.PUBLIC,
         clientId: 'scope-test-client',
@@ -152,7 +136,7 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(query.state).toBe(state);
     });
 
-    it('should redirect with error for invalid scope format (e.g. contains newline)', async () => {
+    it('TC_AU_008: 应该对包含换行符等无效scope格式重定向并附带错误 / Should redirect with error for invalid scope format (e.g. contains newline)', async () => {
       const stateVal = "newlinestate";
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&redirect_uri=${testClient.redirectUris[0]}&scope=openid\nprofile&state=${stateVal}`,
@@ -167,12 +151,10 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
     });
 
     // PKCE Tests
-    it('should redirect with error if client requires PKCE and code_challenge is missing', async () => {
-      // testClient is already set to requirePkce = true
+    it('TC_AU_009: 当客户端需要PKCE但缺少code_challenge时，应该重定向并附带错误 / Should redirect with error if client requires PKCE and code_challenge is missing', async () => {
       const stateVal = "pkce_missing_challenge";
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&redirect_uri=${testClient.redirectUris[0]}&scope=openid&state=${stateVal}`,
-        // Missing code_challenge and code_challenge_method
         { method: 'GET', }
       );
       expect(response.status).toBe(302);
@@ -184,7 +166,7 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(query.state).toBe(stateVal);
     });
 
-    it('should redirect with error for unsupported code_challenge_method (not S256)', async () => {
+    it('TC_AU_010: 应该对不支持的code_challenge_method重定向并附带错误 / Should redirect with error for unsupported code_challenge_method (not S256)', async () => {
       const stateVal = "pkce_bad_method";
       const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&redirect_uri=${testClient.redirectUris[0]}&scope=openid&code_challenge=somechallenge&code_challenge_method=plain&state=${stateVal}`,
@@ -199,8 +181,7 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(query.state).toBe(stateVal);
     });
 
-    it('should redirect with error for invalid code_challenge format (e.g. too short)', async () => {
-        // Assuming PKCEUtils.validateCodeChallenge checks length (min 43 for S256 as per RFC7636)
+    it('TC_AU_011: 应该对无效code_challenge格式重定向并附带错误 / Should redirect with error for invalid code_challenge format (e.g. too short)', async () => {
         const stateVal = "pkce_short_challenge";
         const response = await httpClient.makeRequest(
         `/api/oauth/authorize?response_type=code&client_id=${testClient.clientId}&redirect_uri=${testClient.redirectUris[0]}&scope=openid&code_challenge=short&code_challenge_method=S256&state=${stateVal}`,
@@ -211,28 +192,21 @@ describe('OAuth Authorize Endpoint Unit Tests (Parameter Validation)', () => {
       expect(location).toBeTruthy();
       const query = parseQuery(location!);
       expect(query.error).toBe(OAuth2ErrorTypes.INVALID_REQUEST);
-      expect(query.error_description).toContain('code_challenge');
+      expect(query.error_description).toContain('code_challenge'); // Assuming error message mentions code_challenge
       expect(query.state).toBe(stateVal);
     });
 
-
-    it('should correctly handle OPTIONS request', async () => {
+    it('TC_AU_012: 应该正确处理OPTIONS请求 / Should correctly handle OPTIONS request', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize', { method: 'OPTIONS' });
-      expect(response.status).toBe(200); // Standard is 200 or 204 for OPTIONS
-      // Check for Allow header, though it's not strictly required by this test's focus
+      expect(response.status).toBe(200); // Or 204
+      // Further checks for Allow header could be added if necessary for the application.
     });
 
-    it('should return 405 for unsupported HTTP methods like DELETE', async () => {
+    it('TC_AU_013: 应该对不支持的HTTP方法返回405错误 / Should return 405 for unsupported HTTP methods like DELETE', async () => {
       const response = await httpClient.makeRequest('/api/oauth/authorize', { method: 'DELETE' });
       expect(response.status).toBe(405);
-      const data = await response.json(); // Method Not Allowed might return JSON
-      expect(data.error).toBe('method_not_allowed');
+      const data = await response.json();
+      expect(data.error).toBe('method_not_allowed'); // Standard error for 405
     });
-
-    // Test for "Content-Type" header removed as it's not relevant for 302 redirects
-    // and error pages might vary. Focus is on status and error codes.
   });
-
-  // Removed the entire 'POST /api/oauth/authorize' describe block
-  // Removed '有效客户端和用户测试' as it implies user authentication, better for integration tests.
 });

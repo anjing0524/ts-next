@@ -11,11 +11,11 @@ import {
   TEST_CONFIG,
 } from '../utils/test-helpers';
 
-// Import route functions directly for code coverage
+// Import route functions directly
 import { GET as authorizeGET } from '@/app/api/oauth/authorize/route';
 import { POST as tokenPOST } from '@/app/api/oauth/token/route';
 import { GET as userinfoGET } from '@/app/api/oauth/userinfo/route';
-import { POST as revokePOST } from '@/app/api/oauth/revoke/route';
+// import { POST as revokePOST } from '@/app/api/oauth/revoke/route'; // Not used in this file
 
 /**
  * OAuth2.1 安全性测试套件
@@ -34,7 +34,6 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
   let publicClient: any = null;
 
   beforeAll(async () => {
-    console.log('🔧 Setting up OAuth Security test data...');
     const setup = createOAuth2TestSetup('oauth-security');
     await setup.setup();
     dataManager = setup.dataManager;
@@ -50,49 +49,40 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
   });
 
   afterAll(async () => {
-    console.log('🧹 Cleaning up OAuth Security test data...');
     const setup = createOAuth2TestSetup('oauth-security');
     await setup.cleanup();
   });
 
   async function setupTestData() {
-    try {
-      testUser = await dataManager.createUser({
-        ...TEST_USERS.REGULAR,
-        username: `sec-user-${Date.now()}`,
-        email: `sec-user-${Date.now()}@test.com`,
-      });
+    // Ensure unique data for each test run or rely on afterAll cleanup
+    const now = Date.now();
+    testUser = await dataManager.createUser({
+      ...TEST_USERS.REGULAR,
+      username: `sec-user-${now}`,
+      email: `sec-user-${now}@test.com`,
+    });
 
-      confidentialClient = await dataManager.createClient({
-        ...TEST_CLIENTS.CONFIDENTIAL,
-        clientId: `sec-confidential-${Date.now()}`,
-        grantTypes: ['authorization_code', 'refresh_token', 'client_credentials'],
-        responseTypes: ['code'],
-        scope: ['openid', 'profile', 'email', 'api:read', 'api:write'],
-      });
+    confidentialClient = await dataManager.createClient({
+      ...TEST_CLIENTS.CONFIDENTIAL,
+      clientId: `sec-confidential-${now}`,
+      grantTypes: ['authorization_code', 'refresh_token', 'client_credentials'],
+      responseTypes: ['code'],
+      scope: 'openid profile email api:read api:write', // Ensure scope is a string
+    });
 
-      publicClient = await dataManager.createClient({
-        ...TEST_CLIENTS.PUBLIC,
-        clientId: `sec-public-${Date.now()}`,
-        grantTypes: ['authorization_code'],
-        responseTypes: ['code'],
-        scope: ['openid', 'profile', 'email'],
-        requirePkce: true,
-      });
-
-      console.log('✅ OAuth Security test data setup completed');
-    } catch (error) {
-      console.error('❌ Failed to setup OAuth Security test data:', error);
-      throw error;
-    }
+    publicClient = await dataManager.createClient({
+      ...TEST_CLIENTS.PUBLIC,
+      clientId: `sec-public-${now}`,
+      grantTypes: ['authorization_code'],
+      responseTypes: ['code'],
+      scope: 'openid profile email', // Ensure scope is a string
+      requirePkce: true,
+    });
   }
 
   async function cleanupTestData() {
-    try {
-      console.log('✅ OAuth Security test data cleanup completed');
-    } catch (error) {
-      console.error('❌ Failed to cleanup OAuth Security test data:', error);
-    }
+    // More targeted cleanup can be added here if needed after each test,
+    // but typically afterAll handles the bulk cleanup.
   }
 
   // Helper to create Next.js request object
@@ -111,73 +101,65 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
   }
 
   describe('SEC-001: PKCE 安全防护测试 / PKCE Security Tests', () => {
-    it('SEC-001.1: 应该强制公共客户端使用PKCE / Should enforce PKCE for public clients', async () => {
+    it('TC_SO_001_001: 公共客户端未使用PKCE时应被拒绝 / Should enforce PKCE for public clients by rejecting if missing', async () => {
       const authParams = {
-        response_type: 'code',
-        client_id: publicClient.clientId,
-        redirect_uri: publicClient.redirectUris[0],
-        scope: 'openid profile',
-        // 故意省略 PKCE 参数
+        response_type: 'code', client_id: publicClient.clientId, redirect_uri: publicClient.redirectUris[0], scope: 'openid profile',
       };
-
       const authorizeUrl = `/api/oauth/authorize?${new URLSearchParams(authParams).toString()}`;
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      // 应该返回错误或重定向到错误页面
-      expect(TestAssertions.expectStatus(response, [400, 401, 302, 307])).toBe(true);
-
-      if (response.status === 302 || response.status === 307) {
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST])).toBe(true);
+      if (response.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
         const location = response.headers.get('location');
         expect(location).toBeDefined();
-        // 检查重定向URL是否包含错误信息
-        if (location) {
-          const redirectUrl = new URL(location);
-          expect(redirectUrl.searchParams.get('error')).toBeDefined();
-        }
+        const redirectUrl = new URL(location!);
+        expect(redirectUrl.searchParams.get('error')).toBe(TEST_CONFIG.ERROR_CODES.INVALID_REQUEST);
+        expect(redirectUrl.searchParams.get('error_description')).toContain('PKCE');
+      } else {
+        const error = await response.json();
+        expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_REQUEST);
+        expect(error.error_description).toContain('PKCE');
       }
-
-      console.log('✅ SEC-001.1: PKCE enforcement for public clients working');
     });
 
-    it('SEC-001.2: 应该验证PKCE代码挑战格式 / Should validate PKCE code challenge format', async () => {
+    it('TC_SO_001_002: 应验证PKCE code_challenge格式有效性 / Should validate PKCE code_challenge format', async () => {
       const authParams = {
-        response_type: 'code',
-        client_id: publicClient.clientId,
-        redirect_uri: publicClient.redirectUris[0],
-        scope: 'openid profile',
-        code_challenge: 'invalid-challenge', // 无效的挑战格式
+        response_type: 'code', client_id: publicClient.clientId, redirect_uri: publicClient.redirectUris[0], scope: 'openid profile',
+        code_challenge: 'short', // Invalid: too short for S256
         code_challenge_method: 'S256',
       };
-
       const authorizeUrl = `/api/oauth/authorize?${new URLSearchParams(authParams).toString()}`;
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 302, 307])).toBe(true);
-      console.log('✅ SEC-001.2: PKCE challenge format validation working');
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST])).toBe(true);
+      // Further checks on error content similar to above test can be added.
     });
 
-    it('SEC-001.3: 应该只支持S256挑战方法 / Should only support S256 challenge method', async () => {
+    it('TC_SO_001_003: 应只支持S256作为code_challenge_method / Should only support S256 for code_challenge_method', async () => {
       const pkce = PKCETestUtils.generatePKCE();
       const authParams = {
-        response_type: 'code',
-        client_id: publicClient.clientId,
-        redirect_uri: publicClient.redirectUris[0],
-        scope: 'openid profile',
-        code_challenge: pkce.codeChallenge,
-        code_challenge_method: 'plain', // 不安全的方法
+        response_type: 'code', client_id: publicClient.clientId, redirect_uri: publicClient.redirectUris[0], scope: 'openid profile',
+        code_challenge: pkce.codeChallenge, code_challenge_method: 'plain', // 'plain' is not recommended by OAuth 2.1
       };
-
       const authorizeUrl = `/api/oauth/authorize?${new URLSearchParams(authParams).toString()}`;
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
-
-      expect(TestAssertions.expectStatus(response, [400, 302, 307])).toBe(true);
-      console.log('✅ SEC-001.3: PKCE S256 method enforcement working');
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST])).toBe(true);
+      // Error should indicate 'plain' is not supported or method is invalid
+      if (response.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
+        const location = response.headers.get('location');
+        expect(location).toContain(TEST_CONFIG.ERROR_CODES.INVALID_REQUEST);
+        expect(location).toContain('code_challenge_method');
+      } else {
+        const error = await response.json();
+        expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_REQUEST);
+        expect(error.error_description).toContain('code_challenge_method');
+      }
     });
 
-    it('SEC-001.4: 应该验证代码验证器和挑战的匹配 / Should validate code verifier matches challenge', async () => {
+    it('TC_SO_001_004: 应在令牌交换时验证code_verifier与code_challenge的匹配性 / Should validate code_verifier matches code_challenge at token exchange', async () => {
       const pkce = PKCETestUtils.generatePKCE();
 
       // 创建带PKCE的授权码
@@ -210,83 +192,51 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
 
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401])).toBe(true);
-      console.log('✅ SEC-001.4: PKCE verifier validation working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_GRANT);
+      expect(error.error_description).toContain('PKCE');
     });
   });
 
   describe('SEC-002: 令牌安全测试 / Token Security Tests', () => {
-    it('SEC-002.1: 应该防止令牌篡改 / Should prevent token tampering', async () => {
-      const validToken = await dataManager.createAccessToken(
-        testUser.id,
-        confidentialClient.clientId,
-        'openid profile'
-      );
-
-      // 篡改令牌内容
+    it('TC_SO_002_001: 应拒绝被篡改的访问令牌 / Should prevent token tampering by rejecting tampered tokens', async () => {
+      const validToken = await dataManager.createAccessToken(testUser.id, confidentialClient.clientId, 'openid profile');
       const tamperedToken = validToken.slice(0, -10) + 'tampered123';
-
-      const request = createNextRequest('/api/oauth/userinfo', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${tamperedToken}`,
-        },
-      });
-
+      const request = createNextRequest('/api/oauth/userinfo', { method: 'GET', headers: { Authorization: `Bearer ${tamperedToken}` } });
       const response = await userinfoGET(request);
 
-      expect(TestAssertions.expectStatus(response, [401, 403])).toBe(true);
-      console.log('✅ SEC-002.1: Token tampering protection working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_TOKEN);
     });
 
-    it('SEC-002.2: 应该验证令牌过期 / Should validate token expiration', async () => {
-      // 创建一个已过期的令牌（通过直接操作数据库）
-      const expiredToken = await dataManager.createAccessToken(
-        testUser.id,
-        confidentialClient.clientId,
-        'openid profile'
-      );
-
-      // 手动将令牌设置为过期
-      await dataManager.cleanup(); // 这会删除令牌，模拟过期效果
-
-      const request = createNextRequest('/api/oauth/userinfo', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${expiredToken}`,
-        },
-      });
-
+    it('TC_SO_002_002: 应验证并拒绝过期的访问令牌 / Should validate token expiration and reject expired tokens', async () => {
+      const expiredTokenString = await dataManager.createExpiredAccessToken(testUser.id, confidentialClient.clientId, 'openid profile');
+      const request = createNextRequest('/api/oauth/userinfo', { method: 'GET', headers: { Authorization: `Bearer ${expiredTokenString}` } });
       const response = await userinfoGET(request);
 
-      expect(TestAssertions.expectStatus(response, [401, 403])).toBe(true);
-      console.log('✅ SEC-002.2: Token expiration validation working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_TOKEN);
+      expect(error.error_description).toContain('expired');
     });
 
-    it('SEC-002.3: 应该验证令牌作用域 / Should validate token scope', async () => {
-      const limitedToken = await dataManager.createAccessToken(
-        testUser.id,
-        confidentialClient.clientId,
-        'openid' // 只有基本作用域，没有profile
-      );
-
-      const request = createNextRequest('/api/oauth/userinfo', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${limitedToken}`,
-        },
-      });
-
+    it('TC_SO_002_003: UserInfo端点应验证令牌作用域（至少需要openid） / UserInfo endpoint should validate token scope (at least openid)', async () => {
+      // Token with only 'profile', no 'openid'
+      const limitedToken = await dataManager.createAccessToken(testUser.id, confidentialClient.clientId, 'profile');
+      const request = createNextRequest('/api/oauth/userinfo', { method: 'GET', headers: { Authorization: `Bearer ${limitedToken}` } });
       const response = await userinfoGET(request);
 
-      // 可能成功返回基本信息，或者因为缺少profile作用域而失败
-      expect(TestAssertions.expectStatus(response, [200, 401, 403])).toBe(true);
-      console.log('✅ SEC-002.3: Token scope validation working');
+      // UserInfo endpoint strictly requires 'openid' scope.
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.FORBIDDEN);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INSUFFICIENT_SCOPE);
     });
   });
 
   describe('SEC-003: 授权码安全测试 / Authorization Code Security Tests', () => {
-    it('SEC-003.1: 应该防止授权码重用 / Should prevent authorization code reuse', async () => {
+    it('TC_SO_003_001: 应防止授权码重用 / Should prevent authorization code reuse', async () => {
       const authCode = await dataManager.createAuthorizationCode(
         testUser.id,
         confidentialClient.clientId,
@@ -322,35 +272,16 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
       });
       const secondResponse = await tokenPOST(secondRequest);
 
-      expect(TestAssertions.expectStatus(secondResponse, [400, 401])).toBe(true);
-
-      if (secondResponse.status === 400) {
-        const error = await secondResponse.json();
-        expect(['invalid_grant', 'invalid_client'].includes(error.error)).toBe(true);
-      }
-
-      console.log('✅ SEC-003.1: Authorization code reuse prevention working');
+      expect(secondResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
+      const error = await secondResponse.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_GRANT); // Reused code is an invalid grant
     });
 
-    it('SEC-003.2: 应该验证授权码和客户端的绑定 / Should validate authorization code client binding', async () => {
-      // 为客户端A创建授权码
-      const authCode = await dataManager.createAuthorizationCode(
-        testUser.id,
-        confidentialClient.clientId,
-        confidentialClient.redirectUris[0],
-        'openid profile'
-      );
+    it('TC_SO_003_002: 应验证授权码与客户端的绑定关系 / Should validate authorization code client binding', async () => {
+      const authCodeForClientA = await dataManager.createAuthorizationCode(testUser.id, confidentialClient.clientId, confidentialClient.redirectUris[0], 'openid profile');
+      const clientB = await dataManager.createClient({ ...TEST_CLIENTS.CONFIDENTIAL, clientId: `sec-other-client-${Date.now()}`, grantTypes: ['authorization_code'], responseTypes: ['code'], scope: ['openid', 'profile'] });
 
-      // 创建另一个客户端B
-      const otherClient = await dataManager.createClient({
-        ...TEST_CLIENTS.CONFIDENTIAL,
-        clientId: `sec-other-${Date.now()}`,
-        grantTypes: ['authorization_code'],
-        responseTypes: ['code'],
-        scope: ['openid', 'profile'],
-      });
-
-      // 尝试用客户端B使用客户端A的授权码
+      // Client B attempts to use Client A's code
       const tokenRequestData = {
         grant_type: 'authorization_code',
         code: authCode,
@@ -369,43 +300,30 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
 
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401])).toBe(true);
-      console.log('✅ SEC-003.2: Authorization code client binding validation working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST); // invalid_grant because code is not for this client
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_GRANT);
     });
 
-    it('SEC-003.3: 应该验证重定向URI匹配 / Should validate redirect URI match', async () => {
-      const authCode = await dataManager.createAuthorizationCode(
-        testUser.id,
-        confidentialClient.clientId,
-        confidentialClient.redirectUris[0], // 使用正确的重定向URI创建
-        'openid profile'
-      );
-
+    it('TC_SO_003_003: 应在令牌交换时验证重定向URI的匹配性 / Should validate redirect URI match at token exchange', async () => {
+      const authCode = await dataManager.createAuthorizationCode(testUser.id, confidentialClient.clientId, confidentialClient.redirectUris[0], 'openid profile');
       const tokenRequestData = {
-        grant_type: 'authorization_code',
-        code: authCode,
-        redirect_uri: 'https://malicious.com/callback', // 使用不同的重定向URI
-        client_id: confidentialClient.clientId,
-        client_secret: confidentialClient.plainSecret,
+        grant_type: 'authorization_code', code: authCode, redirect_uri: 'https://wrong-redirect-uri.com/callback',
+        client_id: confidentialClient.clientId, client_secret: confidentialClient.plainSecret,
       };
-
       const request = createNextRequest('/api/oauth/token', {
-        method: 'POST',
-        body: new URLSearchParams(tokenRequestData).toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        method: 'POST', body: new URLSearchParams(tokenRequestData).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401])).toBe(true);
-      console.log('✅ SEC-003.3: Redirect URI validation working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_GRANT); // Mismatched redirect_uri
     });
   });
 
   describe('SEC-004: 客户端认证安全测试 / Client Authentication Security Tests', () => {
-    it('SEC-004.1: 应该拒绝无效的客户端凭证 / Should reject invalid client credentials', async () => {
+    it('TC_SO_004_001: 应拒绝无效的客户端凭证 / Should reject invalid client credentials', async () => {
       const tokenRequestData = {
         grant_type: 'client_credentials',
         scope: 'api:read',
@@ -423,72 +341,39 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
 
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401])).toBe(true);
-
-      if (response.status === 401) {
-        const error = await response.json();
-        expect(error.error).toBe('invalid_client');
-      }
-
-      console.log('✅ SEC-004.1: Invalid client credentials rejection working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_CLIENT);
     });
 
-    it('SEC-004.2: 应该要求机密客户端提供客户端密钥 / Should require client secret for confidential clients', async () => {
-      const tokenRequestData = {
-        grant_type: 'client_credentials',
-        scope: 'api:read',
-        client_id: confidentialClient.clientId,
-        // 故意省略 client_secret
-      };
-
+    it('TC_SO_004_002: 机密客户端发起请求时应要求提供客户端密钥 / Should require client secret for confidential clients when authenticating', async () => {
+      const tokenRequestData = { grant_type: 'client_credentials', scope: 'api:read', client_id: confidentialClient.clientId /* No client_secret */ };
       const request = createNextRequest('/api/oauth/token', {
-        method: 'POST',
-        body: new URLSearchParams(tokenRequestData).toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        method: 'POST', body: new URLSearchParams(tokenRequestData).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401])).toBe(true);
-      console.log('✅ SEC-004.2: Client secret requirement working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_CLIENT);
     });
 
-    it('SEC-004.3: 应该验证客户端状态 / Should validate client status', async () => {
-      // 创建一个禁用的客户端
-      const disabledClient = await dataManager.createClient({
-        ...TEST_CLIENTS.CONFIDENTIAL,
-        clientId: `sec-disabled-${Date.now()}`,
-        isActive: false, // 禁用状态
-        grantTypes: ['client_credentials'],
-        scope: ['api:read'],
-      });
-
-      const tokenRequestData = {
-        grant_type: 'client_credentials',
-        scope: 'api:read',
-        client_id: disabledClient.clientId,
-        client_secret: disabledClient.plainSecret,
-      };
-
+    it('TC_SO_004_003: 应验证客户端是否为活动状态 / Should validate client status (active or not)', async () => {
+      const disabledClient = await dataManager.createClient({ ...TEST_CLIENTS.CONFIDENTIAL, clientId: `sec-disabled-${Date.now()}`, isActive: false, grantTypes: ['client_credentials'], scope: ['api:read'] });
+      const tokenRequestData = { grant_type: 'client_credentials', scope: 'api:read', client_id: disabledClient.clientId, client_secret: disabledClient.plainSecret };
       const request = createNextRequest('/api/oauth/token', {
-        method: 'POST',
-        body: new URLSearchParams(tokenRequestData).toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        method: 'POST', body: new URLSearchParams(tokenRequestData).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
-
       const response = await tokenPOST(request);
 
-      expect(TestAssertions.expectStatus(response, [400, 401, 404])).toBe(true);
-      console.log('✅ SEC-004.3: Client status validation working');
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      const error = await response.json();
+      expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_CLIENT); // Or a more specific "client_disabled"
     });
   });
 
-  describe('SEC-005: 状态参数CSRF防护测试 / State Parameter CSRF Protection Tests', () => {
-    it('SEC-005.1: 应该支持状态参数 / Should support state parameter', async () => {
+  describe('SEC-005: State参数CSRF防护测试 / State Parameter CSRF Protection Tests', () => {
+    it('TC_SO_005_001: 授权请求应支持state参数 / Should support state parameter in authorization requests', async () => {
       const state = 'random-state-value-123456';
       const authParams = {
         response_type: 'code',
@@ -502,22 +387,22 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      // 应该接受带有状态参数的请求
-      expect(TestAssertions.expectStatus(response, [200, 302, 307, 401, 404])).toBe(true);
-
-      if (response.status === 302 || response.status === 307) {
+      // Expect a redirect to login/consent or directly to callback.
+      // State should be preserved in the redirect URL if the request itself is valid enough to identify client/redirect_uri.
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.TEMPORARY_REDIRECT, TEST_CONFIG.HTTP_STATUS.OK])).toBe(true);
+      if (response.status === TEST_CONFIG.HTTP_STATUS.FOUND || response.status === TEST_CONFIG.HTTP_STATUS.TEMPORARY_REDIRECT) {
         const location = response.headers.get('location');
-        if (location) {
-          const redirectUrl = new URL(location);
-          // 如果重定向，应该保持状态参数
-          console.log('Redirect location includes state parameter check');
+        expect(location).toBeDefined();
+        if (location!.includes(confidentialClient.redirectUris[0])) { // If redirecting to client
+             const redirectUrl = new URL(location!);
+             expect(redirectUrl.searchParams.get('state')).toBe(state);
+        } else { // If redirecting to login/consent
+            expect(location).toContain(`state=${encodeURIComponent(state)}`); // State might be URL encoded in a query param of returnUrl
         }
       }
-
-      console.log('✅ SEC-005.1: State parameter support working');
     });
 
-    it('SEC-005.2: 应该在错误响应中保持状态参数 / Should preserve state parameter in error responses', async () => {
+    it('TC_SO_005_002: 错误响应中应保留state参数 / Should preserve state parameter in error responses to redirect_uri', async () => {
       const state = 'error-state-value-123456';
       const authParams = {
         response_type: 'code',
@@ -531,54 +416,58 @@ describe('OAuth2.1安全性测试 / OAuth2.1 Security Tests (SEC)', () => {
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      if (response.status === 302 || response.status === 307) {
+      // If client_id is invalid, it might not redirect to client's URI.
+      // If it does redirect (e.g., if client determined by redirect_uri), state must be preserved.
+      // Or it might be a direct 400/401 error page.
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED])).toBe(true);
+      if (response.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
         const location = response.headers.get('location');
-        if (location) {
-          const redirectUrl = new URL(location);
-          const returnedState = redirectUrl.searchParams.get('state');
-          expect(returnedState).toBe(state);
-        }
+        expect(location).toBeDefined();
+        const redirectUrl = new URL(location!);
+        // If redirecting to a registered client URI (even with an error for other reasons), state must be there.
+        // If redirecting to a generic error page, state might not be applicable.
+        // This test implies redirecting to the client with an error.
+        expect(redirectUrl.searchParams.get('state')).toBe(state);
+        expect(redirectUrl.searchParams.get('error')).toBeDefined();
       }
-
-      console.log('✅ SEC-005.2: State parameter preservation in errors working');
     });
   });
 
   describe('SEC-006: 作用域验证测试 / Scope Validation Tests', () => {
-    it('SEC-006.1: 应该验证请求的作用域 / Should validate requested scopes', async () => {
-      const authParams = {
-        response_type: 'code',
-        client_id: confidentialClient.clientId,
-        redirect_uri: confidentialClient.redirectUris[0],
-        scope: 'invalid_scope unknown_scope',
-      };
-
+    it('TC_SO_006_001: 应验证请求中作用域的有效性 / Should validate requested scopes for validity', async () => {
+      const authParams = { response_type: 'code', client_id: confidentialClient.clientId, redirect_uri: confidentialClient.redirectUris[0], scope: 'invalid_scope unknown_scope' };
       const authorizeUrl = `/api/oauth/authorize?${new URLSearchParams(authParams).toString()}`;
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      // 可能返回错误或重定向到错误页面
-      expect(TestAssertions.expectStatus(response, [200, 302, 307, 400, 404])).toBe(true);
-      console.log('✅ SEC-006.1: Scope validation working');
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST])).toBe(true);
+      if(response.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
+        const location = response.headers.get('location');
+        expect(location).toContain('error=invalid_scope');
+      } else {
+        const error = await response.json();
+        expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_SCOPE);
+      }
     });
 
-    it('SEC-006.2: 应该限制客户端访问未授权的作用域 / Should restrict client access to unauthorized scopes', async () => {
+    it('TC_SO_006_002: 应限制客户端访问其未被授权的范围 / Should restrict client access to scopes it is not authorized for', async () => {
       const authParams = {
-        response_type: 'code',
-        client_id: publicClient.clientId, // 公共客户端可能没有admin权限
-        redirect_uri: publicClient.redirectUris[0],
-        scope: 'openid profile admin:write', // 尝试请求管理员权限
-        code_challenge: 'test-challenge-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-        code_challenge_method: 'S256',
+        response_type: 'code', client_id: publicClient.clientId, redirect_uri: publicClient.redirectUris[0],
+        scope: 'openid profile api:write', // publicClient may not have 'api:write'
+        code_challenge: PKCETestUtils.generatePKCE().codeChallenge, code_challenge_method: 'S256',
       };
-
       const authorizeUrl = `/api/oauth/authorize?${new URLSearchParams(authParams).toString()}`;
       const request = createNextRequest(authorizeUrl);
       const response = await authorizeGET(request);
 
-      // 可能接受请求但过滤掉无效作用域，或者直接拒绝
-      expect(TestAssertions.expectStatus(response, [200, 302, 307, 400, 404])).toBe(true);
-      console.log('✅ SEC-006.2: Scope restriction working');
+      expect(TestAssertions.expectStatus(response, [TEST_CONFIG.HTTP_STATUS.FOUND, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST])).toBe(true);
+       if(response.status === TEST_CONFIG.HTTP_STATUS.FOUND) {
+        const location = response.headers.get('location');
+        expect(location).toContain('error=invalid_scope'); // Client requested scope it's not allowed
+      } else {
+        const error = await response.json();
+        expect(error.error).toBe(TEST_CONFIG.ERROR_CODES.INVALID_SCOPE);
+      }
     });
   });
 });
