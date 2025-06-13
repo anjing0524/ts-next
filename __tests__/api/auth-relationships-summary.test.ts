@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
-describe('Authentication & Authorization Center - Relationships Testing Summary', () => {
-  describe('📋 Testing Coverage Summary', () => {
-    it('should document all tested entity relationships', () => {
+describe('认证与授权中心 - 关系测试总结 / Authentication & Authorization Center - Relationships Testing Summary', () => {
+  describe('📋 测试覆盖总结 / Testing Coverage Summary', () => {
+    it('TC_ARS_001_001: 应记录所有已测试的实体关系 / Should document all tested entity relationships', () => {
       const testedRelationships = {
         // 1. User Entity Relationships (✅ Fully Tested)
         'User → AccessToken': {
@@ -128,11 +128,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
         expect(relationship.description).toBeTruthy();
         expect(relationship.testLocation).toBeTruthy();
       });
-
-      console.log('✅ All entity relationships documented and tested');
     });
 
-    it('should verify unique constraints are properly tested', () => {
+    it('TC_ARS_001_002: 应验证唯一约束是否经过适当测试 / Should verify unique constraints are properly tested', () => {
       const uniqueConstraints = {
         'User.email': {
           status: '✅ TESTED',
@@ -198,11 +196,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
         expect(constraint.description).toBeTruthy();
         expect(constraint.testLocation).toBeTruthy();
       });
-
-      console.log('✅ All unique constraints documented and tested');
     });
 
-    it('should verify cascade deletion behaviors are tested', () => {
+    it('TC_ARS_001_003: 应验证级联删除行为是否经过测试 / Should verify cascade deletion behaviors are tested', () => {
       const cascadeBehaviors = {
         'User deletion → Access tokens deleted': {
           status: '✅ TESTED',
@@ -263,11 +259,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
         expect(['CASCADE DELETE', 'SET NULL']).toContain(cascade.behavior);
         expect(cascade.testLocation).toBeTruthy();
       });
-
-      console.log('✅ All cascade deletion behaviors documented and tested');
     });
 
-    it('should verify OAuth 2.0 flow relationships are tested', () => {
+    it('TC_ARS_001_004: 应验证OAuth 2.0流程关系是否经过测试 / Should verify OAuth 2.0 flow relationships are tested', () => {
       const oauthFlowRelationships = {
         'Authorization Code Flow': {
           status: '✅ TESTED',
@@ -338,11 +332,9 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
         expect(flow.testCoverage.length).toBeGreaterThan(0);
         expect(flow.testLocation).toBeTruthy();
       });
-
-      console.log('✅ All OAuth 2.0 flow relationships documented and tested');
     });
 
-    it('should verify security relationship validations are tested', () => {
+    it('TC_ARS_001_005: 应验证安全关系校验是否经过测试 / Should verify security relationship validations are tested', () => {
       const securityValidations = {
         'Cross-Client Permission Boundaries': {
           status: '✅ TESTED',
@@ -393,13 +385,11 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
         expect(validation.description).toBeTruthy();
         expect(validation.testLocation).toBeTruthy();
       });
-
-      console.log('✅ All security relationship validations documented and tested');
     });
   });
 
-  describe('📊 Test Results Summary', () => {
-    it('should summarize testing achievements', () => {
+  describe('📊 测试结果总结 / Test Results Summary', () => {
+    it('TC_ARS_002_001: 应总结测试成果 / Should summarize testing achievements', () => {
       const testingSummary = {
         totalRelationshipTypes: 14,
         totalUniqueConstraints: 11,
@@ -425,15 +415,6 @@ describe('Authentication & Authorization Center - Relationships Testing Summary'
       expect(testingSummary.totalOAuthFlows).toBe(5);
       expect(testingSummary.totalSecurityValidations).toBe(8);
       expect(testingSummary.coverageAreas).toHaveLength(8);
-
-      console.log('📊 Testing Summary:');
-      console.log(`   • ${testingSummary.totalRelationshipTypes} Entity Relationships Tested`);
-      console.log(`   • ${testingSummary.totalUniqueConstraints} Unique Constraints Validated`);
-      console.log(`   • ${testingSummary.totalCascadeBehaviors} Cascade Behaviors Verified`);
-      console.log(`   • ${testingSummary.totalOAuthFlows} OAuth 2.0 Flows Tested`);
-      console.log(`   • ${testingSummary.totalSecurityValidations} Security Validations Completed`);
-      console.log(`   • ${testingSummary.totalTestFiles} Comprehensive Test Files Created`);
-      console.log('✅ Authentication & Authorization Center relationship testing COMPLETE');
     });
   });
 });
