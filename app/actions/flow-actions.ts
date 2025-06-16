@@ -247,7 +247,7 @@ function calculateStats(stage: string, nodesCount: number, stageStates: PlanStat
     failed: stageStates.filter((s) => ['F', 'Z', 'C', 'T'].includes(s.plan_state || '')).length,
     // 运行中状态：P, A, S, R
     running: stageStates.filter((s) => ['R', 'P', 'A', 'S'].includes(s.plan_state || '')).length,
-    // 等待中状态已包含在运行中，这里可以保留为空或者移除
+    // 等待中则说明计划配置的有，但是state表里面没有
     waiting: nodesCount - stageStates.length,
   };
 }
