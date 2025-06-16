@@ -508,6 +508,21 @@ model SecurityPolicy {
   @@map("security_policies") // 数据库表名
 }
 
+// ================================
+// JTI Blacklist for Token Revocation
+// ================================
+model TokenBlacklist {
+  id        String   @id @default(cuid())
+  jti       String   @unique // JWT ID
+  tokenType String   // 'access' or 'refresh'
+  expiresAt DateTime // Should match the original expiry of the token
+  createdAt DateTime @default(now())
+
+  @@index([jti])
+  @@index([expiresAt]) // For cleaning up expired blacklist entries
+  @@map("token_blacklist")
+}
+
 // 策略类型枚举
 enum PolicyType {
   PASSWORD_STRENGTH    // 密码强度策略

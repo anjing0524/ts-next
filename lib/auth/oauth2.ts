@@ -503,6 +503,16 @@ export class JWTUtils {
         algorithms: [algorithm as string], // 允许的签名算法列表
       });
 
+      // Check JTI blacklist
+      if (payload.jti) {
+        const blacklistedJti = await prisma.tokenBlacklist.findUnique({
+          where: { jti: payload.jti },
+        });
+        if (blacklistedJti) {
+          return { valid: false, error: 'Token has been revoked' };
+        }
+      }
+
       return { valid: true, payload }; // 验证成功
     } catch (error) { // 捕获验证过程中可能发生的任何错误
       let errorMessage = 'Token verification failed'; // 默认错误消息
@@ -591,6 +601,16 @@ export class JWTUtils {
       if (payload.token_type !== 'refresh') {
         console.warn('Invalid token type for refresh token verification:', payload.token_type);
         return { valid: false, error: 'Invalid token type: expected refresh token' };
+      }
+
+      // Check JTI blacklist
+      if (payload.jti) {
+        const blacklistedJti = await prisma.tokenBlacklist.findUnique({
+          where: { jti: payload.jti },
+        });
+        if (blacklistedJti) {
+          return { valid: false, error: 'Refresh token has been revoked' };
+        }
       }
 
       return { valid: true, payload };
