@@ -9,7 +9,7 @@ import {
   createTestSetup,
 } from '../utils/test-helpers';
 
-describe('OAuth2.1 Client Management API Tests', () => {
+describe('OAuth2.1 客户端管理API测试 / OAuth2.1 Client Management API Tests', () => {
   const httpClient = new TestHttpClient();
   const dataManager = new TestDataManager();
   const { setup, cleanup } = createTestSetup('clients-management-enhanced');
@@ -24,10 +24,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
     await cleanup();
   });
 
-  describe('POST /api/clients - 客户端注册', () => {
-    it('应该成功注册机密客户端', async () => {
+  describe('POST /api/clients - 客户端注册 / Client Registration', () => {
+    it('TC_CME_001_001: 应成功注册机密客户端 / Should successfully register a confidential client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
-      const adminToken = await dataManager.createAccessToken(
+      const adminToken = await dataManager.createAccessToken( // Assuming admin token is needed for client registration endpoint
         admin.id!,
         'admin-client',
         'admin:clients'
@@ -56,10 +56,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(client.grantTypes).toEqual(clientData.grantTypes);
     });
 
-    it('应该成功注册公共客户端（无客户端密钥）', async () => {
+    it('TC_CME_001_002: 应成功注册公共客户端（无客户端密钥）/ Should successfully register a public client (no client secret)', async () => {
       const clientData = {
         name: 'Test Public SPA Client',
-        redirectUris: ['http://localhost:3000/callback'],
+        redirectUris: ['http://localhost:3000/callback'], // Valid URI for public client
         grantTypes: ['authorization_code'],
         responseTypes: ['code'],
         scope: ['openid', 'profile'],
@@ -72,14 +72,14 @@ describe('OAuth2.1 Client Management API Tests', () => {
 
       const client = await response.json();
       expect(client.clientId).toBeDefined();
-      expect(client.clientSecret).toBeNull();
+      expect(client.clientSecret).toBeNull(); // Public clients must not have a secret stored
       expect(client.isPublic).toBe(true);
     });
 
-    it('应该拒绝无效的重定向URI', async () => {
+    it('TC_CME_001_003: 应拒绝无效的重定向URI / Should reject invalid redirect URIs', async () => {
       const clientData = {
         name: 'Invalid Redirect Client',
-        redirectUris: ['invalid-uri', 'not-a-url'],
+        redirectUris: ['invalid-uri', 'not-a-url'], // Malformed URIs
         grantTypes: ['authorization_code'],
         responseTypes: ['code'],
         scope: ['openid'],
@@ -95,11 +95,11 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(error.error_description).toContain('redirect_uri');
     });
 
-    it('应该拒绝不支持的授权类型', async () => {
+    it('TC_CME_001_004: 应拒绝不支持的授权类型 / Should reject unsupported grant types', async () => {
       const clientData = {
         name: 'Invalid Grant Type Client',
         redirectUris: ['https://app.example.com/callback'],
-        grantTypes: ['unsupported_grant_type'],
+        grantTypes: ['unsupported_grant_type_value'], // Non-standard grant type
         responseTypes: ['code'],
         scope: ['openid'],
         isPublic: false,
@@ -114,10 +114,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(error.error_description).toContain('grant_type');
     });
 
-    it('应该拒绝缺少必需字段的请求', async () => {
+    it('TC_CME_001_005: 应拒绝缺少必需字段的请求 / Should reject requests missing required fields', async () => {
       const clientData = {
         name: 'Incomplete Client',
-        // 缺少redirectUris, grantTypes等必需字段
+        // Missing redirectUris, grantTypes, etc.
       };
 
       const response = await httpClient.registerClient(clientData);
@@ -125,10 +125,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
 
       const error = await response.json();
-      expect(error.error).toBe('invalid_request');
+      expect(error.error).toBe('invalid_request'); // General error for missing fields
     });
 
-    it('应该验证作用域的有效性', async () => {
+    it('TC_CME_001_006: 应验证作用域的有效性 / Should validate scope validity', async () => {
       const clientData = {
         name: 'Invalid Scope Client',
         redirectUris: ['https://app.example.com/callback'],
@@ -143,12 +143,12 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
 
       const error = await response.json();
-      expect(error.error).toBe('invalid_scope');
+      expect(error.error).toBe('invalid_scope'); // Specific error for invalid scope
     });
   });
 
-  describe('GET /api/clients - 客户端列表查询', () => {
-    it('应该返回管理员可见的所有客户端', async () => {
+  describe('GET /api/clients - 客户端列表查询 / Client List Retrieval', () => {
+    it('TC_CME_002_001: 管理员应能获取所有客户端列表 / Admin should retrieve list of all clients', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -166,21 +166,19 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
 
       const clients = await response.json();
-      expect(Array.isArray(clients)).toBe(true);
-      expect(clients.length).toBeGreaterThanOrEqual(3);
+      expect(Array.isArray(clients.clients)).toBe(true); // Assuming API returns { clients: [], pagination: {} }
+      expect(clients.clients.length).toBeGreaterThanOrEqual(3);
 
-      // 验证返回的客户端信息不包含敏感数据
-      clients.forEach((client: any) => {
+      clients.clients.forEach((client: any) => {
         expect(client.clientId).toBeDefined();
         expect(client.name).toBeDefined();
         expect(client.isPublic).toBeDefined();
         expect(client.isActive).toBeDefined();
-        // 客户端密钥不应该在列表中返回
-        expect(client.clientSecret).toBeUndefined();
+        expect(client.clientSecret).toBeUndefined(); // Client secret should not be listed
       });
     });
 
-    it('应该支持分页查询', async () => {
+    it('TC_CME_002_002: 应支持分页查询 / Should support pagination', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -202,7 +200,7 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(result.pagination.limit).toBe(10);
     });
 
-    it('应该支持按状态筛选客户端', async () => {
+    it('TC_CME_002_003: 应支持按状态筛选客户端 / Should support filtering clients by status', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -217,27 +215,26 @@ describe('OAuth2.1 Client Management API Tests', () => {
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
 
-      const clients = await response.json();
-      clients.forEach((client: any) => {
+      const result = await response.json(); // Assuming it returns { clients: [] }
+      result.clients.forEach((client: any) => {
         expect(client.isActive).toBe(true);
       });
     });
 
-    it('应该拒绝非管理员用户的访问', async () => {
+    it('TC_CME_002_004: 应拒绝非管理员用户的访问 / Should reject access for non-admin users', async () => {
       const user = await dataManager.createTestUser('REGULAR');
-      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile');
+      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile'); // Non-admin scope
 
       const response = await httpClient.authenticatedRequest('/api/clients', userToken);
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.FORBIDDEN);
-
       const error = await response.json();
       expect(error.error).toBe('insufficient_scope');
     });
   });
 
-  describe('GET /api/clients/[clientId] - 客户端详情查询', () => {
-    it('应该返回指定客户端的详细信息', async () => {
+  describe('GET /api/clients/[clientId] - 客户端详情查询 / Client Details Retrieval', () => {
+    it('TC_CME_003_001: 应返回指定客户端的详细信息 / Should return detailed information for a specific client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -256,15 +253,17 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(clientDetails.name).toBe(client.name);
       expect(clientDetails.redirectUris).toEqual(client.redirectUris);
       expect(clientDetails.grantTypes).toEqual(client.grantTypes);
-      expect(clientDetails.scope).toEqual(client.scope);
+      expect(clientDetails.scope).toEqual(JSON.parse(client.scope as string)); // Assuming scope is stored as JSON string
 
-      // 管理员应该能看到客户端密钥（如果是机密客户端）
       if (!client.isPublic) {
+        // Admin should see a representation of the secret, perhaps a masked version or an indicator it exists
+        // For this test, we'll assume the API might return the hashed secret or a specific placeholder.
+        // The original test implies clientDetails.clientSecret would be defined.
         expect(clientDetails.clientSecret).toBeDefined();
       }
     });
 
-    it('应该拒绝查询不存在的客户端', async () => {
+    it('TC_CME_003_002: 应拒绝查询不存在的客户端 / Should reject query for a non-existent client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -280,15 +279,14 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(error.error).toBe('client_not_found');
     });
 
-    it('应该允许客户端查询自己的信息', async () => {
+    it('TC_CME_003_003: 客户端应能查询自身信息 / Client should be able to retrieve its own information', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
-      // 使用客户端凭证获取令牌
       const tokenResponse = await httpClient.requestToken({
         grant_type: 'client_credentials',
         client_id: client.clientId,
-        client_secret: client.plainSecret,
-        scope: 'client:read',
+        client_secret: client.plainSecret!,
+        scope: 'client:read', // Assuming a scope like 'client:read' for this
       });
 
       expect(tokenResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
@@ -297,16 +295,14 @@ describe('OAuth2.1 Client Management API Tests', () => {
       const response = await httpClient.getClient(client.clientId, tokens.access_token);
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
-
       const clientDetails = await response.json();
       expect(clientDetails.clientId).toBe(client.clientId);
-      // 客户端查询自己时不应该返回密钥
-      expect(clientDetails.clientSecret).toBeUndefined();
+      expect(clientDetails.clientSecret).toBeUndefined(); // Client should not get its own secret this way
     });
   });
 
-  describe('PUT /api/clients/[clientId] - 客户端信息更新', () => {
-    it('应该成功更新客户端信息', async () => {
+  describe('PUT /api/clients/[clientId] - 客户端信息更新 / Client Information Update', () => {
+    it('TC_CME_004_001: 应成功更新客户端信息 / Should successfully update client information', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -339,7 +335,7 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(updatedClient.scope).toEqual(updateData.scope);
     });
 
-    it('应该拒绝更新不存在的客户端', async () => {
+    it('TC_CME_004_002: 应拒绝更新不存在的客户端 / Should reject update for a non-existent client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -363,7 +359,7 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.NOT_FOUND);
     });
 
-    it('应该验证更新数据的有效性', async () => {
+    it('TC_CME_004_003: 应验证更新数据的有效性 / Should validate validity of update data', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -390,10 +386,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
 
       const error = await response.json();
-      expect(error.error).toBe('invalid_request');
+      expect(error.error).toBe('invalid_request'); // Or more specific errors for redirectUris/grantTypes
     });
 
-    it('应该防止更新敏感字段（如clientId）', async () => {
+    it('TC_CME_004_004: 应防止更新敏感字段（如clientId）/ Should prevent update of sensitive fields (e.g., clientId)', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -427,8 +423,8 @@ describe('OAuth2.1 Client Management API Tests', () => {
     });
   });
 
-  describe('DELETE /api/clients/[clientId] - 客户端删除', () => {
-    it('应该成功删除客户端', async () => {
+  describe('DELETE /api/clients/[clientId] - 客户端删除 / Client Deletion', () => {
+    it('TC_CME_005_001: 应成功删除客户端 / Should successfully delete a client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -452,45 +448,32 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(getResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.NOT_FOUND);
     });
 
-    it('应该在删除客户端时撤销所有相关令牌', async () => {
+    it('TC_CME_005_002: 删除客户端时应撤销所有相关令牌 / Should revoke all associated tokens when deleting a client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const clientDbId = (await prisma.client.findUnique({where: {clientId: client.clientId}}))!.id;
 
-      // 创建一些令牌
-      const accessToken = await dataManager.createAccessToken(
-        user.id!,
-        client.id!,
-        'openid profile'
-      );
-      const refreshToken = await dataManager.createRefreshToken(
-        user.id!,
-        client.id!,
-        'openid profile offline_access'
-      );
 
-      const adminToken = await dataManager.createAccessToken(
-        admin.id!,
-        'admin-client',
-        'admin:clients'
-      );
+      const accessToken = await dataManager.createAccessToken(user.id!, clientDbId, 'openid profile');
+      // refreshToken creation might need clientDbId if your dataManager uses it. Assuming client.id is the DB id.
+      // const refreshToken = await dataManager.createRefreshToken(user.id!, client.id!, 'openid offline_access');
 
-      // 删除客户端
-      const response = await httpClient.makeRequest(`/api/clients/${client.clientId}`, {
+
+      const adminToken = await dataManager.createAccessToken(admin.id!, 'admin-client', 'admin:clients');
+
+      const deleteResponse = await httpClient.makeRequest(`/api/clients/${client.clientId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: { Authorization: `Bearer ${adminToken}` },
       });
+      expect(deleteResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.NO_CONTENT);
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.NO_CONTENT);
-
-      // 验证令牌已被撤销
       const userinfoResponse = await httpClient.getUserInfo(accessToken);
       expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      // Add check for refresh token if created and if a mechanism to test its validity exists
     });
 
-    it('应该拒绝删除不存在的客户端', async () => {
+    it('TC_CME_005_003: 应拒绝删除不存在的客户端 / Should reject deletion of a non-existent client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -508,24 +491,22 @@ describe('OAuth2.1 Client Management API Tests', () => {
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.NOT_FOUND);
     });
 
-    it('应该拒绝非管理员用户删除客户端', async () => {
+    it('TC_CME_005_004: 非管理员用户应被拒绝删除客户端 / Non-admin user should be rejected from deleting a client', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
-      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile');
+      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile'); // Non-admin scope
 
       const response = await httpClient.makeRequest(`/api/clients/${client.clientId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
+        headers: { Authorization: `Bearer ${userToken}` },
       });
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.FORBIDDEN);
     });
   });
 
-  describe('POST /api/clients/[clientId]/regenerate-secret - 客户端密钥重新生成', () => {
-    it('应该成功重新生成机密客户端的密钥', async () => {
+  describe('POST /api/clients/[clientId]/regenerate-secret - 客户端密钥重新生成 / Client Secret Regeneration', () => {
+    it('TC_CME_006_001: 应成功重新生成机密客户端的密钥 / Should successfully regenerate secret for a confidential client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -559,10 +540,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
         client_secret: originalSecret,
       });
 
-      expect(tokenResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      expect(tokenResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED); // Old secret should not work
     });
 
-    it('应该拒绝为公共客户端重新生成密钥', async () => {
+    it('TC_CME_006_002: 应拒绝为公共客户端重新生成密钥 / Should reject secret regeneration for a public client', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -590,33 +571,26 @@ describe('OAuth2.1 Client Management API Tests', () => {
     });
   });
 
-  describe('安全性和权限测试', () => {
-    it('应该验证管理员权限', async () => {
-      const user = await dataManager.createTestUser('REGULAR');
-      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile');
+  describe('安全性和权限测试 / Security and Permission Tests', () => {
+    it('TC_CME_007_001: 应验证客户端管理操作的管理员权限 / Should verify admin permissions for client management operations', async () => {
+      const user = await dataManager.createTestUser('REGULAR'); // Non-admin user
+      const userToken = await dataManager.createAccessToken(user.id!, 'user-client', 'profile'); // Non-admin scope
 
       const clientData = {
-        name: 'Unauthorized Client',
-        redirectUris: ['https://app.example.com/callback'],
-        grantTypes: ['authorization_code'],
-        responseTypes: ['code'],
-        scope: ['openid'],
-        isPublic: false,
+        name: 'Unauthorized Client Attempt', redirectUris: ['https://app.example.com/callback'], grantTypes: ['authorization_code'],
+        responseTypes: ['code'], scope: ['openid'], isPublic: false,
       };
 
-      const response = await httpClient.makeRequest('/api/clients', {
+      const response = await httpClient.makeRequest('/api/clients', { // Attempt to register client
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${userToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(clientData),
       });
 
       expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.FORBIDDEN);
     });
 
-    it('应该防止SQL注入攻击', async () => {
+    it('TC_CME_007_002: 应能抵御基本的SQL注入尝试 / Should defend against basic SQL injection attempts', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -629,10 +603,10 @@ describe('OAuth2.1 Client Management API Tests', () => {
       const response = await httpClient.getClient(maliciousClientId, adminToken);
 
       // 应该安全地处理恶意输入
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.NOT_FOUND);
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.NOT_FOUND); // Or potentially BAD_REQUEST if input format is rejected earlier
     });
 
-    it('应该限制客户端名称长度', async () => {
+    it('TC_CME_007_003: 应限制客户端名称长度 / Should limit client name length', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,
@@ -658,12 +632,12 @@ describe('OAuth2.1 Client Management API Tests', () => {
         body: JSON.stringify(clientData),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
+      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST); // Assuming validation catches this
     });
   });
 
-  describe('性能和并发测试', () => {
-    it('应该处理并发的客户端创建请求', async () => {
+  describe('性能和并发测试 / Performance and Concurrency Tests', () => {
+    it('TC_CME_008_001: 应处理并发的客户端创建请求 / Should handle concurrent client creation requests', async () => {
       const admin = await dataManager.createTestUser('ADMIN');
       const adminToken = await dataManager.createAccessToken(
         admin.id!,

@@ -9,7 +9,7 @@ import {
   createTestSetup,
 } from '../utils/test-helpers';
 
-describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
+describe('OAuth2.1 令牌撤销端点测试 (RFC 7009) / OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
   const httpClient = new TestHttpClient();
   const dataManager = new TestDataManager();
   const { setup, cleanup } = createTestSetup('oauth-revoke-endpoint');
@@ -24,55 +24,35 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
     await cleanup();
   });
 
-  describe('POST /api/oauth/revoke - 访问令牌撤销', () => {
-    it('应该成功撤销有效的访问令牌', async () => {
+  describe('POST /api/oauth/revoke - 访问令牌撤销 / Access Token Revocation', () => {
+    it('TC_ORE_001_001: 应成功撤销有效的访问令牌 / Should successfully revoke a valid access token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
-      // 调试：打印客户端信息
-      console.log('Client info:', {
-        clientId: client.clientId,
-        plainSecret: client.plainSecret,
-        hashedSecret: client.clientSecret,
-        isPublic: client.isPublic,
-      });
-
-      // 创建访问令牌
       const accessToken = await dataManager.createAccessToken(
         user.id!,
         client.clientId,
         'openid profile'
       );
 
-      // 撤销访问令牌
       const revokeResponse = await httpClient.revokeToken(
         accessToken,
         client.clientId,
         client.plainSecret
       );
 
-      console.log('Revoke response status:', revokeResponse.status);
-      if (revokeResponse.status !== 200) {
-        const errorBody = await revokeResponse.text();
-        console.log('Error response:', errorBody);
-      }
-
-      // RFC 7009: 撤销端点应该返回200 OK
-      expect(revokeResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
-      // Content-Length可能是'0'或null，都是有效的
+      TestAssertions.expectStatus(revokeResponse, TEST_CONFIG.HTTP_STATUS.OK);
       const contentLength = revokeResponse.headers.get('content-length');
-      expect(contentLength === '0' || contentLength === null).toBe(true);
+      expect(contentLength === '0' || contentLength === null).toBe(true); // Body should be empty
 
-      // 验证令牌已被撤销 - 尝试使用令牌访问用户信息应该失败
       const userinfoResponse = await httpClient.getUserInfo(accessToken);
-      expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      TestAssertions.expectStatus(userinfoResponse, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
     });
 
-    it('应该成功撤销有效的刷新令牌', async () => {
+    it('TC_ORE_001_002: 应成功撤销有效的刷新令牌 / Should successfully revoke a valid refresh token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
-      // 创建刷新令牌
       const refreshToken = await dataManager.createRefreshToken(
         user.id!,
         client.clientId,
@@ -86,9 +66,8 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         client.plainSecret
       );
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
-      // 验证刷新令牌已被撤销 - 尝试使用刷新令牌获取新的访问令牌应该失败
       const tokenResponse = await httpClient.requestToken({
         grant_type: 'refresh_token',
         client_id: client.clientId,
@@ -96,16 +75,15 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         refresh_token: refreshToken,
       });
 
-      expect(tokenResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
+      TestAssertions.expectStatus(tokenResponse, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
       const error = await tokenResponse.json();
       expect(error.error).toBe('invalid_grant');
     });
 
-    it('应该在撤销刷新令牌时同时撤销相关的访问令牌', async () => {
+    it('TC_ORE_001_003: 撤销刷新令牌时应同时撤销相关的访问令牌 / Should revoke associated access tokens when revoking a refresh token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
-      // 创建访问令牌和刷新令牌
       const accessToken = await dataManager.createAccessToken(
         user.id!,
         client.clientId,
@@ -124,19 +102,17 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         client.plainSecret
       );
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
-      // 验证相关的访问令牌也被撤销
       const userinfoResponse = await httpClient.getUserInfo(accessToken);
-      expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      TestAssertions.expectStatus(userinfoResponse, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
     });
 
-    it('应该在撤销访问令牌时同时撤销相关的刷新令牌', async () => {
+    it('TC_ORE_001_004: 撤销访问令牌时应同时撤销相关的刷新令牌 / Should revoke associated refresh tokens when revoking an access token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
-      const { TestUtils } = await import('../utils/test-helpers'); // For hashing
+      const { TestUtils } = await import('../utils/test-helpers');
 
-      // 创建访问令牌和多个刷新令牌
       const accessTokenToRevoke = await dataManager.createAccessToken(
         user.id!,
         client.clientId,
@@ -159,34 +135,24 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         client.clientId,
         client.plainSecret
       );
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
-      // 验证访问令牌已被撤销
       const atHash = TestUtils.createTokenHash(accessTokenToRevoke);
       const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
       expect(dbAccessToken?.revoked).toBe(true);
 
-      // 验证相关的刷新令牌1也被撤销
       const rt1Hash = TestUtils.createTokenHash(refreshToken1);
       const dbRefreshToken1 = await prisma.refreshToken.findUnique({ where: { tokenHash: rt1Hash } });
       expect(dbRefreshToken1?.revoked).toBe(true);
 
-      // 验证相关的刷新令牌2也被撤销
       const rt2Hash = TestUtils.createTokenHash(refreshToken2);
       const dbRefreshToken2 = await prisma.refreshToken.findUnique({ where: { tokenHash: rt2Hash } });
       expect(dbRefreshToken2?.revoked).toBe(true);
     });
 
-    it('应该支持token_type_hint参数 - access_token', async () => {
+    it('TC_ORE_001_005: 应支持token_type_hint=access_token / Should support token_type_hint parameter for access_token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
-
-      console.log('Token type hint test - Client info:', {
-        clientId: client.clientId,
-        plainSecret: client.plainSecret,
-        hashedSecret: client.clientSecret,
-        isPublic: client.isPublic,
-      });
 
       const accessToken = await dataManager.createAccessToken(
         user.id!,
@@ -194,7 +160,6 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         'openid profile'
       );
 
-      // 使用token_type_hint指定为access_token
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'POST',
         headers: {
@@ -207,20 +172,13 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      console.log('Token type hint test - Response status:', response.status);
-      if (response.status !== 200) {
-        const errorText = await response.text();
-        console.log('Token type hint test - Error response:', errorText);
-      }
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
-
-      // 验证令牌已被撤销
       const userinfoResponse = await httpClient.getUserInfo(accessToken);
-      expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      TestAssertions.expectStatus(userinfoResponse, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
     });
 
-    it('应该支持token_type_hint参数 - refresh_token (并撤销RT)', async () => {
+    it('TC_ORE_001_006: 应支持token_type_hint=refresh_token并撤销RT / Should support token_type_hint for refresh_token and revoke it', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
       const { TestUtils } = await import('../utils/test-helpers');
@@ -243,27 +201,18 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
       const rtHash = TestUtils.createTokenHash(refreshToken);
       const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
       expect(dbRefreshToken?.revoked).toBe(true);
     });
   });
 
-  describe('Token Type Hint Specific Behavior Tests', () => {
-    const { TestUtils } = globalThis; // Assuming TestUtils is globally available or adjust import
-
-    beforeEach(async () => {
-      // Potentially re-import TestUtils if not global or handle scope
-      // const importedUtils = await import('../utils/test-helpers');
-      // TestUtils = importedUtils.TestUtils;
-    });
-
-    it('当 hint 为 access_token 时，不应撤销实际为 refresh_token 的令牌', async () => {
+  describe('令牌类型提示特定行为测试 / Token Type Hint Specific Behavior Tests', () => {
+    it('TC_ORE_002_001: 当hint为access_token时，不应撤销实际为refresh_token的令牌 / When hint is access_token, should not revoke an actual refresh_token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
       const { TestUtils } = await import('../utils/test-helpers');
-
 
       const refreshTokenString = await dataManager.createRefreshToken(
         user.id!,
@@ -272,21 +221,19 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       );
 
       const response = await httpClient.revokeToken(
-        refreshTokenString, // This is actually a refresh token
+        refreshTokenString,
         client.clientId,
         client.plainSecret,
-        'access_token' // But hint says it's an access token
+        'access_token' // Hint is access_token
       );
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK); // Endpoint always returns 200
-
-      // Verify the refresh token was NOT revoked
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
       const rtHash = TestUtils.createTokenHash(refreshTokenString);
       const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
-      expect(dbRefreshToken?.revoked).toBe(false);
+      expect(dbRefreshToken?.revoked).toBe(false); // Should NOT be revoked
     });
 
-    it('当 hint 为 refresh_token 时，不应撤销实际为 access_token 的令牌', async () => {
+    it('TC_ORE_002_002: 当hint为refresh_token时，不应撤销实际为access_token的令牌 / When hint is refresh_token, should not revoke an actual access_token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
       const { TestUtils } = await import('../utils/test-helpers');
@@ -298,20 +245,19 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       );
 
       const response = await httpClient.revokeToken(
-        accessTokenString, // This is actually an access token
+        accessTokenString,
         client.clientId,
         client.plainSecret,
-        'refresh_token' // But hint says it's a refresh token
+        'refresh_token' // Hint is refresh_token
       );
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
-      // Verify the access token was NOT revoked
       const atHash = TestUtils.createTokenHash(accessTokenString);
       const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
-      expect(dbAccessToken?.revoked).toBe(false);
+      expect(dbAccessToken?.revoked).toBe(false); // Should NOT be revoked
     });
 
-    it('当 hint 为无效值时，应能撤销 access_token (回退到默认行为)', async () => {
+    it('TC_ORE_002_003: 当hint无效时，应能撤销access_token（回退到默认行为）/ When hint is invalid, should successfully revoke access_token (fallback to default)', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
       const { TestUtils } = await import('../utils/test-helpers');
@@ -322,44 +268,41 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         accessToken,
         client.clientId,
         client.plainSecret,
-        'unknown_hint_value' // Invalid hint
+        'unknown_hint_value'
       );
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
       const atHash = TestUtils.createTokenHash(accessToken);
       const dbAccessToken = await prisma.accessToken.findUnique({ where: { tokenHash: atHash } });
-      expect(dbAccessToken?.revoked).toBe(true);
+      expect(dbAccessToken?.revoked).toBe(true); // Should BE revoked
     });
 
-    it('当 hint 为无效值时，应能撤销 refresh_token (回退到默认行为)', async () => {
+    it('TC_ORE_002_004: 当hint无效时，应能撤销refresh_token（回退到默认行为）/ When hint is invalid, should successfully revoke refresh_token (fallback to default)', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
       const { TestUtils } = await import('../utils/test-helpers');
 
       const refreshToken = await dataManager.createRefreshToken(user.id!, client.clientId, 'openid');
-
-      // First, ensure no access token with the same string exists to isolate RT logic path
       const atHashForRTString = TestUtils.createTokenHash(refreshToken);
       const existingAT = await prisma.accessToken.findFirst({ where: { tokenHash: atHashForRTString }});
-      expect(existingAT).toBeNull();
-
+      expect(existingAT).toBeNull(); // Ensure no AT with same hash to isolate RT logic
 
       const response = await httpClient.revokeToken(
         refreshToken,
         client.clientId,
         client.plainSecret,
-        'another_invalid_hint' // Invalid hint
+        'another_invalid_hint'
       );
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
 
       const rtHash = TestUtils.createTokenHash(refreshToken);
       const dbRefreshToken = await prisma.refreshToken.findUnique({ where: { tokenHash: rtHash } });
-      expect(dbRefreshToken?.revoked).toBe(true);
+      expect(dbRefreshToken?.revoked).toBe(true); // Should BE revoked
     });
   });
 
-  describe('客户端认证测试', () => {
-    it('应该支持HTTP Basic认证', async () => {
+  describe('客户端认证测试 / Client Authentication Tests', () => {
+    it('TC_ORE_003_001: 应支持HTTP Basic认证 / Should support HTTP Basic authentication', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -381,10 +324,10 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
     });
 
-    it('应该支持客户端凭证在请求体中', async () => {
+    it('TC_ORE_003_002: 应支持请求体中的客户端凭证 / Should support client credentials in request body', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -407,10 +350,10 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
     });
 
-    it('应该支持公共客户端（无客户端密钥）', async () => {
+    it('TC_ORE_003_003: 应支持公共客户端（无客户端密钥）/ Should support public clients (no client secret)', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('PUBLIC');
 
@@ -432,12 +375,12 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
     });
   });
 
-  describe('错误处理和安全测试', () => {
-    it('应该拒绝无效的客户端凭证', async () => {
+  describe('错误处理和安全测试 / Error Handling and Security Tests', () => {
+    it('TC_ORE_004_001: 应拒绝无效的客户端凭证 / Should reject invalid client credentials', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -460,13 +403,12 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
-
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
       const error = await response.json();
       expect(error.error).toBe('invalid_client');
     });
 
-    it('应该拒绝不存在的客户端', async () => {
+    it('TC_ORE_004_002: 应拒绝不存在的客户端 / Should reject non-existent client', async () => {
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'POST',
         headers: {
@@ -478,13 +420,12 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
-
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
       const error = await response.json();
       expect(error.error).toBe('invalid_client');
     });
 
-    it('应该拒绝缺少token参数的请求', async () => {
+    it('TC_ORE_004_003: 应拒绝缺少token参数的请求 / Should reject requests missing token parameter', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
@@ -498,13 +439,12 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
-
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
       const error = await response.json();
       expect(error.error).toBe('invalid_request');
     });
 
-    it('应该拒绝缺少客户端认证的请求', async () => {
+    it('TC_ORE_004_004: 应拒绝缺少客户端认证的请求 / Should reject requests missing client authentication', async () => {
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'POST',
         headers: {
@@ -515,44 +455,42 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
-
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
       const error = await response.json();
       expect(error.error).toBe('invalid_client');
     });
 
-    it('应该拒绝非POST方法的请求', async () => {
+    it('TC_ORE_004_005: 应拒绝非POST方法的请求 / Should reject non-POST method requests', async () => {
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'GET',
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.METHOD_NOT_ALLOWED);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.METHOD_NOT_ALLOWED);
     });
 
-    it('应该拒绝错误的Content-Type', async () => {
+    it('TC_ORE_004_006: 应拒绝错误的Content-Type / Should reject incorrect Content-Type', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', // Incorrect Content-Type
         },
         body: JSON.stringify({
           token: 'some-token',
           client_id: client.clientId,
-          client_secret: client.plainSecret,
+          client_secret: client.plainSecret!,
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
-
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.BAD_REQUEST);
       const error = await response.json();
-      expect(error.error).toBe('invalid_request');
+      expect(error.error).toBe('invalid_request'); // Or specific content type error
     });
   });
 
-  describe('RFC 7009标准合规性测试', () => {
-    it('应该对不存在的令牌返回200 OK（RFC 7009要求）', async () => {
+  describe('RFC 7009标准合规性测试 / RFC 7009 Compliance Tests', () => {
+    it('TC_ORE_005_001: 对不存在的令牌应返回200 OK（RFC 7009要求）/ Should return 200 OK for non-existent token (RFC 7009)', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
       // 尝试撤销不存在的令牌
@@ -563,10 +501,10 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       );
 
       // RFC 7009: 即使令牌不存在也应该返回200 OK
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
     });
 
-    it('应该对已撤销的令牌返回200 OK', async () => {
+    it('TC_ORE_005_002: 对已撤销的令牌应返回200 OK / Should return 200 OK for an already revoked token', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -582,49 +520,43 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         client.clientId,
         client.plainSecret
       );
-      expect(firstResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(firstResponse, TEST_CONFIG.HTTP_STATUS.OK);
 
-      // 第二次撤销同一个令牌
       const secondResponse = await httpClient.revokeToken(
         accessToken,
         client.clientId,
         client.plainSecret
       );
 
-      // 应该仍然返回200 OK
-      expect(secondResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(secondResponse, TEST_CONFIG.HTTP_STATUS.OK);
     });
 
-    it('应该只允许令牌的所有者客户端撤销令牌', async () => {
+    it('TC_ORE_005_003: 应只允许令牌的原始客户端撤销令牌 / Should only allow token revocation by the original client', async () => {
       const user = await dataManager.createTestUser('REGULAR');
-      const client1 = await dataManager.createTestClient('CONFIDENTIAL');
-      const client2 = await dataManager.createTestClient('WEB_APP');
+      const client1 = await dataManager.createTestClient('CONFIDENTIAL', { clientId: 'client-for-token-owner' });
+      const client2 = await dataManager.createTestClient('CONFIDENTIAL', { clientId: 'client-attempting-revoke' });
 
-      // 使用client1创建令牌
       const accessToken = await dataManager.createAccessToken(
         user.id!,
         client1.clientId,
         'openid profile'
       );
 
-      // 尝试使用client2撤销令牌
       const response = await httpClient.revokeToken(
         accessToken,
-        client2.clientId,
+        client2.clientId, // client2 attempts to revoke client1's token
         client2.plainSecret
       );
 
-      // 应该返回200 OK（但实际上没有撤销任何东西）
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK); // As per RFC7009, but token should not be revoked
 
-      // 验证令牌仍然有效（因为不是正确的客户端）
-      const userinfoResponse = await httpClient.getUserInfo(accessToken);
-      expect(userinfoResponse.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+      const userinfoResponse = await httpClient.getUserInfo(accessToken); // Check if token is still valid
+      TestAssertions.expectStatus(userinfoResponse, TEST_CONFIG.HTTP_STATUS.OK); // Token should still be valid
     });
   });
 
-  describe('审计日志和监控', () => {
-    it('应该记录成功的令牌撤销事件', async () => {
+  describe('审计日志和监控 / Audit Logging and Monitoring (Conceptual)', () => {
+    it('TC_ORE_006_001: 应记录成功的令牌撤销事件 / Should log successful token revocation events', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -640,13 +572,11 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         client.plainSecret
       );
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
-
-      // 这里可以添加审计日志验证逻辑
-      // 例如检查数据库中的audit_logs表
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
+      // Conceptual: Add assertion for audit log existence/content here
     });
 
-    it('应该记录失败的撤销尝试', async () => {
+    it('TC_ORE_006_002: 应记录失败的撤销尝试 / Should log failed revocation attempts', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
       const response = await httpClient.makeRequest('/api/oauth/revoke', {
@@ -661,14 +591,13 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
         }),
       });
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
-
-      // 这里可以添加审计日志验证逻辑
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.UNAUTHORIZED);
+      // Conceptual: Add assertion for audit log for failed attempt
     });
   });
 
-  describe('性能和并发测试', () => {
-    it('应该处理并发的撤销请求', async () => {
+  describe('性能和并发测试 / Performance and Concurrency Tests', () => {
+    it('TC_ORE_007_001: 应处理并发的撤销请求 / Should handle concurrent revocation requests', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -686,13 +615,12 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
 
       const responses = await Promise.all(promises);
 
-      // 所有撤销请求都应该成功
       responses.forEach((response) => {
-        expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
+        TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
       });
     });
 
-    it('应该在合理时间内响应', async () => {
+    it('TC_ORE_007_002: 应在合理时间内响应 / Should respond within a reasonable timeframe', async () => {
       const user = await dataManager.createTestUser('REGULAR');
       const client = await dataManager.createTestClient('CONFIDENTIAL');
 
@@ -710,32 +638,31 @@ describe('OAuth2.1 Token Revocation Endpoint Tests (RFC 7009)', () => {
       );
       const endTime = Date.now();
 
-      expect(response.status).toBe(TEST_CONFIG.HTTP_STATUS.OK);
-
-      // 响应时间应该在合理范围内（小于1秒）
+      TestAssertions.expectStatus(response, TEST_CONFIG.HTTP_STATUS.OK);
       const responseTime = endTime - startTime;
-      expect(responseTime).toBeLessThan(1000);
+      expect(responseTime).toBeLessThan(1000); // Example: 1 second
     });
   });
 
-  describe('速率限制测试', () => {
-    it('应该在超过速率限制时返回429状态码', async () => {
+  describe('速率限制测试 / Rate Limiting Tests (Conceptual)', () => {
+    it('TC_ORE_008_001: 超过速率限制时应返回429状态码 / Should return 429 status code when rate limit is exceeded', async () => {
       const client = await dataManager.createTestClient('CONFIDENTIAL');
+      const requestPromises = [];
+      // Simulate a burst of requests - actual number depends on rate limit config
+      for (let i = 0; i < (TEST_CONFIG.RATE_LIMIT_MAX_REQUESTS_PER_WINDOW || 15) + 5; i++) {
+        requestPromises.push(httpClient.revokeToken('test-token-rate-limit', client.clientId, client.plainSecret));
+      }
+      const responses = await Promise.all(requestPromises);
+      const rateLimitedResponse = responses.find(r => r.status === TEST_CONFIG.HTTP_STATUS.TOO_MANY_REQUESTS);
 
-      // 快速发送大量请求以触发速率限制
-      const promises = Array(20)
-        .fill(null)
-        .map(() => httpClient.revokeToken('test-token', client.clientId, client.plainSecret));
-
-      const responses = await Promise.all(promises);
-
-      // 应该有一些请求被速率限制拒绝
-      const rateLimitedResponses = responses.filter(
-        (r) => r.status === TEST_CONFIG.HTTP_STATUS.TOO_MANY_REQUESTS
-      );
-
-      // 注意：这个测试可能需要根据实际的速率限制配置进行调整
-      // expect(rateLimitedResponses.length).toBeGreaterThan(0)
+      // This assertion is highly dependent on the actual rate limit configuration and test environment behavior.
+      // It might not reliably find a 429 in a fast local test environment without actual rate limiting middleware.
+      // For a conceptual test, we check if *any* response was a 429, or we could assert that not all were 200.
+      // If rateLimitedResponse is undefined, it means no 429 was received.
+      // expect(rateLimitedResponse).toBeDefined();
+      // A more lenient check might be that not all requests succeeded if rate limiting is expected.
+      const successCount = responses.filter(r => r.status === TEST_CONFIG.HTTP_STATUS.OK).length;
+      // expect(successCount).toBeLessThan(responses.length); // If rate limiting kicked in
     });
   });
 });
