@@ -103,8 +103,9 @@ async function userinfoHandler(request: NextRequest) {
   const accessToken = extractAccessToken(request);
   if (!accessToken) {
     return NextResponse.json(
-      errorResponse(401, '未提供访问令牌 (Access token not provided)', 'UNAUTHORIZED', overallRequestId),
-      { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_token", error_description="Access token not provided"' } }
+      // Corrected error to invalid_request as per OIDC spec for malformed/missing token
+      errorResponse(401, '未提供访问令牌 (Access token not provided)', 'INVALID_REQUEST', overallRequestId),
+      { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_request", error_description="Access token not provided"' } }
     );
   }
 
@@ -145,7 +146,8 @@ async function userinfoHandler(request: NextRequest) {
   const scopes = ScopeUtils.parseScopes(jwtPayload.scope as string || dbAccessToken.scope);
   if (!scopes.includes('openid')) {
     return NextResponse.json(
-      errorResponse(403, '权限不足: 需要 "openid" 作用域 (Insufficient scope: "openid" scope is required)', 'INSUFFICIENT_SCOPE', overallRequestId),
+      // Corrected error to lowercase 'insufficient_scope'
+      errorResponse(403, '权限不足: 需要 "openid" 作用域 (Insufficient scope: "openid" scope is required)', 'insufficient_scope', overallRequestId),
       { status: 403, headers: { 'WWW-Authenticate': 'Bearer error="insufficient_scope", error_description="openid scope is required"' } }
     );
   }
@@ -178,37 +180,61 @@ async function userinfoHandler(request: NextRequest) {
   };
 
   if (scopes.includes('profile')) {
-    claims.name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || null;
-    claims.given_name = user.firstName || null;
-    claims.family_name = user.lastName || null;
-    claims.preferred_username = user.username || null; // 如果 Prisma User 模型中有 username
-    claims.nickname = user.displayName || null; // 假设 displayName 是昵称
-    claims.picture = user.avatar || null; // 假设 avatar 是头像 URL
-    claims.updated_at = Math.floor(user.updatedAt.getTime() / 1000); // Unix timestamp
-    // claims.website = user.website || null;
-    // claims.gender = user.gender || null;
-    // claims.birthdate = user.birthdate || null; // (YYYY-MM-DD)
-    // claims.zoneinfo = user.zoneinfo || null;
-    // claims.locale = user.locale || null;
+    claims.name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined;
+    claims.given_name = user.firstName || undefined;
+    claims.family_name = user.lastName || undefined;
+    // OIDC Standard Claims: middle_name, nickname, profile, website, gender, birthdate, zoneinfo, locale
+    // These are not currently available on the User model. Example:
+    // claims.middle_name = user.middleName || undefined;
+    // claims.nickname = user.nickname || user.displayName || undefined;
+    claims.preferred_username = user.username || undefined;
+    claims.profile = user.profileUrl || undefined; // Assuming a 'profileUrl' field on User model
+    claims.picture = user.avatar || undefined;
+    claims.website = user.websiteUrl || undefined; // Assuming a 'websiteUrl' field on User model
+    // claims.gender = user.gender || undefined; // Requires 'gender' field
+    // claims.birthdate = user.birthdate ? user.birthdate.toISOString().split('T')[0] : undefined; // Requires 'birthdate' field (Date type)
+    // claims.zoneinfo = user.zoneinfo || undefined; // Requires 'zoneinfo' field
+    // claims.locale = user.locale || undefined; // Requires 'locale' field
+    claims.updated_at = user.updatedAt ? Math.floor(user.updatedAt.getTime() / 1000) : undefined;
   }
 
   if (scopes.includes('email')) {
-    claims.email = user.email || null;
-    if (user.emailVerified !== undefined) { // 确保 User 模型有此字段 (Ensure User model has this field)
-        claims.email_verified = user.emailVerified;
-    }
+    claims.email = user.email || undefined;
+    // If emailVerified field is not present on user model, default to false,
+    // otherwise use its value. OIDC spec implies it should be returned if email claim is present.
+    claims.email_verified = user.emailVerified === undefined ? false : user.emailVerified;
+  }
+
+  if (scopes.includes('address')) {
+    // Address claim is a structured object. Requires address fields on User model.
+    // Example:
+    // if (user.address_formatted) { // Assuming user model has address fields
+    //   claims.address = {
+    //     formatted: user.address_formatted,
+    //     street_address: user.address_street,
+    //     locality: user.address_locality,
+    //     region: user.address_region,
+    //     postal_code: user.address_postal_code,
+    //     country: user.address_country,
+    //   };
+    //   // Remove null/undefined from address object
+    //   Object.keys(claims.address).forEach(key => {
+    //     if (claims.address![key as keyof typeof claims.address] === null || claims.address![key as keyof typeof claims.address] === undefined) {
+    //       delete claims.address![key as keyof typeof claims.address];
+    //     }
+    //   });
+    //   if (Object.keys(claims.address).length === 0) delete claims.address;
+    // }
   }
 
   if (scopes.includes('phone')) {
-    claims.phone_number = user.phone || null; // 假设 Prisma User 模型有 'phone' 字段 (Assuming Prisma User model has 'phone' field)
-    if (user.phoneVerified !== undefined) { // 确保 User 模型有此字段 (Ensure User model has this field)
-        claims.phone_number_verified = user.phoneVerified;
-    }
+    claims.phone_number = user.phone || undefined;
+    // If phoneVerified field is not present on user model, default to false,
+    // otherwise use its value.
+    claims.phone_number_verified = user.phoneVerified === undefined ? false : user.phoneVerified;
   }
 
-  // ... 其他作用域 (address, etc.) (Other scopes)
-
-  // 移除值为 null 的声明，以保持响应简洁
+  // 移除值为 null 或 undefined 的声明，以保持响应简洁
   Object.keys(claims).forEach(key => {
     if (claims[key] === null || claims[key] === undefined) {
       delete claims[key];

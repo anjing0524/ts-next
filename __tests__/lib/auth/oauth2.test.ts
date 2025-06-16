@@ -146,6 +146,136 @@ describe('OAuth2 核心逻辑库 - ScopeUtils.validateScopes / OAuth2 Core Libra
   });
 });
 
+// Mock 'jose' module for JWTUtils tests
+vi.mock('jose', async (importOriginal) => {
+  const actualJose = await importOriginal();
+  return {
+    ...actualJose,
+    jwtVerify: vi.fn(),
+    importSPKI: vi.fn().mockResolvedValue('mock_spki_key'),
+    importPKCS8: vi.fn().mockResolvedValue('mock_pkcs8_key'),
+    SignJWT: vi.fn().mockImplementation(() => ({
+      setProtectedHeader: vi.fn().mockReturnThis(),
+      setExpirationTime: vi.fn().mockReturnThis(),
+      sign: vi.fn().mockResolvedValue('mock.signed.jwt'),
+    })),
+  };
+});
+
+// Mock prisma for JWTUtils tests
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    tokenBlacklist: {
+      findUnique: vi.fn(),
+    },
+    // Add other prisma models if JWTUtils interacts with them directly
+  },
+}));
+
+import { JWTUtils } from '@/lib/auth/oauth2'; // Import JWTUtils after mocks are set up
+import * as jose from 'jose'; // Import mocked jose
+import { prisma } from '@/lib/prisma'; // Import mocked prisma
+
+describe('JWTUtils - Token Revocation (JTI Blacklist)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Setup default environment variables for JWTUtils if not already set globally for tests
+    process.env.JWT_ISSUER = 'test-issuer';
+    process.env.JWT_AUDIENCE = 'test-audience';
+    process.env.JWT_ALGORITHM = 'RS256'; // Ensure this matches what jose mock might expect if specific
+    process.env.JWT_PUBLIC_KEY_PEM = 'mock_public_key_pem_content'; // Needed for getRSAPublicKeyForVerification
+    process.env.JWT_PRIVATE_KEY_PEM = 'mock_private_key_pem_content'; // Needed for getRSAPrivateKeyForSigning
+  });
+
+  const mockJwtPayload = {
+    jti: 'test-jti-123',
+    sub: 'user-sub-456',
+    iss: 'test-issuer',
+    aud: 'test-audience',
+    exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+  };
+
+  describe('verifyAccessToken', () => {
+    it('TC_LAO_JWT_001: should return valid: false if JTI is in blacklist', async () => {
+      (jose.jwtVerify as any).mockResolvedValue({ payload: { ...mockJwtPayload } });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue({ jti: 'test-jti-123', expiresAt: new Date() });
+
+      const result = await JWTUtils.verifyAccessToken('mock.access.token');
+
+      expect(jose.jwtVerify).toHaveBeenCalledWith('mock.access.token', 'mock_spki_key', expect.anything());
+      expect(prisma.tokenBlacklist.findUnique).toHaveBeenCalledWith({ where: { jti: 'test-jti-123' } });
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Token has been revoked');
+    });
+
+    it('TC_LAO_JWT_002: should return valid: true if JTI is not in blacklist and token is otherwise valid', async () => {
+      (jose.jwtVerify as any).mockResolvedValue({ payload: { ...mockJwtPayload } });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue(null); // JTI not found in blacklist
+
+      const result = await JWTUtils.verifyAccessToken('mock.access.token');
+
+      expect(result.valid).toBe(true);
+      expect(result.payload?.jti).toBe('test-jti-123');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('TC_LAO_JWT_003: should proceed normally if token has no JTI (though our tokens should always have one)', async () => {
+      const payloadWithoutJti = { ...mockJwtPayload };
+      delete (payloadWithoutJti as any).jti;
+      (jose.jwtVerify as any).mockResolvedValue({ payload: payloadWithoutJti });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue(null);
+
+      const result = await JWTUtils.verifyAccessToken('mock.access.token.no.jti');
+
+      expect(prisma.tokenBlacklist.findUnique).not.toHaveBeenCalled();
+      expect(result.valid).toBe(true);
+      expect(result.payload?.sub).toBe('user-sub-456');
+    });
+  });
+
+  describe('verifyRefreshToken', () => {
+    const mockRefreshTokenPayload = {
+      ...mockJwtPayload,
+      token_type: 'refresh', // Specific to our refresh tokens
+    };
+
+    it('TC_LAO_JWT_004: should return valid: false if JTI is in blacklist', async () => {
+      (jose.jwtVerify as any).mockResolvedValue({ payload: { ...mockRefreshTokenPayload } });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue({ jti: 'test-jti-123', expiresAt: new Date() });
+
+      const result = await JWTUtils.verifyRefreshToken('mock.refresh.token');
+
+      expect(jose.jwtVerify).toHaveBeenCalledWith('mock.refresh.token', 'mock_spki_key', expect.anything());
+      expect(prisma.tokenBlacklist.findUnique).toHaveBeenCalledWith({ where: { jti: 'test-jti-123' } });
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Refresh token has been revoked');
+    });
+
+    it('TC_LAO_JWT_005: should return valid: true if JTI is not in blacklist and token is otherwise valid', async () => {
+      (jose.jwtVerify as any).mockResolvedValue({ payload: { ...mockRefreshTokenPayload } });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue(null); // JTI not found
+
+      const result = await JWTUtils.verifyRefreshToken('mock.refresh.token');
+
+      expect(result.valid).toBe(true);
+      expect(result.payload?.jti).toBe('test-jti-123');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('TC_LAO_JWT_006: should still fail if token_type is not "refresh", even if JTI is not blacklisted', async () => {
+      const payloadNotRefresh = { ...mockJwtPayload, token_type: 'access' }; // Wrong type
+      (jose.jwtVerify as any).mockResolvedValue({ payload: payloadNotRefresh });
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue(null);
+
+      const result = await JWTUtils.verifyRefreshToken('mock.refresh.token.wrong.type');
+
+      expect(prisma.tokenBlacklist.findUnique).not.toHaveBeenCalled(); // Blacklist check is after type check
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Invalid token type: expected refresh token');
+    });
+  });
+});
+
 describe('OAuth2 核心逻辑库 - 其他ScopeUtils函数 / OAuth2 Core Library - Other ScopeUtils functions', () => {
   it('TC_LAO_006_001: parseScopes应正确拆分和过滤作用域字符串 / parseScopes correctly splits and filters scope string', () => {
     expect(ScopeUtils.parseScopes('profile email phone')).toEqual(['profile', 'email', 'phone']);

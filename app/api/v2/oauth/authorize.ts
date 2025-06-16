@@ -64,6 +64,35 @@ async function handleAuthorizeRequest(
     // PKCE validation
     let pkceData: { codeChallenge?: string; codeChallengeMethod?: string } = {};
 
+    // Enforce PKCE for public clients
+    if (client.clientType === 'PUBLIC') {
+      if (!code_challenge || !code_challenge_method || code_challenge_method !== 'S256') {
+        const error = {
+          error: OAuth2ErrorTypes.INVALID_REQUEST,
+          error_description: 'PKCE (code_challenge and code_challenge_method=S256) is required for public clients.',
+        };
+
+        await AuthorizationUtils.logAuditEvent({
+          clientId: client.id,
+          action: 'authorization_request_failed',
+          resource: 'oauth/authorize',
+          ipAddress,
+          userAgent,
+          success: false,
+          errorMessage: error.error_description,
+          metadata: { reason: 'Missing or invalid PKCE for public client' },
+        });
+
+        const redirectUrl = new URL(redirect_uri);
+        redirectUrl.searchParams.set('error', error.error);
+        redirectUrl.searchParams.set('error_description', error.error_description);
+        if (state) redirectUrl.searchParams.set('state', state);
+
+        return NextResponse.redirect(redirectUrl.toString());
+      }
+      // If PKCE parameters are present for a public client, they will be validated by the existing logic below.
+    }
+
     if (code_challenge) {
       if (!code_challenge_method || code_challenge_method !== 'S256') {
         const error = {
