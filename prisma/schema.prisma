@@ -14,7 +14,7 @@ datasource db {
 // 认证核心模型 (Authentication Core)
 // ================================
 
-// 用户表 - 认证系统的核心
+// 用户表 - 认证系统的核心（内网环境，管理员创建用户）
 model User {
   id           String    @id @default(cuid())
   username     String    @unique
@@ -26,12 +26,15 @@ model User {
 
   // 用户基本信息
   displayName  String? // 显示名称
+  firstName    String? // 名
+  lastName     String? // 姓
   avatar       String? // 头像URL
   organization String? // 用户所属组织
   department   String? // 用户所属部门
   mustChangePassword Boolean @default(true) // 是否需要在下次登录时强制修改密码
   failedLoginAttempts Int      @default(0)
   lockedUntil         DateTime?
+  createdBy    String? // 创建者ID（管理员）
 
   // 关联关系
   userRoles          UserRole[]

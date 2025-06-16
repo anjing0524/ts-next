@@ -82,7 +82,7 @@ const authUrl = new URL('/api/oauth/authorize', 'https://auth.company.com');
 authUrl.searchParams.set('response_type', 'code');
 authUrl.searchParams.set('client_id', 'your_client_id');
 authUrl.searchParams.set('redirect_uri', 'https://yourapp.com/callback');
-authUrl.searchParams.set('scope', 'openid profile');
+authUrl.searchParams.set('scope', 'openid profile api:read');
 authUrl.searchParams.set('state', generateRandomString(32));
 authUrl.searchParams.set('code_challenge', codeChallenge);
 authUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
@@ -328,6 +328,12 @@ try {
    // 推荐：使用httpOnly cookie存储refresh token
    // 使用内存或sessionStorage存储access token
    ```
+
+2. **内网环境特点**: 本系统专为内网环境设计
+   - 用户由管理员创建和管理
+   - 客户端由管理员注册和配置
+   - 权限由管理员分配
+   - 无需邮箱和手机号验证
 
 2. **令牌刷新**: 实现自动令牌刷新机制
    ```javascript

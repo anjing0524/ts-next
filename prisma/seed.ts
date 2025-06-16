@@ -257,19 +257,15 @@ async function main() {
   const adminUser = await prisma.user.upsert({
     where: { username: 'admin' },
     update: { // In case the user exists, update relevant fields
-      email: 'admin@company.com',
       passwordHash: hashedAdminPassword,
       isActive: true,
       mustChangePassword: true,
       firstName: '系统', // System
       lastName: '管理员', // Administrator
-      displayName: '系统管理员',
-      emailVerified: true, // Assume admin email is verified
-      phoneVerified: false, // No phone specified
+      displayName: '系统管理员'
     },
     create: {
       username: 'admin',
-      email: 'admin@company.com',
       passwordHash: hashedAdminPassword,
       isActive: true,
       mustChangePassword: true,
@@ -281,8 +277,6 @@ async function main() {
       organization: '默认组织', // Default Organization
       department: 'IT部门', // IT Department
       workLocation: '总部', // Headquarters
-      emailVerified: true, // Assume admin email is verified
-      phoneVerified: false,
     },
   });
   console.log(`默认管理员用户已更新/创建: ${adminUser.username} (密码: ${adminPassword})`); // Default admin user upserted/created
@@ -318,7 +312,7 @@ async function main() {
     const scopesToSeed = [
     { name: 'openid', description: 'OIDC必须 Scope，用于认证。', isPublic: true, isActive: true },
     { name: 'profile', description: '访问用户基本个人资料信息。', isPublic: true, isActive: true },
-    { name: 'email', description: '访问用户邮箱地址。', isPublic: true, isActive: true },
+
     { name: 'offline_access', description: '允许发放刷新令牌以实现长期访问。', isPublic: true, isActive: true },
     { name: 'order:read', description: '允许读取订单信息。', isPublic: false, isActive: true },
     { name: 'order:create', description: '允许创建新订单。', isPublic: false, isActive: true },
@@ -343,17 +337,17 @@ async function main() {
   const userRole = seededRoles['USER']; // Get the 'USER' role
 
   const usersToSeed = [
-    { username: 'testuser', email: 'testuser@example.com', firstName: '普通', lastName: '用户', isActive: true, mustChangePassword: false },
-    { username: 'inactiveuser', email: 'inactive@example.com', firstName: '停用', lastName: '用户', isActive: false, mustChangePassword: false },
-    { username: 'lockeduser', email: 'locked@example.com', firstName: '锁定', lastName: '用户', isActive: true, mustChangePassword: false, lockedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, // Locked for 7 days
-    { username: 'changepwuser', email: 'changepw@example.com', firstName: '修改密码', lastName: '用户', isActive: true, mustChangePassword: true },
+    { username: 'testuser', firstName: '普通', lastName: '用户', isActive: true, mustChangePassword: false },
+    { username: 'inactiveuser', firstName: '停用', lastName: '用户', isActive: false, mustChangePassword: false },
+    { username: 'lockeduser', firstName: '锁定', lastName: '用户', isActive: true, mustChangePassword: false, lockedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, // Locked for 7 days
+    { username: 'changepwuser', firstName: '修改密码', lastName: '用户', isActive: true, mustChangePassword: true },
   ];
 
   for (const userData of usersToSeed) {
     const createdUser = await prisma.user.upsert({
       where: { username: userData.username },
       update: { ...userData, passwordHash: hashedGeneralPassword },
-      create: { ...userData, passwordHash: hashedGeneralPassword, emailVerified: true },
+      create: { ...userData, passwordHash: hashedGeneralPassword },
     });
     console.log(`测试用户已更新/创建: ${createdUser.username}`); // Test user upserted/created
     await prisma.passwordHistory.create({
@@ -380,7 +374,7 @@ async function main() {
   // Collect all permission names for the admin client's allowed scopes
   // This is a simplified approach; in a real scenario, you might pick specific admin scopes.
   const allPermissionNamesForAdminClient = Object.keys(seededPermissions);
-  const adminClientAllowedScopes = ['openid', 'profile', 'email', 'offline_access', 'admin:full_access', ...allPermissionNamesForAdminClient].join(' ');
+  const adminClientAllowedScopes = ['openid', 'profile', 'offline_access', 'admin:full_access', ...allPermissionNamesForAdminClient].join(' ');
 
 
   await prisma.oAuthClient.upsert({
@@ -423,7 +417,7 @@ async function main() {
       redirectUris: JSON.stringify(['http://localhost:3001/callback', 'https://spa.example.com/callback']),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
       responseTypes: JSON.stringify(['code']),
-      allowedScopes: 'openid profile email order:read product:read',
+      allowedScopes: 'openid profile order:read product:read',
       requirePkce: true,
       requireConsent: true,
       isActive: true,
@@ -448,7 +442,7 @@ async function main() {
       redirectUris: JSON.stringify(['http://localhost:3002/callback', 'https://webapp.example.com/callback']),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
       responseTypes: JSON.stringify(['code']),
-      allowedScopes: 'openid profile email order:read order:create product:read offline_access',
+      allowedScopes: 'openid profile order:read order:create product:read offline_access',
       requirePkce: true,
       requireConsent: true,
       isActive: true,
