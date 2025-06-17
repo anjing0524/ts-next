@@ -1,127 +1,115 @@
-# Documentation Index
+# OAuth2.1认证授权中心文档导航
 
-> **Last Updated**: 2024-12-19  
-> **Maintained by**: Development Team
+> **项目**: OAuth2.1认证授权中心  
+> **文档版本**: v2.0.0  
+> **最后更新**: 2024-12-19  
+> **维护团队**: 全体开发团队
 
-This directory contains comprehensive documentation for the OAuth2.1 Authentication Authorization Center project. All documents follow the [Documentation Standards](./documentation-standards.md) for consistency and maintainability.
+## 文档概述
 
-## 📚 Document Categories
+本文档库包含OAuth2.1认证授权中心项目的完整技术文档，涵盖产品需求、系统设计、开发指南、测试策略、部署运维等各个方面。所有文档均采用中文编写，遵循统一的格式规范。
 
-### Core Architecture & Design
-- **[Architecture Design](./architecture-design.md)** - Complete technical design and system architecture
-- **[Product Requirements](./product-requirements.md)** - Product specifications and business requirements
-- **[Permission System Design](./permission-system-design.md)** - RBAC permission model and authorization design
-- **[Admin Interface Design](./admin-interface-design.md)** - Management interface design and user experience
+## 文档分类
 
-### API & Integration
-- **[API Documentation](./api-documentation.md)** - API specifications and usage guidelines
-- **[JWT Authentication Guide](./jwt-authentication-guide.md)** - JWT implementation and usage instructions
+### 📋 产品与需求
+- [产品需求文档](./产品需求文档.md) - 详细的产品功能需求和业务规则
 
-### Development & Implementation
-- **[Code Upgrade Plan](./code-upgrade-plan.md)** - Code modernization and upgrade strategies
-- **[Testing Strategy](./testing-strategy.md)** - Comprehensive testing approach and methodologies
-- **[Utility Functions Standards](./utility-functions-standards.md)** - Standardized utility functions and coding conventions
+### 🏗️ 系统设计
+- [系统架构设计](./系统架构设计.md) - 整体系统架构和技术选型
+- [权限体系设计文档](./权限体系设计文档.md) - RBAC权限模型和访问控制设计
+- [管理页面设计文档](./管理页面设计文档.md) - 管理界面设计规范和用户体验
 
-### Operations & Deployment
-- **[Deployment Operations](./deployment-operations.md)** - Deployment procedures and operational guidelines
-- **[System Optimization Report](./system-optimization-report.md)** - Performance optimization analysis and recommendations
+### 🔧 开发指南
+- [代码升级方案](./代码升级方案.md) - 系统升级和重构方案
+- [工具函数规范](./工具函数规范.md) - 通用工具函数的开发规范
 
-### Standards & Guidelines
-- **[Documentation Standards](./documentation-standards.md)** - Documentation formatting, maintenance, and quality standards
+### 🔐 认证授权
+- [JWT认证授权使用说明](./JWT认证授权使用说明.md) - JWT令牌的获取、验证和使用指南
 
-## 🗂️ Legacy Documents (To Be Consolidated)
+### 📡 接口文档
+- [API接口文档](./API接口文档.md) - 完整的API接口规范和使用说明
 
-The following documents are being consolidated into the new standardized format:
+### 🧪 测试策略
+- [测试策略文档](./测试策略文档.md) - 全面的测试策略和实施方案
 
-### Testing Documentation
-- `测试设计方案.md` → Merged into [Testing Strategy](./testing-strategy.md)
-- `详细测试方案.md` → Merged into [Testing Strategy](./testing-strategy.md)
+### 📚 规范指南
+- [文档规范指南](./文档规范指南.md) - 文档编写和维护的标准规范
 
-### Documentation Guidelines
-- `文档标准化规范.md` → Merged into [Documentation Standards](./documentation-standards.md)
-- `文档维护指南.md` → Merged into [Documentation Standards](./documentation-standards.md)
+### 📊 分析报告
+- [系统优化报告](./系统优化报告.md) - 系统性能优化和改进建议
 
-### Project Rules
-- `.trae/rules/project_rules.md` → Integrated into [Documentation Standards](./documentation-standards.md)
+## 文档状态
 
-## 📋 Quick Reference
+| 文档名称 | 状态 | 版本 | 最后更新 | 维护人员 |
+|----------|------|------|----------|----------|
+| 产品需求文档 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 产品团队 |
+| 系统架构设计 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 架构团队 |
+| 权限体系设计文档 | ✅ 正式版 | v2.0.0 | 2024-01-20 | 架构团队 |
+| 管理页面设计文档 | 🔄 设计阶段 | v1.0 | 2024-12-19 | 前端团队 |
+| 代码升级方案 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 开发团队 |
+| 工具函数规范 | ✅ 正式版 | v1.0.0 | 2024-01-20 | 开发团队 |
+| JWT认证授权使用说明 | ✅ 正式版 | v2.0.0 | 2024-01-20 | 认证团队 |
+| API接口文档 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 后端团队 |
+| 测试策略文档 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 测试团队 |
+| 文档规范指南 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 全体团队 |
+| 系统优化报告 | ✅ 正式版 | v2.0.0 | 2024-12-19 | 架构团队 |
 
-### For Developers
-1. Start with [Architecture Design](./architecture-design.md) for system overview
-2. Review [API Documentation](./api-documentation.md) for integration details
-3. Follow [JWT Authentication Guide](./jwt-authentication-guide.md) for auth implementation
-4. Use [Testing Strategy](./testing-strategy.md) for test development
+## 快速导航
 
-### For DevOps
-1. Reference [Deployment Operations](./deployment-operations.md) for deployment procedures
-2. Check [System Optimization Report](./system-optimization-report.md) for performance insights
-3. Follow [Documentation Standards](./documentation-standards.md) for documentation updates
+### 🚀 新手入门
+1. 阅读 [产品需求文档](./产品需求文档.md) 了解项目背景
+2. 查看 [系统架构设计](./系统架构设计.md) 理解技术架构
+3. 参考 [代码升级方案](./代码升级方案.md) 进行环境搭建
+4. 使用 [API接口文档](./API接口文档.md) 进行接口调用
 
-### For Product Team
-1. Review [Product Requirements](./product-requirements.md) for feature specifications
-2. Check [Code Upgrade Plan](./code-upgrade-plan.md) for development roadmap
-3. Reference [Architecture Design](./architecture-design.md) for technical constraints
+### 👨‍💻 开发人员
+- [工具函数规范](./工具函数规范.md) - 代码开发规范
+- [测试策略文档](./测试策略文档.md) - 测试用例编写
+- [JWT认证授权使用说明](./JWT认证授权使用说明.md) - 认证集成
 
-## 🔄 Document Status
+### 🎨 设计人员
+- [管理页面设计文档](./管理页面设计文档.md) - UI/UX设计规范
+- [权限体系设计文档](./权限体系设计文档.md) - 权限交互设计
 
-| Document | Status | Last Updated | Next Review |
-|----------|--------|--------------|-------------|
-| Architecture Design | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Product Requirements | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Permission System Design | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Admin Interface Design | ✅ Current | 2024-12-19 | 2025-01-19 |
-| API Documentation | ✅ Current | 2024-12-19 | 2025-01-19 |
-| JWT Authentication Guide | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Testing Strategy | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Deployment Operations | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Code Upgrade Plan | ✅ Current | 2024-12-19 | 2025-01-19 |
-| System Optimization Report | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Utility Functions Standards | ✅ Current | 2024-12-19 | 2025-01-19 |
-| Documentation Standards | ✅ Current | 2024-12-19 | 2025-01-19 |
+### 📝 文档维护
+- [文档规范指南](./文档规范指南.md) - 文档编写标准
+- [系统优化报告](./系统优化报告.md) - 持续改进参考
 
-## 📝 Contributing to Documentation
+## 文档更新记录
 
-### Before Making Changes
-1. Read the [Documentation Standards](./documentation-standards.md)
-2. Check if the document you want to modify is listed above
-3. Follow the established naming conventions and templates
+### v2.0.0 (2024-12-19)
+- 🔄 完成文档标准化重构
+- 📝 统一采用中文命名和内容
+- 🗂️ 优化文档分类和结构
+- 📋 合并重复文档，精简文档数量
+- 📚 新增文档规范指南
+- 🧪 整合测试相关文档
 
-### Making Updates
-1. Create a branch for your documentation changes
-2. Update the relevant document(s)
-3. Update the "Last Updated" date in the document header
-4. Update this README if you add/remove documents
-5. Submit a pull request for review
+### v1.0.0 (2024-01-20)
+- 📄 初始文档版本
+- 🏗️ 建立基础文档结构
+- 📋 完成核心功能文档
 
-### Quality Checklist
-- [ ] Content is accurate and up-to-date
-- [ ] Formatting follows documentation standards
-- [ ] Links are working and point to correct locations
-- [ ] Code examples are tested and functional
-- [ ] Document version and dates are updated
+## 贡献指南
 
-## 🔗 Related Resources
+### 文档更新流程
+1. 按照 [文档规范指南](./文档规范指南.md) 编写或更新文档
+2. 提交Pull Request并请求相关人员审查
+3. 审查通过后合并到主分支
+4. 更新本README中的文档状态表
 
-### External References
-- [OAuth 2.1 Specification](https://tools.ietf.org/html/draft-ietf-oauth-v2-1-01)
-- [OpenID Connect Specification](https://openid.net/connect/)
-- [JWT RFC 7519](https://tools.ietf.org/html/rfc7519)
-- [PKCE RFC 7636](https://tools.ietf.org/html/rfc7636)
+### 问题反馈
+- 发现文档错误或过时信息，请提交Issue
+- 建议改进文档结构或内容，请在项目讨论区提出
+- 紧急问题请直接联系相关维护人员
 
-### Development Tools
-- [Vitest Documentation](https://vitest.dev/)
-- [Prisma Documentation](https://www.prisma.io/docs/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+## 联系方式
 
-## 📞 Support
-
-For questions about documentation:
-1. Check the [Documentation Standards](./documentation-standards.md) first
-2. Search existing GitHub issues
-3. Create a new issue with the `documentation` label
-4. Contact the development team for urgent matters
+- **项目负责人**: [项目经理]
+- **技术负责人**: [技术总监]
+- **文档管理员**: [文档管理员]
+- **问题反馈**: [项目Issue页面]
 
 ---
 
-**Note**: This documentation index is automatically updated when documents are added, removed, or significantly modified. For the most current information, always refer to the individual documents linked above.
+**注意**: 本文档库持续更新中，请定期查看最新版本。如有疑问，请参考 [文档规范指南](./文档规范指南.md) 或联系相关维护人员。
