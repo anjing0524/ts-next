@@ -2,13 +2,13 @@ import os from 'os'; // For os related info
 import process from 'process'; // For process related info
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // Updated import
+// import { successResponse } from '@/lib/api/apiResponse'; // Assuming direct response now
+// import { withErrorHandler } from '@/lib/api/errorHandler'; // Assuming requirePermission handles errors
 
-import { successResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler } from '@/lib/api/errorHandler';
-import { withAuth } from '@/lib/auth/middleware';
 
-async function getSystemMetricsHandler(request: NextRequest) {
-  const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
+async function getSystemMetricsHandler(request: AuthenticatedRequest) { // Changed to AuthenticatedRequest
+  // const requestId = (request as { requestId?: string }).requestId; // Not directly available with requirePermission HOF
 
   // Calculate memory usage, ensuring values are numbers before toFixed
   const totalMemBytes = os.totalmem();
@@ -52,14 +52,8 @@ async function getSystemMetricsHandler(request: NextRequest) {
     ).arrayBuffersMB = (process.memoryUsage().arrayBuffers / (1024 * 1024)).toFixed(2);
   }
 
-  return NextResponse.json(
-    successResponse(metrics, 200, 'System metrics retrieved successfully.', requestId)
-  );
+  return NextResponse.json(metrics); // Direct response
 }
 
-export const GET = withErrorHandler(
-  withAuth(getSystemMetricsHandler, {
-    requiredPermissions: ['system:metrics:read'], // Permission to read system metrics
-    requireUserContext: true, // Ensure an authenticated user/admin is making the request
-  })
-);
+// Updated to use requirePermission HOF
+export const GET = requirePermission('system:metrics:read')(getSystemMetricsHandler);

@@ -1,125 +1,182 @@
 // /api/v2/system/security-policies/password
+// 描述: 管理密码相关的安全策略 (获取和更新)。
+// (Manages password-related security policies - Get and Update.)
 
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { Prisma, PolicyType, SecurityPolicy } from '@prisma/client';
+
+// --- Zod Schemas for Password Policies ---
+
+// 密码强度策略的Zod Schema
+const PasswordStrengthPolicySchema = z.object({
+  minLength: z.number().int().min(6).max(128).default(8),
+  requireUppercase: z.boolean().default(true),
+  requireLowercase: z.boolean().default(true),
+  requireNumber: z.boolean().default(true),
+  requireSpecialChar: z.boolean().default(false), // Note: `requireSymbol` was in Swagger, using `requireSpecialChar` for consistency
+  // minCharacterTypes: z.number().int().min(1).max(4).default(3), // Example from design doc, not in current swagger example here
+});
+
+// 密码历史策略的Zod Schema
+const PasswordHistoryPolicySchema = z.object({
+  historyCount: z.number().int().min(0).max(24).default(5), // 0 means disabled
+});
+
+// 密码过期策略的Zod Schema
+const PasswordExpirationPolicySchema = z.object({
+  maxAgeDays: z.number().int().min(0).max(365).default(90), // 0 means disabled
+  notifyDaysBeforeExpiration: z.number().int().min(0).max(30).default(14),
+});
+
+// 更新密码策略的完整请求体Zod Schema
+const UpdatePasswordPoliciesSchema = z.object({
+  passwordStrength: PasswordStrengthPolicySchema.optional(),
+  passwordHistory: PasswordHistoryPolicySchema.optional(),
+  passwordExpiration: PasswordExpirationPolicySchema.optional(),
+}).strict(); // No other properties allowed
+
+// Helper to fetch and structure password policies
+// 辅助函数：获取并构造密码策略对象
+async function getPasswordPolicies(): Promise<Record<string, any>> {
+  const policies = await prisma.securityPolicy.findMany({
+    where: {
+      type: {
+        in: [PolicyType.PASSWORD_STRENGTH, PolicyType.PASSWORD_HISTORY, PolicyType.PASSWORD_EXPIRATION],
+      },
+      isActive: true, // Typically, only active policies are relevant
+    },
+  });
+
+  const structuredPolicies: Record<string, any> = {};
+  policies.forEach(p => {
+    // Prisma automatically parses the JSON 'policy' field
+    if (p.type === PolicyType.PASSWORD_STRENGTH) structuredPolicies.passwordStrength = p.policy;
+    if (p.type === PolicyType.PASSWORD_HISTORY) structuredPolicies.passwordHistory = p.policy;
+    if (p.type === PolicyType.PASSWORD_EXPIRATION) structuredPolicies.passwordExpiration = p.policy;
+  });
+  return structuredPolicies;
+}
 
 /**
  * @swagger
  * /api/v2/system/security-policies/password:
  *   get:
  *     summary: 获取密码相关安全策略 (系统安全策略管理)
- *     description: 专门用于检索与密码相关的安全策略，例如密码强度、历史、过期等。
+ *     description: 检索与密码相关的安全策略，包括密码强度、历史、过期等。需要 'system:securitypolicies:read' 权限。
  *     tags: [System API - Security Policies]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
- *       200:
- *         description: 成功获取密码相关安全策略。
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 passwordStrength:
- *                   type: object
- *                   description: 密码强度策略配置。
- *                   properties:
- *                     minLength:
- *                       type: integer
- *                     requireUppercase:
- *                       type: boolean
- *                     requireLowercase:
- *                       type: boolean
- *                     requireNumber:
- *                       type: boolean
- *                     requireSymbol:
- *                       type: boolean
- *                 passwordHistory:
- *                   type: object
- *                   description: 密码历史策略配置。
- *                   properties:
- *                     historyCount: # 不能与最近多少个密码重复
- *                       type: integer
- *                 passwordExpiration:
- *                   type: object
- *                   description: 密码过期策略配置。
- *                   properties:
- *                     maxAgeDays: # 密码多少天后过期
- *                       type: integer
- *                     notifyDaysBeforeExpiration: # 过期前多少天开始提醒
- *                       type: integer
- *       401:
- *         description: 未经授权。
- *       403:
- *         description: 禁止访问。
+ *       200: { description: "成功获取密码相关安全策略。" } # Schema defined in previous subtask
+ *       401: { description: "未经授权。" }
+ *       403: { description: "禁止访问。" }
+ */
+async function getPasswordPoliciesHandler(request: AuthenticatedRequest) {
+  try {
+    const policies = await getPasswordPolicies();
+    // Ensure all policy types have at least default values if not found in DB
+    // This part depends on whether policies are guaranteed to exist or should be created on-the-fly if missing.
+    // For now, assuming they are seeded or an admin UI manages their creation.
+    // If a policy type is missing, its key will be absent in the response.
+    return NextResponse.json(policies);
+  } catch (error) {
+    console.error("Error fetching password policies:", error);
+    return NextResponse.json({ message: "Error fetching password policies." }, { status: 500 });
+  }
+}
+export const GET = requirePermission('system:securitypolicies:read')(getPasswordPoliciesHandler);
+
+
+/**
+ * @swagger
+ * /api/v2/system/security-policies/password:
  *   put:
  *     summary: 更新密码相关安全策略 (系统安全策略管理)
- *     description: 更新与密码相关的各项安全策略配置。
+ *     description: 更新与密码相关的各项安全策略配置。需要 'system:passwordpolicy:update' 权限。
  *     tags: [System API - Security Policies]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               passwordStrength:
- *                 type: object # Same structure as GET response
- *               passwordHistory:
- *                 type: object # Same structure as GET response
- *               passwordExpiration:
- *                 type: object # Same structure as GET response
+ *           schema: { $ref: '#/components/schemas/PasswordPoliciesUpdatePayload' }
  *     responses:
- *       200:
- *         description: 密码相关安全策略已成功更新。
- *         content:
- *           application/json:
- *             schema:
- *               # Same structure as GET response
- *               type: object
- *       400:
- *         description: 无效请求参数。
- *       401:
- *         description: 未经授权。
- *       403:
- *         description: 禁止访问。
+ *       200: { description: "密码相关安全策略已成功更新。" }
+ *       400: { description: "无效请求参数。" }
+ *       401: { description: "未经授权。" }
+ *       403: { description: "禁止访问。" }
+ * components:
+ *   schemas:
+ *     PasswordPoliciesUpdatePayload:
+ *       type: object
+ *       properties:
+ *         passwordStrength: { $ref: '#/components/schemas/PasswordStrengthPolicy' }
+ *         passwordHistory: { $ref: '#/components/schemas/PasswordHistoryPolicy' }
+ *         passwordExpiration: { $ref: '#/components/schemas/PasswordExpirationPolicy' }
+ *     PasswordStrengthPolicy: # Define this based on Zod schema
+ *       type: object
+ *       properties: { minLength: {type: "integer"}, requireUppercase: {type: "boolean"} /* etc. */ }
+ *     PasswordHistoryPolicy: # Define this
+ *       type: object
+ *       properties: { historyCount: {type: "integer"} }
+ *     PasswordExpirationPolicy: # Define this
+ *       type: object
+ *       properties: { maxAgeDays: {type: "integer"} /* etc. */ }
  */
-export async function GET(request: Request) {
-  // TODO: 实现获取密码相关安全策略的逻辑 (Implement logic to get password-related security policies)
-  // 1. 验证用户权限。
-  // 2. 从数据库中检索 SecurityPolicy 记录，筛选 type 为 PASSWORD_STRENGTH, PASSWORD_HISTORY, PASSWORD_EXPIRATION。
-  // 3. 将这些策略的 policy JSON 内容组合成一个响应对象。
-  console.log('GET /api/v2/system/security-policies/password request');
+async function updatePasswordPoliciesHandler(request: AuthenticatedRequest) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request body', message: 'Failed to parse JSON body.' }, { status: 400 });
+  }
 
-  // 示例数据 (Example data)
-  const policies = {
-    passwordStrength: {
-      minLength: 10,
-      requireUppercase: true,
-      requireLowercase: true,
-      requireNumber: true,
-      requireSymbol: true
-    },
-    passwordHistory: {
-      historyCount: 5
-    },
-    passwordExpiration: {
-      maxAgeDays: 90,
-      notifyDaysBeforeExpiration: 14
+  const validationResult = UpdatePasswordPoliciesSchema.safeParse(payload);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+  }
+
+  const { passwordStrength, passwordHistory, passwordExpiration } = validationResult.data;
+  const updates: Promise<SecurityPolicy>[] = [];
+
+  try {
+    if (passwordStrength) {
+      updates.push(prisma.securityPolicy.upsert({
+        where: { type: PolicyType.PASSWORD_STRENGTH }, // Assuming type is unique for these global policies
+        update: { policy: passwordStrength as Prisma.JsonObject, isActive: true, name: 'Password Strength Policy' },
+        create: { name: 'Password Strength Policy', type: PolicyType.PASSWORD_STRENGTH, policy: passwordStrength as Prisma.JsonObject, isActive: true, description: "Defines requirements for user passwords." },
+      }));
     }
-  };
-  return NextResponse.json(policies);
-}
+    if (passwordHistory) {
+      updates.push(prisma.securityPolicy.upsert({
+        where: { type: PolicyType.PASSWORD_HISTORY },
+        update: { policy: passwordHistory as Prisma.JsonObject, isActive: true, name: 'Password History Policy' },
+        create: { name: 'Password History Policy', type: PolicyType.PASSWORD_HISTORY, policy: passwordHistory as Prisma.JsonObject, isActive: true, description: "Defines password reuse restrictions." },
+      }));
+    }
+    if (passwordExpiration) {
+      updates.push(prisma.securityPolicy.upsert({
+        where: { type: PolicyType.PASSWORD_EXPIRATION },
+        update: { policy: passwordExpiration as Prisma.JsonObject, isActive: true, name: 'Password Expiration Policy' },
+        create: { name: 'Password Expiration Policy', type: PolicyType.PASSWORD_EXPIRATION, policy: passwordExpiration as Prisma.JsonObject, isActive: true, description: "Defines password validity duration." },
+      }));
+    }
 
-export async function PUT(request: Request) {
-  // TODO: 实现更新密码相关安全策略的逻辑 (Implement logic to update password-related security policies)
-  // 1. 验证用户权限。
-  // 2. 解析请求体中的各项密码策略配置。
-  // 3. 对每个策略类型 (PASSWORD_STRENGTH, PASSWORD_HISTORY, PASSWORD_EXPIRATION):
-  //    a. 查找对应的 SecurityPolicy 记录 (通过 type 或固定 name)。
-  //    b. 更新其 policy JSON 内容。
-  //    c. 如果记录不存在，可能需要创建 (或报错，取决于设计)。
-  // 4. 返回更新后的完整密码策略配置。
-  const body = await request.json();
-  console.log('PUT /api/v2/system/security-policies/password request, body:', body);
+    if (updates.length === 0) {
+      return NextResponse.json({ message: "No password policies provided for update." }, { status: 400 });
+    }
 
-  // 模拟更新，直接返回请求体 (Simulate update, echo back the request body)
-  return NextResponse.json(body);
+    await prisma.$transaction(updates);
+    const updatedPolicies = await getPasswordPolicies(); // Fetch the updated, structured policies
+
+    return NextResponse.json(updatedPolicies);
+  } catch (error) {
+    console.error("Error updating password policies:", error);
+    return NextResponse.json({ message: "Error updating password policies." }, { status: 500 });
+  }
 }
+export const PUT = requirePermission('system:passwordpolicy:update')(updatePasswordPoliciesHandler);

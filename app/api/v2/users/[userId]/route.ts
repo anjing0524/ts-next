@@ -10,7 +10,8 @@ import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型
 // import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 认证/授权由中间件处理
 import { isValidEmail } from '@/lib/utils';   // 电子邮件格式验证辅助函数
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件和认证请求类型
-// import bcrypt from 'bcrypt'; // bcrypt 用于密码处理，但此文件中的更新操作明确禁止密码更改。
+import bcrypt from 'bcrypt'; // bcrypt 用于密码处理，允许在PATCH中更新密码。
+import { z } from 'zod'; // 引入Zod
 
 // --- 辅助函数 ---
 
@@ -200,14 +201,45 @@ async function patchUserHandler(req: AuthenticatedRequest, context: RouteContext
     return errorResponse('Request body cannot be empty for PATCH operations. Please provide at least one field to update.', 400, 'validation_error_empty_body');
   }
 
-  // 步骤 2: 数据验证。
-  // 同样禁止通过此接口修改密码。
-  if ((requestBody as any).password || (requestBody as any).passwordHash) {
-    return errorResponse('Password updates are not allowed via this PATCH endpoint. Use dedicated password change/reset flows.', 400, 'validation_error_password');
+  // 步骤 2: Zod Schema 定义部分更新 (所有字段可选)
+  // 密码策略与创建时相同
+  const passwordPolicySchemaOptional = z.string()
+    .min(8, "Password must be at least 8 characters long / 密码长度至少为8位")
+    .max(64, "Password must be at most 64 characters long / 密码长度最多为64位")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter / 密码必须包含至少一个大写字母")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter / 密码必须包含至少一个小写字母")
+    .regex(/[0-9]/, "Password must contain at least one number / 密码必须包含至少一个数字")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character / 密码必须包含至少一个特殊字符")
+    .optional();
+
+  const userPatchSchema = z.object({
+    // 用户名通常不允许更改，如果允许，需谨慎处理冲突
+    // username: z.string().min(3, "用户名长度至少为3位").optional(),
+    email: z.string().email("Invalid email address / 无效的电子邮件地址").optional().nullable(),
+    password: passwordPolicySchemaOptional, // 允许更新密码
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    displayName: z.string().optional().nullable(),
+    avatar: z.string().url("Invalid URL format for avatar / 头像URL格式无效").optional().nullable(),
+    organization: z.string().optional().nullable(),
+    department: z.string().optional().nullable(),
+    // workLocation: z.string().optional().nullable(), // If present in schema
+    isActive: z.boolean().optional(),
+    mustChangePassword: z.boolean().optional(),
+    // emailVerified: z.boolean().optional(), // If admin can change this
+    // phoneVerified: z.boolean().optional(), // If admin can change this
+  }).strict(); // 使用 .strict() 来禁止未知字段
+
+  const validationResult = userPatchSchema.safeParse(requestBody);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
-  // 如果提供了 email，则验证其格式。
-  if (requestBody.email && typeof requestBody.email === 'string' && !isValidEmail(requestBody.email)) {
-    return errorResponse('Invalid email format provided.', 400, 'validation_error_email');
+
+  const validatedData = validationResult.data;
+
+  // 不允许通过此接口更改用户名 (Username changes not allowed via this endpoint)
+  if (validatedData.hasOwnProperty('username')) {
+    return errorResponse('Username modification is not allowed via PATCH request.', 400, 'validation_error_username_modification');
   }
 
   try {
@@ -215,67 +247,74 @@ async function patchUserHandler(req: AuthenticatedRequest, context: RouteContext
     const existingUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!existingUser) return errorResponse('User not found to update.', 404, 'user_not_found');
 
-    // 步骤 4: 冲突检查 (如果 username 或 email 被更改)。
-    // 与 PUT 请求中的逻辑类似，但仅当这些字段在 PATCH 请求中被提供时才进行检查。
-    if (requestBody.username && typeof requestBody.username === 'string' && requestBody.username.trim() !== existingUser.username) {
-      const conflictingUser = await prisma.user.findUnique({ where: { username: requestBody.username.trim() } });
-      if (conflictingUser) return errorResponse('Username already taken by another user.', 409, 'username_conflict');
-    }
-    if (requestBody.email && typeof requestBody.email === 'string' && requestBody.email.trim().toLowerCase() !== existingUser.email.toLowerCase()) {
-      const conflictingUser = await prisma.user.findUnique({ where: { email: requestBody.email.trim().toLowerCase() } });
-      if (conflictingUser) return errorResponse('Email already taken by another user.', 409, 'email_conflict');
+    // 步骤 4: 冲突检查 (仅 email, 因为 username 不允许更改)。
+    if (validatedData.email && typeof validatedData.email === 'string') {
+      const trimmedEmail = validatedData.email.trim().toLowerCase();
+      if (trimmedEmail !== existingUser.email) { // 仅当 email 实际更改时检查冲突
+        const conflictingUser = await prisma.user.findFirst({
+          where: {
+            email: trimmedEmail,
+            id: { not: targetUserId } // 排除当前用户自身
+          }
+        });
+        if (conflictingUser) return errorResponse('Email already taken by another user.', 409, 'email_conflict');
+      }
     }
 
     // 步骤 5: 动态构建 Prisma 更新数据对象 (`patchData`)。
-    // 只包含请求体中明确提供的字段。
     const patchData: Prisma.UserUpdateInput = {};
-    if (requestBody.username !== undefined) patchData.username = requestBody.username.trim();
-    if (requestBody.email !== undefined && typeof requestBody.email === 'string') patchData.email = requestBody.email.trim().toLowerCase();
-    if (requestBody.firstName !== undefined) patchData.firstName = requestBody.firstName;
-    if (requestBody.lastName !== undefined) patchData.lastName = requestBody.lastName;
-    if (requestBody.displayName !== undefined) patchData.displayName = requestBody.displayName;
-    if (requestBody.avatar !== undefined) patchData.avatar = requestBody.avatar;
-    if (requestBody.phone !== undefined) patchData.phone = requestBody.phone;
-    if (requestBody.organization !== undefined) patchData.organization = requestBody.organization;
-    if (requestBody.department !== undefined) patchData.department = requestBody.department;
-    if (requestBody.workLocation !== undefined) patchData.workLocation = requestBody.workLocation;
-    if (requestBody.isActive !== undefined) patchData.isActive = Boolean(requestBody.isActive);
-    if (requestBody.mustChangePassword !== undefined) patchData.mustChangePassword = Boolean(requestBody.mustChangePassword);
-    if (requestBody.emailVerified !== undefined) patchData.emailVerified = Boolean(requestBody.emailVerified);
-    if (requestBody.phoneVerified !== undefined) patchData.phoneVerified = Boolean(requestBody.phoneVerified);
 
-    // 如果 `patchData` 对象中至少有一个字段被设置 (即有实际的更新操作)，
-    // 则手动设置 `updatedAt` 时间戳。
-    if (Object.keys(patchData).length > 0) {
-        patchData.updatedAt = new Date();
-    } else {
-        // 如果请求体中没有提供任何有效的、可更新的字段，
-        // 可以选择直接返回现有用户信息 (HTTP 200) 或返回一个错误 (例如 400 Bad Request)。
-        // 此处选择返回现有用户信息，表示“无操作”但也成功。
-        return NextResponse.json(excludeSensitiveUserFields(existingUser), { status: 200 });
+    // 处理非密码字段
+    Object.keys(validatedData).forEach(key => {
+      if (key !== 'password' && validatedData[key as keyof typeof validatedData] !== undefined) {
+        if (key === 'email' && typeof validatedData.email === 'string') {
+          patchData.email = validatedData.email.trim().toLowerCase();
+        } else {
+          patchData[key as keyof typeof patchData] = validatedData[key as keyof typeof validatedData];
+        }
+      }
+    });
+
+    // 处理密码更新
+    if (validatedData.password) {
+      const saltRounds = 12;
+      patchData.passwordHash = await bcrypt.hash(validatedData.password, saltRounds);
+      // 通常，如果管理员设置了密码，用户应该在下次登录时更改它。
+      // 如果 mustChangePassword 未在请求中明确设置，则默认为 true。
+      if (validatedData.mustChangePassword === undefined) {
+        patchData.mustChangePassword = true;
+      }
     }
+
+    // 如果没有任何有效字段要更新 (例如，只提供了 username，但它被禁止更新)
+    if (Object.keys(patchData).length === 0) {
+      return NextResponse.json(excludeSensitiveUserFields(existingUser), { status: 200, message: "No valid fields provided for update." });
+    }
+    patchData.updatedAt = new Date(); // 手动设置更新时间
 
     // 步骤 6: 执行用户部分更新操作。
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
-      data: patchData, // 应用部分更新数据
+      data: patchData,
+      select: { // 确保返回的数据不包含 passwordHash
+        id: true, username: true, email: true, firstName: true, lastName: true,
+        displayName: true, avatar: true, organization: true, department: true,
+        isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true, lastLoginAt: true,
+      }
     });
-    // 返回更新后的用户信息 (排除敏感字段)。
-    return NextResponse.json(excludeSensitiveUserFields(updatedUser), { status: 200 });
+    return NextResponse.json(updatedUser, { status: 200 });
 
   } catch (error: any) {
-    // 错误处理：捕获 Prisma 特定的唯一约束冲突错误。
+    console.error(`Error partially updating user ${targetUserId} (PATCH) by admin ${performingAdmin?.id}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-       const target = (error.meta?.target as string[]) || ['field']; // 获取冲突的字段名
+       const target = (error.meta?.target as string[]) || ['field'];
       return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict_unique');
     }
-    // 记录其他未知错误。
-    console.error(`Error partially updating user ${targetUserId} (PATCH) by admin ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred while partially updating user information.', 500, 'server_error');
   }
 }
 // 将 patchUserHandler 与 'users:update' 权限绑定，并导出为 PATCH 请求的处理函数。
-export const PATCH = requirePermission('users:update', patchUserHandler);
+export const PATCH = requirePermission('users:update')(patchUserHandler); // Corrected: wrap with HOF
 
 // --- DELETE /api/v2/users/{userId} (删除用户) ---
 // 此端点用于删除指定 userId 的用户。

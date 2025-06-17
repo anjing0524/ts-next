@@ -110,7 +110,7 @@ async function userinfoHandler(request: NextRequest) {
   }
 
   // 1. 验证访问令牌的有效性 (签名, 过期时间, aud, iss等)
-  const tokenVerification = await JWTUtils.verifyAccessToken(accessToken);
+  const tokenVerification = await JWTUtils.verifyAccessToken(accessToken); // This already checks JWT claims like exp, nbf, iss, aud
   if (!tokenVerification.valid || !tokenVerification.payload) {
     return NextResponse.json(
       errorResponse(401, `无效的访问令牌: ${tokenVerification.error || 'Verification failed'} (Invalid access token)`, 'INVALID_TOKEN', overallRequestId),
@@ -120,22 +120,49 @@ async function userinfoHandler(request: NextRequest) {
 
   const jwtPayload = tokenVerification.payload;
 
-  // 2. 检查令牌是否在数据库中被撤销 (如果 AccessToken 表有 isRevoked 字段)
-  //    并确保它仍然有效 (未过期 - JWTUtils.verifyAccessToken 应该已经检查了 exp)
-  const accessTokenHash = JWTUtils.getTokenHash(accessToken); // 使用 JWTUtils 中的方法
+  // 2. 额外检查: 令牌是否已被明确撤销 (JTI黑名单检查)
+  // (Additional Check: Token explicitly revoked - JTI blacklist check)
+  if (jwtPayload.jti) {
+    const blacklistedJti = await prisma.tokenBlacklist.findUnique({
+      where: { jti: jwtPayload.jti },
+    });
+    if (blacklistedJti) {
+      console.log(`UserInfo: Access token JTI (${jwtPayload.jti}) found in blacklist.`);
+      return NextResponse.json(
+        errorResponse(401, '访问令牌已被撤销 (Access token has been revoked)', 'INVALID_TOKEN', overallRequestId),
+        { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_token", error_description="Token revoked (JTI blacklisted)"' } }
+      );
+    }
+  }
+
+  // 3. 检查数据库中的 AccessToken 记录 (可选但建议作为双重检查或用于获取关联数据)
+  // (Check AccessToken record in DB - optional but recommended as double check or for fetching associated data)
+  // 注意: JWTUtils.verifyAccessToken 已经验证了签名和声明 (包括 'exp')。
+  // (Note: JWTUtils.verifyAccessToken has already validated signature and claims (incl. 'exp').)
+  // 此DB检查主要是为了确保令牌记录仍然存在于系统中 (例如，未被物理删除)，并且可以获取关联的用户。
+  // (This DB check is mainly to ensure the token record still exists in the system (e.g., not physically deleted) and to fetch the associated user.)
+  // const accessTokenHash = JWTUtils.getTokenHash(accessToken); // Not strictly needed if relying on JTI from payload
   const dbAccessToken = await prisma.accessToken.findFirst({
     where: {
-      tokenHash: accessTokenHash,
-      // revoked: false, // Prisma AccessToken schema might not have 'revoked'. Typically relies on expiry or explicit revocation list if needed.
-      // For now, assume if it exists and JWT is valid, it's active unless specific revocation logic is added to AccessToken table.
-      expiresAt: { gt: new Date() } // Double check expiry against DB record, though JWT verify also does.
+      // tokenHash: accessTokenHash, // If using hash for lookup
+      // If AccessToken table has a 'jti' field that matches jwtPayload.jti, use that for lookup
+      // For this example, we'll assume the JWT payload's 'sub' (userId) is the primary link after successful JWT verification.
+      // And that the 'exp' claim check by jwtVerify is sufficient for expiry.
+      // A lookup by JTI here could be an alternative if AccessToken stores JTI.
+      id: jwtPayload.ati, // Assuming 'ati' (Access Token ID) claim stores the DB primary key of the AccessToken record.
+                           // Or, if 'jti' in JWT is the same as AccessToken.id, use jwtPayload.jti.
+                           // If AccessToken.id is not in JWT, then this DB lookup might need tokenHash or other unique property.
+                           // For now, let's assume 'sub' (userId) from JWT is the primary way to get the user.
+                           // The existing code used tokenHash, let's stick to that for consistency if it was intended.
+      tokenHash: JWTUtils.getTokenHash(accessToken),
+      expiresAt: { gt: new Date() } // Still good to double-check expiry against DB record
     },
     include: {
-      user: true, // 包含关联的用户信息 (Include associated user information)
+      user: true,
     }
   });
 
-  if (!dbAccessToken) {
+  if (!dbAccessToken || !dbAccessToken.user) { // Ensure user is also loaded
     return NextResponse.json(
       errorResponse(401, '访问令牌无效或已被撤销 (Access token is invalid or revoked)', 'INVALID_TOKEN', overallRequestId),
       { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_token", error_description="Token not found in DB or revoked"' } }

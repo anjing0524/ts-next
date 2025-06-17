@@ -43,8 +43,21 @@ export async function GET(req: NextRequest) {
   const responseType = searchParams.get('response_type'); // 必须是 "code" (授权码流程)
   const scope = searchParams.get('scope');                // 请求的权限范围 (scopes)
   const state = searchParams.get('state');                // 客户端提供的随机字符串，用于防止CSRF攻击，授权服务器应在回调时原样返回
-  const codeChallenge = searchParams.get('code_challenge'); // PKCE code challenge (S256哈希后的 code_verifier)
-  const codeChallengeMethod = searchParams.get('code_challenge_method'); // PKCE code challenge method (必须是 "S256")
+  // const codeChallenge = searchParams.get('code_challenge'); // PKCE code challenge (S256哈希后的 code_verifier)
+  // const codeChallengeMethod = searchParams.get('code_challenge_method'); // PKCE code challenge method (必须是 "S256")
+
+  // Zod schema for authorize request query parameters
+  // Zod schema 用于验证授权请求的查询参数
+  const AuthorizeRequestSchema = z.object({
+    client_id: z.string({ required_error: "client_id is required" }),
+    redirect_uri: z.string({ required_error: "redirect_uri is required" }).url("Invalid redirect_uri format"),
+    response_type: z.literal("code", { errorMap: () => ({ message: "response_type must be 'code'"}) }),
+    scope: z.string().optional(), // Scope validation against client's allowed scopes happens later
+    state: z.string().optional(),
+    code_challenge: z.string({ required_error: "code_challenge is required for PKCE" }),
+    code_challenge_method: z.literal("S256", { errorMap: () => ({ message: "code_challenge_method must be 'S256'"}) }),
+    nonce: z.string().optional(), // For OIDC (this is good, already in Zod schema)
+  });
 
   // 辅助函数: 构建错误重定向URL。
   // OAuth 2.0 规范要求在发生错误时，如果可能，将用户重定向回客户端的 redirect_uri 并附带错误信息。
@@ -63,27 +76,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(errorUrl.toString(), 302); // 执行302重定向
   };
 
-  // --- 步骤 2: 第三方客户端请求参数验证 ---
-  // (Parameter Validation for the third-party client request)
-  // 检查所有必需的参数是否存在且格式正确。
-  if (!clientId || !redirectUri || !responseType || !codeChallenge || !codeChallengeMethod) {
-    // 安全考虑: redirectUri 可能未提供或无效，因此这里直接调用 buildErrorRedirect，它会处理 redirectUri 为 null 的情况。
-    return buildErrorRedirect(redirectUri, 'invalid_request', 'Missing required parameters (client_id, redirect_uri, response_type, code_challenge, code_challenge_method).', state);
+  // --- 步骤 2: 第三方客户端请求参数验证 (使用Zod) ---
+  // (Parameter Validation for the third-party client request using Zod)
+  const paramsToValidate: Record<string, any> = {};
+  searchParams.forEach((value, key) => {
+    paramsToValidate[key] = value;
+  });
+
+  const validationResult = AuthorizeRequestSchema.safeParse(paramsToValidate);
+
+  if (!validationResult.success) {
+    const firstError = validationResult.error.errors[0];
+    // redirectUri might not be available or valid if it's part of the validation failure
+    const baseRedirectUriForError = paramsToValidate.redirect_uri && typeof paramsToValidate.redirect_uri === 'string' && PKCEUtils.validateCodeVerifier(paramsToValidate.redirect_uri) // Basic check if it's a URL-like string
+                               ? paramsToValidate.redirect_uri
+                               : null;
+    return buildErrorRedirect(
+      baseRedirectUriForError,
+      'invalid_request',
+      `${firstError.path.join('.')}: ${firstError.message}`,
+      paramsToValidate.state
+    );
   }
-  if (responseType !== 'code') { // 响应类型必须是 'code'
-    return buildErrorRedirect(redirectUri, 'unsupported_response_type', 'response_type must be "code".', state);
-  }
-  if (codeChallengeMethod !== 'S256') { // PKCE 质询方法必须是 'S256'
-    return buildErrorRedirect(redirectUri, 'invalid_request', 'code_challenge_method must be "S256".', state);
-  }
-  if (!PKCEUtils.validateCodeChallenge(codeChallenge)) { // 使用 PKCEUtils 验证 code_challenge 的格式是否符合规范
+
+  // 从验证结果中获取参数 (Get parameters from validation result)
+  const {
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: responseType,
+    scope,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallengeMethod,
+    nonce // Extract nonce from validated data
+  } = validationResult.data;
+
+  // PKCE code_challenge format validation (already partly covered by string(), but RFC specifies format)
+  if (!PKCEUtils.validateCodeChallenge(codeChallenge)) {
      return buildErrorRedirect(redirectUri, 'invalid_request', 'Invalid code_challenge format.', state);
   }
 
   // --- 步骤 3: 第三方客户端验证 ---
   // (Third-party Client Validation)
   // 从数据库中查找提供的 client_id 是否对应一个已注册且激活的客户端。
-  const thirdPartyClient = await prisma.oAuthClient.findUnique({ where: { clientId: clientId } });
+  const thirdPartyClient = await prisma.oAuthClient.findUnique({ where: { clientId: clientId! } }); // clientId is now guaranteed by Zod
   if (!thirdPartyClient || !thirdPartyClient.isActive) {
     // 安全考虑: 客户端不存在或无效，不能重定向到其 redirect_uri，因此直接返回JSON错误。
     // 这是为了防止将错误信息泄露给未经验证的 redirect_uri。
@@ -241,6 +277,7 @@ export async function GET(req: NextRequest) {
         expiresAt: codeExpiresAt,            // 过期时间
         codeChallenge: codeChallenge,        // PKCE code challenge
         codeChallengeMethod: codeChallengeMethod, // PKCE method ('S256')
+        nonce: nonce,                        // Store OIDC nonce if provided
       },
     });
   } catch (dbError) {

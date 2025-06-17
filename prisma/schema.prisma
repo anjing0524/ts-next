@@ -112,6 +112,7 @@ model AuthorizationCode {
   expiresAt           DateTime
   codeChallenge       String? // PKCE code challenge
   codeChallengeMethod String? // PKCE code challenge method
+  nonce               String?  // OIDC nonce
   isUsed              Boolean  @default(false)
   createdAt           DateTime @default(now())
 

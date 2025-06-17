@@ -17,7 +17,7 @@ export interface TestUser {
   password: string;
   firstName: string;
   lastName: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'user'; // This might become less relevant with RBAC or represent a default/super role
   isActive: boolean;
   emailVerified: boolean;
   plainPassword?: string;
@@ -35,6 +35,23 @@ export interface TestClient {
   isPublic: boolean;
   isActive: boolean;
   plainSecret?: string;
+}
+
+// RBAC-related Test Interfaces
+// RBAC相关的测试接口
+export interface TestRole {
+  id?: string;
+  name: string;
+  description?: string;
+  permissions?: string[]; // Array of permission names or IDs | 权限名称或ID数组
+}
+
+export interface TestPermission {
+  id?: string;
+  name: string; // e.g., 'users:create', 'posts:read' | 例如 'users:create', 'posts:read'
+  description?: string;
+  resource?: string; // e.g., 'users', 'posts' | 例如 'users', 'posts'
+  action?: string; // e.g., 'create', 'read' | 例如 'create', 'read'
 }
 
 export interface TestScope {
@@ -146,6 +163,26 @@ export const TEST_CLIENTS: { [key: string]: Partial<TestClient> } = {
     isActive: true,
   },
 } as const;
+
+// Predefined Test Permissions
+// 预定义的测试权限
+export const TEST_PERMISSIONS: { [key: string]: Partial<TestPermission> } = {
+  USER_READ: { name: 'users:read', description: 'Read user information / 读取用户信息', resource: 'users', action: 'read' },
+  USER_CREATE: { name: 'users:create', description: 'Create new users / 创建新用户', resource: 'users', action: 'create' },
+  USER_UPDATE: { name: 'users:update', description: 'Update user information / 更新用户信息', resource: 'users', action: 'update' },
+  USER_DELETE: { name: 'users:delete', description: 'Delete users / 删除用户', resource: 'users', action: 'delete' },
+  POST_READ: { name: 'posts:read', description: 'Read post information / 读取帖子信息', resource: 'posts', action: 'read' },
+  POST_CREATE: { name: 'posts:create', description: 'Create new posts / 创建新帖子', resource: 'posts', action: 'create' },
+};
+
+// Predefined Test Roles
+// 预定义的测试角色
+export const TEST_ROLES: { [key:string]: Partial<TestRole> } = {
+  USER_MANAGER: { name: 'user_manager', description: 'User Manager / 用户管理员', permissions: ['users:read', 'users:create', 'users:update', 'users:delete'] },
+  POST_EDITOR: { name: 'post_editor', description: 'Post Editor / 帖子编辑员', permissions: ['posts:read', 'posts:create'] },
+  VIEWER: { name: 'viewer', description: 'Viewer / 查看者', permissions: ['users:read', 'posts:read'] },
+};
+
 
 // Constants
 export const TEST_CONFIG = {
@@ -580,6 +617,8 @@ export class TestDataManager {
   private createdClients: string[] = [];
   private createdTokens: string[] = [];
   private createdScopes: string[] = [];
+  private createdRoles: string[] = []; // 新增：用于存储创建的角色ID
+  private createdPermissions: string[] = []; // 新增：用于存储创建的权限ID
   // PrismaClient is no longer stored as a property 'this.prisma'
   // Methods will use the aliased 'db' import directly.
 
@@ -612,6 +651,33 @@ export class TestDataManager {
   }
 
   /**
+   * 创建预定义的测试角色
+   * Creates a predefined test role.
+   */
+  async createTestRole(roleType: keyof typeof TEST_ROLES): Promise<any /* Replace with actual Prisma Role type */> {
+    const roleData = TEST_ROLES[roleType];
+    if (!roleData) {
+      throw new Error(`Test role type '${roleType}' not found in TEST_ROLES`);
+    }
+    const role = await this.createRole(roleData);
+    return role;
+  }
+
+  /**
+   * 创建预定义的测试权限
+   * Creates a predefined test permission.
+   */
+  async createTestPermission(permissionType: keyof typeof TEST_PERMISSIONS): Promise<any /* Replace with actual Prisma Permission type */> {
+    const permissionData = TEST_PERMISSIONS[permissionType];
+    if (!permissionData) {
+      throw new Error(`Test permission type '${permissionType}' not found in TEST_PERMISSIONS`);
+    }
+    // Using findOrCreatePermission to avoid duplicates and simplify creation
+    const permission = await this.findOrCreatePermission(permissionData);
+    return permission;
+  }
+
+  /**
    * 创建测试用户
    */
   async createUser(userData: Partial<TestUser>): Promise<TestUser> {
@@ -639,12 +705,12 @@ export class TestDataManager {
       id: user.id,
       username,
       email: user.email,
-      password: user.password,
+      password: user.password, // This should be plainPassword or not returned if hashed
       firstName: user.firstName || 'Test',
       lastName: user.lastName || 'User',
-      role: userData.role || 'user',
+      role: userData.role || 'user', // Default role
       isActive: user.isActive,
-      emailVerified: user.emailVerified,
+      emailVerified: user.emailVerified, // This field needs to exist in your Prisma model
       plainPassword,
     };
   }
@@ -681,7 +747,7 @@ export class TestDataManager {
       // These should be derived from the actual prisma model's state.
       id: client.id,
       clientId: client.clientId,
-      clientSecret: client.clientSecret,
+      clientSecret: client.clientSecret, // This will be the hashed secret if not public
       name: client.clientName || '', // Read from clientName for the return object
       redirectUris: JSON.parse(client.redirectUris || '[]'),
       grantTypes: JSON.parse(client.grantTypes || '[]'),
@@ -721,12 +787,154 @@ export class TestDataManager {
   }
 
   /**
+   * 查找或创建权限 (Finds or creates a permission)
+   * @param permissionData - 权限数据 (Permission data)
+   * @returns Prisma Permission object
+   */
+  async findOrCreatePermission(permissionData: Partial<TestPermission>): Promise<any /* Replace with actual Prisma Permission type */> {
+    const permissionName = permissionData.name;
+    if (!permissionName) {
+      throw new Error("Permission name is required / 权限名称是必需的");
+    }
+
+    let permission = await db.permission.findUnique({ where: { name: permissionName } });
+    if (!permission) {
+      // 确保提供了 resource 和 action，如果它们是必需的
+      // Ensure resource and action are provided if they are mandatory
+      const resource = permissionData.resource || permissionName.split(':')[0] || 'general';
+      const action = permissionData.action || permissionName.split(':')[1] || 'access';
+
+      permission = await db.permission.create({
+        data: {
+          name: permissionName,
+          description: permissionData.description || `Permission ${permissionName} / 权限 ${permissionName}`,
+          resource: resource, // 从名称派生或使用默认值
+          action: action, // 从名称派生或使用默认值
+          // 根据您的Prisma Schema调整其他必填字段
+          // Adjust other required fields based on your Prisma Schema
+        },
+      });
+      if (!this.createdPermissions.includes(permission.id)) {
+        this.createdPermissions.push(permission.id);
+      }
+    }
+    return permission;
+  }
+
+  /**
+   * 创建角色 (Creates a role)
+   * @param roleData - 角色数据 (Role data)
+   * @returns Prisma Role object with permissions
+   */
+  async createRole(roleData: Partial<TestRole>): Promise<any /* Replace with actual Prisma Role type */> {
+    const roleName = `${this.prefix}${roleData.name || 'role'}_${Date.now()}`;
+    const role = await db.role.create({
+      data: {
+        name: roleName,
+        description: roleData.description || 'Test Role / 测试角色',
+        // 根据您的Prisma Schema调整其他必填字段
+      },
+    });
+    this.createdRoles.push(role.id);
+
+    if (roleData.permissions && roleData.permissions.length > 0) {
+      for (const pName of roleData.permissions) {
+        const permission = await this.findOrCreatePermission({ name: pName });
+        await db.rolePermission.create({
+          data: {
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        });
+      }
+    }
+    // 返回包含权限的角色 (Return role with permissions)
+    // Assuming your Prisma schema has a relation `permissions` on `Role` model that links to `RolePermission`
+    return db.role.findUnique({
+      where: { id: role.id },
+      include: { permissions: { include: { permission: true } } },
+    });
+  }
+
+  /**
+   * 创建权限 (Creates a permission)
+   * Note: Prefer findOrCreatePermission for most cases to avoid duplicates.
+   * 注意：大多数情况下优先使用 findOrCreatePermission 以避免重复。
+   * @param permissionData - 权限数据 (Permission data)
+   * @returns Prisma Permission object
+   */
+  async createPermission(permissionData: Partial<TestPermission>): Promise<any /* Replace with actual Prisma Permission type */> {
+    // Prefixing to ensure uniqueness during tests, unless a specific ID is given (which create doesn't take)
+    const permissionName = `${this.prefix}${permissionData.name || 'permission'}_${Date.now()}`;
+    const resource = permissionData.resource || permissionName.split(':')[0] || 'general';
+    const action = permissionData.action || permissionName.split(':')[1] || 'access';
+
+    const permission = await db.permission.create({
+      data: {
+        name: permissionName, // Ensure this is unique if your schema enforces it
+        description: permissionData.description || `Test Permission ${permissionName} / 测试权限 ${permissionName}`,
+        resource: resource,
+        action: action,
+        // 根据您的Prisma Schema调整其他必填字段
+      },
+    });
+    this.createdPermissions.push(permission.id);
+    return permission;
+  }
+
+  /**
+   * 分配角色给用户 (Assigns a role to a user)
+   * @param userId - 用户ID (User ID)
+   * @param roleId - 角色ID (Role ID)
+   */
+  async assignRoleToUser(userId: string, roleId: string): Promise<void> {
+    // Assuming UserRole model has fields userId and roleId
+    await db.userRole.create({
+      data: {
+        userId,
+        roleId,
+      },
+    });
+  }
+
+  /**
+   * 分配权限给角色 (Assigns a permission to a role) - 可选，如果createRole未处理
+   * Optional, if not handled by createRole
+   * @param roleId - 角色ID (Role ID)
+   * @param permissionId - 权限ID (Permission ID)
+   */
+  async assignPermissionToRole(roleId: string, permissionId: string): Promise<void> {
+    // 首先检查是否已存在关联，避免重复创建错误
+    // First, check if the association already exists to avoid duplicate creation errors
+    // This assumes a composite key or unique constraint like `@@unique([roleId, permissionId])` in `RolePermission`
+    const existingLink = await db.rolePermission.findUnique({
+      where: {
+        roleId_permissionId: { // 替换为实际的联合唯一键名 (Replace with actual composite unique key name)
+          roleId: roleId,
+          permissionId: permissionId,
+        },
+      },
+    });
+
+    if (!existingLink) {
+      await db.rolePermission.create({
+        data: {
+          roleId,
+          permissionId,
+        },
+      });
+    }
+  }
+
+  /**
    * 创建访问令牌
    */
   async createAccessToken(
     userId: string,
     clientId: string,
-    scope = 'openid profile'
+    scope = 'openid profile',
+    // Adding permissions to token creation if needed by JWTUtils
+    permissionNames: string[] = []
   ): Promise<string> {
     // 导入JWTUtils
     const { JWTUtils } = await import('@/lib/auth/oauth2');
@@ -755,7 +963,7 @@ export class TestDataManager {
       client_id: clientId,
       user_id: userId,
       scope,
-      permissions: [],
+      permissions: permissionNames, // Pass permission names
     });
 
     // 将JWT令牌保存到数据库
@@ -928,13 +1136,49 @@ export class TestDataManager {
         return;
     }
     try {
-      // Delete tokens first (they have foreign key constraints)
+      // 清理RBAC相关的连接表 (Cleanup RBAC related join tables first)
+      if (this.createdUsers.length > 0) {
+        await db.userRole.deleteMany({ where: { userId: { in: this.createdUsers } } }).catch(e => console.error("Error cleaning up UserRole by userIds:", e));
+      }
+      // Fallback or additional cleanup for roles not directly tied to createdUsers but in createdRoles
+      if (this.createdRoles.length > 0) {
+        await db.userRole.deleteMany({ where: { roleId: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up UserRole by roleIds:", e));
+      }
+
+      if (this.createdRoles.length > 0) {
+        await db.rolePermission.deleteMany({ where: { roleId: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up RolePermission by roleIds:", e));
+      }
+      // Fallback for permissions not directly tied to createdRoles but in createdPermissions
+      if (this.createdPermissions.length > 0) {
+        await db.rolePermission.deleteMany({ where: { permissionId: { in: this.createdPermissions } } }).catch(e => console.error("Error cleaning up RolePermission by permissionIds:", e));
+      }
+
+      // 然后删除角色和权限 (Then delete roles and permissions)
+      if (this.createdRoles.length > 0) {
+        await db.role.deleteMany({ where: { id: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up roles:", e));
+      }
+      if (this.createdPermissions.length > 0) {
+        await db.permission.deleteMany({
+          where: {
+            // Prefer deleting by ID, but also catch prefixed ones if findOrCreatePermission didn't add to array
+            OR: [
+              { id: { in: this.createdPermissions } },
+              { name: { startsWith: this.prefix } }
+            ]
+          }
+        }).catch(e => console.error("Error cleaning up permissions:", e));
+      }
+
+      // Delete tokens
       await db.accessToken
         .deleteMany({
           where: {
             OR: [
-              { client: { clientId: { startsWith: this.prefix } } },
-              { user: { username: { startsWith: this.prefix } } },
+              { client: { clientId: { startsWith: this.prefix } } }, // Assuming client relation exists
+              { user: { username: { startsWith: this.prefix } } },   // Assuming user relation exists
+              // If direct client/user IDs are stored on token tables and are in createdClients/createdUsers:
+              // { clientId: { in: this.createdClients } }, // This requires clientId on AccessToken model
+              // { userId: { in: this.createdUsers } },     // This requires userId on AccessToken model
             ],
           },
         })
@@ -963,30 +1207,41 @@ export class TestDataManager {
         .catch(() => {});
 
       // Delete clients and users
-      await db.oAuthClient // Corrected model name
-        .deleteMany({
-          where: { clientId: { startsWith: this.prefix } },
-        })
-        .catch(() => {});
+      if (this.createdClients.length > 0) {
+        await db.oAuthClient // Corrected model name
+          .deleteMany({
+            where: { id: { in: this.createdClients } }, // Prefer deleting by ID
+          })
+          .catch(() => {});
+      }
 
-      await db.user
-        .deleteMany({
-          where: { username: { startsWith: this.prefix } },
-        })
-        .catch(() => {});
+      if (this.createdUsers.length > 0) {
+        await db.user
+          .deleteMany({
+            where: { id: { in: this.createdUsers } }, // Prefer deleting by ID
+          })
+          .catch(() => {});
+      }
 
-      // Delete test scopes
+      // Delete test scopes that were prefixed
       await db.scope
         .deleteMany({
           where: { name: { startsWith: this.prefix } },
         })
         .catch(() => {});
+      // And scopes added by ID
+       if (this.createdScopes.length > 0) {
+        await db.scope.deleteMany({ where: { id: { in: this.createdScopes } } }).catch(() => {});
+      }
+
 
       // Clear tracking arrays
       this.createdUsers.length = 0;
       this.createdClients.length = 0;
       this.createdTokens.length = 0;
       this.createdScopes.length = 0;
+      this.createdRoles.length = 0;
+      this.createdPermissions.length = 0;
     } catch (error) {
       console.error('Failed to cleanup test data:', error);
     }
@@ -1003,34 +1258,44 @@ export class TestDataManager {
         return;
     }
     try {
+      // 清理连接表 (Clear join tables first)
+      await db.userRole.deleteMany({}).catch(e => console.error("Error clearing UserRole:", e));
+      await db.rolePermission.deleteMany({}).catch(e => console.error("Error clearing RolePermission:", e));
+
       // Delete all tokens first (they have foreign key constraints)
       await db.accessToken.deleteMany({}).catch(() => {});
       await db.refreshToken.deleteMany({}).catch(() => {});
       await db.authorizationCode.deleteMany({}).catch(() => {});
 
-      // Delete user permissions (correct model name)
+      // Delete user permissions (correct model name if it exists, e.g. UserPermission)
+      // Assuming a generic name if not specified, or remove if no such direct table
+      // await db.userPermission.deleteMany({}).catch(() => {}); // If you have a direct UserPermission table
       await db.userResourcePermission.deleteMany({}).catch(() => {});
+
 
       // Delete audit logs and sessions
       await db.auditLog.deleteMany({}).catch(() => {});
-      // UserSession model is deprecated/removed in favor of JWTs.
-      // await db.userSession.deleteMany({}).catch(() => {})
       await db.consentGrant.deleteMany({}).catch(() => {});
 
       // Delete clients and users
-      await db.oAuthClient.deleteMany({}).catch(() => {}); // Corrected model name
+      await db.oAuthClient.deleteMany({}).catch(() => {});
       await db.user.deleteMany({}).catch(() => {});
 
-      // Delete resources, permissions and scopes
-      await db.resource.deleteMany({}).catch(() => {});
-      await db.permission.deleteMany({}).catch(() => {});
+      // Delete RBAC entities, resources, and scopes
+      await db.role.deleteMany({}).catch(e => console.error("Error clearing Role:", e));
+      await db.permission.deleteMany({}).catch(e => console.error("Error clearing Permission:", e));
+      await db.resource.deleteMany({}).catch(() => {}); // If you have a Resource model
       await db.scope.deleteMany({}).catch(() => {});
+
 
       // Clear tracking arrays
       this.createdUsers.length = 0;
       this.createdClients.length = 0;
       this.createdTokens.length = 0;
       this.createdScopes.length = 0;
+      this.createdRoles.length = 0;
+      this.createdPermissions.length = 0;
+
 
       console.log('✅ 数据库已完全清理 / Database completely cleared');
     } catch (error) {
@@ -1393,6 +1658,7 @@ export class OAuth2TestHelper extends TestHttpClient {
   async cleanup(): Promise<void> {
     this.createdTestUsers.length = 0;
     this.createdTestClients.length = 0;
+    // Note: DataManager cleanup is handled separately by createOAuth2TestSetup
   }
 }
 
@@ -1407,7 +1673,7 @@ export class OAuthFlowTestHelper {
    */
   async testAuthorizationCodeFlow(
     client: TestClient,
-    user: TestUser
+    user: TestUser // User is needed for context, though not directly used in this simplified version
   ): Promise<{
     success: boolean;
     authCode?: string;
@@ -1421,7 +1687,7 @@ export class OAuthFlowTestHelper {
         response_type: 'code',
         client_id: client.clientId,
         redirect_uri: client.redirectUris[0],
-        scope: 'openid profile',
+        scope: 'openid profile', // Adjust scope as needed
         state: TestUtils.generateState(),
       });
 
@@ -1436,20 +1702,21 @@ export class OAuthFlowTestHelper {
         code: authCode,
         redirect_uri: client.redirectUris[0],
         client_id: client.clientId,
-        client_secret: client.plainSecret,
+        client_secret: client.plainSecret, // Required for confidential clients
       });
 
       if (tokenResponse.status === 200) {
         const tokenData = await tokenResponse.json();
+        TestAssertions.assertValidTokens(tokenData); // Validate token structure
         return {
           success: true,
           authCode,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
+          accessToken: tokenData.access_token as string,
+          refreshToken: tokenData.refresh_token as string,
         };
       }
-
-      return { success: false, error: `Token request failed: ${tokenResponse.status}` };
+      const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
+      return { success: false, error: `Token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}` };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -1467,21 +1734,22 @@ export class OAuthFlowTestHelper {
       const tokenResponse = await this.httpClient.requestToken({
         grant_type: 'client_credentials',
         client_id: client.clientId,
-        client_secret: client.plainSecret,
-        scope: 'api:read',
+        client_secret: client.plainSecret, // Required for confidential clients
+        scope: 'api:read', // Adjust scope as needed
       });
 
       if (tokenResponse.status === 200) {
         const tokenData = await tokenResponse.json();
+        TestAssertions.assertValidTokens(tokenData);
         return {
           success: true,
-          accessToken: tokenData.access_token,
+          accessToken: tokenData.access_token as string,
         };
       }
-
+      const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
       return {
         success: false,
-        error: `Client credentials request failed: ${tokenResponse.status}`,
+        error: `Client credentials request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}`,
       };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -1497,7 +1765,7 @@ export class OAuthFlowTestHelper {
   ): Promise<{
     success: boolean;
     accessToken?: string;
-    newRefreshToken?: string;
+    newRefreshToken?: string; // Some flows return a new refresh token
     error?: string;
   }> {
     try {
@@ -1505,19 +1773,20 @@ export class OAuthFlowTestHelper {
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
         client_id: client.clientId,
-        client_secret: client.plainSecret,
+        client_secret: client.plainSecret, // Required for confidential clients
       });
 
       if (tokenResponse.status === 200) {
         const tokenData = await tokenResponse.json();
+        TestAssertions.assertValidTokens(tokenData);
         return {
           success: true,
-          accessToken: tokenData.access_token,
-          newRefreshToken: tokenData.refresh_token,
+          accessToken: tokenData.access_token as string,
+          newRefreshToken: tokenData.refresh_token as string | undefined,
         };
       }
-
-      return { success: false, error: `Refresh token request failed: ${tokenResponse.status}` };
+      const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
+      return { success: false, error: `Refresh token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}` };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -1540,6 +1809,7 @@ export function createTestSetup(testName: string) {
     async setup() {
       TestUtils.setupTestEnv();
       await dataManager.setupBasicScopes();
+      // Any other global setup for standard tests
       return dataManager;
     },
 
@@ -1554,22 +1824,23 @@ export function createTestSetup(testName: string) {
  */
 export function createOAuth2TestSetup(testName: string) {
   const dataManager = new TestDataManager(`${testName}_`);
-  const oauth2Helper = new OAuth2TestHelper(dataManager);
+  const oauth2Helper = new OAuth2TestHelper(dataManager); // Pass dataManager instance
 
   return {
     dataManager,
-    httpClient: defaultHttpClient,
+    httpClient: defaultHttpClient, // Use the shared instance
     oauth2Helper,
 
     async setup() {
       TestUtils.setupTestEnv();
       await dataManager.setupBasicScopes();
+      // Any other global setup for OAuth2 tests
       return { dataManager, oauth2Helper };
     },
 
     async cleanup() {
-      await oauth2Helper.cleanup();
-      await dataManager.cleanup();
+      await oauth2Helper.cleanup(); // Specific cleanup for OAuth2TestHelper if any
+      await dataManager.cleanup(); // General data cleanup
     },
   };
 }
