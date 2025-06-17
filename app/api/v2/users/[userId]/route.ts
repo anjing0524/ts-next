@@ -5,13 +5,13 @@
 // `RouteContext` 用于从动态路由参数中提取 `userId`。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Prisma ORM 客户端
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端 // Corrected import
 import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型
-// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 认证/授权由中间件处理
-import { isValidEmail } from '@/lib/utils';   // 电子邮件格式验证辅助函数
+// import { isValidEmail } from '@/lib/utils';   // Replaced by Zod email validation
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件和认证请求类型
 import bcrypt from 'bcrypt'; // bcrypt 用于密码处理，允许在PATCH中更新密码。
-import { z } from 'zod'; // 引入Zod
+// import { z } from 'zod'; // Zod imported from schemas
+import { userUpdatePayloadSchema, userPatchPayloadSchema, passwordPolicySchema } from '../schemas'; // Import schemas
 
 // --- 辅助函数 ---
 
@@ -84,78 +84,66 @@ export const GET = requirePermission('users:read', getUserByIdHandler);
 async function updateUserHandler(req: AuthenticatedRequest, context: RouteContext): Promise<NextResponse> {
   const { params } = context;
   const targetUserId = params.userId; // 目标用户ID。
-  const performingAdmin = req.user;   // 执行操作的管理员。
+  const performingAdmin = req.user;
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PUT (full update) user ${targetUserId}.`);
 
-  // 步骤 1: 解析请求体 (JSON 格式)。
-  // 定义 requestBody 的类型，排除不允许通过此接口修改的字段 (如 id, passwordHash, 时间戳等)，
-  // 并指明某些字段 (如 isActive) 是可选的 Partial<Pick<...>>。
-  let requestBody: Omit<User, 'id' | 'passwordHash' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'failedLoginAttempts' | 'lockedUntil'>
-                   & Partial<Pick<User, 'isActive' | 'mustChangePassword' | 'emailVerified' | 'phoneVerified'>>;
+  // 步骤 1: 解析请求体并使用Zod验证
+  let rawRequestBody;
   try {
-    requestBody = await req.json();
+    rawRequestBody = await req.json();
   } catch (e) {
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
-  // 步骤 2: 数据验证。
-  // 安全考虑: 明确禁止通过此通用更新接口修改密码。密码更改应通过专门的流程 (如密码重置或用户自行修改密码接口)。
-  if ((requestBody as any).password || (requestBody as any).passwordHash) {
-    return errorResponse('Password updates are not allowed via this PUT endpoint. Please use dedicated password change/reset flows.', 400, 'validation_error_password');
+  const validationResult = userUpdatePayloadSchema.safeParse(rawRequestBody);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
-  // 如果提供了 email，则验证其格式。
-  if (requestBody.email && !isValidEmail(requestBody.email)) {
-    return errorResponse('Invalid email format provided.', 400, 'validation_error_email');
-  }
-  // 对于严格的 PUT 操作，可能需要验证所有必需字段都已提供。
-  // 此处实现较为灵活，更接近 PATCH 的行为，允许只更新部分字段。
-  // 如果需要严格的 PUT，应取消注释下面的检查或添加更全面的验证。
-  // if (typeof requestBody.username !== 'string' || typeof requestBody.email !== 'string') {
-  //     return errorResponse('Username and email are required for PUT operations (full resource representation).', 400, 'validation_error_required_fields');
-  // }
+  // 从验证结果中获取处理过的数据
+  const updateDataFromRequest = validationResult.data;
+
+  // 安全考虑: 明确禁止通过此通用更新接口修改密码。
+  // The userUpdatePayloadSchema already omits 'password'.
+  // Username changes are also omitted from schema, preventing them here.
 
   try {
     // 步骤 3: 检查目标用户是否存在。
     const existingUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!existingUser) return errorResponse('User not found to update.', 404, 'user_not_found');
 
-    // 步骤 4: 冲突检查 (如果 username 或 email 被更改)。
-    // 如果请求中包含 username 且与现有 username 不同，则检查新 username 是否已被其他用户占用。
-    if (requestBody.username && requestBody.username.trim() !== existingUser.username) {
-      const conflictingUser = await prisma.user.findUnique({ where: { username: requestBody.username.trim() } });
-      // 如果找到其他用户使用了该 username，返回 409 Conflict 错误。
-      if (conflictingUser) return errorResponse('Username already taken by another user.', 409, 'username_conflict');
-    }
-    // 如果请求中包含 email 且与现有 email 不同 (忽略大小写)，则检查新 email 是否已被其他用户占用。
-    if (requestBody.email && requestBody.email.trim().toLowerCase() !== existingUser.email.toLowerCase()) {
-      const conflictingUser = await prisma.user.findUnique({ where: { email: requestBody.email.trim().toLowerCase() } });
-      if (conflictingUser) return errorResponse('Email already taken by another user.', 409, 'email_conflict');
+    // 步骤 4: 冲突检查 (仅 email, 因为 username 不允许更改 via this schema)。
+    if (updateDataFromRequest.email && typeof updateDataFromRequest.email === 'string') {
+      const trimmedEmail = updateDataFromRequest.email.trim().toLowerCase();
+      // Only check for conflict if the email is actually changing and is not null
+      if (trimmedEmail !== (existingUser.email || '').toLowerCase()) {
+        const conflictingUser = await prisma.user.findFirst({
+          where: {
+            email: trimmedEmail,
+            id: { not: targetUserId } // 排除当前用户自身
+          }
+        });
+        if (conflictingUser) return errorResponse('Email already taken by another user.', 409, 'email_conflict');
+      }
     }
 
     // 步骤 5: 准备更新数据对象。
-    // 对于 PUT，理论上应使用请求体中的所有字段来替换现有资源。
-    // 此实现中，我们只更新请求体中明确提供的字段。
-    // 明确处理 boolean 类型字段，确保它们被正确转换为布尔值。
-    const updateData: Prisma.UserUpdateInput = {
-      username: requestBody.username?.trim(), // trim() 去除首尾空格
-      email: requestBody.email?.trim().toLowerCase(), // trim() 和 toLowerCase() 标准化 email
-      firstName: requestBody.firstName,
-      lastName: requestBody.lastName,
-      displayName: requestBody.displayName,
-      avatar: requestBody.avatar,
-      phone: requestBody.phone,
-      organization: requestBody.organization,
-      department: requestBody.department,
-      workLocation: requestBody.workLocation,
-      isActive: typeof requestBody.isActive === 'boolean' ? requestBody.isActive : undefined,
-      mustChangePassword: typeof requestBody.mustChangePassword === 'boolean' ? requestBody.mustChangePassword : undefined,
-      emailVerified: typeof requestBody.emailVerified === 'boolean' ? requestBody.emailVerified : undefined,
-      phoneVerified: typeof requestBody.phoneVerified === 'boolean' ? requestBody.phoneVerified : undefined,
-      updatedAt: new Date(), // 手动设置 updatedAt 时间戳，因为 Prisma 默认可能只在某些条件下自动更新。
-    };
-    // 清理 updateData 对象，移除值为 undefined 的属性。
-    // 这样 Prisma 就不会尝试将这些字段更新为 null (除非它们在 requestBody 中显式设置为 null)。
-    Object.keys(updateData).forEach(key => updateData[key as keyof Prisma.UserUpdateInput] === undefined && delete updateData[key as keyof Prisma.UserUpdateInput]);
+    // Prisma's update data only includes fields present in updateDataFromRequest.
+    // Zod's .optional().nullable() means fields might be explicitly null to clear them, or undefined to leave them unchanged.
+    // Prisma handles undefined fields by not updating them.
+    const updateData: Prisma.UserUpdateInput = { ...updateDataFromRequest };
+
+    // Explicitly set email to null if it was provided as null in request, otherwise use trimmed/lowercased.
+    if (updateDataFromRequest.email === null) {
+        updateData.email = null;
+    } else if (updateDataFromRequest.email) {
+        updateData.email = updateDataFromRequest.email.trim().toLowerCase();
+    }
+
+
+    // Ensure boolean fields are correctly passed if they were part of the schema and request
+    // (Zod's default/optional handles this, so direct assignment is fine)
+
+    updateData.updatedAt = new Date(); // 手动设置 updatedAt 时间戳
 
     // 步骤 6: 执行用户更新操作。
     const updatedUser = await prisma.user.update({
@@ -185,52 +173,23 @@ export const PUT = requirePermission('users:update', updateUserHandler);
 async function patchUserHandler(req: AuthenticatedRequest, context: RouteContext): Promise<NextResponse> {
   const { params } = context;
   const targetUserId = params.userId; // 目标用户ID。
-  const performingAdmin = req.user;   // 执行操作的管理员。
+  const performingAdmin = req.user;
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PATCH user ${targetUserId}.`);
 
   // 步骤 1: 解析请求体 (JSON 格式)。
-  // 类型定义为 Partial<...> 表示请求体中的所有字段都是可选的。
-  let requestBody: Partial<Omit<User, 'id' | 'passwordHash' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'failedLoginAttempts' | 'lockedUntil'>>;
+  let rawRequestBody;
   try {
-    requestBody = await req.json();
+    rawRequestBody = await req.json();
   } catch (e) {
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
-  // PATCH 请求体不能为空。
-  if (Object.keys(requestBody).length === 0) {
-    return errorResponse('Request body cannot be empty for PATCH operations. Please provide at least one field to update.', 400, 'validation_error_empty_body');
+  if (Object.keys(rawRequestBody).length === 0) {
+    return errorResponse('Request body cannot be empty for PATCH operations.', 400, 'validation_error_empty_body');
   }
 
-  // 步骤 2: Zod Schema 定义部分更新 (所有字段可选)
-  // 密码策略与创建时相同
-  const passwordPolicySchemaOptional = z.string()
-    .min(8, "Password must be at least 8 characters long / 密码长度至少为8位")
-    .max(64, "Password must be at most 64 characters long / 密码长度最多为64位")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter / 密码必须包含至少一个大写字母")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter / 密码必须包含至少一个小写字母")
-    .regex(/[0-9]/, "Password must contain at least one number / 密码必须包含至少一个数字")
-    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character / 密码必须包含至少一个特殊字符")
-    .optional();
-
-  const userPatchSchema = z.object({
-    // 用户名通常不允许更改，如果允许，需谨慎处理冲突
-    // username: z.string().min(3, "用户名长度至少为3位").optional(),
-    email: z.string().email("Invalid email address / 无效的电子邮件地址").optional().nullable(),
-    password: passwordPolicySchemaOptional, // 允许更新密码
-    firstName: z.string().optional().nullable(),
-    lastName: z.string().optional().nullable(),
-    displayName: z.string().optional().nullable(),
-    avatar: z.string().url("Invalid URL format for avatar / 头像URL格式无效").optional().nullable(),
-    organization: z.string().optional().nullable(),
-    department: z.string().optional().nullable(),
-    // workLocation: z.string().optional().nullable(), // If present in schema
-    isActive: z.boolean().optional(),
-    mustChangePassword: z.boolean().optional(),
-    // emailVerified: z.boolean().optional(), // If admin can change this
-    // phoneVerified: z.boolean().optional(), // If admin can change this
-  }).strict(); // 使用 .strict() 来禁止未知字段
-
-  const validationResult = userPatchSchema.safeParse(requestBody);
+  // 步骤 2: 使用 Zod 进行输入数据验证 (schema imported from ../schemas)
+  // The imported userPatchPayloadSchema already includes passwordPolicySchema.optional()
+  const validationResult = userPatchPayloadSchema.safeParse(rawRequestBody);
   if (!validationResult.success) {
     return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }

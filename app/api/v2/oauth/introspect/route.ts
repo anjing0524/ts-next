@@ -2,25 +2,23 @@
 // 描述: OAuth 2.0 令牌内省端点 (RFC 7662)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
+// import { z } from 'zod'; // Zod is imported from schemas.ts
 
 import { prisma } from '@/lib/prisma';
-import { successResponse, errorResponse } from '@/lib/api/apiResponse';
+// successResponse, errorResponse are not used in this specific version of the file.
+// import { successResponse, errorResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes, ScopeUtils } from '@/lib/auth/oauth2'; // 假设这些工具类可用
-// import { withClientAuth } from '@/lib/auth/middleware'; // 可能需要一个专门的客户端认证中间件
+import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes, ScopeUtils } from '@/lib/auth/oauth2';
+import * as jose from 'jose'; // For decoding JWT to get claims
 
-// --- 请求 Schema ---
-const IntrospectionRequestSchema = z.object({
-  token: z.string().min(1, '令牌 (token) 不能为空'),
-  token_type_hint: z.string().optional().describe('可选的令牌类型提示 (e.g., access_token, refresh_token)'),
-  // RFC 7662 允许客户端发送额外的参数，服务器可以忽略或使用它们
-  // clientId: z.string().optional(), // 客户端ID，用于验证客户端是否有权内省此令牌
-  // clientSecret: z.string().optional(), // 客户端密钥
-});
-
-// --- 辅助函数 ---
-// authenticateIntrospectionClient is replaced by ClientAuthUtils.authenticateClient
+// Import Zod schemas from the dedicated schema file
+import {
+  introspectTokenRequestSchema,
+  IntrospectTokenRequestPayload, // Type for validated request
+  IntrospectResponse,            // Union type for response
+  IntrospectResponseActive,      // Type for active response
+  IntrospectResponseInactive     // Type for inactive response
+} from './schemas';
 
 /**
  * @swagger
@@ -115,147 +113,164 @@ async function introspectionHandler(request: NextRequest) {
   const overallRequestId = (request as any).requestId; // from withErrorHandler
 
   if (request.headers.get('content-type') !== 'application/x-www-form-urlencoded') {
-    return NextResponse.json(errorResponse(415, '不支持的媒体类型 (Unsupported Media Type). 请使用 application/x-www-form-urlencoded。', 'UNSUPPORTED_MEDIA_TYPE', overallRequestId), { status: 415 });
+    // Using a simplified error response structure here as errorResponse util is not in scope.
+    return NextResponse.json({ error: 'unsupported_media_type', error_description: 'Unsupported Media Type. Please use application/x-www-form-urlencoded.' }, { status: 415 });
   }
 
   const bodyParams = new URLSearchParams(await request.text());
+  const rawBodyData: Record<string, any> = {};
+  bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
+
 
   // --- 客户端认证 (Client Authentication) ---
-  // 使用 ClientAuthUtils 进行客户端认证
-  // (Use ClientAuthUtils for client authentication)
   const clientAuthResult = await ClientAuthUtils.authenticateClient(request, bodyParams);
 
   if (!clientAuthResult.client) {
-    // ClientAuthUtils.authenticateClient 返回的错误对象结构可能与 errorResponse 不同
-    // (The error object structure returned by ClientAuthUtils.authenticateClient might differ from errorResponse)
-    // 因此，我们直接返回它提供的 NextResponse 或构建一个新的
-    // (So, we either return the NextResponse it provides or construct a new one)
     if (clientAuthResult.error) {
       return NextResponse.json(clientAuthResult.error, { status: 401 });
     }
-    // 默认错误，如果 authenticateClient 未返回特定错误响应
-    // (Default error if authenticateClient didn't return a specific error response)
     return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication failed' }, { status: 401 });
   }
   const authenticatedClient = clientAuthResult.client;
   console.log(`Introspection request authenticated for client: ${authenticatedClient.clientId}`);
 
 
-  // --- 请求体验证 ---
-  const token = bodyParams.get('token');
-  const tokenTypeHint = bodyParams.get('token_type_hint');
-
-  if (!token) {
-    // 如果令牌无效或过期，或者客户端无权内省，则返回 active: false
-    // 这里是请求格式错误的情况
-    return NextResponse.json({ active: false, error: '请求缺少令牌 (token is required)' }, { status: 400 });
+  // --- 请求体验证 (Using imported Zod schema) ---
+  const validationResult = introspectTokenRequestSchema.safeParse(rawBodyData);
+  if (!validationResult.success) {
+    return NextResponse.json(
+        { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: validationResult.error.errors[0]?.message || 'Invalid introspection request parameters.', issues: validationResult.error.flatten().fieldErrors },
+        { status: 400 }
+    );
   }
+  const { token, token_type_hint } = validationResult.data;
 
-  let responsePayload: Record<string, any> = { active: false };
+
+  let activeResponsePayload: IntrospectResponseActive | null = null;
 
   // --- 令牌验证逻辑 ---
-  // 尝试验证为访问令牌
-  const accessTokenVerification = await JWTUtils.verifyAccessToken(token);
-  if (accessTokenVerification.valid && accessTokenVerification.payload) {
-    const payload = accessTokenVerification.payload;
-    // 检查令牌是否在数据库中被撤销 (如果 AccessToken 表有 isRevoked 字段)
-    const accessTokenHash = JWTUtils.getTokenHash(token);
-    const dbAccessToken = await prisma.accessToken.findFirst({
-        // where: { tokenHash: accessTokenHash, isRevoked: false, expiresAt: { gt: new Date() } } // isRevoked not in schema
-        where: { tokenHash: accessTokenHash, expiresAt: { gt: new Date() } }
-    });
+  // Try as Access Token
+  if (token_type_hint === 'access_token' || !token_type_hint) {
+    const atVerification = await JWTUtils.verifyAccessToken(token);
+    if (atVerification.valid && atVerification.payload) {
+      const payload = atVerification.payload;
+      let isTokenActiveInDb = false;
 
-    if (dbAccessToken) {
-        // 令牌有效，并且属于进行内省请求的客户端，或者令牌没有特定的授权客户端（例如，某些内部令牌）
-        // (Token is valid, AND belongs to the client making introspection request, OR token has no specific authorized client for introspection)
-        // RFC 7662: "the specifics of a protected resource's authorization policy are beyond the scope of this specification".
-        // 我们通常允许任何经过认证的客户端内省任何有效的令牌，但也可以添加策略，例如只允许令牌的原始客户端内省它。
-        // (We typically allow any authenticated client to introspect any valid token, but policies can be added,
-        //  e.g., only allow token's original client to introspect it.)
-        // if (payload.client_id !== authenticatedClient.clientId) { /* ... potentially restrict ... */ }
+      // Check JTI blacklist first
+      if (payload.jti) {
+        const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
+        if (blacklisted) {
+          return NextResponse.json({ active: false } as IntrospectResponseInactive);
+        }
+      }
 
-        responsePayload = {
-            active: true,
-            scope: payload.scope as string || '',
-            client_id: payload.client_id as string,
-            username: payload.username as string || undefined, // 如果JWT中有username (If username in JWT)
-            sub: payload.sub as string,
-            aud: payload.aud as string | string[] | undefined, // aud can be array
-            iss: payload.iss as string,
-            exp: payload.exp,
-            iat: payload.iat,
-            jti: payload.jti,
-            token_type: 'Bearer', // 通常访问令牌是 Bearer 类型 (Usually access tokens are Bearer type)
-            // 根据需要添加更多声明 (Add more claims as needed)
-            // 例如，如果令牌与用户关联，则添加用户相关的声明
-            // (For example, if token is user-associated, add user-related claims)
-            ...(dbAccessToken.userId && { user_id: dbAccessToken.userId }),
-        };
-    }
-  }
-
-  // 如果作为访问令牌验证失败，或者提示是 refresh_token (If access token verification fails, OR hint is refresh_token)
-  // 注意：RFC 7662 内省端点主要用于访问令牌，但也可以用于其他令牌类型。
-  // (Note: RFC 7662 introspection endpoint is primarily for access tokens, but can be used for other token types.)
-  if (!responsePayload.active && (tokenTypeHint === 'refresh_token' || !accessTokenVerification.valid)) {
-    const refreshTokenVerification = await JWTUtils.verifyRefreshToken(token);
-    if (refreshTokenVerification.valid && refreshTokenVerification.payload) {
-      const payload = refreshTokenVerification.payload;
-      const refreshTokenHash = JWTUtils.getTokenHash(token);
-      const dbRefreshToken = await prisma.refreshToken.findFirst({
-          // where: { tokenHash: refreshTokenHash, isRevoked: false, expiresAt: { gt: new Date() }} // isRevoked not in schema
-          where: { tokenHash: refreshTokenHash, expiresAt: { gt: new Date() }}
+      // Then check AccessToken table
+      const dbAccessToken = await prisma.accessToken.findFirst({
+        where: {
+            tokenHash: JWTUtils.getTokenHash(token),
+            // isRevoked: false, // Assuming isRevoked is part of the model, if not, remove
+            expiresAt: { gt: new Date() }
+        }
       });
-      if (dbRefreshToken && !dbRefreshToken.isRevoked) { // Check isRevoked for refresh tokens specifically
-        responsePayload = {
+      // If isRevoked is not on AccessToken, blacklisting is the primary revocation check for ATs
+      // For this logic, let's assume blacklisting check is primary for ATs.
+      // If found in DB and not expired (and optionally !isRevoked if field exists), it's active.
+      if (dbAccessToken /* && !dbAccessToken.isRevoked (if field exists) */) {
+        isTokenActiveInDb = true;
+      }
+
+      if (isTokenActiveInDb) {
+        activeResponsePayload = {
             active: true,
-            scope: payload.scope as string || '',
-            client_id: payload.client_id as string,
-            sub: payload.sub as string, // 通常是 user_id 或 client_id (Usually user_id or client_id)
+            scope: payload.scope as string || undefined,
+            client_id: payload.client_id as string, // client_id from token payload
+            username: payload.user_id ? (await prisma.user.findUnique({where: {id: payload.user_id as string}}))?.username : undefined,
+            sub: payload.sub as string,
             aud: payload.aud as string | string[] | undefined,
             iss: payload.iss as string,
             exp: payload.exp,
             iat: payload.iat,
             jti: payload.jti,
-            token_type: 'refresh_token', // 明确这是刷新令牌 (Clearly indicate this is a refresh token)
-             ...(dbRefreshToken.userId && { user_id: dbRefreshToken.userId }),
+            token_type: 'Bearer',
+            ...(dbAccessToken.userId && { user_id: dbAccessToken.userId }), // Add user_id if present in db record
+            permissions: payload.permissions as string[] || undefined, // If permissions are in token
         };
       }
     }
   }
 
-  // 如果令牌有效 (active: true)，确保所有必要的声明都存在且符合RFC 7662
-  // (If token is active, ensure all necessary claims exist and conform to RFC 7662)
-  // The current construction of responsePayload should generally cover this.
-  // Ensure client_id is always present if active.
-  if (responsePayload.active && !responsePayload.client_id) {
-      if (accessTokenVerification.payload?.client_id) {
-          responsePayload.client_id = accessTokenVerification.payload.client_id;
-      } else if (refreshTokenVerification?.payload?.client_id) {
-          responsePayload.client_id = refreshTokenVerification.payload.client_id;
-      } else {
-          // This case should ideally not be reached if tokens are generated correctly
-          console.warn("Active token introspection, but client_id could not be determined from token payload.");
-          responsePayload.active = false; // Mark as inactive if essential info like client_id is missing
-      }
+    }
   }
 
+  // If not identified as an active access token, or if hint was refresh_token
+  if (!activeResponsePayload && (token_type_hint === 'refresh_token' || !token_type_hint || (token_type_hint === 'access_token' && !activeResponsePayload))) {
+    const rtVerification = await JWTUtils.verifyRefreshToken(token);
+    if (rtVerification.valid && rtVerification.payload) {
+      const payload = rtVerification.payload;
+      let isTokenActiveInDb = false;
 
-  // 审计日志 (可选) (Optional audit log)
-  await AuthorizationUtils.logAuditEvent({
-      clientId: authenticatedClient.id, // Use the DB ID of the authenticated client
-      action: 'token_introspect',
-      resource: `token_type:${tokenTypeHint || 'unknown'}`,
-      ipAddress: request.headers.get('x-forwarded-for') || request.ip || undefined,
-      userAgent: request.headers.get('user-agent') || undefined,
-      success: responsePayload.active,
-      metadata: {
-          introspected_token_jti: responsePayload.jti, // JTI of the token being introspected
-          introspected_token_active: responsePayload.active,
-      },
-  });
+      if (payload.jti) {
+        const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
+        if (blacklisted) {
+          return NextResponse.json({ active: false } as IntrospectResponseInactive);
+        }
+      }
 
-  return NextResponse.json(responsePayload, { status: 200 });
+      const dbRefreshToken = await prisma.refreshToken.findFirst({
+          where: { tokenHash: JWTUtils.getTokenHash(token), isRevoked: false, expiresAt: { gt: new Date() }}
+      });
+      if (dbRefreshToken) { // Refresh tokens explicitly check isRevoked
+        isTokenActiveInDb = true;
+      }
+
+      if (isTokenActiveInDb) {
+        activeResponsePayload = {
+            active: true,
+            scope: payload.scope as string || undefined,
+            client_id: payload.client_id as string,
+            username: payload.user_id ? (await prisma.user.findUnique({where: {id: payload.user_id as string}}))?.username : undefined,
+            sub: payload.sub as string,
+            aud: payload.aud as string | string[] | undefined,
+            iss: payload.iss as string,
+            exp: payload.exp,
+            iat: payload.iat,
+            jti: payload.jti,
+            token_type: 'refresh_token', // Hinting it's a refresh token, though RFC7662 is vague on this for RTs
+            ...(dbRefreshToken?.userId && { user_id: dbRefreshToken.userId }),
+        };
+      }
+    }
+  }
+
+  // Final response construction
+  if (activeResponsePayload) {
+    // Ensure all required fields for active response are present, even if from different sources
+    if (!activeResponsePayload.client_id && accessTokenVerification.payload?.client_id) {
+        activeResponsePayload.client_id = accessTokenVerification.payload.client_id as string;
+    } else if (!activeResponsePayload.client_id && refreshTokenVerification?.payload?.client_id) {
+        activeResponsePayload.client_id = refreshTokenVerification.payload.client_id as string;
+    }
+    // If still no client_id for an active token, something is wrong with token generation or data.
+    if (!activeResponsePayload.client_id) {
+        console.warn("Active token introspection, but client_id could not be determined from token payload.");
+        return NextResponse.json({ active: false } as IntrospectResponseInactive);
+    }
+
+    // Remove undefined fields for cleaner response, then validate with Zod
+    Object.keys(activeResponsePayload).forEach(key =>
+        (activeResponsePayload as any)[key] === undefined && delete (activeResponsePayload as any)[key]
+    );
+    const parsedActiveResponse = IntrospectResponseActive.safeParse(activeResponsePayload);
+    if (parsedActiveResponse.success) {
+        return NextResponse.json(parsedActiveResponse.data);
+    } else {
+        console.error("Introspection active response schema validation failed:", parsedActiveResponse.error.flatten());
+        return NextResponse.json({ active: false, error_description: "Internal server error processing token details." } as IntrospectResponseInactive);
+    }
+  }
+
+  // If token is invalid, expired, revoked, or not found by any means
+  return NextResponse.json({ active: false } as IntrospectResponseInactive);
 }
 
 // TODO: 替换简化的 authenticateIntrospectionClient 为健壮的客户端认证中间件 (e.g., withClientAuth)

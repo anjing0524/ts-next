@@ -1882,51 +1882,206 @@ export class OAuthFlowTestHelper {
 // Create instances for convenience
 const defaultHttpClient = new TestHttpClient();
 
+// ============================================================================
+// Test Database Setup and Teardown Utilities
+// 测试数据库设置和拆卸工具
+// ============================================================================
+
+const globalDataManager = new TestDataManager('global_setup_');
+
 /**
- * 创建标准测试设置
+ * 初始化测试数据库 (Initializes the test database)
+ * 清理数据库并设置基础作用域 (Clears the database and sets up basic scopes)
  */
-export function createTestSetup(testName: string) {
-  const dataManager = new TestDataManager(`${testName}_`);
+export async function setupTestDb(): Promise<void> {
+  console.log('Setting up test database...');
+  await globalDataManager.clearDatabase(); // 清理所有相关表 (Clear all relevant tables)
+  await globalDataManager.setupBasicScopes(); // 设置基础OAuth作用域 (Setup basic OAuth scopes)
+  console.log('Test database setup complete.');
+}
+
+/**
+ * 清理测试数据库 (Tears down the test database)
+ * 目前是 clearDatabase 的别名 (Currently an alias for clearDatabase)
+ */
+export async function teardownTestDb(): Promise<void> {
+  console.log('Tearing down test database...');
+  await globalDataManager.clearDatabase();
+  console.log('Test database teardown complete.');
+}
+
+// ============================================================================
+// Authenticated Request Utilities
+// 带认证的请求工具
+// ============================================================================
+
+/**
+ * 创建一个预配置的认证请求工具 (Creates a pre-configured authenticated request utility)
+ *
+ * @param userId - 需要获取令牌的用户ID (The ID of the user for whom to obtain a token)
+ * @param permissions - (可选) 此令牌应包含的权限名称列表 (Optional list of permission names this token should have)
+ * @returns 返回一个配置好的TestHttpClient实例或一个可以发起认证请求的函数
+ *          (Returns a configured TestHttpClient instance or a function that can make authenticated requests)
+ *
+ * @example
+ * const authedRequest = await createAuthenticatedRequest('user-id-123', ['users:read', 'users:write']);
+ * const response = await authedRequest.get('/api/v2/users/some-user-id');
+ * // 或者: const response = await authedRequest('/api/v2/users/some-user-id', { method: 'GET' });
+ */
+export async function createAuthenticatedRequest(
+  userId: string,
+  permissions: string[] = []
+): Promise<{
+  request: (path: string, options?: RequestInit) => Promise<Response>;
+  get: (path: string, options?: RequestInit) => Promise<Response>;
+  post: (path: string, body: any, options?: RequestInit) => Promise<Response>;
+  put: (path: string, body: any, options?: RequestInit) => Promise<Response>;
+  delete: (path: string, options?: RequestInit) => Promise<Response>;
+}> {
+  // 1. 确保用户存在 (Ensure user exists)
+  // 通常, 测试用户应由此函数的调用者或全局测试设置创建
+  // Typically, the test user should be created by the caller of this function or by global test setup
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error(`User with ID ${userId} not found. Cannot create authenticated request.`);
+  }
+
+  // 2. 创建一个临时的测试客户端 (Create a temporary test client if one isn't readily available)
+  //    或者测试设置中应该有一个预定义的客户端用于此类操作
+  //    Alternatively, there should be a predefined client in test setup for such operations.
+  //    这里我们假设一个通用的内部客户端ID用于生成内部测试令牌
+  //    Here we assume a generic internal client ID for generating internal test tokens
+  const internalTestClientId = 'internal-test-runner-client';
+  let internalClient = await db.oAuthClient.findUnique({ where: { clientId: internalTestClientId }});
+  if (!internalClient) {
+    internalClient = await db.oAuthClient.create({
+      data: {
+        clientId: internalTestClientId,
+        name: 'Internal Test Runner Client',
+        clientType: 'CONFIDENTIAL', // 机密客户端，因为它将用于代表用户获取令牌
+        redirectUris: '[]', // 对于内部测试可能不需要
+        grantTypes: '["client_credentials"]', // 可能需要其他授权类型来模拟用户令牌
+        responseTypes: '[]',
+        allowedScopes: '["openid", "profile", ...permissions]', // 确保作用域足够
+        isActive: true,
+        clientSecret: await bcrypt.hash('internal-secret', 12), // 内部使用的密钥
+        accessTokenTtl: 3600,
+        refreshTokenTtl: 7200,
+      }
+    });
+  }
+
+
+  // 3. 使用 TestDataManager 或直接使用 JWTUtils 生成令牌
+  //    (Use TestDataManager or JWTUtils directly to generate a token)
+  const tokenManager = new TestDataManager('auth_req_');
+  const accessToken = await tokenManager.createAccessToken(
+    userId,
+    internalTestClientId, // 使用内部客户端ID
+    permissions.join(' '), // scopes 通常是空格分隔的字符串
+    permissions // 传递权限名称数组
+  );
+  // 不需要 `await tokenManager.cleanup()` 因为这会删除用户和客户端
+
+  const httpClient = new TestHttpClient(); // 使用默认的 httpClient
+
+  const makeAuthedRequest = (path: string, options: RequestInit = {}) => {
+    return httpClient.authenticatedRequest(path, accessToken, options);
+  };
 
   return {
-    dataManager,
-    httpClient: defaultHttpClient,
+    request: makeAuthedRequest,
+    get: (path: string, options?: RequestInit) => makeAuthedRequest(path, { ...options, method: 'GET' }),
+    post: (path: string, body: any, options?: RequestInit) => makeAuthedRequest(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
+    put: (path: string, body: any, options?: RequestInit) => makeAuthedRequest(path, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+    delete: (path: string, options?: RequestInit) => makeAuthedRequest(path, { ...options, method: 'DELETE' }),
+  };
+}
 
-    async setup() {
-      TestUtils.setupTestEnv();
-      await dataManager.setupBasicScopes();
-      // Any other global setup for standard tests
+// ============================================================================
+// Test Data Factory Information
+// 测试数据工厂信息
+// ============================================================================
+// 对于创建测试数据，请使用 TestDataManager 类中提供的具体方法，例如:
+// For creating test data, please use the specific methods provided in the TestDataManager class, such as:
+// - dataManager.createUser({ ... })
+// - dataManager.createClient({ ... })
+// - dataManager.createRole({ ... })
+// - dataManager.createPermission({ ... })
+// 这种方法比单一的泛型 createTestData(modelName, overrides) 更类型安全且易于使用。
+// This approach is more type-safe and easier to use than a single generic createTestData(modelName, overrides).
+// 请参考 TestDataManager 中的实现以获取更多细节和可用的预定义测试实体。
+// Please refer to the TestDataManager implementation for more details and available predefined test entities.
+// ============================================================================
+
+/**
+ * 创建标准测试设置 (Creates a standard test setup)
+ */
+export function createTestSetup(testName: string) {
+  const dataManager = new TestDataManager(`${testName}_`); // 每个测试设置实例使用独立的dataManager，并带有前缀
+
+  return {
+    dataManager, // 暴露dataManager实例以便测试可以创建特定的数据
+    httpClient: defaultHttpClient, // 全局共享的httpClient实例
+
+    /**
+     * 测试设置的初始化函数
+     * (Setup function for the test environment)
+     */
+    async setup(): Promise<TestDataManager> {
+      TestUtils.setupTestEnv(); // 确保环境变量等已设置
+      // 注意：不再在这里调用全局的 setupTestDb() 或 dataManager.setupBasicScopes()
+      // Those can be called once globally if needed, or per-suite.
+      // This setup focuses on returning a specific dataManager for the current test context.
+      // 如果每个测试或测试套件需要完全隔离和全新的基础数据，则在此处调用：
+      // If each test/suite needs complete isolation and fresh base data, call here:
+      // await dataManager.clearDatabase(); // 清理特定于此测试的数据
+      // await dataManager.setupBasicScopes(); // 为此测试设置基础作用域
       return dataManager;
     },
 
-    async cleanup() {
-      await dataManager.cleanup();
+    /**
+     * 测试设置的清理函数
+     * (Cleanup function for the test environment)
+     */
+    async cleanup(): Promise<void> {
+      await dataManager.cleanup(); // 清理此dataManager实例创建的数据
     },
   };
 }
 
 /**
- * 创建OAuth2集成测试设置
+ * 创建OAuth2集成测试设置 (Creates an OAuth2 integration test setup)
  */
 export function createOAuth2TestSetup(testName: string) {
-  const dataManager = new TestDataManager(`${testName}_`);
-  const oauth2Helper = new OAuth2TestHelper(dataManager); // Pass dataManager instance
+  const dataManager = new TestDataManager(`${testName}_`); // 每个测试设置实例使用独立的dataManager
+  const oauth2Helper = new OAuth2TestHelper(dataManager);
 
   return {
-    dataManager,
-    httpClient: defaultHttpClient, // Use the shared instance
-    oauth2Helper,
+    dataManager, // 暴露dataManager
+    httpClient: defaultHttpClient, // 全局共享的httpClient
+    oauth2Helper, // 暴露oauth2Helper
 
-    async setup() {
+    /**
+     * OAuth2测试设置的初始化函数
+     * (Setup function for the OAuth2 test environment)
+     */
+    async setup(): Promise<{ dataManager: TestDataManager; oauth2Helper: OAuth2TestHelper }> {
       TestUtils.setupTestEnv();
-      await dataManager.setupBasicScopes();
-      // Any other global setup for OAuth2 tests
+      // 与 createTestSetup 类似，决定是否在此处进行清理和基础数据设置
+      // Similar to createTestSetup, decide if cleanup and base data setup happens here or globally.
+      // await dataManager.clearDatabase();
+      // await dataManager.setupBasicScopes();
       return { dataManager, oauth2Helper };
     },
 
-    async cleanup() {
-      await oauth2Helper.cleanup(); // Specific cleanup for OAuth2TestHelper if any
-      await dataManager.cleanup(); // General data cleanup
+    /**
+     * OAuth2测试设置的清理函数
+     * (Cleanup function for the OAuth2 test environment)
+     */
+    async cleanup(): Promise<void> {
+      await oauth2Helper.cleanup(); // OAuth2TestHelper 可能有自己的特定清理逻辑
+      await dataManager.cleanup(); // 清理此dataManager实例创建的数据
     },
   };
 }

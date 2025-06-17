@@ -4,10 +4,10 @@
 // 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Prisma ORM 客户端。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端。 // Corrected import
 import { Role, Prisma } from '@prisma/client'; // Prisma 生成的角色类型和高级查询类型。
-// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 认证由中间件处理。
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件。
+import { userRoleAssignmentPayloadSchema, userRoleListResponseSchema } from '../schemas'; // Import Zod schemas
 
 // --- 辅助函数 ---
 
@@ -70,21 +70,25 @@ async function listUserRolesHandler(req: AuthenticatedRequest, context: RouteCon
 
     // 步骤 3: 格式化响应数据。
     // 从 UserRole 记录中提取 Role 对象，并选择性地构造返回给客户端的角色信息。
-    const rolesToReturn = userRoles
-      .map(ur => ur.role) // 从每个 UserRole 对象中提取关联的 Role 对象。
-      .filter(role => role != null) // 确保 Role 对象存在 (理论上 `include` 会保证，但作为防御性检查)。
-      .map(role => ({ // 为每个 Role 对象构造一个更简洁的返回结构。
+    const rolesData = userRoles
+      .map(ur => ur.role)
+      .filter(role => role != null)
+      .map(role => ({
         id: role.id,
         name: role.name,
         displayName: role.displayName,
         description: role.description,
-        isActive: role.isActive, // 包含角色本身的激活状态。
-        // 如果需要 UserRole 分配记录的特定信息 (例如分配时间)，可以从 `ur` 中获取并添加到这里。
-        // assignedAt: ur.assignedAt,
+        isActive: role.isActive,
       }));
 
-    // 返回包含角色列表的 JSON 响应。
-    return NextResponse.json({ roles: rolesToReturn }, { status: 200 });
+    // Validate response with Zod schema
+    const validatedResponse = userRoleListResponseSchema.safeParse({ roles: rolesData });
+    if (!validatedResponse.success) {
+        console.error("Failed to validate list user roles response:", validatedResponse.error.issues);
+        return errorResponse('Internal server error: Failed to prepare role data.', 500, 'response_validation_failed');
+    }
+
+    return NextResponse.json(validatedResponse.data, { status: 200 });
 
   } catch (error) {
     // 错误处理：记录未知错误，并返回500服务器错误。
@@ -107,20 +111,19 @@ async function assignRolesToUserHandler(req: AuthenticatedRequest, context: Rout
   const performingAdmin = req.user; // 执行操作的管理员。
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) assigning roles to user ${targetUserId}.`);
 
-  // 步骤 1: 解析请求体。
-  // 期望请求体是一个 JSON 对象，包含一个 `roleIds` 数组，其中每个元素是角色ID字符串。
-  let requestBody;
+  // 步骤 1: 解析请求体并使用Zod验证。
+  let rawRequestBody;
   try {
-    requestBody = await req.json();
+    rawRequestBody = await req.json();
   } catch (e) {
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
-  const { roleIds } = requestBody; // 从请求体中解构出 roleIds。
-  // 验证 `roleIds` 是否是一个非空的字符串数组成员。
-  if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0 || !roleIds.every(id => typeof id === 'string')) {
-    return errorResponse('Invalid request: "roleIds" must be a non-empty array of strings representing role IDs.', 400, 'validation_error_roleIds');
+  const validationResult = userRoleAssignmentPayloadSchema.safeParse(rawRequestBody);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
+  const { roleIds } = validationResult.data; // 从验证结果中获取 roleIds
 
   try {
     // 步骤 2: 检查目标用户是否存在。
