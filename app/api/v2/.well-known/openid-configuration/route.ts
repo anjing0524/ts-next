@@ -112,9 +112,20 @@ async function discoveryHandler(request: NextRequest) {
     id_token_signing_alg_values_supported: process.env.JWT_ALGORITHM ? [process.env.JWT_ALGORITHM as string] : ["RS256"], // ID令牌支持的JWS签名算法
 
     claims_supported: [ // UserInfo端点或ID令牌中可能返回的声明 (Claims that can be returned from UserInfo or in ID Token)
-        "sub", "iss", "aud", "exp", "iat", "jti", // Standard JWT claims
-        "name", "given_name", "family_name", "preferred_username", "email", "picture", "updated_at", // Standard OIDC profile/email claims
-        // "email_verified", "phone_number", "phone_number_verified" // Include if supported and fields exist
+        // Standard OIDC claims based on current User model and userInfoResponseSchema
+        "sub",
+        "name",
+        "given_name",
+        "family_name",
+        "preferred_username",
+        "picture",
+        "updated_at",
+        // Custom claims available from User model
+        "organization",
+        "department"
+        // NOTE: "iss", "aud", "exp", "iat", "jti" are JWT envelope claims, not typically listed in OIDC 'claims_supported'.
+        // 'claims_supported' refers to claims about the End-User.
+        // Email, phone, address related claims are omitted as they are not in the current User model.
     ],
     // 以下是一些其他常见的OIDC元数据字段，根据实际支持情况添加
     // (Below are some other common OIDC metadata fields, add based on actual support)

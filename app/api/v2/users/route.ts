@@ -3,22 +3,18 @@
 // 使用 `requirePermission` 中间件来保护这些端点，确保只有具有适当权限的用户才能执行操作。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。 // Corrected import to use the alias
 import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型，User 用于类型提示，Prisma 用于高级查询类型。
 import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。
-// import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 不再使用 V2 会话令牌。认证和授权通过 OAuth Bearer Token 和 requirePermission 中间件处理。
-// import { isValidEmail } from '@/lib/utils';   // 辅助函数，用于验证电子邮件格式。 // Zod will handle email validation
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission 高阶函数和 AuthenticatedRequest 类型。
-import { z } from 'zod'; // 引入 Zod 用于数据校验
-import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。
-// import { prisma } from '@/lib/prisma'; // prisma is already imported globally in the original file as "prisma" not "db"
+// Zod is imported from schemas.ts
+// import { z } from 'zod';
+import { userCreatePayloadSchema, userListQuerySchema } from './schemas'; // Import Zod schemas
 
-// 定义密码的最小长度 - Zod schema will handle this.
-// const MIN_PASSWORD_LENGTH = 8;
 // 定义获取用户列表时分页的默认页面大小。
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE_CONST = 10; // Renamed to avoid conflict with schema default if any
 // 定义获取用户列表时分页允许的最大页面大小，以防止滥用。
-const MAX_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE_CONST = 100; // Renamed
 
 // --- 辅助函数 ---
 
@@ -53,58 +49,17 @@ function excludeSensitiveUserFields(user: User | Partial<User>): Partial<User> {
 // 此端点用于创建新用户，受到 `requirePermission('users:create')` 的保护。
 // 只有拥有 'users:create' 权限的用户 (通常是管理员) 才能调用此接口。
 async function createUserHandler(req: AuthenticatedRequest): Promise<NextResponse> {
-  // `requirePermission` 中间件已经处理了认证和权限检查。
-  // `req.user` 包含了执行此操作的已认证用户 (管理员) 的信息。
-  const performingAdmin = req.user; // 获取执行操作的管理员信息
-  // 日志记录管理员尝试创建用户的行为，有助于审计和追踪。
+  const performingAdmin = req.user;
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to create a new user.`);
 
-  // 步骤 1: 解析请求体 (JSON 格式)
   let requestBody;
   try {
-    requestBody = await req.json(); // 从请求中异步读取并解析 JSON 数据。
+    requestBody = await req.json();
   } catch (e) {
-    // 如果请求体不是有效的 JSON，则返回400错误。
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
-  // 从请求体中解构出用户相关字段。
-  // 为 isActive 和 mustChangePassword 提供默认值。
-  // const {
-  //   username, email, password, // 必需字段 // These will come from validatedData
-  //   firstName, lastName, displayName, avatar, phone, // 可选个人信息字段
-  //   organization, department, workLocation, // 可选工作相关字段
-  //   isActive = true,        // 用户状态，默认为 true (激活)
-  //   mustChangePassword = true, // 是否需要在下次登录时强制修改密码，默认为 true
-  // } = requestBody; // No longer directly destructuring from requestBody
-
-  // Zod schema for password policy (moved to top level of the module)
-  const passwordPolicySchema = z.string()
-    .min(8, "Password must be at least 8 characters long / 密码长度至少为8位")
-    .max(64, "Password must be at most 64 characters long / 密码长度最多为64位")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter / 密码必须包含至少一个大写字母")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter / 密码必须包含至少一个小写字母")
-    .regex(/[0-9]/, "Password must contain at least one number / 密码必须包含至少一个数字")
-    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character / 密码必须包含至少一个特殊字符");
-
-  // Zod schema for user creation payload (moved to top level of the module)
-  const userCreatePayloadSchema = z.object({
-    username: z.string().min(3, "Username must be at least 3 characters long / 用户名长度至少为3位"),
-    password: passwordPolicySchema,
-    email: z.string().email("Invalid email address / 无效的电子邮件地址").optional().nullable(),
-    firstName: z.string().optional().nullable(),
-    lastName: z.string().optional().nullable(),
-    displayName: z.string().optional().nullable(), // Added displayName
-    avatar: z.string().url("Invalid URL format for avatar / 头像URL格式无效").optional().nullable(), // Added avatar with URL validation
-    // phone: z.string().regex(/^\+[1-9]\d{1,14}$/, "Invalid phone number format / 无效的电话号码格式").optional().nullable(), // Example phone validation
-    organization: z.string().optional().nullable(),
-    department: z.string().optional().nullable(),
-    // workLocation: z.string().optional().nullable(), // Assuming this is not in User model directly
-    isActive: z.boolean().default(true).optional(),
-    mustChangePassword: z.boolean().default(true).optional(),
-  });
-
-  // 步骤 2: 使用 Zod 进行输入数据验证
+  // 步骤 2: 使用 Zod 进行输入数据验证 (schema imported from ./schemas)
   const validationResult = userCreatePayloadSchema.safeParse(requestBody);
   if (!validationResult.success) {
     // 返回400错误，包含Zod解析出的具体错误信息
@@ -189,54 +144,42 @@ export const POST = requirePermission('users:create')(createUserHandler); // Cor
 // 此端点用于获取用户列表，支持分页、过滤和排序。
 // 受到 `requirePermission('users:list')` 的保护。
 async function listUsersHandler(req: AuthenticatedRequest): Promise<NextResponse> {
-  // 管理员认证和权限检查已由 `requirePermission` 中间件处理。
-  const performingAdmin = req.user; // 获取执行操作的管理员信息。
+  const performingAdmin = req.user;
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing users.`);
 
-  // 步骤 1: 处理查询参数 (用于分页、过滤、排序)。
-  const { searchParams } = new URL(req.url); // 解析 URL 中的查询参数。
+  // 步骤 1: 使用 Zod 解析和验证查询参数。
+  const { searchParams } = new URL(req.url);
+  const queryParamsRaw: Record<string, string> = {};
+  searchParams.forEach((value, key) => { queryParamsRaw[key] = value; });
 
-  // 分页参数: page (页码) 和 pageSize (每页数量)。
-  // Define DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE if not already defined at module level
-  const DEFAULT_PAGE_SIZE = 10;
-  const MAX_PAGE_SIZE = 100;
+  const validationResult = userListQuerySchema.safeParse(queryParamsRaw);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+  }
 
-  const page = parseInt(searchParams.get('page') || '1', 10); // 默认为第1页。
-  let pageSize = parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10); // 默认为 DEFAULT_PAGE_SIZE。
-  if (pageSize <= 0) pageSize = DEFAULT_PAGE_SIZE; // 防止 pageSize 小于等于0。
-  if (pageSize > MAX_PAGE_SIZE) pageSize = MAX_PAGE_SIZE; // 限制最大页面大小，防止请求过多数据。
+  let {
+    page,
+    pageSize,
+    username: usernameQuery,
+    email: emailQuery,
+    isActive: isActiveQuery,
+    sortBy,
+    sortOrder
+  } = validationResult.data;
 
-  // 过滤参数: username (按用户名过滤), email (按邮箱过滤), isActive (按用户状态过滤)。
-  const usernameQuery = searchParams.get('username');
-  const emailQuery = searchParams.get('email');
-  const isActiveQuery = searchParams.get('isActive'); // 可能为 'true', 'false', 或 null/undefined。
-
-  // 排序参数: sortBy (排序字段) 和 sortOrder (排序顺序 'asc' 或 'desc')。
-  const sortBy = searchParams.get('sortBy') || 'createdAt'; // 默认按用户创建时间排序。
-  const sortOrderInput = searchParams.get('sortOrder') || 'desc'; // 默认降序排列。
-  // 验证 sortOrder 是否为 'asc' 或 'desc'，否则默认为 'desc'。
-  const sortOrder = (sortOrderInput.toLowerCase() === 'asc' || sortOrderInput.toLowerCase() === 'desc') ? sortOrderInput.toLowerCase() as Prisma.SortOrder : 'desc';
+  // Apply page size constraints
+  pageSize = Math.min(pageSize ?? DEFAULT_PAGE_SIZE_CONST, MAX_PAGE_SIZE_CONST);
+  if ((pageSize ?? DEFAULT_PAGE_SIZE_CONST) <=0) pageSize = DEFAULT_PAGE_SIZE_CONST;
 
 
   // 步骤 2: 构建 Prisma 查询条件 (`where` 和 `orderBy`)。
-  const where: Prisma.UserWhereInput = {}; // 初始化空的 `where` 条件对象。
-  // 如果提供了 usernameQuery，则添加用户名模糊查询条件 (不区分大小写)。
+  const where: Prisma.UserWhereInput = {};
   if (usernameQuery) where.username = { contains: usernameQuery, mode: 'insensitive' };
-  // 如果提供了 emailQuery，则添加邮箱模糊查询条件 (不区分大小写)。
   if (emailQuery) where.email = { contains: emailQuery, mode: 'insensitive' };
-  // 如果提供了 isActiveQuery，则根据其值 (true/false) 添加用户状态过滤条件。
-  if (isActiveQuery !== null && isActiveQuery !== undefined) {
-    if (isActiveQuery.toLowerCase() === 'true') where.isActive = true;
-    else if (isActiveQuery.toLowerCase() === 'false') where.isActive = false;
-    // 如果 isActiveQuery 是其他无效值，则忽略此过滤条件。
-  }
+  if (isActiveQuery !== undefined) where.isActive = isActiveQuery; // Already boolean from Zod transform
 
-  // 确保 sortBy 参数是 User 模型的一个有效字段，以防止注入或错误。
-  // `validSortByFields` 定义了允许排序的字段列表。
   const validSortByFields: (keyof User)[] = ['username', 'email', 'createdAt', 'updatedAt', 'lastLoginAt', 'displayName', 'firstName', 'lastName'];
-  // 如果 sortBy 无效，则默认使用 'createdAt'。
   const safeSortBy = validSortByFields.includes(sortBy as keyof User) ? sortBy : 'createdAt';
-  // 构建 Prisma `orderBy` 对象。
   const orderBy: Prisma.UserOrderByWithRelationInput = { [safeSortBy]: sortOrder };
 
   try {

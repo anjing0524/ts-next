@@ -2,33 +2,29 @@
 // 描述: OAuth 2.0 令牌撤销端点 (RFC 7009)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import crypto from 'crypto'; // 引入 crypto 用于哈希
+// import { z } from 'zod'; // Zod is imported from schemas.ts
+// import crypto from 'crypto'; // crypto is used by JWTUtils.getTokenHash, not directly here
 
 import { prisma } from '@/lib/prisma';
-import { successResponse, errorResponse } from '@/lib/api/apiResponse';
+// successResponse and errorResponse are not used in this specific version of the file.
+// import { successResponse, errorResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // 假设这些工具类可用
+import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // Using JWTUtils from oauth2.ts
+import * as jose from 'jose'; // For decoding JWT to get JTI
 
-// --- Zod Schema for Revocation Request Body ---
-const RevocationRequestSchema = z.object({
-  token: z.string({ required_error: "token is required" }).min(1, '令牌 (token) 不能为空'),
-  token_type_hint: z.enum(['access_token', 'refresh_token']).optional().describe('可选的令牌类型提示 (e.g., access_token, refresh_token)'),
-  // client_id and client_secret are implicitly handled by ClientAuthUtils if passed in body,
-  // but primarily ClientAuthUtils checks Authorization header first.
-  // Zod schema here focuses on token and hint.
-});
+// Import Zod schema from the dedicated schema file
+import { revokeTokenRequestSchema, RevokeTokenRequestPayload } from './schemas';
 
 
 /**
  * @swagger
  * /api/v2/oauth/revoke:
  *   post:
- *     summary: OAuth 2.0 令牌撤销 (Token Revocation)
+ *     summary: OAuth 2.0 令牌撤销 (Token Revocation) - RFC 7009
  *     description: |
- *       撤销一个访问令牌或刷新令牌。
- *       此端点受客户端凭证保护。公共客户端可以撤销其令牌而无需认证密钥。
- *       参考 RFC 7009。
+ *       撤销一个访问令牌或刷新令牌 (RFC 7009).
+ *       客户端通过提供令牌来进行撤销。服务器将验证客户端身份（如果适用）和令牌。
+ *       无论令牌是否有效或已被撤销，服务器通常都会返回 HTTP 200 OK，以防止信息泄露。
  *     tags:
  *       - OAuth V2
  *     consumes:
@@ -47,10 +43,11 @@ const RevocationRequestSchema = z.object({
  *                 description: 需要撤销的令牌。
  *               token_type_hint:
  *                 type: string
- *                 description: 可选的令牌类型提示 (例如 "access_token" 或 "refresh_token")。
+ *                 enum: [access_token, refresh_token]
+ *                 description: 可选的令牌类型提示。
  *               client_id:
  *                 type: string
- *                 description: (如果未使用Basic Auth) 进行请求的客户端ID。
+ *                 description: (如果未使用Basic Auth且客户端是公共的) 进行请求的客户端ID。
  *               client_secret:
  *                 type: string
  *                 description: (如果未使用Basic Auth且客户端是机密的) 客户端密钥。
@@ -58,11 +55,29 @@ const RevocationRequestSchema = z.object({
  *               - token
  *     responses:
  *       '200':
- *         description: 令牌已成功撤销或客户端无权撤销或令牌无效 (服务器不区分这些情况以避免信息泄露)。
+ *         description: 令牌已成功撤销，或者令牌无效/未知（服务器不区分以防信息泄露）。
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object # 通常为空响应体
  *       '400':
- *         description: 无效的请求 (例如缺少 'token' 参数或不支持的令牌类型)。
+ *         description: 无效的请求（例如，缺少 'token' 参数，或请求格式不正确）。
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuthError'
  *       '401':
- *         description: 客户端认证失败 (仅当客户端认证是必需的时)。
+ *         description: 客户端认证失败。
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuthError'
+ *       '415':
+ *         description: 不支持的媒体类型（请求体必须是 application/x-www-form-urlencoded）。
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuthError'
  *       '500':
  *         description: 服务器内部错误。
  */
@@ -70,7 +85,8 @@ async function revocationHandler(request: NextRequest) {
   const overallRequestId = (request as any).requestId; // from withErrorHandler
 
   if (request.headers.get('content-type') !== 'application/x-www-form-urlencoded') {
-    return NextResponse.json(errorResponse(415, '不支持的媒体类型 (Unsupported Media Type). 请使用 application/x-www-form-urlencoded。', 'UNSUPPORTED_MEDIA_TYPE', overallRequestId), { status: 415 });
+    // Using a simplified error response structure here as errorResponse util is not in scope.
+    return NextResponse.json({ error: 'unsupported_media_type', error_description: 'Unsupported Media Type. Please use application/x-www-form-urlencoded.' }, { status: 415 });
   }
 
   const bodyParams = new URLSearchParams(await request.text());
@@ -79,34 +95,46 @@ async function revocationHandler(request: NextRequest) {
 
 
   // --- 客户端认证 (Client Authentication) ---
-  // ClientAuthUtils.authenticateClient handles Basic Auth (from header) or client_id/secret from body (via bodyParams)
   const clientAuthResult = await ClientAuthUtils.authenticateClient(request, bodyParams);
+  let authenticatedClient = clientAuthResult.client;
 
-  if (!clientAuthResult.client) {
-    // RFC 7009: If client authentication fails, the server an error response as described in RFC 6749, Section 5.2.
+  // Handle public clients that might provide client_id in body
+  if (!authenticatedClient && rawBodyData.client_id && !clientAuthResult.error) {
+    const publicClientCheck = await prisma.oAuthClient.findUnique({
+      where: { clientId: rawBodyData.client_id as string, isActive: true, clientType: 'PUBLIC' }
+    });
+    if (publicClientCheck) authenticatedClient = publicClientCheck;
+  }
+
+  // If client authentication is required (e.g. confidential client) and failed, or no client identified
+  if (!authenticatedClient) {
     return NextResponse.json(
-      clientAuthResult.error || { error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication failed' },
+      clientAuthResult.error || { error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication or identification failed.' },
       { status: 401 }
     );
   }
-  const authenticatedClient = clientAuthResult.client;
-  console.log(`Token revocation request authenticated for client: ${authenticatedClient.clientId}`);
+  console.log(`Token revocation request potentially for client: ${authenticatedClient.clientId}`);
 
-  // --- 请求体验证 (Using Zod on rawBodyData which includes token and hint) ---
-  const validationResult = RevocationRequestSchema.safeParse(rawBodyData);
+  // --- 请求体验证 (Using imported Zod schema) ---
+  const validationResult = revokeTokenRequestSchema.safeParse(rawBodyData);
   if (!validationResult.success) {
     return NextResponse.json(
-      errorResponse(400, validationResult.error.errors[0]?.message || 'Invalid revocation request parameters.', OAuth2ErrorTypes.INVALID_REQUEST, overallRequestId),
+      { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: validationResult.error.errors[0]?.message || 'Invalid revocation request parameters.', issues: validationResult.error.flatten().fieldErrors },
       { status: 400 }
     );
+  }
+
+  // client_id from body, if present, must match authenticated client
+  if (validationResult.data.client_id && validationResult.data.client_id !== authenticatedClient.clientId) {
+    return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: "client_id in body does not match authenticated client." }, { status: 400 });
   }
 
   const { token: tokenToRevoke, token_type_hint: tokenTypeHint } = validationResult.data;
 
   // --- 令牌撤销逻辑 ---
-  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke);
+  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke); // From lib/auth/oauth2.ts
   let tokenFoundAndRevoked = false;
-  let revokedTokenDetails = { type: "unknown", idForLog: "unknown" };
+  let revokedTokenInfo = { type: "unknown", idForLog: "unknown" }; // Corrected variable name
 
   // JWTs contain a 'jti' (JWT ID) claim. We should use this for blacklisting if possible.
   // For opaque tokens stored by hash, we use the hash.

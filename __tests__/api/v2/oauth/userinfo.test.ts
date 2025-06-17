@@ -196,157 +196,119 @@ describe('OIDC UserInfo Endpoint - /api/v2/oauth/userinfo', () => {
   });
 
   describe('Successful UserInfo Responses', () => {
+    // Adjusted mockUser to reflect fields actually in Prisma schema and used by the route
     const mockUser: User = {
       id: 'user123',
       username: 'testuser',
-      passwordHash: 'hash',
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(Date.now() - 100000), // ensure updated_at is in the past
+      passwordHash: 'hash', // Required by User type, not directly used in UserInfo response
+      isActive: true,      // Required by User type
+      createdAt: new Date(), // Required by User type
+      updatedAt: new Date(Date.now() - 100000),
       lastLoginAt: null,
       displayName: 'Test Display Name',
       firstName: 'Test',
       lastName: 'User',
       avatar: 'http://example.com/avatar.jpg',
-      organization: 'Org',
-      department: 'Dept',
-      mustChangePassword: false,
-      failedLoginAttempts: 0,
-      lockedUntil: null,
-      createdBy: 'admin',
-      email: 'test@example.com',
-      emailVerified: true,
-      phone: '+11234567890',
-      phoneVerified: false,
-      // Add any other fields from User model that might be used
-      profileUrl: 'http://example.com/profile',
-      websiteUrl: 'http://example.com/website',
-      gender: 'male',
-      birthdate: '1990-01-01',
-      zoneinfo: 'America/New_York',
-      locale: 'en-US',
-      address_formatted: '123 Main St, Anytown, USA',
+      organization: 'Info Org',
+      department: 'Info Dept',
+      mustChangePassword: true,  // Required by User type
+      failedLoginAttempts: 0,   // Required by User type
+      lockedUntil: null,        // Required by User type
+      createdBy: null,          // Required by User type
+      // Fields like email, emailVerified, phone, phoneVerified, address_formatted are NOT in the Prisma schema
+      // So they are removed from this mock if they are not used by the UserInfo construction logic.
+      // The route only maps existing Prisma fields.
     };
 
     const setupSuccessMocks = (tokenScope: string, dbScope?: string) => {
-      const jwtPayload = { sub: 'user123', scope: tokenScope, jti: 'jti-success', aud: 'api_resource_dev', iss: 'http://localhost:3000' };
+      const jwtPayload = { sub: mockUser.id, scope: tokenScope, jti: 'jti-success', aud: process.env.JWT_AUDIENCE!, iss: process.env.JWT_ISSUER! };
       const dbAccessToken = {
         id: 'dbTokenSuccess',
         tokenHash: `hashed-validtoken-${tokenScope.replace(/\s+/g, '-')}`,
-        userId: 'user123',
+        userId: mockUser.id,
         clientId: 'client1',
-        scope: dbScope || tokenScope, // DB scope can sometimes differ slightly, though usually matches JWT
+        scope: dbScope || tokenScope,
         expiresAt: new Date(Date.now() + 3600 * 1000),
+        isRevoked: false, // Added this field as it's in the model now
         user: mockUser,
       };
       (JWTUtils.verifyAccessToken as any).mockResolvedValue({ valid: true, payload: jwtPayload });
       (prisma.accessToken.findFirst as any).mockResolvedValue(dbAccessToken);
+      (prisma.tokenBlacklist.findUnique as any).mockResolvedValue(null); // Assume token JTI not blacklisted for success cases
     };
 
     test('should return 200 with only "sub" if only "openid" scope is granted', async () => {
       setupSuccessMocks('openid');
       const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-openid-only' });
       const response = await GET(request);
-      const jsonBody = JSON.parse(await (response as Response).text());
-
+      const jsonBody = await (response as Response).json();
 
       expect(response.status).toBe(200);
-      expect(jsonBody.sub).toBe('user123');
+      expect(jsonBody.sub).toBe(mockUser.id);
       expect(Object.keys(jsonBody).length).toBe(1); // Only sub
     });
 
-    test('should return profile claims for "openid profile" scopes', async () => {
+    test('should return profile claims for "openid profile" scopes (based on available User fields)', async () => {
       setupSuccessMocks('openid profile');
       const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-profile' });
       const response = await GET(request);
-      const jsonBody = JSON.parse(await (response as Response).text());
+      const jsonBody = await (response as Response).json();
 
       expect(response.status).toBe(200);
-      expect(jsonBody.sub).toBe('user123');
-      expect(jsonBody.name).toBe('Test User');
-      expect(jsonBody.given_name).toBe('Test');
-      expect(jsonBody.family_name).toBe('User');
-      expect(jsonBody.preferred_username).toBe('testuser');
-      expect(jsonBody.nickname).toBe('Test Display Name'); // from displayName
-      expect(jsonBody.picture).toBe('http://example.com/avatar.jpg');
-      expect(jsonBody.profile).toBe('http://example.com/profile');
-      expect(jsonBody.website).toBe('http://example.com/website');
-      // gender, birthdate, zoneinfo, locale are not in the current User model used by userinfo endpoint.
-      // If they were, they would be tested here. The UserInfo route code has commented out lines for them.
+      expect(jsonBody.sub).toBe(mockUser.id);
+      expect(jsonBody.name).toBe(mockUser.displayName || `${mockUser.firstName || ''} ${mockUser.lastName || ''}`.trim());
+      expect(jsonBody.given_name).toBe(mockUser.firstName);
+      expect(jsonBody.family_name).toBe(mockUser.lastName);
+      expect(jsonBody.preferred_username).toBe(mockUser.username);
+      expect(jsonBody.picture).toBe(mockUser.avatar);
+      expect(jsonBody.organization).toBe(mockUser.organization);
+      expect(jsonBody.department).toBe(mockUser.department);
       expect(jsonBody.updated_at).toBe(Math.floor(mockUser.updatedAt.getTime() / 1000));
+
+      // Ensure claims not in schema or based on non-existent User fields are undefined
+      expect(jsonBody.email).toBeUndefined();
+      expect(jsonBody.profile).toBeUndefined(); // Was user.profileUrl, not in Prisma User
+      expect(jsonBody.website).toBeUndefined(); // Was user.websiteUrl, not in Prisma User
     });
 
-    test('should return email claims for "openid email" scopes', async () => {
-      setupSuccessMocks('openid email');
-      const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-email' });
+    // Since User model has no email, email_verified, phone_number, phone_number_verified, address fields,
+    // tests for 'email', 'phone', 'address' scopes will not return these specific claims.
+    // The UserInfoResponse schema already reflects this.
+
+    test('should not return email claims if "email" scope is granted but User model lacks email field', async () => {
+      setupSuccessMocks('openid email'); // Token has 'email' scope
+      const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-email-scope-no-field' });
       const response = await GET(request);
-      const jsonBody = JSON.parse(await (response as Response).text());
+      const jsonBody = await (response as Response).json();
 
       expect(response.status).toBe(200);
-      expect(jsonBody.sub).toBe('user123');
-      expect(jsonBody.email).toBe('test@example.com');
-      expect(jsonBody.email_verified).toBe(true);
+      expect(jsonBody.sub).toBe(mockUser.id);
+      expect(jsonBody.email).toBeUndefined();
+      expect(jsonBody.email_verified).toBeUndefined();
     });
 
-    test('should return phone claims for "openid phone" scopes', async () => {
-        setupSuccessMocks('openid phone');
-        const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-phone' });
-        const response = await GET(request);
-        const jsonBody = JSON.parse(await (response as Response).text());
-
-        expect(response.status).toBe(200);
-        expect(jsonBody.sub).toBe('user123');
-        expect(jsonBody.phone_number).toBe('+11234567890');
-        expect(jsonBody.phone_number_verified).toBe(false);
-    });
-
-    test('should return all relevant claims for "openid profile email phone" scopes', async () => {
-      setupSuccessMocks('openid profile email phone');
-      const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-all' });
+    test('should return all relevant claims for "openid profile" (as other scopes like email/phone/address have no corresponding User fields)', async () => {
+      setupSuccessMocks('openid profile email phone address'); // Token has all these scopes
+      const request = createMockUserInfoRequest({ Authorization: 'Bearer validtoken-all-scopes' });
       const response = await GET(request);
-      const jsonBody = JSON.parse(await (response as Response).text());
+      const jsonBody = await (response as Response).json();
 
       expect(response.status).toBe(200);
-      // Profile
-      expect(jsonBody.sub).toBe('user123');
-      expect(jsonBody.name).toBe('Test User');
-      expect(jsonBody.picture).toBe('http://example.com/avatar.jpg');
-      // Email
-      expect(jsonBody.email).toBe('test@example.com');
-      expect(jsonBody.email_verified).toBe(true);
-      // Phone
-      expect(jsonBody.phone_number).toBe('+11234567890');
-      expect(jsonBody.phone_number_verified).toBe(false);
-      // Ensure no other claims are present
-      const expectedKeys = ['sub', 'name', 'given_name', 'family_name', 'preferred_username', 'nickname', 'picture', 'profile', 'website', 'updated_at', 'email', 'email_verified', 'phone_number', 'phone_number_verified'];
+      expect(jsonBody.sub).toBe(mockUser.id);
+      expect(jsonBody.name).toBe(mockUser.displayName || `${mockUser.firstName || ''} ${mockUser.lastName || ''}`.trim());
+      expect(jsonBody.picture).toBe(mockUser.avatar);
+      expect(jsonBody.organization).toBe(mockUser.organization);
+      expect(jsonBody.department).toBe(mockUser.department);
+
+      // These should be undefined as per current User model and schema
+      expect(jsonBody.email).toBeUndefined();
+      expect(jsonBody.phone_number).toBeUndefined();
+      expect(jsonBody.address).toBeUndefined();
+
+      const expectedKeys = ['sub', 'name', 'given_name', 'family_name', 'preferred_username', 'picture', 'updated_at', 'organization', 'department'];
       Object.keys(jsonBody).forEach(key => {
         expect(expectedKeys).toContain(key);
       });
     });
-
-     test('email_verified should default to false if not on user model and email scope present', async () => {
-      const userWithoutEmailVerified = { ...mockUser };
-      delete (userWithoutEmailVerified as any).emailVerified; // Simulate field not existing
-
-      const jwtPayload = { sub: 'user123', scope: 'openid email', jti: 'jti-success-no-email-verified', aud: 'api_resource_dev', iss: 'http://localhost:3000' };
-      const dbAccessToken = {
-        id: 'dbTokenSuccessNoEmailVerified',
-        userId: 'user123',
-        user: userWithoutEmailVerified, // Use modified user
-        scope: 'openid email',
-        expiresAt: new Date(Date.now() + 3600 * 1000),
-      };
-      (JWTUtils.verifyAccessToken as any).mockResolvedValue({ valid: true, payload: jwtPayload });
-      (prisma.accessToken.findFirst as any).mockResolvedValue(dbAccessToken);
-
-      const request = createMockUserInfoRequest({ Authorization: 'Bearer token-no-email-verified-field' });
-      const response = await GET(request);
-      const jsonBody = JSON.parse(await (response as Response).text());
-
-      expect(response.status).toBe(200);
-      expect(jsonBody.email).toBe(mockUser.email);
-      expect(jsonBody.email_verified).toBe(false); // Should default to false
-    });
-
   });
 });
