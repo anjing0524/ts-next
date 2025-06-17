@@ -20,9 +20,10 @@ interface TaskDetailProps {
   onClose: () => void;
   taskPk: string | number | null;
   redate: string | null;
+  exeId: number;
 }
 
-export function TaskStateDetail({ isOpen, onClose, taskPk, redate }: TaskDetailProps) {
+export function TaskStateDetail({ isOpen, onClose, taskPk, redate, exeId = 1 }: TaskDetailProps) {
   const [taskDetail, setTaskDetail] = useState<TaskStateDetailType | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
@@ -30,7 +31,7 @@ export function TaskStateDetail({ isOpen, onClose, taskPk, redate }: TaskDetailP
       if (!taskPk || !redate) return;
       try {
         setLoading(true);
-        const detail = await getTaskInfo(taskPk, redate);
+        const detail = await getTaskInfo(taskPk, redate, exeId);
         setTaskDetail(detail);
       } catch (error) {
         console.error('获取任务详情失败:', error);
@@ -39,10 +40,10 @@ export function TaskStateDetail({ isOpen, onClose, taskPk, redate }: TaskDetailP
       }
     }
 
-    if (isOpen && taskPk) {
+    if (isOpen && taskPk && exeId) {
       fetchTaskDetail();
     }
-  }, [isOpen, taskPk, redate]);
+  }, [isOpen, taskPk, redate, exeId]);
 
   // 定义详情项
   const detailItems = taskDetail

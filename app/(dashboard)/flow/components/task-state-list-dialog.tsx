@@ -500,6 +500,7 @@ export function TaskDetailsDialog() {
         onClose={() => setIsDetailOpen(false)}
         taskPk={selectedTaskPk}
         redate={format(new Date(redate as number), 'yyyy-MM-dd')}
+        exeId={exeId}
       />
     </>
   );
