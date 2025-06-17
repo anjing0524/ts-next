@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
 import mysqlPool from '@/lib/instance/mysql-client';
 import { PlanConf, PlanState, TaskState } from '@/types/db-types';
-import logger from '@/utils/logger';
+import logger from '@/lib/utils/logger';
 
 import { TaskConfState, TaskStateDetailType } from '../(dashboard)/flow/types/type';
 

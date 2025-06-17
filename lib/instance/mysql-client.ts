@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 
-import logger from '@/utils/logger';
+import logger from '@/lib/utils/logger';
 dotenv.config();
 
 // 声明全局变量类型

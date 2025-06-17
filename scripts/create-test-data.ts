@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse } from 'csv-parse';
-import logger from '@/utils/logger';
+import logger from '@/lib/utils/logger';
 // 使用 lib 下的 MySQL 连接池
 import pool from '@/lib/instance/mysql-client';
 

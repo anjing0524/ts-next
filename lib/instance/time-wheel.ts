@@ -1,4 +1,4 @@
-import logger from '@/utils/logger';
+import logger from '@/lib/utils/logger';
 import TimeWheel from '@/utils/time-wheel';
 
 // 定义单例时间轮实例

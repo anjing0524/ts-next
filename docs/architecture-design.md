@@ -3,7 +3,7 @@
 **版本**: 2.0  
 **创建日期**: 2024-12-19  
 **状态**: 生产就绪  
-**团队**: 认证授权团队  
+**团队**: 认证授权团队
 
 ## 目录
 
@@ -35,6 +35,7 @@
 ### 支持的授权模式
 
 1. **授权码模式 (Authorization Code)**
+
    - 强制PKCE (Proof Key for Code Exchange)
    - 支持刷新令牌
    - 适用于Web应用和移动应用
@@ -55,11 +56,37 @@
 
 ### 技术栈
 
-- **框架**: Next.js 14 (App Router)
-- **数据库**: PostgreSQL + Prisma ORM
-- **认证**: JWT (RS256签名)
+### 前端技术栈
+
+- **框架**: Next.js 15 (App Router)
+- **语言**: TypeScript 5.x
+- **样式**: Tailwind CSS 3.x
+- **UI组件**: Shadcn/ui (基于Radix UI)
+- **状态管理**: Zustand
+- **表单处理**: React Hook Form + Zod
+- **HTTP客户端**: Fetch API (原生)
+- **构建工具**: Turbopack (Next.js 15内置)
+
+### 后端技术栈
+
+- **运行时**: Node.js 18+
+- **框架**: Next.js 15 API Routes
+- **语言**: TypeScript 5.x
+- **数据库**: SQLite (开发) / PostgreSQL (生产)
+- **ORM**: Prisma 5.x
+- **认证**: JWT + OAuth 2.1
 - **加密**: bcrypt (密码哈希)
 - **验证**: Zod (数据验证)
+- **缓存**: 内存缓存 + Redis (可选)
+- **WebAssembly**: Rust + wasm-pack (性能关键模块)
+
+### 开发工具
+
+- **包管理**: pnpm
+- **代码规范**: ESLint + Prettier
+- **类型检查**: TypeScript
+- **测试框架**: Vitest + Testing Library
+- **Git钩子**: Husky + lint-staged
 
 ### 系统架构
 
@@ -78,6 +105,7 @@
 ### 核心模型
 
 #### User (用户)
+
 ```sql
 model User {
   id           String    @id @default(cuid())
@@ -100,6 +128,7 @@ model User {
 ```
 
 #### OAuthClient (OAuth客户端)
+
 ```sql
 model OAuthClient {
   id                String     @id @default(cuid())
@@ -118,6 +147,7 @@ model OAuthClient {
 ```
 
 #### Role & Permission (角色和权限)
+
 ```sql
 model Role {
   id          String @id @default(cuid())
@@ -144,11 +174,13 @@ model Permission {
 ### OAuth2.1端点
 
 #### 1. 授权端点
+
 ```
 GET /api/v2/oauth/authorize
 ```
 
 **参数**:
+
 - `response_type`: 固定为 "code"
 - `client_id`: 客户端ID
 - `redirect_uri`: 重定向URI
@@ -158,11 +190,13 @@ GET /api/v2/oauth/authorize
 - `code_challenge_method`: 固定为 "S256"
 
 #### 2. 令牌端点
+
 ```
 POST /api/v2/oauth/token
 ```
 
 **授权码模式**:
+
 ```json
 {
   "grant_type": "authorization_code",
@@ -174,6 +208,7 @@ POST /api/v2/oauth/token
 ```
 
 **客户端凭证模式**:
+
 ```json
 {
   "grant_type": "client_credentials",
@@ -182,6 +217,7 @@ POST /api/v2/oauth/token
 ```
 
 **刷新令牌**:
+
 ```json
 {
   "grant_type": "refresh_token",
@@ -190,12 +226,14 @@ POST /api/v2/oauth/token
 ```
 
 #### 3. 用户信息端点
+
 ```
 GET /api/v2/oauth/userinfo
 Authorization: Bearer {access_token}
 ```
 
 #### 4. 令牌撤销端点
+
 ```
 POST /api/v2/oauth/revoke
 ```
@@ -203,11 +241,13 @@ POST /api/v2/oauth/revoke
 ### OIDC发现端点
 
 #### 1. 配置发现
+
 ```
 GET /.well-known/openid-configuration
 ```
 
 #### 2. 公钥端点
+
 ```
 GET /.well-known/jwks.json
 ```
@@ -215,30 +255,109 @@ GET /.well-known/jwks.json
 ## 安全机制
 
 ### 1. PKCE (强制)
+
 - 所有授权码流程必须使用PKCE
 - 使用SHA256哈希算法
 - 防止授权码拦截攻击
 
 ### 2. JWT安全
+
 - 使用RS256算法签名
 - 支持公钥验证
 - 包含标准声明 (iss, aud, exp, iat, sub)
 
 ### 3. 客户端认证
+
 - 机密客户端使用HTTP Basic认证
 - 公开客户端仅验证client_id
 - 支持客户端密钥轮换
 
 ### 4. 权限控制
+
 - 基于RBAC模型
 - 细粒度权限控制
 - 支持资源级别权限
+
+## 安全设计
+
+### 密码安全
+
+- BCrypt哈希存储
+- 密码强度要求
+- 密码历史记录
+- 强制密码更新
+- 账户锁定机制
+- 登录尝试记录
+
+### 令牌安全
+
+- JWT使用RS256签名
+- 访问令牌短期有效(15分钟)
+- 刷新令牌长期有效(30天)
+- 令牌撤销机制
+- JTI黑名单管理
+- 令牌轮换策略
+
+### 传输安全
+
+- 强制HTTPS
+- HSTS头部
+- 安全Cookie设置
+- CSRF保护
+- XSS防护
+
+### 访问控制
+
+- RBAC权限模型
+- 最小权限原则
+- 权限缓存机制
+- IP白名单控制
+- 客户端认证
+
+## 缓存策略
+
+### 权限缓存
+
+- **内存缓存**: 用户权限信息缓存15分钟
+- **Redis缓存**: 分布式环境下的权限共享
+- **缓存失效**: 权限变更时主动清除
+
+### 令牌缓存
+
+- **黑名单缓存**: 撤销令牌的JTI缓存
+- **客户端信息缓存**: OAuth客户端配置缓存
+
+### 配置缓存
+
+- **系统配置**: 启动时加载，变更时刷新
+- **安全策略**: 内存缓存，定期同步
+
+## 性能优化
+
+### 数据库优化
+
+- **索引策略**: 关键字段建立复合索引
+- **查询优化**: 使用Prisma查询优化
+- **连接池**: 数据库连接池管理
+
+### API优化
+
+- **响应压缩**: Gzip压缩
+- **请求限流**: 基于IP和用户的限流
+- **异步处理**: 非关键操作异步执行
+
+### 前端优化
+
+- **代码分割**: 路由级别的代码分割
+- **静态资源**: CDN加速
+- **缓存策略**: 浏览器缓存优化
 
 ## JWT认证授权使用说明
 
 ### JWT结构
 
 #### Header
+
 ```json
 {
   "alg": "RS256",
@@ -248,6 +367,7 @@ GET /.well-known/jwks.json
 ```
 
 #### Payload (Access Token)
+
 ```json
 {
   "iss": "https://auth.company.com",
@@ -272,6 +392,7 @@ GET /.well-known/jwks.json
 ### 使用示例
 
 #### 1. 获取访问令牌
+
 ```javascript
 // 授权码模式
 const tokenResponse = await fetch('/api/v2/oauth/token', {
@@ -284,23 +405,25 @@ const tokenResponse = await fetch('/api/v2/oauth/token', {
     code: authorizationCode,
     redirect_uri: redirectUri,
     client_id: clientId,
-    code_verifier: codeVerifier
-  })
+    code_verifier: codeVerifier,
+  }),
 });
 
 const tokens = await tokenResponse.json();
 ```
 
 #### 2. 使用访问令牌
+
 ```javascript
 const apiResponse = await fetch('/api/v2/users', {
   headers: {
-    'Authorization': `Bearer ${tokens.access_token}`
-  }
+    Authorization: `Bearer ${tokens.access_token}`,
+  },
 });
 ```
 
 #### 3. 刷新令牌
+
 ```javascript
 const refreshResponse = await fetch('/api/v2/oauth/token', {
   method: 'POST',
@@ -309,8 +432,8 @@ const refreshResponse = await fetch('/api/v2/oauth/token', {
   },
   body: new URLSearchParams({
     grant_type: 'refresh_token',
-    refresh_token: tokens.refresh_token
-  })
+    refresh_token: tokens.refresh_token,
+  }),
 });
 ```
 
@@ -352,14 +475,14 @@ const refreshResponse = await fetch('/api/v2/oauth/token', {
 
 #### 权限矩阵
 
-| 页面/功能 | 超级管理员 | 用户管理员 | 客户端管理员 | 审计员 | 普通用户 |
-|-----------|------------|------------|--------------|--------|----------|
-| 仪表板 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 用户管理 | ✓ | ✓ | ✗ | ✗ | ✗ |
-| 客户端管理 | ✓ | ✗ | ✓ | ✗ | ✗ |
-| 权限管理 | ✓ | ✓ | ✗ | ✗ | ✗ |
-| 审计日志 | ✓ | ✓ | ✓ | ✓ | ✗ |
-| 系统设置 | ✓ | ✗ | ✗ | ✗ | ✗ |
+| 页面/功能  | 超级管理员 | 用户管理员 | 客户端管理员 | 审计员 | 普通用户 |
+| ---------- | ---------- | ---------- | ------------ | ------ | -------- |
+| 仪表板     | ✓          | ✓          | ✓            | ✓      | ✓        |
+| 用户管理   | ✓          | ✓          | ✗            | ✗      | ✗        |
+| 客户端管理 | ✓          | ✗          | ✓            | ✗      | ✗        |
+| 权限管理   | ✓          | ✓          | ✗            | ✗      | ✗        |
+| 审计日志   | ✓          | ✓          | ✓            | ✓      | ✗        |
+| 系统设置   | ✓          | ✗          | ✗            | ✗      | ✗        |
 
 #### 菜单权限配置
 
@@ -370,7 +493,7 @@ const menuPermissions = {
   clientManagement: ['admin:clients:read', 'admin:clients:write'],
   permissionManagement: ['admin:permissions:read', 'admin:permissions:write'],
   auditLogs: ['admin:audit:read'],
-  systemSettings: ['admin:system:read', 'admin:system:write']
+  systemSettings: ['admin:system:read', 'admin:system:write'],
 };
 ```
 
@@ -389,18 +512,22 @@ const menuPermissions = {
 ### 预定义角色
 
 1. **超级管理员 (super_admin)**
+
    - 系统最高权限
    - 可管理所有资源
 
 2. **用户管理员 (user_admin)**
+
    - 用户和角色管理
    - 权限分配
 
 3. **客户端管理员 (client_admin)**
+
    - OAuth客户端管理
    - 客户端配置
 
 4. **审计员 (auditor)**
+
    - 查看审计日志
    - 生成合规报告
 
@@ -453,22 +580,26 @@ TOKEN_AUDIENCE="api.company.com"
 ### 部署步骤
 
 1. **安装依赖**
+
 ```bash
 npm install
 ```
 
 2. **数据库迁移**
+
 ```bash
 npx prisma migrate deploy
 npx prisma db seed
 ```
 
 3. **构建应用**
+
 ```bash
 npm run build
 ```
 
 4. **启动服务**
+
 ```bash
 npm start
 ```

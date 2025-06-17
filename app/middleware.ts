@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { jwtVerify, JWTPayload } from 'jose'; // Import JWTPayload for type hinting
 
 import { AuthorizationUtils } from '@/lib/auth/oauth2'; // Import AuthorizationUtils
-import logger from '@/utils/logger'; // Import logger
+import logger from '@/lib/utils/logger'; // Import logger
 
 import type { NextRequest } from 'next/server';
 

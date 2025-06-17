@@ -1,0 +1,1085 @@
+# OAuth2.1认证授权中心权限体系设计文档
+
+> **文档版本**: v2.0.0  
+> **创建日期**: 2024-01-20  
+> **最后更新**: 2024-01-20  
+> **文档状态**: 正式版  
+> **维护团队**: 架构团队
+
+## 文档摘要
+
+本文档详细描述了OAuth2.1认证授权中心的权限体系设计，包括RBAC权限模型、菜单权限、API权限、数据权限和操作权限的设计方案。确保系统具备企业级的细粒度权限控制能力。
+
+## 目录
+
+- [1. 权限体系概述](#1-权限体系概述)
+  - [1.1 权限模型](#11-权限模型)
+  - [1.2 权限层级](#12-权限层级)
+- [2. 管理页面菜单权限设计](#2-管理页面菜单权限设计)
+- [3. API权限设计](#3-api权限设计)
+- [4. 数据权限设计](#4-数据权限设计)
+- [5. 操作权限设计](#5-操作权限设计)
+- [6. 权限检查机制](#6-权限检查机制)
+- [7. 权限缓存策略](#7-权限缓存策略)
+- [8. 权限审计](#8-权限审计)
+
+## 1. 权限体系概述
+
+### 1.1 权限模型
+
+本系统采用基于RBAC（Role-Based Access Control）的权限模型，结合OAuth2.1标准，实现细粒度的权限控制。权限体系包括：
+
+- **菜单权限**：控制用户可访问的管理界面菜单
+- **API权限**：控制用户可调用的API接口
+- **数据权限**：控制用户可访问的数据范围
+- **操作权限**：控制用户可执行的具体操作
+
+### 1.2 权限层级
+
+```
+系统管理员 (SYSTEM_ADMIN)
+├── 用户管理员 (USER_ADMIN)
+├── 权限管理员 (PERMISSION_ADMIN)
+├── 客户端管理员 (CLIENT_ADMIN)
+├── 审计管理员 (AUDIT_ADMIN)
+└── 普通用户 (USER)
+```
+
+## 2. 管理页面菜单权限设计
+
+### 2.1 菜单结构
+
+```json
+{
+  "menus": [
+    {
+      "id": "dashboard",
+      "name": "仪表板",
+      "path": "/dashboard",
+      "icon": "dashboard",
+      "permission": "menu:dashboard:view",
+      "children": []
+    },
+    {
+      "id": "user-management",
+      "name": "用户管理",
+      "path": "/users",
+      "icon": "users",
+      "permission": "menu:users:view",
+      "children": [
+        {
+          "id": "user-list",
+          "name": "用户列表",
+          "path": "/users/list",
+          "permission": "menu:users:list"
+        },
+        {
+          "id": "user-create",
+          "name": "创建用户",
+          "path": "/users/create",
+          "permission": "menu:users:create"
+        },
+        {
+          "id": "user-roles",
+          "name": "用户角色",
+          "path": "/users/roles",
+          "permission": "menu:users:roles"
+        }
+      ]
+    },
+    {
+      "id": "role-management",
+      "name": "角色管理",
+      "path": "/roles",
+      "icon": "shield",
+      "permission": "menu:roles:view",
+      "children": [
+        {
+          "id": "role-list",
+          "name": "角色列表",
+          "path": "/roles/list",
+          "permission": "menu:roles:list"
+        },
+        {
+          "id": "role-permissions",
+          "name": "角色权限",
+          "path": "/roles/permissions",
+          "permission": "menu:roles:permissions"
+        }
+      ]
+    },
+    {
+      "id": "permission-management",
+      "name": "权限管理",
+      "path": "/permissions",
+      "icon": "key",
+      "permission": "menu:permissions:view",
+      "children": [
+        {
+          "id": "api-permissions",
+          "name": "API权限",
+          "path": "/permissions/api",
+          "permission": "menu:permissions:api"
+        },
+        {
+          "id": "menu-permissions",
+          "name": "菜单权限",
+          "path": "/permissions/menu",
+          "permission": "menu:permissions:menu"
+        },
+        {
+          "id": "data-permissions",
+          "name": "数据权限",
+          "path": "/permissions/data",
+          "permission": "menu:permissions:data"
+        }
+      ]
+    },
+    {
+      "id": "client-management",
+      "name": "客户端管理",
+      "path": "/clients",
+      "icon": "apps",
+      "permission": "menu:clients:view",
+      "children": [
+        {
+          "id": "client-list",
+          "name": "客户端列表",
+          "path": "/clients/list",
+          "permission": "menu:clients:list"
+        },
+        {
+          "id": "client-register",
+          "name": "注册客户端",
+          "path": "/clients/register",
+          "permission": "menu:clients:register"
+        },
+        {
+          "id": "client-scopes",
+          "name": "作用域管理",
+          "path": "/clients/scopes",
+          "permission": "menu:clients:scopes"
+        }
+      ]
+    },
+    {
+      "id": "audit-management",
+      "name": "审计管理",
+      "path": "/audit",
+      "icon": "file-text",
+      "permission": "menu:audit:view",
+      "children": [
+        {
+          "id": "audit-logs",
+          "name": "审计日志",
+          "path": "/audit/logs",
+          "permission": "menu:audit:logs"
+        },
+        {
+          "id": "security-events",
+          "name": "安全事件",
+          "path": "/audit/security",
+          "permission": "menu:audit:security"
+        },
+        {
+          "id": "compliance-reports",
+          "name": "合规报告",
+          "path": "/audit/compliance",
+          "permission": "menu:audit:compliance"
+        }
+      ]
+    },
+    {
+      "id": "system-management",
+      "name": "系统管理",
+      "path": "/system",
+      "icon": "settings",
+      "permission": "menu:system:view",
+      "children": [
+        {
+          "id": "system-config",
+          "name": "系统配置",
+          "path": "/system/config",
+          "permission": "menu:system:config"
+        },
+        {
+          "id": "security-policies",
+          "name": "安全策略",
+          "path": "/system/security",
+          "permission": "menu:system:security"
+        },
+        {
+          "id": "system-monitoring",
+          "name": "系统监控",
+          "path": "/system/monitoring",
+          "permission": "menu:system:monitoring"
+        },
+        {
+          "id": "data-management",
+          "name": "数据管理",
+          "path": "/system/data",
+          "permission": "menu:system:data"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 2.2 菜单权限映射
+
+| 菜单路径 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|------|
+| /dashboard | menu:dashboard:view | USER | 仪表板查看 |
+| /users | menu:users:view | USER_ADMIN | 用户管理入口 |
+| /users/list | menu:users:list | USER_ADMIN | 用户列表 |
+| /users/create | menu:users:create | USER_ADMIN | 创建用户 |
+| /users/roles | menu:users:roles | USER_ADMIN | 用户角色管理 |
+| /roles | menu:roles:view | PERMISSION_ADMIN | 角色管理入口 |
+| /roles/list | menu:roles:list | PERMISSION_ADMIN | 角色列表 |
+| /roles/permissions | menu:roles:permissions | PERMISSION_ADMIN | 角色权限管理 |
+| /permissions | menu:permissions:view | PERMISSION_ADMIN | 权限管理入口 |
+| /permissions/api | menu:permissions:api | PERMISSION_ADMIN | API权限管理 |
+| /permissions/menu | menu:permissions:menu | PERMISSION_ADMIN | 菜单权限管理 |
+| /permissions/data | menu:permissions:data | PERMISSION_ADMIN | 数据权限管理 |
+| /clients | menu:clients:view | CLIENT_ADMIN | 客户端管理入口 |
+| /clients/list | menu:clients:list | CLIENT_ADMIN | 客户端列表 |
+| /clients/register | menu:clients:register | CLIENT_ADMIN | 注册客户端 |
+| /clients/scopes | menu:clients:scopes | CLIENT_ADMIN | 作用域管理 |
+| /audit | menu:audit:view | AUDIT_ADMIN | 审计管理入口 |
+| /audit/logs | menu:audit:logs | AUDIT_ADMIN | 审计日志 |
+| /audit/security | menu:audit:security | AUDIT_ADMIN | 安全事件 |
+| /audit/compliance | menu:audit:compliance | AUDIT_ADMIN | 合规报告 |
+| /system | menu:system:view | SYSTEM_ADMIN | 系统管理入口 |
+| /system/config | menu:system:config | SYSTEM_ADMIN | 系统配置 |
+| /system/security | menu:system:security | SYSTEM_ADMIN | 安全策略 |
+| /system/monitoring | menu:system:monitoring | SYSTEM_ADMIN | 系统监控 |
+| /system/data | menu:system:data | SYSTEM_ADMIN | 数据管理 |
+
+## 3. API权限设计
+
+### 3.1 API权限分类
+
+#### 3.1.1 认证授权API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/auth/login | POST | auth:login | PUBLIC | 用户登录 |
+| /api/v2/auth/logout | POST | auth:logout | USER | 用户登出 |
+| /api/v2/auth/register | POST | auth:register | USER_ADMIN | 用户注册 |
+| /api/v2/auth/me | GET | auth:profile:read | USER | 获取当前用户信息 |
+| /api/v2/auth/refresh | POST | auth:refresh | USER | 刷新令牌 |
+| /api/v2/auth/check | POST | auth:permission:check | USER | 权限检查 |
+| /api/v2/auth/check-batch | POST | auth:permission:batch | USER | 批量权限检查 |
+| /api/v2/auth/password/change | POST | auth:password:change | USER | 修改密码 |
+| /api/v2/auth/password/reset | POST | auth:password:reset | USER_ADMIN | 重置密码 |
+
+#### 3.1.2 OAuth2.1 API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/oauth/authorize | GET | oauth:authorize | PUBLIC | OAuth授权端点 |
+| /api/v2/oauth/token | POST | oauth:token | PUBLIC | OAuth令牌端点 |
+| /api/v2/oauth/introspect | POST | oauth:introspect | CLIENT_ADMIN | 令牌内省 |
+| /api/v2/oauth/revoke | POST | oauth:revoke | USER | 令牌撤销 |
+| /api/v2/oauth/userinfo | GET | oauth:userinfo | USER | 用户信息端点 |
+| /api/v2/oauth/consent | GET/POST | oauth:consent | USER | 用户同意管理 |
+
+#### 3.1.3 用户管理API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/users | GET | users:list | USER_ADMIN | 用户列表 |
+| /api/v2/users | POST | users:create | USER_ADMIN | 创建用户 |
+| /api/v2/users/{userId} | GET | users:read | USER_ADMIN | 用户详情 |
+| /api/v2/users/{userId} | PUT | users:update | USER_ADMIN | 更新用户 |
+| /api/v2/users/{userId} | DELETE | users:delete | USER_ADMIN | 删除用户 |
+| /api/v2/users/{userId}/lock | POST | users:lock | USER_ADMIN | 锁定用户 |
+| /api/v2/users/{userId}/unlock | POST | users:unlock | USER_ADMIN | 解锁用户 |
+| /api/v2/users/{userId}/roles | GET | users:roles:read | USER_ADMIN | 用户角色列表 |
+| /api/v2/users/{userId}/roles | POST | users:roles:assign | USER_ADMIN | 分配角色 |
+| /api/v2/users/{userId}/roles/{roleId} | DELETE | users:roles:remove | USER_ADMIN | 移除角色 |
+| /api/v2/users/{userId}/permissions | GET | users:permissions:read | USER_ADMIN | 用户权限列表 |
+| /api/v2/users/{userId}/permissions/verify | POST | users:permissions:verify | USER | 权限验证 |
+| /api/v2/users/{userId}/reset-password | POST | users:password:reset | USER_ADMIN | 重置用户密码 |
+
+#### 3.1.4 角色权限管理API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/roles | GET | roles:list | PERMISSION_ADMIN | 角色列表 |
+| /api/v2/roles | POST | roles:create | PERMISSION_ADMIN | 创建角色 |
+| /api/v2/roles/{roleId} | GET | roles:read | PERMISSION_ADMIN | 角色详情 |
+| /api/v2/roles/{roleId} | PUT | roles:update | PERMISSION_ADMIN | 更新角色 |
+| /api/v2/roles/{roleId} | DELETE | roles:delete | PERMISSION_ADMIN | 删除角色 |
+| /api/v2/roles/{roleId}/permissions | GET | roles:permissions:read | PERMISSION_ADMIN | 角色权限列表 |
+| /api/v2/roles/{roleId}/permissions | POST | roles:permissions:assign | PERMISSION_ADMIN | 分配权限 |
+| /api/v2/roles/{roleId}/permissions/{permissionId} | DELETE | roles:permissions:remove | PERMISSION_ADMIN | 移除权限 |
+| /api/v2/permissions | GET | permissions:list | PERMISSION_ADMIN | 权限列表 |
+| /api/v2/permissions | POST | permissions:create | PERMISSION_ADMIN | 创建权限 |
+| /api/v2/permissions/{permissionId} | GET | permissions:read | PERMISSION_ADMIN | 权限详情 |
+| /api/v2/permissions/{permissionId} | PUT | permissions:update | PERMISSION_ADMIN | 更新权限 |
+| /api/v2/permissions/{permissionId} | DELETE | permissions:delete | PERMISSION_ADMIN | 删除权限 |
+
+#### 3.1.5 客户端管理API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/clients | GET | clients:list | CLIENT_ADMIN | 客户端列表 |
+| /api/v2/clients | POST | clients:create | CLIENT_ADMIN | 创建客户端 |
+| /api/v2/clients/{clientId} | GET | clients:read | CLIENT_ADMIN | 客户端详情 |
+| /api/v2/clients/{clientId} | PUT | clients:update | CLIENT_ADMIN | 更新客户端 |
+| /api/v2/clients/{clientId} | DELETE | clients:delete | CLIENT_ADMIN | 删除客户端 |
+| /api/v2/clients/{clientId}/regenerate-secret | POST | clients:secret:regenerate | CLIENT_ADMIN | 重新生成密钥 |
+| /api/v2/clients/{clientId}/scopes | GET | clients:scopes:read | CLIENT_ADMIN | 客户端作用域 |
+| /api/v2/clients/{clientId}/scopes | PUT | clients:scopes:update | CLIENT_ADMIN | 更新客户端作用域 |
+| /api/v2/scopes | GET | scopes:list | CLIENT_ADMIN | 作用域列表 |
+| /api/v2/scopes | POST | scopes:create | CLIENT_ADMIN | 创建作用域 |
+| /api/v2/scopes/{scopeId} | GET | scopes:read | CLIENT_ADMIN | 作用域详情 |
+| /api/v2/scopes/{scopeId} | PUT | scopes:update | CLIENT_ADMIN | 更新作用域 |
+| /api/v2/scopes/{scopeId} | DELETE | scopes:delete | CLIENT_ADMIN | 删除作用域 |
+
+#### 3.1.6 审计管理API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/audit/logs | GET | audit:logs:read | AUDIT_ADMIN | 审计日志列表 |
+| /api/v2/audit/logs/{logId} | GET | audit:logs:detail | AUDIT_ADMIN | 审计日志详情 |
+| /api/v2/audit/logs/search | POST | audit:logs:search | AUDIT_ADMIN | 审计日志搜索 |
+| /api/v2/audit/logs/export | POST | audit:logs:export | AUDIT_ADMIN | 导出审计日志 |
+| /api/v2/audit/statistics | GET | audit:statistics:read | AUDIT_ADMIN | 审计统计信息 |
+| /api/v2/audit/security-events | GET | audit:security:read | AUDIT_ADMIN | 安全事件列表（预留） |
+| /api/v2/audit/compliance-reports | GET | audit:compliance:read | AUDIT_ADMIN | 合规报告列表（预留） |
+
+#### 3.1.7 系统管理API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/system/configurations | GET | system:config:read | SYSTEM_ADMIN | 系统配置列表 |
+| /api/v2/system/configurations | PUT | system:config:update | SYSTEM_ADMIN | 批量更新系统配置 |
+| /api/v2/system/configurations/{configKey} | GET | system:config:detail | SYSTEM_ADMIN | 特定配置项 |
+| /api/v2/system/configurations/{configKey} | PUT | system:config:item:update | SYSTEM_ADMIN | 更新特定配置项 |
+| /api/v2/system/health | GET | system:health:read | SYSTEM_ADMIN | 系统健康状态 |
+| /api/v2/system/health/database | GET | system:health:database | SYSTEM_ADMIN | 数据库健康状态 |
+| /api/v2/system/health/cache | GET | system:health:cache | SYSTEM_ADMIN | 缓存健康状态 |
+| /api/v2/system/metrics | GET | system:metrics:read | SYSTEM_ADMIN | 系统性能指标 |
+| /api/v2/system/security-policies | GET | system:security:read | SYSTEM_ADMIN | 安全策略列表 |
+| /api/v2/system/security-policies/password | GET | system:security:password:read | SYSTEM_ADMIN | 密码策略 |
+| /api/v2/system/security-policies/password | PUT | system:security:password:update | SYSTEM_ADMIN | 更新密码策略 |
+| /api/v2/system/backups | GET | system:backup:read | SYSTEM_ADMIN | 备份列表 |
+| /api/v2/system/backups | POST | system:backup:create | SYSTEM_ADMIN | 创建数据备份 |
+| /api/v2/system/backups/{backupId}/restore | POST | system:backup:restore | SYSTEM_ADMIN | 恢复数据 |
+
+### 3.2 个人账户API
+
+| API路径 | HTTP方法 | 权限标识 | 角色要求 | 描述 |
+|---------|---------|---------|---------|------|
+| /api/v2/account/profile | GET | account:profile:read | USER | 获取个人资料 |
+| /api/v2/account/profile | PUT | account:profile:update | USER | 更新个人资料 |
+| /api/v2/account/change-password | POST | account:password:change | USER | 修改密码 |
+| /api/v2/account/sessions | GET | account:sessions:read | USER | 个人会话列表 |
+| /api/v2/account/sessions/{sessionId} | DELETE | account:sessions:delete | USER | 终止特定会话 |
+| /api/v2/account/permissions | GET | account:permissions:read | USER | 个人权限列表 |
+| /api/v2/account/roles | GET | account:roles:read | USER | 个人角色列表 |
+| /api/v2/account/consents | GET | account:consents:read | USER | 个人授权同意列表 |
+
+## 4. 需要删除的API
+
+基于API路由优化分析，以下API需要删除或重构：
+
+### 4.1 重复的权限检查API（删除）
+
+- `/api/auth/check-batch` - 已标记为DEPRECATED，直接删除
+- `/api/v1/auth/check` - 重定向实现，删除
+- `/api/v1/auth/check-batch` - 重定向实现，删除
+
+### 4.2 不规范的管理API（重构到v2）
+
+- `/api/v1/admin/audit-logs` → 迁移到 `/api/v2/audit/logs`
+- `/api/v1/admin/roles` → 迁移到 `/api/v2/roles`
+- `/api/v1/admin/permissions` → 迁移到 `/api/v2/permissions`
+- `/api/v1/admin/users` → 迁移到 `/api/v2/users`
+
+### 4.3 无版本OAuth API（迁移到v2）
+
+- `/api/oauth/authorize` → 迁移到 `/api/v2/oauth/authorize`
+- `/api/oauth/token` → 迁移到 `/api/v2/oauth/token`
+- `/api/oauth/consent` → 迁移到 `/api/v2/oauth/consent`
+
+### 4.4 保留的兼容API
+
+- `/api/permissions/check` - 保留作为v1兼容层，内部调用v2接口
+- `/.well-known/oauth-authorization-server` - 保留标准发现端点
+- `/.well-known/jwks.json` - 保留JWKS端点
+
+## 5. 系统监控数据上报设计
+
+### 5.1 监控数据类型
+
+#### 5.1.1 性能指标
+
+```typescript
+interface PerformanceMetrics {
+  // API性能指标
+  apiResponseTime: {
+    endpoint: string;
+    method: string;
+    averageTime: number;
+    p95Time: number;
+    p99Time: number;
+    requestCount: number;
+  }[];
+  
+  // 数据库性能指标
+  databaseMetrics: {
+    connectionPoolSize: number;
+    activeConnections: number;
+    queryExecutionTime: number;
+    slowQueries: number;
+  };
+  
+  // 缓存性能指标
+  cacheMetrics: {
+    hitRate: number;
+    missRate: number;
+    evictionRate: number;
+    memoryUsage: number;
+  };
+  
+  // 系统资源指标
+  systemMetrics: {
+    cpuUsage: number;
+    memoryUsage: number;
+    diskUsage: number;
+    networkIO: number;
+  };
+}
+```
+
+#### 5.1.2 业务指标
+
+```typescript
+interface BusinessMetrics {
+  // 认证指标
+  authenticationMetrics: {
+    loginAttempts: number;
+    successfulLogins: number;
+    failedLogins: number;
+    lockedAccounts: number;
+  };
+  
+  // OAuth指标
+  oauthMetrics: {
+    authorizationRequests: number;
+    tokenIssuances: number;
+    tokenRevocations: number;
+    activeTokens: number;
+  };
+  
+  // 权限指标
+  permissionMetrics: {
+    permissionChecks: number;
+    permissionDenials: number;
+    roleAssignments: number;
+  };
+}
+```
+
+### 5.2 数据上报机制
+
+#### 5.2.1 内部指标收集
+
+```typescript
+// 中间件级别的指标收集
+export class MetricsCollector {
+  // API响应时间收集
+  collectApiMetrics(req: Request, res: Response, responseTime: number) {
+    const metric = {
+      endpoint: req.path,
+      method: req.method,
+      statusCode: res.statusCode,
+      responseTime,
+      timestamp: new Date(),
+      userId: req.user?.id,
+      clientId: req.client?.id
+    };
+    
+    // 存储到时序数据库或内存缓存
+    this.storeMetric('api_performance', metric);
+  }
+  
+  // 业务事件收集
+  collectBusinessEvent(eventType: string, data: any) {
+    const event = {
+      type: eventType,
+      data,
+      timestamp: new Date()
+    };
+    
+    this.storeMetric('business_events', event);
+  }
+}
+```
+
+#### 5.2.2 外部监控集成
+
+```typescript
+// 支持多种监控系统
+export interface MonitoringAdapter {
+  sendMetrics(metrics: any): Promise<void>;
+}
+
+// Prometheus适配器
+export class PrometheusAdapter implements MonitoringAdapter {
+  async sendMetrics(metrics: PerformanceMetrics) {
+    // 转换为Prometheus格式并推送
+  }
+}
+
+// 自定义监控适配器
+export class CustomMonitoringAdapter implements MonitoringAdapter {
+  async sendMetrics(metrics: any) {
+    // 发送到自定义监控系统
+    await fetch('/api/v2/system/metrics/report', {
+      method: 'POST',
+      body: JSON.stringify(metrics)
+    });
+  }
+}
+```
+
+### 5.3 监控配置
+
+```typescript
+interface MonitoringConfig {
+  // 指标收集配置
+  collection: {
+    enabled: boolean;
+    interval: number; // 收集间隔（秒）
+    batchSize: number; // 批量上报大小
+  };
+  
+  // 存储配置
+  storage: {
+    type: 'memory' | 'redis' | 'database';
+    retentionPeriod: number; // 数据保留期（天）
+  };
+  
+  // 上报配置
+  reporting: {
+    enabled: boolean;
+    endpoints: string[]; // 上报端点
+    interval: number; // 上报间隔（秒）
+  };
+  
+  // 告警配置
+  alerting: {
+    enabled: boolean;
+    thresholds: {
+      apiResponseTime: number;
+      errorRate: number;
+      cpuUsage: number;
+      memoryUsage: number;
+    };
+  };
+}
+```
+
+## 6. 数据管理设计
+
+### 6.1 数据范围
+
+认证授权中心的数据管理仅涵盖以下数据库表：
+
+#### 6.1.1 用户相关表
+- `User` - 用户基本信息
+- `UserProfile` - 用户详细资料
+- `PasswordHistory` - 密码历史记录
+- `UserSession` - 用户会话信息
+
+#### 6.1.2 权限相关表
+- `Role` - 角色定义
+- `Permission` - 权限定义
+- `UserRole` - 用户角色关联
+- `RolePermission` - 角色权限关联
+- `ApiPermission` - API权限
+- `MenuPermission` - 菜单权限
+- `DataPermission` - 数据权限
+
+#### 6.1.3 OAuth相关表
+- `OAuthClient` - OAuth客户端
+- `AuthorizationCode` - 授权码
+- `AccessToken` - 访问令牌
+- `RefreshToken` - 刷新令牌
+- `ConsentGrant` - 用户同意授权
+- `Scope` - OAuth作用域
+
+#### 6.1.4 审计相关表
+- `AuditLog` - 审计日志
+- `SecurityEvent` - 安全事件
+- `LoginAttempt` - 登录尝试记录
+
+#### 6.1.5 系统相关表
+- `SystemConfiguration` - 系统配置
+- `SecurityPolicy` - 安全策略
+
+### 6.2 数据管理功能
+
+#### 6.2.1 数据备份
+
+```typescript
+interface BackupConfig {
+  // 备份策略
+  strategy: {
+    type: 'full' | 'incremental' | 'differential';
+    schedule: string; // Cron表达式
+    retention: number; // 保留份数
+  };
+  
+  // 备份范围
+  scope: {
+    tables: string[]; // 要备份的表
+    excludeData: string[]; // 排除数据的表（仅结构）
+  };
+  
+  // 存储配置
+  storage: {
+    type: 'local' | 's3' | 'ftp';
+    path: string;
+    encryption: boolean;
+  };
+}
+```
+
+#### 6.2.2 数据恢复
+
+```typescript
+interface RestoreOptions {
+  backupId: string;
+  targetTables?: string[]; // 指定恢复的表
+  pointInTime?: Date; // 时间点恢复
+  validateOnly?: boolean; // 仅验证不执行
+}
+```
+
+#### 6.2.3 数据清理
+
+```typescript
+interface DataCleanupPolicy {
+  // 审计日志清理
+  auditLogs: {
+    retentionDays: number;
+    archiveBeforeDelete: boolean;
+  };
+  
+  // 过期令牌清理
+  expiredTokens: {
+    cleanupInterval: number; // 清理间隔（小时）
+    batchSize: number;
+  };
+  
+  // 会话清理
+  expiredSessions: {
+    cleanupInterval: number;
+    gracePeriod: number; // 宽限期（分钟）
+  };
+}
+```
+
+## 7. 安全策略管理
+
+### 7.1 密码策略
+
+#### 7.1.1 密码强度策略
+
+```typescript
+interface PasswordStrengthPolicy {
+  // 基本要求
+  minLength: number; // 最小长度
+  maxLength: number; // 最大长度
+  
+  // 字符要求
+  requireUppercase: boolean; // 需要大写字母
+  requireLowercase: boolean; // 需要小写字母
+  requireNumbers: boolean; // 需要数字
+  requireSpecialChars: boolean; // 需要特殊字符
+  specialChars: string; // 允许的特殊字符
+  
+  // 复杂度要求
+  minCharacterTypes: number; // 最少字符类型数
+  maxRepeatingChars: number; // 最大重复字符数
+  maxSequentialChars: number; // 最大连续字符数
+  
+  // 禁止规则
+  forbiddenPatterns: string[]; // 禁止的模式
+  forbiddenWords: string[]; // 禁止的词汇
+  forbidUserInfo: boolean; // 禁止包含用户信息
+}
+```
+
+#### 7.1.2 密码历史策略
+
+```typescript
+interface PasswordHistoryPolicy {
+  // 历史记录
+  historyCount: number; // 记录历史密码数量
+  preventReuse: boolean; // 防止重复使用
+  
+  // 变更限制
+  minChangeInterval: number; // 最小变更间隔（小时）
+  maxChangeFrequency: number; // 最大变更频率（次/天）
+}
+```
+
+#### 7.1.3 密码过期策略
+
+```typescript
+interface PasswordExpirationPolicy {
+  // 过期设置
+  enabled: boolean;
+  maxAge: number; // 最大使用期（天）
+  warningDays: number; // 过期前警告天数
+  
+  // 过期处理
+  forceChangeOnExpiry: boolean; // 过期后强制修改
+  gracePeriod: number; // 宽限期（天）
+  lockOnExpiry: boolean; // 过期后锁定账户
+}
+```
+
+### 7.2 账户安全策略
+
+#### 7.2.1 登录安全策略
+
+```typescript
+interface LoginSecurityPolicy {
+  // 失败尝试
+  maxFailedAttempts: number; // 最大失败次数
+  lockoutDuration: number; // 锁定时长（分钟）
+  resetFailedAttemptsAfter: number; // 重置失败计数时间（分钟）
+  
+  // 验证要求
+  requireMFA: boolean; // 需要多因子认证
+  mfaGracePeriod: number; // MFA宽限期（天）
+  
+  // 会话安全
+  sessionTimeout: number; // 会话超时（分钟）
+  maxConcurrentSessions: number; // 最大并发会话数
+  forceLogoutOnPasswordChange: boolean; // 密码变更后强制登出
+}
+```
+
+#### 7.2.2 访问控制策略
+
+```typescript
+interface AccessControlPolicy {
+  // IP限制
+  ipWhitelist: string[]; // IP白名单
+  ipBlacklist: string[]; // IP黑名单
+  allowedNetworks: string[]; // 允许的网络段
+  
+  // 时间限制
+  allowedTimeRanges: {
+    start: string; // 开始时间
+    end: string; // 结束时间
+    days: number[]; // 允许的星期几
+  }[];
+  
+  // 设备限制
+  deviceRegistrationRequired: boolean; // 需要设备注册
+  maxRegisteredDevices: number; // 最大注册设备数
+  deviceTrustDuration: number; // 设备信任期（天）
+}
+```
+
+### 7.3 OAuth安全策略
+
+#### 7.3.1 客户端安全策略
+
+```typescript
+interface ClientSecurityPolicy {
+  // PKCE要求
+  requirePKCE: boolean; // 强制PKCE
+  allowedCodeChallengeMethods: string[]; // 允许的挑战方法
+  
+  // 令牌安全
+  accessTokenLifetime: number; // 访问令牌生命周期（秒）
+  refreshTokenLifetime: number; // 刷新令牌生命周期（秒）
+  authorizationCodeLifetime: number; // 授权码生命周期（秒）
+  
+  // 客户端验证
+  requireClientAuthentication: boolean; // 需要客户端认证
+  allowedAuthenticationMethods: string[]; // 允许的认证方法
+  
+  // 重定向安全
+  strictRedirectUriMatching: boolean; // 严格重定向URI匹配
+  allowLocalhostRedirect: boolean; // 允许localhost重定向
+  requireHttpsRedirect: boolean; // 需要HTTPS重定向
+}
+```
+
+#### 7.3.2 作用域安全策略
+
+```typescript
+interface ScopeSecurityPolicy {
+  // 作用域限制
+  maxScopesPerRequest: number; // 每次请求最大作用域数
+  requireExplicitConsent: boolean; // 需要明确同意
+  consentExpiration: number; // 同意过期时间（天）
+  
+  // 敏感作用域
+  sensitiveScopes: string[]; // 敏感作用域列表
+  requireAdditionalAuth: boolean; // 敏感作用域需要额外认证
+}
+```
+
+## 8. 权限初始化数据
+
+### 8.1 默认角色
+
+```sql
+-- 系统管理员
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('system-admin', 'SYSTEM_ADMIN', '系统管理员', '拥有系统所有权限的超级管理员');
+
+-- 用户管理员
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('user-admin', 'USER_ADMIN', '用户管理员', '负责用户账户管理的管理员');
+
+-- 权限管理员
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('permission-admin', 'PERMISSION_ADMIN', '权限管理员', '负责角色权限管理的管理员');
+
+-- 客户端管理员
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('client-admin', 'CLIENT_ADMIN', '客户端管理员', '负责OAuth客户端管理的管理员');
+
+-- 审计管理员
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('audit-admin', 'AUDIT_ADMIN', '审计管理员', '负责审计日志管理的管理员');
+
+-- 普通用户
+INSERT INTO Role (id, name, displayName, description) VALUES 
+('user', 'USER', '普通用户', '系统的普通用户');
+```
+
+### 8.2 默认权限
+
+```sql
+-- 菜单权限
+INSERT INTO Permission (id, name, displayName, description, category, resourcePattern, action) VALUES 
+-- 仪表板
+('menu-dashboard-view', 'menu:dashboard:view', '仪表板查看', '查看系统仪表板', 'menu', '/dashboard', 'VIEW'),
+-- 用户管理菜单
+('menu-users-view', 'menu:users:view', '用户管理入口', '访问用户管理模块', 'menu', '/users', 'VIEW'),
+('menu-users-list', 'menu:users:list', '用户列表', '查看用户列表页面', 'menu', '/users/list', 'VIEW'),
+('menu-users-create', 'menu:users:create', '创建用户', '访问创建用户页面', 'menu', '/users/create', 'VIEW'),
+-- 角色管理菜单
+('menu-roles-view', 'menu:roles:view', '角色管理入口', '访问角色管理模块', 'menu', '/roles', 'VIEW'),
+('menu-roles-list', 'menu:roles:list', '角色列表', '查看角色列表页面', 'menu', '/roles/list', 'VIEW'),
+-- 权限管理菜单
+('menu-permissions-view', 'menu:permissions:view', '权限管理入口', '访问权限管理模块', 'menu', '/permissions', 'VIEW'),
+('menu-permissions-api', 'menu:permissions:api', 'API权限管理', '管理API权限', 'menu', '/permissions/api', 'VIEW'),
+-- 客户端管理菜单
+('menu-clients-view', 'menu:clients:view', '客户端管理入口', '访问客户端管理模块', 'menu', '/clients', 'VIEW'),
+('menu-clients-list', 'menu:clients:list', '客户端列表', '查看客户端列表页面', 'menu', '/clients/list', 'VIEW'),
+-- 审计管理菜单
+('menu-audit-view', 'menu:audit:view', '审计管理入口', '访问审计管理模块', 'menu', '/audit', 'VIEW'),
+('menu-audit-logs', 'menu:audit:logs', '审计日志', '查看审计日志页面', 'menu', '/audit/logs', 'VIEW'),
+-- 系统管理菜单
+('menu-system-view', 'menu:system:view', '系统管理入口', '访问系统管理模块', 'menu', '/system', 'VIEW'),
+('menu-system-config', 'menu:system:config', '系统配置', '管理系统配置', 'menu', '/system/config', 'VIEW');
+
+-- API权限
+INSERT INTO Permission (id, name, displayName, description, category, resourcePattern, action) VALUES 
+-- 认证API
+('api-auth-login', 'auth:login', '用户登录', '用户登录接口', 'api', '/api/v2/auth/login', 'POST'),
+('api-auth-logout', 'auth:logout', '用户登出', '用户登出接口', 'api', '/api/v2/auth/logout', 'POST'),
+('api-auth-profile-read', 'auth:profile:read', '获取用户信息', '获取当前用户信息', 'api', '/api/v2/auth/me', 'GET'),
+-- 用户管理API
+('api-users-list', 'users:list', '用户列表', '获取用户列表', 'api', '/api/v2/users', 'GET'),
+('api-users-create', 'users:create', '创建用户', '创建新用户', 'api', '/api/v2/users', 'POST'),
+('api-users-read', 'users:read', '用户详情', '获取用户详细信息', 'api', '/api/v2/users/*', 'GET'),
+('api-users-update', 'users:update', '更新用户', '更新用户信息', 'api', '/api/v2/users/*', 'PUT'),
+('api-users-delete', 'users:delete', '删除用户', '删除用户账户', 'api', '/api/v2/users/*', 'DELETE'),
+-- 角色管理API
+('api-roles-list', 'roles:list', '角色列表', '获取角色列表', 'api', '/api/v2/roles', 'GET'),
+('api-roles-create', 'roles:create', '创建角色', '创建新角色', 'api', '/api/v2/roles', 'POST'),
+('api-roles-read', 'roles:read', '角色详情', '获取角色详细信息', 'api', '/api/v2/roles/*', 'GET'),
+('api-roles-update', 'roles:update', '更新角色', '更新角色信息', 'api', '/api/v2/roles/*', 'PUT'),
+('api-roles-delete', 'roles:delete', '删除角色', '删除角色', 'api', '/api/v2/roles/*', 'DELETE'),
+-- 权限管理API
+('api-permissions-list', 'permissions:list', '权限列表', '获取权限列表', 'api', '/api/v2/permissions', 'GET'),
+('api-permissions-create', 'permissions:create', '创建权限', '创建新权限', 'api', '/api/v2/permissions', 'POST'),
+-- 客户端管理API
+('api-clients-list', 'clients:list', '客户端列表', '获取OAuth客户端列表', 'api', '/api/v2/clients', 'GET'),
+('api-clients-create', 'clients:create', '创建客户端', '创建OAuth客户端', 'api', '/api/v2/clients', 'POST'),
+-- 审计API
+('api-audit-logs-read', 'audit:logs:read', '审计日志查看', '查看审计日志', 'api', '/api/v2/audit/logs', 'GET'),
+-- 系统管理API
+('api-system-config-read', 'system:config:read', '系统配置查看', '查看系统配置', 'api', '/api/v2/system/configurations', 'GET'),
+('api-system-config-update', 'system:config:update', '系统配置更新', '更新系统配置', 'api', '/api/v2/system/configurations', 'PUT');
+```
+
+### 8.3 角色权限分配
+
+```sql
+-- 系统管理员拥有所有权限
+INSERT INTO RolePermission (roleId, permissionId) 
+SELECT 'system-admin', id FROM Permission;
+
+-- 用户管理员权限
+INSERT INTO RolePermission (roleId, permissionId) VALUES 
+('user-admin', 'menu-dashboard-view'),
+('user-admin', 'menu-users-view'),
+('user-admin', 'menu-users-list'),
+('user-admin', 'menu-users-create'),
+('user-admin', 'api-auth-profile-read'),
+('user-admin', 'api-users-list'),
+('user-admin', 'api-users-create'),
+('user-admin', 'api-users-read'),
+('user-admin', 'api-users-update'),
+('user-admin', 'api-users-delete');
+
+-- 权限管理员权限
+INSERT INTO RolePermission (roleId, permissionId) VALUES 
+('permission-admin', 'menu-dashboard-view'),
+('permission-admin', 'menu-roles-view'),
+('permission-admin', 'menu-roles-list'),
+('permission-admin', 'menu-permissions-view'),
+('permission-admin', 'menu-permissions-api'),
+('permission-admin', 'api-auth-profile-read'),
+('permission-admin', 'api-roles-list'),
+('permission-admin', 'api-roles-create'),
+('permission-admin', 'api-roles-read'),
+('permission-admin', 'api-roles-update'),
+('permission-admin', 'api-roles-delete'),
+('permission-admin', 'api-permissions-list'),
+('permission-admin', 'api-permissions-create');
+
+-- 客户端管理员权限
+INSERT INTO RolePermission (roleId, permissionId) VALUES 
+('client-admin', 'menu-dashboard-view'),
+('client-admin', 'menu-clients-view'),
+('client-admin', 'menu-clients-list'),
+('client-admin', 'api-auth-profile-read'),
+('client-admin', 'api-clients-list'),
+('client-admin', 'api-clients-create');
+
+-- 审计管理员权限
+INSERT INTO RolePermission (roleId, permissionId) VALUES 
+('audit-admin', 'menu-dashboard-view'),
+('audit-admin', 'menu-audit-view'),
+('audit-admin', 'menu-audit-logs'),
+('audit-admin', 'api-auth-profile-read'),
+('audit-admin', 'api-audit-logs-read');
+
+-- 普通用户权限
+INSERT INTO RolePermission (roleId, permissionId) VALUES 
+('user', 'menu-dashboard-view'),
+('user', 'api-auth-login'),
+('user', 'api-auth-logout'),
+('user', 'api-auth-profile-read');
+```
+
+### 8.4 默认管理员用户
+
+```sql
+-- 创建默认系统管理员
+INSERT INTO User (id, username, firstName, lastName, organization, department, passwordHash, isActive, mustChangePassword) VALUES 
+('admin-001', 'admin', 'System', 'Admin', 'IT Department', 'Security', '$2b$10$hashedpassword', true, true);
+
+-- 分配系统管理员角色
+INSERT INTO UserRole (userId, roleId, assignedAt) VALUES 
+('admin-001', 'system-admin', NOW());
+```
+
+## 9. 实施建议
+
+### 9.1 权限验证中间件
+
+```typescript
+// 权限验证中间件
+export function requirePermission(permission: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const hasPermission = await checkUserPermission(user.id, permission);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      
+      next();
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  };
+}
+
+// 使用示例
+app.get('/api/v2/users', requirePermission('users:list'), getUserList);
+app.post('/api/v2/users', requirePermission('users:create'), createUser);
+```
+
+### 9.2 菜单权限过滤
+
+```typescript
+// 根据用户权限过滤菜单
+export async function filterMenusByPermissions(userId: string, menus: Menu[]): Promise<Menu[]> {
+  const userPermissions = await getUserPermissions(userId);
+  
+  return menus.filter(menu => {
+    if (menu.permission && !userPermissions.includes(menu.permission)) {
+      return false;
+    }
+    
+    if (menu.children) {
+      menu.children = menu.children.filter(child => 
+        !child.permission || userPermissions.includes(child.permission)
+      );
+    }
+    
+    return true;
+  });
+}
+```
+
+### 9.3 权限缓存策略
+
+```typescript
+// Redis权限缓存
+export class PermissionCache {
+  private redis: Redis;
+  private cacheTTL = 300; // 5分钟
+  
+  async getUserPermissions(userId: string): Promise<string[]> {
+    const cacheKey = `user:permissions:${userId}`;
+    const cached = await this.redis.get(cacheKey);
+    
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    
+    const permissions = await this.loadUserPermissionsFromDB(userId);
+    await this.redis.setex(cacheKey, this.cacheTTL, JSON.stringify(permissions));
+    
+    return permissions;
+  }
+  
+  async invalidateUserPermissions(userId: string): Promise<void> {
+    const cacheKey = `user:permissions:${userId}`;
+    await this.redis.del(cacheKey);
+  }
+}
+```
+
+---
+
+**文档版本**: v1.0  
+**创建日期**: 2024年12月  
+**最后更新**: 2024年12月  
+**维护者**: OAuth2.1认证授权中心开发团队

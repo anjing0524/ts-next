@@ -20,40 +20,39 @@ if (!global.fetch) {
 
 // Define placeholder JWT PEM keys if not already set
 if (!process.env.JWT_PRIVATE_KEY_PEM) {
-  process.env.JWT_PRIVATE_KEY_PEM = "placeholder_private_key_pem_for_testing_only";
+  process.env.JWT_PRIVATE_KEY_PEM = 'placeholder_private_key_pem_for_testing_only';
   console.warn(
-    "⚠️ WARNING: JWT_PRIVATE_KEY_PEM was not set. Using a placeholder for testing. " +
-    "Actual JWT signing/verification will not be cryptographically valid."
+    '⚠️ WARNING: JWT_PRIVATE_KEY_PEM was not set. Using a placeholder for testing. ' +
+      'Actual JWT signing/verification will not be cryptographically valid.'
   );
 }
 if (!process.env.JWT_PUBLIC_KEY_PEM) {
-  process.env.JWT_PUBLIC_KEY_PEM = "placeholder_public_key_pem_for_testing_only";
+  process.env.JWT_PUBLIC_KEY_PEM = 'placeholder_public_key_pem_for_testing_only';
   console.warn(
-    "⚠️ WARNING: JWT_PUBLIC_KEY_PEM was not set. Using a placeholder for testing. " +
-    "Actual JWT signing/verification will not be cryptographically valid."
+    '⚠️ WARNING: JWT_PUBLIC_KEY_PEM was not set. Using a placeholder for testing. ' +
+      'Actual JWT signing/verification will not be cryptographically valid.'
   );
 }
 // It's also good practice to set other related JWT env vars if they are expected by JWTUtils
 if (!process.env.JWT_ALGORITHM) {
-  process.env.JWT_ALGORITHM = "RS256"; // Default algorithm used in JWTUtils
+  process.env.JWT_ALGORITHM = 'RS256'; // Default algorithm used in JWTUtils
 }
 if (!process.env.JWT_KEY_ID) {
-  process.env.JWT_KEY_ID = "test-kid";
+  process.env.JWT_KEY_ID = 'test-kid';
 }
 if (!process.env.JWT_ISSUER) {
-  process.env.JWT_ISSUER = "http://localhost:3000"; // Default test issuer
+  process.env.JWT_ISSUER = 'http://localhost:3000'; // Default test issuer
 }
 if (!process.env.JWT_AUDIENCE) {
-  process.env.JWT_AUDIENCE = "api_resource_dev"; // Default test audience
+  process.env.JWT_AUDIENCE = 'api_resource_dev'; // Default test audience
 }
 if (!process.env.JWKS_URI) {
-  process.env.JWKS_URI = "http://localhost/.well-known/jwks.json"; // Dummy JWKS URI for testing
+  process.env.JWKS_URI = 'http://localhost/.well-known/jwks.json'; // Dummy JWKS URI for testing
   console.warn(
-    "⚠️ WARNING: JWKS_URI was not set. Using a placeholder for testing. " +
-    "Actual JWT validation against a remote JWKS will not occur without further mocking if fetch is called."
+    '⚠️ WARNING: JWKS_URI was not set. Using a placeholder for testing. ' +
+      'Actual JWT validation against a remote JWKS will not occur without further mocking if fetch is called.'
   );
 }
-
 
 // Setup environment variables for testing
 Object.assign(process.env, {
@@ -74,7 +73,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 import { prisma } from '@/lib/prisma'; // Import prisma for connect/disconnect
-import logger from '@/utils/logger'; // Import the actual logger to clear its mocks
+import logger from '@/lib/utils/logger'; // Import the actual logger to clear its mocks
 
 // Setup and cleanup hooks
 beforeAll(async () => {
@@ -114,10 +113,14 @@ afterAll(async () => {
     const connectedPrisma = (globalThis as any).__vitestConnectedPrisma;
     if (connectedPrisma && typeof connectedPrisma.$disconnect === 'function') {
       await connectedPrisma.$disconnect();
-      console.log('✅ 数据库连接已断开 (via __vitestConnectedPrisma) / Database connection disconnected');
+      console.log(
+        '✅ 数据库连接已断开 (via __vitestConnectedPrisma) / Database connection disconnected'
+      );
     } else {
       // Fallback if __vitestConnectedPrisma wasn't set or valid
-      console.warn('__vitestConnectedPrisma not found or not functional, attempting disconnect on prisma from import.');
+      console.warn(
+        '__vitestConnectedPrisma not found or not functional, attempting disconnect on prisma from import.'
+      );
       await prisma.$disconnect();
       console.log('✅ 数据库连接已断开 (via direct import) / Database connection disconnected');
     }

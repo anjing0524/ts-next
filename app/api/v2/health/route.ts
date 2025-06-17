@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { checkPoolHealth } from '@/lib/instance/mysql-client';
-import logger from '@/utils/logger';
+import logger from '@/lib/utils/logger';
 
 export async function GET() {
   try {
