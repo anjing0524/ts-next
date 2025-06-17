@@ -25,16 +25,16 @@ model User {
   lastLoginAt  DateTime?
 
   // 用户基本信息
-  displayName  String? // 显示名称
-  firstName    String? // 名
-  lastName     String? // 姓
-  avatar       String? // 头像URL
-  organization String? // 用户所属组织
-  department   String? // 用户所属部门
-  mustChangePassword Boolean @default(true) // 是否需要在下次登录时强制修改密码
-  failedLoginAttempts Int      @default(0)
+  displayName         String? // 显示名称
+  firstName           String? // 名
+  lastName            String? // 姓
+  avatar              String? // 头像URL
+  organization        String? // 用户所属组织
+  department          String? // 用户所属部门
+  mustChangePassword  Boolean   @default(true) // 是否需要在下次登录时强制修改密码
+  failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
-  createdBy    String? // 创建者ID（管理员）
+  createdBy           String? // 创建者ID（管理员）
 
   // 关联关系
   userRoles          UserRole[]
@@ -55,39 +55,39 @@ model User {
 
 // OAuth客户端表
 model OAuthClient {
-  id                String     @id @default(cuid())
-  clientId          String     @unique
-  clientSecret      String? // 机密客户端的密钥 (BCrypt哈希存储)
-  redirectUris      String     // JSON字符串存储重定向URI列表
-  grantTypes        String     // JSON字符串存储授权类型
-  responseTypes     String     // JSON字符串存储响应类型
-  allowedScopes     String     // JSON字符串存储权限范围
-  clientName        String? // 客户端名称
-  clientDescription String? // 客户端描述
-  clientType        ClientType @default(PUBLIC) // 客户端类型
-  logoUri           String? // Added: URL of the client's logo
-  policyUri         String? // Added: URL of the client's policy
-  tosUri            String? // Added: URL of the client's terms of service
-  jwksUri           String? // Added: URL of the client's JSON Web Key Set
-  tokenEndpointAuthMethod String @default("client_secret_basic") // Added: Client authentication method for the token endpoint
-  requirePkce       Boolean    @default(true) // Added: Whether PKCE is required for this client
-  requireConsent    Boolean    @default(true) // Added: Whether user consent is required for this client
-  ipWhitelist       String? // Added: IP whitelist (e.g., JSON string of IPs/ranges)
-  isActive          Boolean    @default(true)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id                      String     @id @default(cuid())
+  clientId                String     @unique
+  clientSecret            String? // 机密客户端的密钥 (BCrypt哈希存储)
+  redirectUris            String // JSON字符串存储重定向URI列表
+  grantTypes              String // JSON字符串存储授权类型
+  responseTypes           String // JSON字符串存储响应类型
+  allowedScopes           String // JSON字符串存储权限范围
+  clientName              String? // 客户端名称
+  clientDescription       String? // 客户端描述
+  clientType              ClientType @default(PUBLIC) // 客户端类型
+  logoUri                 String? // Added: URL of the client's logo
+  policyUri               String? // Added: URL of the client's policy
+  tosUri                  String? // Added: URL of the client's terms of service
+  jwksUri                 String? // Added: URL of the client's JSON Web Key Set
+  tokenEndpointAuthMethod String     @default("client_secret_basic") // Added: Client authentication method for the token endpoint
+  requirePkce             Boolean    @default(true) // Added: Whether PKCE is required for this client
+  requireConsent          Boolean    @default(true) // Added: Whether user consent is required for this client
+  ipWhitelist             String? // Added: IP whitelist (e.g., JSON string of IPs/ranges)
+  isActive                Boolean    @default(true)
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
 
   // 关联关系
-  authorizationCodes AuthorizationCode[]
-  accessTokens       AccessToken[]
-  refreshTokens      RefreshToken[]
-  consentGrants      ConsentGrant[] // Added relation to ConsentGrant
-  accessTokenLifetime Int? // 访问令牌生命周期（秒）
-  refreshTokenLifetime Int? // 刷新令牌生命周期（秒）
+  authorizationCodes        AuthorizationCode[]
+  accessTokens              AccessToken[]
+  refreshTokens             RefreshToken[]
+  consentGrants             ConsentGrant[] // Added relation to ConsentGrant
+  accessTokenLifetime       Int? // 访问令牌生命周期（秒）
+  refreshTokenLifetime      Int? // 刷新令牌生命周期（秒）
   authorizationCodeLifetime Int? // 授权码生命周期（秒）
-  strictRedirectUriMatching Boolean @default(true) // 严格重定向URI匹配
-  allowLocalhostRedirect Boolean @default(false) // 允许localhost重定向 (开发时可能有用)
-  requireHttpsRedirect Boolean @default(true) // 要求HTTPS重定向
+  strictRedirectUriMatching Boolean             @default(true) // 严格重定向URI匹配
+  allowLocalhostRedirect    Boolean             @default(false) // 允许localhost重定向 (开发时可能有用)
+  requireHttpsRedirect      Boolean             @default(true) // 要求HTTPS重定向
 
   @@index([clientId])
   @@index([isActive])
@@ -108,11 +108,11 @@ model AuthorizationCode {
   userId              String
   clientId            String
   redirectUri         String
-  scope               String   // JSON字符串存储权限范围
+  scope               String // JSON字符串存储权限范围
   expiresAt           DateTime
   codeChallenge       String? // PKCE code challenge
   codeChallengeMethod String? // PKCE code challenge method
-  nonce               String?  // OIDC nonce
+  nonce               String? // OIDC nonce
   isUsed              Boolean  @default(false)
   createdAt           DateTime @default(now())
 
@@ -133,9 +133,9 @@ model AccessToken {
   id        String   @id @default(cuid())
   token     String   @unique // This field might be removed if only tokenHash is stored
   tokenHash String?  @unique // Hash of the token for secure lookup
-  userId    String?  // Optional: if token is not user-specific (e.g. client_credentials)
+  userId    String? // Optional: if token is not user-specific (e.g. client_credentials)
   clientId  String
-  scope     String   // JSON字符串存储权限范围
+  scope     String // JSON字符串存储权限范围
   expiresAt DateTime
   // isRevoked Boolean  @default(false) // Access tokens are typically not revoked, rely on short expiry. Consider if this field is truly needed.
   // revokedAt DateTime?
@@ -155,18 +155,18 @@ model AccessToken {
 
 // 刷新令牌表
 model RefreshToken {
-  id        String   @id @default(cuid())
-  token     String   @unique // This field might be removed if only tokenHash is stored
-  tokenHash String?  @unique // Hash of the token for secure lookup
-  userId    String
-  clientId  String
-  scope     String   // JSON字符串存储权限范围
-  expiresAt DateTime
-  isRevoked Boolean  @default(false)
-  revokedAt DateTime? // Timestamp of revocation
-  createdAt DateTime @default(now())
-  previousTokenId String? @unique // Optional: To link rotated refresh tokens for advanced detection
-                                 // If used, ensure it has a relation or is just an ID.
+  id              String    @id @default(cuid())
+  token           String    @unique // This field might be removed if only tokenHash is stored
+  tokenHash       String?   @unique // Hash of the token for secure lookup
+  userId          String
+  clientId        String
+  scope           String // JSON字符串存储权限范围
+  expiresAt       DateTime
+  isRevoked       Boolean   @default(false)
+  revokedAt       DateTime? // Timestamp of revocation
+  createdAt       DateTime  @default(now())
+  previousTokenId String?   @unique // Optional: To link rotated refresh tokens for advanced detection
+  // If used, ensure it has a relation or is just an ID.
   // replacedByTokenId String? @unique // Optional: ID of the token that replaced this one.
 
   // 关联关系
@@ -174,7 +174,6 @@ model RefreshToken {
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   // previousToken RefreshToken? @relation("RefreshTokenRotation", fields: [previousTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   // nextToken     RefreshToken? @relation("RefreshTokenRotation", fields: [replacedByTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
 
   @@index([tokenHash]) // Index on tokenHash
   @@index([userId])
@@ -254,8 +253,8 @@ enum HttpMethod {
 
 // API权限详细信息表
 model ApiPermission {
-  id           String @id @default(cuid())
-  permissionId String @unique
+  id           String     @id @default(cuid())
+  permissionId String     @unique
   httpMethod   HttpMethod // HTTP方法 (GET, POST, PUT, DELETE等)
   endpoint     String // API端点路径
   rateLimit    Int? // 速率限制 (每分钟请求数)
@@ -333,7 +332,7 @@ model UserRole {
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   // ABAC 扩展属性
-  context    String?     // 上下文条件，如时间、地点等
+  context    String? // 上下文条件，如时间、地点等
   expiresAt  DateTime? // 角色分配过期时间
   assignedBy String? // 分配者ID
   assignedAt DateTime  @default(now())
@@ -351,7 +350,7 @@ model RolePermission {
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   // ABAC 扩展属性
-  conditions String?    // 权限生效条件
+  conditions String? // 权限生效条件
   assignedAt DateTime @default(now())
 
   @@id([roleId, permissionId])
@@ -373,7 +372,6 @@ model AuditLog {
   status       String // 操作状态 (e.g., SUCCESS, FAILURE, PENDING)
   ipAddress    String? // IP地址
   userAgent    String? // 用户代理
-  sessionId    String? // 会话ID (If applicable)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // SetNull to keep audit logs if user is deleted
 
@@ -405,11 +403,11 @@ model PasswordHistory {
 // OAuth Scopes
 // ================================
 model Scope {
-  id          String  @id @default(cuid())
-  name        String  @unique // e.g., "openid", "profile", "order:read"
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "openid", "profile", "order:read"
   description String?
-  isPublic    Boolean @default(false) // Can public clients request this scope?
-  isActive    Boolean @default(true)
+  isPublic    Boolean  @default(false) // Can public clients request this scope?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -423,11 +421,11 @@ model Scope {
 // User Consent Grants
 // ================================
 model ConsentGrant {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  clientId  String   // This should be the Prisma CUID of the OAuthClient
-  scopes    String   // JSON array of granted scope strings e.g., ["openid", "profile", "order:read"]
-  issuedAt  DateTime @default(now())
+  clientId  String // This should be the Prisma CUID of the OAuthClient
+  scopes    String // JSON array of granted scope strings e.g., ["openid", "profile", "order:read"]
+  issuedAt  DateTime  @default(now())
   expiresAt DateTime? // Optional: if consents can expire
   revokedAt DateTime? // If consent is explicitly revoked
 
@@ -449,7 +447,7 @@ model ConsentGrant {
 // Used to blacklist JTIs of V2 Auth Refresh Tokens
 model RevokedAuthJti {
   jti       String   @id // JTI of the V2 Auth Refresh Token (JWT ID)
-  userId    String   // User ID to whom this JTI belonged
+  userId    String // User ID to whom this JTI belonged
   expiresAt DateTime // Expiry of this blacklist record (should match original refresh token's expiry)
   createdAt DateTime @default(now())
 
@@ -462,13 +460,13 @@ model RevokedAuthJti {
 
 // 登录尝试记录
 model LoginAttempt {
-  id          String   @id @default(cuid()) // 主键
-  userId      String?  // 用户ID (如果尝试与已知用户关联)
-  username    String   // 尝试登录的用户名
-  ipAddress   String?  // IP地址
-  userAgent   String?  // 用户代理
-  timestamp   DateTime @default(now()) // 尝试时间
-  successful  Boolean  // 是否成功
+  id            String   @id @default(cuid()) // 主键
+  userId        String? // 用户ID (如果尝试与已知用户关联)
+  username      String // 尝试登录的用户名
+  ipAddress     String? // IP地址
+  userAgent     String? // 用户代理
+  timestamp     DateTime @default(now()) // 尝试时间
+  successful    Boolean // 是否成功
   failureReason String? // 失败原因 (e.g., WRONG_PASSWORD, USER_NOT_FOUND, ACCOUNT_LOCKED)
 
   // 关联用户 (可选，如果需要从用户导航到登录尝试)
@@ -485,10 +483,10 @@ model LoginAttempt {
 model SystemConfiguration {
   id          String   @id @default(cuid()) // 主键
   key         String   @unique // 配置键
-  value       String   // 配置值 (建议存储为JSON字符串以支持复杂类型)
-  description String?  // 配置描述
+  value       String // 配置值 (建议存储为JSON字符串以支持复杂类型)
+  description String? // 配置描述
   type        String   @default("string") // 值类型: string, number, boolean, json
-  isEditable  Boolean  @default(true)  // 是否可通过API编辑
+  isEditable  Boolean  @default(true) // 是否可通过API编辑
   createdAt   DateTime @default(now()) // 创建时间
   updatedAt   DateTime @updatedAt // 更新时间
 
@@ -497,13 +495,13 @@ model SystemConfiguration {
 
 // 安全策略
 model SecurityPolicy {
-  id        String   @id @default(cuid()) // 主键
-  name      String   @unique //策略名称, 例如 "PasswordStrength", "LoginSecurity"
-  type      PolicyType      // 策略类型
-  policy    Json     // JSON对象，包含具体策略配置
-  isActive  Boolean  @default(true) // 是否激活
-  createdAt DateTime @default(now()) // 创建时间
-  updatedAt DateTime @updatedAt // 更新时间
+  id        String     @id @default(cuid()) // 主键
+  name      String     @unique //策略名称, 例如 "PasswordStrength", "LoginSecurity"
+  type      PolicyType // 策略类型
+  policy    Json // JSON对象，包含具体策略配置
+  isActive  Boolean    @default(true) // 是否激活
+  createdAt DateTime   @default(now()) // 创建时间
+  updatedAt DateTime   @updatedAt // 更新时间
 
   @@index([name, type])
   @@map("security_policies") // 数据库表名
@@ -515,7 +513,7 @@ model SecurityPolicy {
 model TokenBlacklist {
   id        String   @id @default(cuid())
   jti       String   @unique // JWT ID
-  tokenType String   // 'access' or 'refresh'
+  tokenType String // 'access' or 'refresh'
   expiresAt DateTime // Should match the original expiry of the token
   createdAt DateTime @default(now())
 
@@ -526,11 +524,11 @@ model TokenBlacklist {
 
 // 策略类型枚举
 enum PolicyType {
-  PASSWORD_STRENGTH    // 密码强度策略
-  PASSWORD_HISTORY     // 密码历史策略
-  PASSWORD_EXPIRATION  // 密码过期策略
-  LOGIN_SECURITY       // 登录安全策略
-  ACCESS_CONTROL       // 访问控制策略
-  CLIENT_SECURITY      // OAuth客户端安全策略
-  SCOPE_SECURITY       // OAuth作用域安全策略
+  PASSWORD_STRENGTH // 密码强度策略
+  PASSWORD_HISTORY // 密码历史策略
+  PASSWORD_EXPIRATION // 密码过期策略
+  LOGIN_SECURITY // 登录安全策略
+  ACCESS_CONTROL // 访问控制策略
+  CLIENT_SECURITY // OAuth客户端安全策略
+  SCOPE_SECURITY // OAuth作用域安全策略
 }

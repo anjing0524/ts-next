@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client'; // Keep for type annotation in other classes if needed
 import { prisma as db } from '@/lib/prisma'; // Import aliased prisma for direct use
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
@@ -167,22 +166,63 @@ export const TEST_CLIENTS: { [key: string]: Partial<TestClient> } = {
 // Predefined Test Permissions
 // 预定义的测试权限
 export const TEST_PERMISSIONS: { [key: string]: Partial<TestPermission> } = {
-  USER_READ: { name: 'users:read', description: 'Read user information / 读取用户信息', resource: 'users', action: 'read' },
-  USER_CREATE: { name: 'users:create', description: 'Create new users / 创建新用户', resource: 'users', action: 'create' },
-  USER_UPDATE: { name: 'users:update', description: 'Update user information / 更新用户信息', resource: 'users', action: 'update' },
-  USER_DELETE: { name: 'users:delete', description: 'Delete users / 删除用户', resource: 'users', action: 'delete' },
-  POST_READ: { name: 'posts:read', description: 'Read post information / 读取帖子信息', resource: 'posts', action: 'read' },
-  POST_CREATE: { name: 'posts:create', description: 'Create new posts / 创建新帖子', resource: 'posts', action: 'create' },
+  USER_READ: {
+    name: 'users:read',
+    description: 'Read user information / 读取用户信息',
+    resource: 'users',
+    action: 'read',
+  },
+  USER_CREATE: {
+    name: 'users:create',
+    description: 'Create new users / 创建新用户',
+    resource: 'users',
+    action: 'create',
+  },
+  USER_UPDATE: {
+    name: 'users:update',
+    description: 'Update user information / 更新用户信息',
+    resource: 'users',
+    action: 'update',
+  },
+  USER_DELETE: {
+    name: 'users:delete',
+    description: 'Delete users / 删除用户',
+    resource: 'users',
+    action: 'delete',
+  },
+  POST_READ: {
+    name: 'posts:read',
+    description: 'Read post information / 读取帖子信息',
+    resource: 'posts',
+    action: 'read',
+  },
+  POST_CREATE: {
+    name: 'posts:create',
+    description: 'Create new posts / 创建新帖子',
+    resource: 'posts',
+    action: 'create',
+  },
 };
 
 // Predefined Test Roles
 // 预定义的测试角色
-export const TEST_ROLES: { [key:string]: Partial<TestRole> } = {
-  USER_MANAGER: { name: 'user_manager', description: 'User Manager / 用户管理员', permissions: ['users:read', 'users:create', 'users:update', 'users:delete'] },
-  POST_EDITOR: { name: 'post_editor', description: 'Post Editor / 帖子编辑员', permissions: ['posts:read', 'posts:create'] },
-  VIEWER: { name: 'viewer', description: 'Viewer / 查看者', permissions: ['users:read', 'posts:read'] },
+export const TEST_ROLES: { [key: string]: Partial<TestRole> } = {
+  USER_MANAGER: {
+    name: 'user_manager',
+    description: 'User Manager / 用户管理员',
+    permissions: ['users:read', 'users:create', 'users:update', 'users:delete'],
+  },
+  POST_EDITOR: {
+    name: 'post_editor',
+    description: 'Post Editor / 帖子编辑员',
+    permissions: ['posts:read', 'posts:create'],
+  },
+  VIEWER: {
+    name: 'viewer',
+    description: 'Viewer / 查看者',
+    permissions: ['users:read', 'posts:read'],
+  },
 };
-
 
 // Constants
 export const TEST_CONFIG = {
@@ -654,7 +694,9 @@ export class TestDataManager {
    * 创建预定义的测试角色
    * Creates a predefined test role.
    */
-  async createTestRole(roleType: keyof typeof TEST_ROLES): Promise<any /* Replace with actual Prisma Role type */> {
+  async createTestRole(
+    roleType: keyof typeof TEST_ROLES
+  ): Promise<any /* Replace with actual Prisma Role type */> {
     const roleData = TEST_ROLES[roleType];
     if (!roleData) {
       throw new Error(`Test role type '${roleType}' not found in TEST_ROLES`);
@@ -667,7 +709,9 @@ export class TestDataManager {
    * 创建预定义的测试权限
    * Creates a predefined test permission.
    */
-  async createTestPermission(permissionType: keyof typeof TEST_PERMISSIONS): Promise<any /* Replace with actual Prisma Permission type */> {
+  async createTestPermission(
+    permissionType: keyof typeof TEST_PERMISSIONS
+  ): Promise<any /* Replace with actual Prisma Permission type */> {
     const permissionData = TEST_PERMISSIONS[permissionType];
     if (!permissionData) {
       throw new Error(`Test permission type '${permissionType}' not found in TEST_PERMISSIONS`);
@@ -723,7 +767,8 @@ export class TestDataManager {
     const plainSecret =
       clientData.clientSecret || `secret_${crypto.randomBytes(16).toString('hex')}`;
     // Using aliased 'db' import directly
-    const client = await db.oAuthClient.create({ // Corrected model name to oAuthClient
+    const client = await db.oAuthClient.create({
+      // Corrected model name to oAuthClient
       data: {
         clientId,
         clientSecret: clientData.isPublic ? null : await bcrypt.hash(plainSecret, 12),
@@ -753,7 +798,7 @@ export class TestDataManager {
       grantTypes: JSON.parse(client.grantTypes || '[]'),
       responseTypes: JSON.parse(client.responseTypes || '[]'),
       scope: JSON.parse(client.allowedScopes || '[]'), // Derive from allowedScopes
-      isPublic: client.clientType === 'PUBLIC',      // Derive from clientType
+      isPublic: client.clientType === 'PUBLIC', // Derive from clientType
       isActive: client.isActive,
       plainSecret: clientData.isPublic ? undefined : plainSecret,
     };
@@ -791,10 +836,12 @@ export class TestDataManager {
    * @param permissionData - 权限数据 (Permission data)
    * @returns Prisma Permission object
    */
-  async findOrCreatePermission(permissionData: Partial<TestPermission>): Promise<any /* Replace with actual Prisma Permission type */> {
+  async findOrCreatePermission(
+    permissionData: Partial<TestPermission>
+  ): Promise<any /* Replace with actual Prisma Permission type */> {
     const permissionName = permissionData.name;
     if (!permissionName) {
-      throw new Error("Permission name is required / 权限名称是必需的");
+      throw new Error('Permission name is required / 权限名称是必需的');
     }
 
     let permission = await db.permission.findUnique({ where: { name: permissionName } });
@@ -807,7 +854,8 @@ export class TestDataManager {
       permission = await db.permission.create({
         data: {
           name: permissionName,
-          description: permissionData.description || `Permission ${permissionName} / 权限 ${permissionName}`,
+          description:
+            permissionData.description || `Permission ${permissionName} / 权限 ${permissionName}`,
           resource: resource, // 从名称派生或使用默认值
           action: action, // 从名称派生或使用默认值
           // 根据您的Prisma Schema调整其他必填字段
@@ -826,7 +874,9 @@ export class TestDataManager {
    * @param roleData - 角色数据 (Role data)
    * @returns Prisma Role object with permissions
    */
-  async createRole(roleData: Partial<TestRole>): Promise<any /* Replace with actual Prisma Role type */> {
+  async createRole(
+    roleData: Partial<TestRole>
+  ): Promise<any /* Replace with actual Prisma Role type */> {
     const roleName = `${this.prefix}${roleData.name || 'role'}_${Date.now()}`;
     const role = await db.role.create({
       data: {
@@ -863,7 +913,9 @@ export class TestDataManager {
    * @param permissionData - 权限数据 (Permission data)
    * @returns Prisma Permission object
    */
-  async createPermission(permissionData: Partial<TestPermission>): Promise<any /* Replace with actual Prisma Permission type */> {
+  async createPermission(
+    permissionData: Partial<TestPermission>
+  ): Promise<any /* Replace with actual Prisma Permission type */> {
     // Prefixing to ensure uniqueness during tests, unless a specific ID is given (which create doesn't take)
     const permissionName = `${this.prefix}${permissionData.name || 'permission'}_${Date.now()}`;
     const resource = permissionData.resource || permissionName.split(':')[0] || 'general';
@@ -872,7 +924,9 @@ export class TestDataManager {
     const permission = await db.permission.create({
       data: {
         name: permissionName, // Ensure this is unique if your schema enforces it
-        description: permissionData.description || `Test Permission ${permissionName} / 测试权限 ${permissionName}`,
+        description:
+          permissionData.description ||
+          `Test Permission ${permissionName} / 测试权限 ${permissionName}`,
         resource: resource,
         action: action,
         // 根据您的Prisma Schema调整其他必填字段
@@ -909,7 +963,8 @@ export class TestDataManager {
     // This assumes a composite key or unique constraint like `@@unique([roleId, permissionId])` in `RolePermission`
     const existingLink = await db.rolePermission.findUnique({
       where: {
-        roleId_permissionId: { // 替换为实际的联合唯一键名 (Replace with actual composite unique key name)
+        roleId_permissionId: {
+          // 替换为实际的联合唯一键名 (Replace with actual composite unique key name)
           roleId: roleId,
           permissionId: permissionId,
         },
@@ -941,7 +996,8 @@ export class TestDataManager {
     // Using aliased 'db' import directly
 
     // 确保客户端存在，并获取其内部ID
-    const client = await db.oAuthClient.findUnique({ // Corrected model name
+    const client = await db.oAuthClient.findUnique({
+      // Corrected model name
       where: { clientId },
     });
 
@@ -968,7 +1024,8 @@ export class TestDataManager {
 
     // 将JWT令牌保存到数据库
     const tokenHash = crypto.createHash('sha256').update(jwtToken).digest('hex');
-    await db.accessToken.create({ // Using 'db'
+    await db.accessToken.create({
+      // Using 'db'
       data: {
         token: jwtToken,
         tokenHash,
@@ -996,7 +1053,8 @@ export class TestDataManager {
     // Using aliased 'db' import directly
 
     // 获取客户端的内部ID
-    const client = await db.oAuthClient.findUnique({ // Corrected model name
+    const client = await db.oAuthClient.findUnique({
+      // Corrected model name
       where: { clientId },
     });
 
@@ -1013,7 +1071,8 @@ export class TestDataManager {
 
     // 将JWT刷新令牌保存到数据库
     const tokenHash = crypto.createHash('sha256').update(jwtRefreshToken).digest('hex');
-    await db.refreshToken.create({ // Using 'db'
+    await db.refreshToken.create({
+      // Using 'db'
       data: {
         token: jwtRefreshToken,
         tokenHash,
@@ -1042,7 +1101,8 @@ export class TestDataManager {
     // Using aliased 'db' import directly
 
     // 获取客户端的内部ID
-    const client = await db.oAuthClient.findUnique({ // Corrected model name
+    const client = await db.oAuthClient.findUnique({
+      // Corrected model name
       where: { clientId },
     });
 
@@ -1052,7 +1112,8 @@ export class TestDataManager {
       );
     }
 
-    await db.authorizationCode.create({ // Using 'db'
+    await db.authorizationCode.create({
+      // Using 'db'
       data: {
         code,
         clientId: client.id, // 使用客户端的内部ID
@@ -1073,9 +1134,12 @@ export class TestDataManager {
    */
   async setupBasicScopes(): Promise<void> {
     // Using aliased 'db' import directly
-    if (!db.scope?.findMany || !db.scope?.create) { // check properties on 'db'
-        console.warn("Prisma client (for scope setup) is not functional via module import. Skipping setupBasicScopes.");
-        return;
+    if (!db.scope?.findMany || !db.scope?.create) {
+      // check properties on 'db'
+      console.warn(
+        'Prisma client (for scope setup) is not functional via module import. Skipping setupBasicScopes.'
+      );
+      return;
     }
     // Only create scopes if they don't already exist to avoid conflicts
     const existingScopes = await db.scope.findMany({
@@ -1100,7 +1164,8 @@ export class TestDataManager {
     for (const scopeData of basicScopes) {
       if (!existingScopeNames.has(scopeData.name)) {
         try {
-          await db.scope.create({ // Using 'db'
+          await db.scope.create({
+            // Using 'db'
             data: scopeData,
           });
         } catch (error: unknown) {
@@ -1131,42 +1196,54 @@ export class TestDataManager {
    */
   async cleanup(): Promise<void> {
     // Using aliased 'db' import directly
-    if (!db.accessToken?.deleteMany) { // Check properties on 'db'
-        console.error("Prisma client not functional via module import during cleanup. Skipping cleanup.");
-        return;
+    if (!db.accessToken?.deleteMany) {
+      // Check properties on 'db'
+      console.error(
+        'Prisma client not functional via module import during cleanup. Skipping cleanup.'
+      );
+      return;
     }
     try {
       // 清理RBAC相关的连接表 (Cleanup RBAC related join tables first)
       if (this.createdUsers.length > 0) {
-        await db.userRole.deleteMany({ where: { userId: { in: this.createdUsers } } }).catch(e => console.error("Error cleaning up UserRole by userIds:", e));
+        await db.userRole
+          .deleteMany({ where: { userId: { in: this.createdUsers } } })
+          .catch((e) => console.error('Error cleaning up UserRole by userIds:', e));
       }
       // Fallback or additional cleanup for roles not directly tied to createdUsers but in createdRoles
       if (this.createdRoles.length > 0) {
-        await db.userRole.deleteMany({ where: { roleId: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up UserRole by roleIds:", e));
+        await db.userRole
+          .deleteMany({ where: { roleId: { in: this.createdRoles } } })
+          .catch((e) => console.error('Error cleaning up UserRole by roleIds:', e));
       }
 
       if (this.createdRoles.length > 0) {
-        await db.rolePermission.deleteMany({ where: { roleId: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up RolePermission by roleIds:", e));
+        await db.rolePermission
+          .deleteMany({ where: { roleId: { in: this.createdRoles } } })
+          .catch((e) => console.error('Error cleaning up RolePermission by roleIds:', e));
       }
       // Fallback for permissions not directly tied to createdRoles but in createdPermissions
       if (this.createdPermissions.length > 0) {
-        await db.rolePermission.deleteMany({ where: { permissionId: { in: this.createdPermissions } } }).catch(e => console.error("Error cleaning up RolePermission by permissionIds:", e));
+        await db.rolePermission
+          .deleteMany({ where: { permissionId: { in: this.createdPermissions } } })
+          .catch((e) => console.error('Error cleaning up RolePermission by permissionIds:', e));
       }
 
       // 然后删除角色和权限 (Then delete roles and permissions)
       if (this.createdRoles.length > 0) {
-        await db.role.deleteMany({ where: { id: { in: this.createdRoles } } }).catch(e => console.error("Error cleaning up roles:", e));
+        await db.role
+          .deleteMany({ where: { id: { in: this.createdRoles } } })
+          .catch((e) => console.error('Error cleaning up roles:', e));
       }
       if (this.createdPermissions.length > 0) {
-        await db.permission.deleteMany({
-          where: {
-            // Prefer deleting by ID, but also catch prefixed ones if findOrCreatePermission didn't add to array
-            OR: [
-              { id: { in: this.createdPermissions } },
-              { name: { startsWith: this.prefix } }
-            ]
-          }
-        }).catch(e => console.error("Error cleaning up permissions:", e));
+        await db.permission
+          .deleteMany({
+            where: {
+              // Prefer deleting by ID, but also catch prefixed ones if findOrCreatePermission didn't add to array
+              OR: [{ id: { in: this.createdPermissions } }, { name: { startsWith: this.prefix } }],
+            },
+          })
+          .catch((e) => console.error('Error cleaning up permissions:', e));
       }
 
       // Delete tokens
@@ -1175,7 +1252,7 @@ export class TestDataManager {
           where: {
             OR: [
               { client: { clientId: { startsWith: this.prefix } } }, // Assuming client relation exists
-              { user: { username: { startsWith: this.prefix } } },   // Assuming user relation exists
+              { user: { username: { startsWith: this.prefix } } }, // Assuming user relation exists
               // If direct client/user IDs are stored on token tables and are in createdClients/createdUsers:
               // { clientId: { in: this.createdClients } }, // This requires clientId on AccessToken model
               // { userId: { in: this.createdUsers } },     // This requires userId on AccessToken model
@@ -1230,10 +1307,9 @@ export class TestDataManager {
         })
         .catch(() => {});
       // And scopes added by ID
-       if (this.createdScopes.length > 0) {
+      if (this.createdScopes.length > 0) {
         await db.scope.deleteMany({ where: { id: { in: this.createdScopes } } }).catch(() => {});
       }
-
 
       // Clear tracking arrays
       this.createdUsers.length = 0;
@@ -1253,14 +1329,19 @@ export class TestDataManager {
    */
   async clearDatabase(): Promise<void> {
     // Using aliased 'db' import directly
-    if (!db.accessToken?.deleteMany) { // Check properties on 'db'
-        console.error("Prisma client not functional via module import during clearDatabase. Skipping clearDatabase.");
-        return;
+    if (!db.accessToken?.deleteMany) {
+      // Check properties on 'db'
+      console.error(
+        'Prisma client not functional via module import during clearDatabase. Skipping clearDatabase.'
+      );
+      return;
     }
     try {
       // 清理连接表 (Clear join tables first)
-      await db.userRole.deleteMany({}).catch(e => console.error("Error clearing UserRole:", e));
-      await db.rolePermission.deleteMany({}).catch(e => console.error("Error clearing RolePermission:", e));
+      await db.userRole.deleteMany({}).catch((e) => console.error('Error clearing UserRole:', e));
+      await db.rolePermission
+        .deleteMany({})
+        .catch((e) => console.error('Error clearing RolePermission:', e));
 
       // Delete all tokens first (they have foreign key constraints)
       await db.accessToken.deleteMany({}).catch(() => {});
@@ -1272,7 +1353,6 @@ export class TestDataManager {
       // await db.userPermission.deleteMany({}).catch(() => {}); // If you have a direct UserPermission table
       await db.userResourcePermission.deleteMany({}).catch(() => {});
 
-
       // Delete audit logs and sessions
       await db.auditLog.deleteMany({}).catch(() => {});
       await db.consentGrant.deleteMany({}).catch(() => {});
@@ -1282,11 +1362,12 @@ export class TestDataManager {
       await db.user.deleteMany({}).catch(() => {});
 
       // Delete RBAC entities, resources, and scopes
-      await db.role.deleteMany({}).catch(e => console.error("Error clearing Role:", e));
-      await db.permission.deleteMany({}).catch(e => console.error("Error clearing Permission:", e));
+      await db.role.deleteMany({}).catch((e) => console.error('Error clearing Role:', e));
+      await db.permission
+        .deleteMany({})
+        .catch((e) => console.error('Error clearing Permission:', e));
       await db.resource.deleteMany({}).catch(() => {}); // If you have a Resource model
       await db.scope.deleteMany({}).catch(() => {});
-
 
       // Clear tracking arrays
       this.createdUsers.length = 0;
@@ -1295,7 +1376,6 @@ export class TestDataManager {
       this.createdScopes.length = 0;
       this.createdRoles.length = 0;
       this.createdPermissions.length = 0;
-
 
       console.log('✅ 数据库已完全清理 / Database completely cleared');
     } catch (error) {
@@ -1716,7 +1796,10 @@ export class OAuthFlowTestHelper {
         };
       }
       const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
-      return { success: false, error: `Token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}` };
+      return {
+        success: false,
+        error: `Token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}`,
+      };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -1786,7 +1869,10 @@ export class OAuthFlowTestHelper {
         };
       }
       const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
-      return { success: false, error: `Refresh token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}` };
+      return {
+        success: false,
+        error: `Refresh token request failed: ${tokenResponse.status} - ${errorData.error || 'No error description'}`,
+      };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
