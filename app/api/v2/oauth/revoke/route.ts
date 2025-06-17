@@ -10,18 +10,15 @@ import { successResponse, errorResponse } from '@/lib/api/apiResponse';
 import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
 import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // 假设这些工具类可用
 
-// --- 请求 Schema ---
+// --- Zod Schema for Revocation Request Body ---
 const RevocationRequestSchema = z.object({
-  token: z.string().min(1, '令牌 (token) 不能为空'),
-  token_type_hint: z.string().optional().describe('可选的令牌类型提示 (e.g., access_token, refresh_token)'),
-  // client_id 和 client_secret 用于客户端认证，如果未使用 Basic Auth
-  client_id: z.string().optional(),
-  client_secret: z.string().optional(),
+  token: z.string({ required_error: "token is required" }).min(1, '令牌 (token) 不能为空'),
+  token_type_hint: z.enum(['access_token', 'refresh_token']).optional().describe('可选的令牌类型提示 (e.g., access_token, refresh_token)'),
+  // client_id and client_secret are implicitly handled by ClientAuthUtils if passed in body,
+  // but primarily ClientAuthUtils checks Authorization header first.
+  // Zod schema here focuses on token and hint.
 });
 
-// --- 辅助函数 ---
-// authenticateRevocationClient is replaced by ClientAuthUtils.authenticateClient
-// local getTokenHash is replaced by JWTUtils.getTokenHash
 
 /**
  * @swagger
@@ -77,106 +74,150 @@ async function revocationHandler(request: NextRequest) {
   }
 
   const bodyParams = new URLSearchParams(await request.text());
+  const rawBodyData: Record<string, any> = {};
+  bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
+
 
   // --- 客户端认证 (Client Authentication) ---
+  // ClientAuthUtils.authenticateClient handles Basic Auth (from header) or client_id/secret from body (via bodyParams)
   const clientAuthResult = await ClientAuthUtils.authenticateClient(request, bodyParams);
 
   if (!clientAuthResult.client) {
-    if (clientAuthResult.error) {
-      return NextResponse.json(clientAuthResult.error, { status: 401 });
-    }
-    return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication failed' }, { status: 401 });
+    // RFC 7009: If client authentication fails, the server an error response as described in RFC 6749, Section 5.2.
+    return NextResponse.json(
+      clientAuthResult.error || { error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication failed' },
+      { status: 401 }
+    );
   }
   const authenticatedClient = clientAuthResult.client;
   console.log(`Token revocation request authenticated for client: ${authenticatedClient.clientId}`);
 
-
-  // --- 请求体验证 ---
-  const tokenToRevoke = bodyParams.get('token');
-  const tokenTypeHint = bodyParams.get('token_type_hint');
-
-  if (!tokenToRevoke) {
-    return NextResponse.json(errorResponse(400, '请求缺少令牌 (token is required)', OAuth2ErrorTypes.INVALID_REQUEST, overallRequestId), { status: 400 });
+  // --- 请求体验证 (Using Zod on rawBodyData which includes token and hint) ---
+  const validationResult = RevocationRequestSchema.safeParse(rawBodyData);
+  if (!validationResult.success) {
+    return NextResponse.json(
+      errorResponse(400, validationResult.error.errors[0]?.message || 'Invalid revocation request parameters.', OAuth2ErrorTypes.INVALID_REQUEST, overallRequestId),
+      { status: 400 }
+    );
   }
 
+  const { token: tokenToRevoke, token_type_hint: tokenTypeHint } = validationResult.data;
+
   // --- 令牌撤销逻辑 ---
-  // RFC 7009: 服务器应该首先验证令牌，然后验证客户端是否有权撤销它。
-  // 如果令牌无效或客户端无权，服务器应该仍然返回200 OK，以防止客户端探测令牌。
-
-  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke); // 使用 JWTUtils 中的方法
-
+  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke);
   let tokenFoundAndRevoked = false;
-  let revokedTokenInfo = { type: "unknown", jti: "unknown" };
+  let revokedTokenDetails = { type: "unknown", idForLog: "unknown" };
+
+  // JWTs contain a 'jti' (JWT ID) claim. We should use this for blacklisting if possible.
+  // For opaque tokens stored by hash, we use the hash.
+  // Let's assume for now that our JWTs have 'jti' and we can decode them to get it.
+  // If not, AccessToken.id or RefreshToken.id (if they are unique like JTIs) can be used.
+
+  let decodedJwtPayload: jose.JWTPayload | null = null;
+  try {
+    decodedJwtPayload = jose.decodeJwt(tokenToRevoke);
+  } catch (e) {
+    // Not a JWT, or malformed. Proceed with hash-based lookup.
+    console.warn("Revocation: Token provided is not a valid JWT, proceeding with hash-based lookup.", e);
+  }
+  const jtiToBlacklist = decodedJwtPayload?.jti || null;
 
 
-  // 尝试作为访问令牌处理 (Try to process as access token)
+  // 尝试作为访问令牌处理
   if (tokenTypeHint === 'access_token' || !tokenTypeHint) {
     const accessToken = await prisma.accessToken.findFirst({
-      // where: { tokenHash: tokenHash, clientId: authenticatedClient.id }, // 确保令牌属于此客户端 (Ensure token belongs to this client)
-      // clientId in AccessToken is the Prisma CUID, authenticatedClient.id is also CUID
-      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }
+      where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
     });
 
     if (accessToken) {
-      // Prisma schema for AccessToken might not have 'revoked' field directly.
-      // If it's meant to be immediately unusable, removing or marking it (if schema supports) is an option.
-      // For short-lived access tokens, often no action is taken other than acknowledging.
-      // Let's assume for now there isn't a specific 'revoked' field on AccessToken, or it's handled by expiry.
-      // If there was a `revoked` field:
-      /*
-      if (!accessToken.isRevoked) { // Assuming a boolean field `isRevoked`
-        await prisma.accessToken.update({
-          where: { id: accessToken.id },
-          data: { isRevoked: true, revokedAt: new Date() }, // And `revokedAt`
-        });
-      }
-      */
+      // Add to TokenBlacklist. Use JTI if available, otherwise the token's own ID or hash.
+      // Assuming AccessToken.id can serve as a unique identifier if JTI is not part of its direct model.
+      // The JWTUtils.createAccessToken *does* add a JTI. So jwtPayload.jti should be preferred.
+      const effectiveJti = jtiToBlacklist || accessToken.id; // Fallback to accessToken.id if JTI not in JWT
+
+      await prisma.tokenBlacklist.upsert({
+          where: { jti: effectiveJti },
+          create: { jti: effectiveJti, tokenType: 'access_token', expiresAt: accessToken.expiresAt },
+          update: { expiresAt: accessToken.expiresAt }, // Update expiry if somehow re-blacklisted
+      });
+      // Optionally, delete the AccessToken entry if it's not needed for audit/other purposes post-revocation
+      // await prisma.accessToken.delete({ where: { id: accessToken.id } });
+
       tokenFoundAndRevoked = true;
-      revokedTokenInfo = { type: "access_token", jti: accessToken.id }; // Using AccessToken.id as a stand-in for JTI if not directly present
-      console.log(`Access token (ID/Hash_Prefix: ${accessToken.id}/${tokenHash.substring(0,6)}) belonging to client ${authenticatedClient.clientId} acknowledged for revocation.`);
+      revokedTokenDetails = { type: "access_token", idForLog: accessToken.id };
+      console.log(`Access token (ID: ${accessToken.id}) for client ${authenticatedClient.clientId} blacklisted.`);
     }
   }
 
-  // 尝试作为刷新令牌处理 (Try to process as refresh token)
+  // 尝试作为刷新令牌处理
   if (!tokenFoundAndRevoked && (tokenTypeHint === 'refresh_token' || !tokenTypeHint)) {
     const refreshToken = await prisma.refreshToken.findFirst({
-      // where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
-      where: { tokenHash: tokenHash, clientId: authenticatedClient.id }
+      where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
     });
 
-    if (refreshToken) {
-      if (!refreshToken.isRevoked) { // Prisma schema has isRevoked for RefreshToken
-        await prisma.refreshToken.update({
+    if (refreshToken && !refreshToken.isRevoked) {
+      const effectiveJti = jtiToBlacklist || refreshToken.id; // Fallback to refreshToken.id
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Revoke the refresh token itself (mark as revoked and add to blacklist)
+        await tx.refreshToken.update({
           where: { id: refreshToken.id },
           data: { isRevoked: true, revokedAt: new Date() },
         });
-      }
-      tokenFoundAndRevoked = true;
-      revokedTokenInfo = { type: "refresh_token", jti: refreshToken.id }; // Using RefreshToken.id as a stand-in for JTI
-
-      console.log(`Refresh token (ID/Hash_Prefix: ${refreshToken.id}/${tokenHash.substring(0,6)}) belonging to client ${authenticatedClient.clientId} was revoked.`);
-
-      // 标准还建议，如果撤销的是刷新令牌，相关的访问令牌也应被撤销。
-      // (Standard also recommends revoking associated access tokens if a refresh token is revoked.)
-      // This requires linking access tokens to the refresh token that issued them, or by user+client.
-      // Example (if access tokens are linked by userId and clientId):
-      if (refreshToken.userId) {
-        /*
-        const updatedAccessTokens = await prisma.accessToken.updateMany({
-          where: {
-            userId: refreshToken.userId,
-            clientId: authenticatedClient.id,
-            // isRevoked: false, // if AccessToken had this field
-            expiresAt: { gt: new Date() }
-          },
-          data: {
-            // isRevoked: true, revokedAt: new Date()
-            // Or simply delete them if they are not meant to be queryable once revoked this way
-          },
+        await tx.tokenBlacklist.upsert({
+            where: { jti: effectiveJti },
+            create: { jti: effectiveJti, tokenType: 'refresh_token', expiresAt: refreshToken.expiresAt },
+            update: { expiresAt: refreshToken.expiresAt },
         });
-        console.log(`Revoked ${updatedAccessTokens.count} associated access tokens for user ${refreshToken.userId} and client ${authenticatedClient.clientId}.`);
-        */
-      }
+
+        tokenFoundAndRevoked = true;
+        revokedTokenDetails = { type: "refresh_token", idForLog: refreshToken.id };
+        console.log(`Refresh token (ID: ${refreshToken.id}) for client ${authenticatedClient.clientId} revoked and blacklisted.`);
+
+        // 2. Cascading Revocation: Invalidate related Access Tokens
+        // Find access tokens that could have been derived from this refresh token family.
+        // This is a simplified approach; a more robust one might trace a chain of refresh tokens if rotation creates new DB IDs.
+        // For now, assume access tokens are linked by user and client, and their expiry is relevant.
+        if (refreshToken.userId) {
+          const relatedAccessTokens = await tx.accessToken.findMany({
+            where: {
+              userId: refreshToken.userId,
+              clientId: authenticatedClient.id,
+              expiresAt: { gt: new Date() }, // Only active ones
+              // We need a way to get their JTIs if not directly stored on AccessToken model
+              // For now, we'll assume AccessToken.id is usable as a JTI for blacklisting.
+            }
+          });
+
+          if (relatedAccessTokens.length > 0) {
+            const blacklistEntries = relatedAccessTokens.map(at => {
+              // Attempt to decode each access token to get its JTI for blacklisting
+              // This is inefficient. Ideally, JTI is stored on AccessToken model.
+              let accessJti = at.id; // Fallback
+              try {
+                const decodedAt = jose.decodeJwt(at.token); // Assuming raw token is stored for this...
+                if(decodedAt.jti) accessJti = decodedAt.jti;
+              } catch(e) { console.warn("Could not decode AT to get JTI during cascading revoke, using ID as JTI."); }
+
+              return { jti: accessJti, tokenType: 'access_token', expiresAt: at.expiresAt };
+            });
+
+            // Batch upsert into blacklist
+            // Prisma createMany does not support `onConflict` or `upsert` directly in batch.
+            // Loop for upsert (can be slow for many tokens, consider raw SQL or batching logic for production)
+            for (const entry of blacklistEntries) {
+                await tx.tokenBlacklist.upsert({
+                    where: {jti: entry.jti},
+                    create: entry,
+                    update: {expiresAt: entry.expiresAt} // Keep it simple, just update expiry if re-blacklisted
+                });
+            }
+            // Optional: Delete the AccessToken entries from their original table
+            // await tx.accessToken.deleteMany({ where: { id: { in: relatedAccessTokens.map(at => at.id) } } });
+            console.log(`Cascaded revocation: ${relatedAccessTokens.length} access tokens blacklisted for user ${refreshToken.userId}, client ${authenticatedClient.clientId}.`);
+          }
+        }
+      });
     }
   }
 

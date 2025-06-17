@@ -1,138 +1,224 @@
 // /api/v2/system/configurations
+// 描述: 管理系统配置项 - 获取列表和批量更新。
+// (Manages system configuration items - List and Bulk Update.)
 
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { Prisma, SystemConfiguration } from '@prisma/client';
+
+// Zod Schema for listing system configurations (query parameters)
+// 列出系统配置的Zod Schema (查询参数)
+const SystemConfigListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(100), // System configs usually aren't excessively numerous
+  editableOnly: z.preprocess(val => val === 'true' || val === true, z.boolean().optional().default(false)),
+});
+
+// Zod Schema for a single entry in the bulk update payload
+// 批量更新负载中单个条目的Zod Schema
+const SystemConfigUpdateEntrySchema = z.object({
+  key: z.string().min(1, "配置项的键不能为空 (Configuration key cannot be empty)"),
+  value: z.any(), // Value can be string, number, boolean, or object/array for JSON type
+});
+
+// Zod Schema for the bulk update payload (array of entries)
+// 批量更新负载的Zod Schema (条目数组)
+const SystemConfigBulkUpdatePayloadSchema = z.array(SystemConfigUpdateEntrySchema);
+
+
+// 辅助函数：根据存储的类型转换值
+// (Helper function: Convert value based on its stored type)
+function parseConfigValue(value: string, type: string): any {
+  try {
+    if (type === 'boolean') return value === 'true';
+    if (type === 'number') return parseFloat(value);
+    if (type === 'json') return JSON.parse(value);
+    return value; // string or other
+  } catch (e) {
+    console.error(`Error parsing config value '${value}' of type '${type}':`, e);
+    return value; // Return original string if parsing fails
+  }
+}
+
+// 辅助函数：格式化配置项以用于响应
+// (Helper function: Format configuration item for response)
+function formatConfigForResponse(config: SystemConfiguration): any {
+  return {
+    ...config,
+    value: parseConfigValue(config.value, config.type),
+  };
+}
+
 
 /**
  * @swagger
  * /api/v2/system/configurations:
  *   get:
  *     summary: 获取所有系统配置项 (系统配置管理)
- *     description:检索系统中所有可用的配置项及其当前值。可能需要管理员权限。
+ *     description: 检索系统中所有可用的配置项及其当前值。需要 'system:configurations:read' 权限。
  *     tags: [System API - Configurations]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - name: page
+ *       - name: page {description: "页码"}
  *         in: query
- *         description: 页码
- *         schema:
- *           type: integer
- *           default: 1
- *       - name: limit
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit {description: "每页数量"}
  *         in: query
- *         description: 每页数量
- *         schema:
- *           type: integer
- *           default: 100 # System configs are usually not that many
- *       - name: editableOnly
+ *         schema: { type: integer, default: 100 }
+ *       - name: editableOnly {description: "只返回可编辑的配置项"}
  *         in: query
- *         description: 只返回可编辑的配置项
- *         schema:
- *           type: boolean
- *           default: false
+ *         schema: { type: boolean, default: false }
  *     responses:
- *       200:
- *         description: 成功获取系统配置项列表。
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       key:
- *                         type: string
- *                       value:
- *                         type: any # Can be string, number, boolean, JSON object/array
- *                       description:
- *                         type: string
- *                       type:
- *                         type: string
- *                         enum: [string, number, boolean, json]
- *                       isEditable:
- *                         type: boolean
- *                 pagination:
- *                   type: object # Pagination structure
- *       401:
- *         description: 未经授权。
- *       403:
- *         description: 禁止访问。
+ *       200: { description: "成功获取系统配置项列表。" }
+ *       401: { description: "未经授权。" }
+ *       403: { description: "禁止访问。" }
+ */
+async function listSystemConfigurationsHandler(request: AuthenticatedRequest) {
+  const { searchParams } = new URL(request.url);
+  const queryParams: Record<string, string | undefined> = {};
+  searchParams.forEach((value, key) => { queryParams[key] = value; });
+
+  const validationResult = SystemConfigListQuerySchema.safeParse(queryParams);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+  }
+  const { page, limit, editableOnly } = validationResult.data;
+
+  const whereClause: Prisma.SystemConfigurationWhereInput = {};
+  if (editableOnly) {
+    whereClause.isEditable = true;
+  }
+
+  try {
+    const configurations = await prisma.systemConfiguration.findMany({
+      where: whereClause,
+      orderBy: { key: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    const totalRecords = await prisma.systemConfiguration.count({ where: whereClause });
+
+    return NextResponse.json({
+      data: configurations.map(formatConfigForResponse),
+      pagination: {
+        page,
+        pageSize: limit,
+        totalItems: totalRecords,
+        totalPages: Math.ceil(totalRecords / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to list system configurations:", error);
+    return NextResponse.json({ message: "Error listing system configurations." }, { status: 500 });
+  }
+}
+export const GET = requirePermission('system:configurations:read')(listSystemConfigurationsHandler);
+
+
+/**
+ * @swagger
+ * /api/v2/system/configurations:
  *   put:
  *     summary: 批量更新系统配置项 (系统配置管理)
- *     description: 批量更新一个或多个系统配置项的值。只允许更新 `isEditable=true` 的配置项。
+ *     description: 批量更新一个或多个系统配置项的值。只允许更新 `isEditable=true` 的配置项。需要 'system:configurations:update' 权限。
  *     tags: [System API - Configurations]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: array
- *             items:
- *               type: object
- *               required:
- *                 - key
- *                 - value
- *               properties:
- *                 key:
- *                   type: string
- *                   description: 要更新的配置项的键。
- *                 value:
- *                   type: any # Value type should match the 'type' defined for the key
- *                   description: 配置项的新值。
- *           example:
- *             - key: "SITE_NAME"
- *               value: "My Awesome App"
- *             - key: "MAINTENANCE_MODE"
- *               value: false
+ *             items: { $ref: '#/components/schemas/SystemConfigUpdateEntry' }
  *     responses:
- *       200:
- *         description: 系统配置项已成功更新。返回更新后的配置项列表。
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 # Schema for a single configuration item
- *                 type: object
- *       400:
- *         description: 无效请求，例如尝试更新不可编辑的配置项或值类型不匹配。
- *       401:
- *         description: 未经授权。
- *       403:
- *         description: 禁止访问。
+ *       200: { description: "系统配置项已成功更新。" }
+ *       400: { description: "无效请求或部分更新失败。" }
+ *       401: { description: "未经授权。" }
+ *       403: { description: "禁止访问或尝试更新不可编辑的配置项。" }
+ * components:
+ *  schemas:
+ *    SystemConfigUpdateEntry:
+ *      type: object
+ *      required: [key, value]
+ *      properties:
+ *        key: { type: string }
+ *        value: { type: "object", description: "可以是字符串、数字、布尔值或JSON对象/数组" }
  */
-export async function GET(request: Request) {
-  // TODO: 实现获取所有系统配置项的逻辑 (Implement logic to get all system configurations)
-  // 1. 验证用户权限 (通常需要高级管理员权限)。
-  // 2. 从数据库查询 SystemConfiguration 记录。
-  // 3. 根据查询参数 (editableOnly) 过滤结果。
-  // 4. 支持分页。
-  // 5. 返回配置项列表。注意：对于敏感配置，可能需要隐藏或部分屏蔽其值。
-  console.log('GET /api/v2/system/configurations request');
-  return NextResponse.json({
-    data: [
-      { key: 'SITE_NAME', value: 'Default Site Name', description: 'Public name of the website', type: 'string', isEditable: true },
-      { key: 'MAINTENANCE_MODE', value: false, description: 'Enable/disable maintenance mode', type: 'boolean', isEditable: true },
-      { key: 'API_VERSION', value: 'v2.1.0', description: 'Current API version', type: 'string', isEditable: false },
-    ],
-    pagination: { page: 1, limit: 100, total: 3 }
-  });
-}
+async function bulkUpdateSystemConfigurationsHandler(request: AuthenticatedRequest) {
+  let payloadArray;
+  try {
+    payloadArray = await request.json();
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request body', message: 'Failed to parse JSON body.' }, { status: 400 });
+  }
 
-export async function PUT(request: Request) {
-  // TODO: 实现批量更新系统配置项的逻辑 (Implement logic to bulk update system configurations)
-  // 1. 验证用户权限。
-  // 2. 解析请求体中的配置项数组。
-  // 3. 对于每个配置项:
-  //    a. 验证 key 是否存在。
-  //    b. 验证配置项是否可编辑 (isEditable=true)。
-  //    c. 验证 value 的类型是否与配置项定义的 type 匹配。
-  //    d. 如果配置项是JSON类型，确保存储的是有效的JSON字符串。
-  //    e. 更新数据库中的 SystemConfiguration 记录。
-  // 4. 返回成功更新的配置项列表。
-  const updates = await request.json();
-  console.log('PUT /api/v2/system/configurations request, updates:', updates);
-  // 模拟更新 (Simulate update)
-  return NextResponse.json(updates.map((u: {key: string, value: any}) => ({ ...u, status: 'updated' })));
+  const validationResult = SystemConfigBulkUpdatePayloadSchema.safeParse(payloadArray);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+  }
+
+  const updates = validationResult.data;
+  const results = [];
+  const errors = [];
+
+  for (const update of updates) {
+    try {
+      const configItem = await prisma.systemConfiguration.findUnique({
+        where: { key: update.key },
+      });
+
+      if (!configItem) {
+        errors.push({ key: update.key, message: "Configuration item not found." });
+        continue;
+      }
+      if (!configItem.isEditable) {
+        errors.push({ key: update.key, message: "Configuration item is not editable." });
+        continue;
+      }
+
+      let valueToStore: string;
+      // Validate and stringify value based on stored type
+      if (configItem.type === 'boolean') {
+        if (typeof update.value !== 'boolean') throw new Error('Invalid type for boolean config.');
+        valueToStore = String(update.value);
+      } else if (configItem.type === 'number') {
+        if (typeof update.value !== 'number') throw new Error('Invalid type for number config.');
+        valueToStore = String(update.value);
+      } else if (configItem.type === 'json') {
+        // For JSON, expect object/array, then stringify.
+        if (typeof update.value !== 'object' && !Array.isArray(update.value)) throw new Error('Invalid type for json config, must be object or array.');
+        valueToStore = JSON.stringify(update.value);
+      } else { // string or other
+        if (typeof update.value !== 'string') throw new Error('Invalid type for string config.');
+        valueToStore = update.value;
+      }
+
+      const updatedItem = await prisma.systemConfiguration.update({
+        where: { key: update.key },
+        data: { value: valueToStore, updatedAt: new Date() },
+      });
+      results.push(formatConfigForResponse(updatedItem));
+    } catch (err: any) {
+      console.error(`Failed to update config key ${update.key}:`, err);
+      errors.push({ key: update.key, message: err.message || "Update failed." });
+    }
+  }
+
+  if (errors.length > 0) {
+    // If there are any errors, even if some updates succeeded,
+    // consider returning a mixed status or a general error indicating partial success.
+    // For simplicity, if any error occurs, return 400 with details.
+    return NextResponse.json({
+      message: "One or more configuration updates failed.",
+      updatedItems: results,
+      failedItems: errors,
+    }, { status: errors.length === updates.length ? 400 : 207 }); // 207 Multi-Status if partial success
+  }
+
+  return NextResponse.json({ data: results, message: "Configurations updated successfully." });
 }
+export const PUT = requirePermission('system:configurations:update')(bulkUpdateSystemConfigurationsHandler);

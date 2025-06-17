@@ -53,16 +53,29 @@ async function getRoleByIdHandler(req: AuthenticatedRequest, context: RouteConte
     // 从数据库中查找具有指定 ID 的角色。
     const role = await prisma.role.findUnique({
       where: { id: roleId },
-      // (可选) 如果需要同时返回与此角色关联的权限信息，可以取消注释下面的 include：
-      // include: { rolePermissions: { include: { permission: true } } }
+      include: { // 包含与角色关联的权限信息
+        rolePermissions: {
+          include: {
+            permission: true, // 包含每个关联的完整权限对象
+          },
+        },
+      },
     });
 
     if (!role) {
       // 如果未找到角色，返回404 Not Found错误。
       return NextResponse.json({ message: '角色未找到 (Role not found)' }, { status: 404 });
     }
+
+    // 格式化角色数据以包含扁平化的权限列表
+    const { rolePermissions, ...roleData } = role;
+    const formattedRole = {
+      ...roleData,
+      permissions: rolePermissions.map(rp => rp.permission), // 直接提取permission对象
+    };
+
     // 返回找到的角色信息，HTTP状态码为 200 OK。
-    return NextResponse.json(role);
+    return NextResponse.json(formattedRole);
   } catch (error) {
     // 错误处理：记录错误并返回500服务器错误。
     console.error(`获取角色 ${roleId} 详情失败 (Failed to fetch role details for ID ${roleId}):`, error);
@@ -123,26 +136,42 @@ async function updateRoleHandler(req: AuthenticatedRequest, context: RouteContex
         return NextResponse.json({ message: '禁止操作：不能停用 SYSTEM_ADMIN 角色 (Forbidden: Cannot deactivate the SYSTEM_ADMIN role)' }, { status: 403 });
     }
     // 如果请求中尝试修改 'name' 字段，可以明确拒绝。
-    // if (body.name && body.name !== existingRole.name) {
-    //   return NextResponse.json({ message: '禁止操作：不允许修改角色名称 (Forbidden: Modifying the role name is not allowed)' }, { status: 403 });
-    // }
+  if ((body as any).name && (body as any).name !== existingRole.name) { // Check if name is in body and different
+    return NextResponse.json({ message: '禁止操作：不允许修改角色名称 (Forbidden: Modifying the role name is not allowed)' }, { status: 400 });
+  }
 
 
     // 步骤 3: 执行角色信息更新。
     // Prisma `update` 操作会忽略值为 `undefined` 的字段，从而实现部分更新。
-    const updatedRole = await prisma.role.update({
-      where: { id: roleId }, // 指定要更新的角色。
-      data: {
-        // 只有当字段在 validationResult.data 中明确提供时，才包含在更新数据中。
-        displayName: displayName !== undefined ? displayName : undefined,
-        // 如果 description 显式设为 null，则会清空数据库中的描述。
-        description: description !== undefined ? description : undefined,
-        isActive: isActive !== undefined ? isActive : undefined,
-        // updatedAt 会由 Prisma 自动更新 (通常在 schema 中配置了 @updatedAt)。
-      },
+  const dataToUpdate: Prisma.RoleUpdateInput = {};
+  if (displayName !== undefined) dataToUpdate.displayName = displayName;
+  if (description !== undefined) dataToUpdate.description = description; // Allows setting to null
+  if (isActive !== undefined) dataToUpdate.isActive = isActive;
+
+  // 如果没有任何基础字段更新，并且也没有权限更新（后续添加），则可能无需操作
+  // For now, an empty dataToUpdate will just update 'updatedAt' if schema has it auto-updating.
+  // We will handle permission updates within the transaction.
+
+  const updatedRoleAfterBase = await prisma.role.update({
+    where: { id: roleId },
+    data: dataToUpdate,
+  });
+
+  // 返回更新后的角色信息 (权限部分尚未处理，将在PATCH中处理)
+  // For PUT, if it were a full replacement, permissions would be cleared and re-added here.
+  // Since this PUT behaves like PATCH for non-permission fields, we'll return the current state.
+  // The full permission update logic will be in PATCH.
+  const roleForResponse = await prisma.role.findUnique({
+    where: { id: roleId },
+    include: { rolePermissions: { include: { permission: true } } }
     });
-    // 返回更新后的角色信息。
-    return NextResponse.json(updatedRole);
+
+  const { rolePermissions, ...roleData } = roleForResponse!;
+  const formattedRole = {
+    ...roleData,
+    permissions: rolePermissions.map(rp => rp.permission)
+  };
+  return NextResponse.json(formattedRole);
   } catch (error) {
     // 错误处理。
     console.error(`更新角色 ${roleId} 失败 (Failed to update role ${roleId}):`, error);
@@ -208,7 +237,116 @@ async function deleteRoleHandler(req: AuthenticatedRequest, context: RouteContex
 
 // 使用 `requirePermission` 中间件包装处理函数，并导出为相应的 HTTP 方法。
 export const GET = requirePermission('roles:read')(getRoleByIdHandler);
-export const PUT = requirePermission('roles:update')(updateRoleHandler);
+// PUT is refactored to PATCH below as per subtask requirements.
+// export const PUT = requirePermission('roles:update')(updateRoleHandler);
+
+
+// --- PATCH /api/v2/roles/{roleId} (部分更新角色信息，包括权限) ---
+const RolePatchSchema = z.object({
+  displayName: z.string().min(1).max(100).optional(),
+  description: z.string().max(255).optional().nullable(),
+  isActive: z.boolean().optional(),
+  permissionIds: z.array(z.string().cuid("无效的权限ID格式")).optional(), // 权限ID列表，用于完整替换当前角色的权限
+});
+
+async function patchRoleHandler(req: AuthenticatedRequest, context: RouteContext): Promise<NextResponse> {
+  const { roleId } = context.params;
+  let body;
+  try {
+    body = await req.json();
+  } catch (e) {
+    return NextResponse.json({ message: '无效的JSON请求体' }, { status: 400 });
+  }
+
+  const validationResult = RolePatchSchema.safeParse(body);
+  if (!validationResult.success) {
+    return NextResponse.json({ message: '更新角色信息验证失败', errors: validationResult.error.format() }, { status: 400 });
+  }
+
+  const { displayName, description, isActive, permissionIds } = validationResult.data;
+
+  if (Object.keys(validationResult.data).length === 0) {
+    return NextResponse.json({ message: '请求体中至少需要一个待更新的字段' }, { status: 400 });
+  }
+
+  try {
+    const existingRole = await prisma.role.findUnique({ where: { id: roleId } });
+    if (!existingRole) {
+      return NextResponse.json({ message: '角色未找到，无法更新' }, { status: 404 });
+    }
+
+    if (CORE_SYSTEM_ROLES.includes(existingRole.name) && isActive === false && existingRole.name === 'SYSTEM_ADMIN') {
+      return NextResponse.json({ message: '禁止操作：不能停用 SYSTEM_ADMIN 角色' }, { status: 403 });
+    }
+    // 角色名称 `name` 不允许修改
+    if ((body as any).name && (body as any).name !== existingRole.name) {
+      return NextResponse.json({ message: '禁止操作：不允许修改角色名称' }, { status: 400 });
+    }
+
+    // 在事务中更新角色基础信息和权限关联
+    const updatedRole = await prisma.$transaction(async (tx) => {
+      const roleUpdateData: Prisma.RoleUpdateInput = {};
+      if (displayName !== undefined) roleUpdateData.displayName = displayName;
+      if (description !== undefined) roleUpdateData.description = description;
+      if (isActive !== undefined) roleUpdateData.isActive = isActive;
+
+      if (Object.keys(roleUpdateData).length > 0) {
+        await tx.role.update({
+          where: { id: roleId },
+          data: roleUpdateData,
+        });
+      }
+
+      // 如果提供了 permissionIds，则更新权限关联
+      // 这通常意味着先删除所有现有权限，再添加新的权限
+      if (permissionIds !== undefined) {
+        // 验证新的 permissionIds 是否都有效
+        if (permissionIds.length > 0) {
+          const permissionsCount = await tx.permission.count({
+            where: { id: { in: permissionIds } },
+          });
+          if (permissionsCount !== permissionIds.length) {
+            throw new Error('一个或多个提供的权限ID无效或不存在 (One or more provided permissionIds are invalid or do not exist)');
+          }
+        }
+
+        await tx.rolePermission.deleteMany({ where: { roleId: roleId } });
+        if (permissionIds.length > 0) {
+          await tx.rolePermission.createMany({
+            data: permissionIds.map(pid => ({ roleId: roleId, permissionId: pid })),
+          });
+        }
+      }
+
+      // 返回更新后的角色，并包含最新的权限信息
+      return tx.role.findUnique({
+        where: { id: roleId },
+        include: { rolePermissions: { include: { permission: true } } },
+      });
+    });
+
+    if (!updatedRole) { // Should not happen if transaction is successful
+        throw new Error("Role update failed post-transaction somehow.")
+    }
+
+    const { rolePermissions, ...roleData } = updatedRole;
+    const formattedRole = {
+      ...roleData,
+      permissions: rolePermissions.map(rp => rp.permission),
+    };
+    return NextResponse.json(formattedRole);
+
+  } catch (error: any) {
+    console.error(`更新角色 ${roleId} 失败:`, error);
+    if (error.message.includes("权限ID无效")) {
+        return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ message: `更新角色时发生错误` }, { status: 500 });
+  }
+}
+export const PATCH = requirePermission('roles:update')(patchRoleHandler);
+
+
 export const DELETE = requirePermission('roles:delete')(deleteRoleHandler);
 
 [end of app/api/v2/roles/[roleId]/route.ts]

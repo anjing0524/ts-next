@@ -58,6 +58,7 @@ if (!process.env.JWKS_URI) {
 // Setup environment variables for testing
 Object.assign(process.env, {
   NODE_ENV: 'test', // This will be set regardless of prior value
+  DATABASE_URL: 'file:./prisma/dev.db', // Ensure Vitest uses dev.db
   NEXT_PUBLIC_BASE_PATH: '/datamgr_flow',
   TEST_BASE_URL: 'http://localhost:3000',
 });

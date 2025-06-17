@@ -7,11 +7,14 @@ import prisma from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交�
 import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型，User 用于类型提示，Prisma 用于高级查询类型。
 import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。
 // import { JWTUtils } from '@/lib/auth/oauth2'; // REMOVED: 不再使用 V2 会话令牌。认证和授权通过 OAuth Bearer Token 和 requirePermission 中间件处理。
-import { isValidEmail } from '@/lib/utils';   // 辅助函数，用于验证电子邮件格式。
+// import { isValidEmail } from '@/lib/utils';   // 辅助函数，用于验证电子邮件格式。 // Zod will handle email validation
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission 高阶函数和 AuthenticatedRequest 类型。
+import { z } from 'zod'; // 引入 Zod 用于数据校验
+import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。
+// import { prisma } from '@/lib/prisma'; // prisma is already imported globally in the original file as "prisma" not "db"
 
-// 定义密码的最小长度。
-const MIN_PASSWORD_LENGTH = 8;
+// 定义密码的最小长度 - Zod schema will handle this.
+// const MIN_PASSWORD_LENGTH = 8;
 // 定义获取用户列表时分页的默认页面大小。
 const DEFAULT_PAGE_SIZE = 10;
 // 定义获取用户列表时分页允许的最大页面大小，以防止滥用。
@@ -67,89 +70,119 @@ async function createUserHandler(req: AuthenticatedRequest): Promise<NextRespons
 
   // 从请求体中解构出用户相关字段。
   // 为 isActive 和 mustChangePassword 提供默认值。
-  const {
-    username, email, password, // 必需字段
-    firstName, lastName, displayName, avatar, phone, // 可选个人信息字段
-    organization, department, workLocation, // 可选工作相关字段
-    isActive = true,        // 用户状态，默认为 true (激活)
-    mustChangePassword = true, // 是否需要在下次登录时强制修改密码，默认为 true
-  } = requestBody;
+  // const {
+  //   username, email, password, // 必需字段 // These will come from validatedData
+  //   firstName, lastName, displayName, avatar, phone, // 可选个人信息字段
+  //   organization, department, workLocation, // 可选工作相关字段
+  //   isActive = true,        // 用户状态，默认为 true (激活)
+  //   mustChangePassword = true, // 是否需要在下次登录时强制修改密码，默认为 true
+  // } = requestBody; // No longer directly destructuring from requestBody
 
-  // 步骤 2: 输入数据验证
-  // 验证必需字段是否存在。
-  if (!username || !email || !password) {
-    return errorResponse('Username, email, and password are required.', 400, 'validation_error');
+  // Zod schema for password policy (moved to top level of the module)
+  const passwordPolicySchema = z.string()
+    .min(8, "Password must be at least 8 characters long / 密码长度至少为8位")
+    .max(64, "Password must be at most 64 characters long / 密码长度最多为64位")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter / 密码必须包含至少一个大写字母")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter / 密码必须包含至少一个小写字母")
+    .regex(/[0-9]/, "Password must contain at least one number / 密码必须包含至少一个数字")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character / 密码必须包含至少一个特殊字符");
+
+  // Zod schema for user creation payload (moved to top level of the module)
+  const userCreatePayloadSchema = z.object({
+    username: z.string().min(3, "Username must be at least 3 characters long / 用户名长度至少为3位"),
+    password: passwordPolicySchema,
+    email: z.string().email("Invalid email address / 无效的电子邮件地址").optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    displayName: z.string().optional().nullable(), // Added displayName
+    avatar: z.string().url("Invalid URL format for avatar / 头像URL格式无效").optional().nullable(), // Added avatar with URL validation
+    // phone: z.string().regex(/^\+[1-9]\d{1,14}$/, "Invalid phone number format / 无效的电话号码格式").optional().nullable(), // Example phone validation
+    organization: z.string().optional().nullable(),
+    department: z.string().optional().nullable(),
+    // workLocation: z.string().optional().nullable(), // Assuming this is not in User model directly
+    isActive: z.boolean().default(true).optional(),
+    mustChangePassword: z.boolean().default(true).optional(),
+  });
+
+  // 步骤 2: 使用 Zod 进行输入数据验证
+  const validationResult = userCreatePayloadSchema.safeParse(requestBody);
+  if (!validationResult.success) {
+    // 返回400错误，包含Zod解析出的具体错误信息
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
-  // 验证密码长度。
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return errorResponse(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`, 400, 'validation_error');
-  }
-  // 验证电子邮件格式。
-  if (!isValidEmail(email)) { // isValidEmail 是从 @lib/utils 导入的辅助函数。
-    return errorResponse('Invalid email format.', 400, 'validation_error');
-  }
-  // TODO: 可以考虑使用 Zod 或类似的库进行更全面的输入验证，例如 username 的格式、电话号码格式等。
-  // 例如: PasswordComplexitySchema.parse(password) (如果密码复杂度规则也适用于管理员创建的初始密码)
+
+  // 从验证结果中获取处理过的数据 (Validated data)
+  const {
+    username, email, password, firstName, lastName, displayName, avatar,
+    organization, department, isActive, mustChangePassword, /* phone (if added) */
+  } = validationResult.data;
+
 
   try {
     // 步骤 3: 检查用户名或邮箱是否已在数据库中存在 (冲突检查)。
-    // 使用 Prisma 的 OR 操作符在一个查询中同时检查 username 和 email。
-    // trim() 用于去除首尾空格，toLowerCase() 用于确保 email 比较时不区分大小写。
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email ? email.trim().toLowerCase() : null;
+
+    const existingUserConditions: Prisma.UserWhereInput[] = [{ username: trimmedUsername }];
+    if (trimmedEmail) {
+      existingUserConditions.push({ email: trimmedEmail });
+    }
+
     const existingUser = await prisma.user.findFirst({
-      where: { OR: [{ username: username.trim() }, { email: email.trim().toLowerCase() }] },
+      where: { OR: existingUserConditions },
     });
+
     if (existingUser) {
-      // 如果找到已存在的用户，判断是 username 冲突还是 email 冲突，并返回409错误。
-      const conflictField = existingUser.username === username.trim() ? 'username' : 'email';
+      const conflictField = existingUser.username === trimmedUsername ? 'username' : 'email';
       return errorResponse(`${conflictField} already exists. Please choose a different ${conflictField}.`, 409, 'conflict');
     }
 
     // 步骤 4: 哈希密码。
-    // 使用 bcrypt 对用户提供的明文密码进行哈希处理，增加安全性。
-    // 10 是盐轮数 (salt rounds)，表示哈希的计算成本。
-    const passwordHash = await bcrypt.hash(password, 10);
+    const saltRounds = 12; // Recommended salt rounds for bcrypt
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // 步骤 5: 在数据库中创建用户记录。
     const newUser = await prisma.user.create({
       data: {
-        username: username.trim(), // 存储处理过的 username
-        email: email.trim().toLowerCase(), // 存储处理过的 email
-        passwordHash, // 存储哈希后的密码
-        firstName: firstName || null, // 可选字段，如果未提供则为 null
+        username: trimmedUsername,
+        email: trimmedEmail,
+        passwordHash,
+        firstName: firstName || null,
         lastName: lastName || null,
-        displayName: displayName || username.trim(), // 如果未提供 displayName，则默认使用 username
+        displayName: displayName || trimmedUsername,
         avatar: avatar || null,
-        phone: phone || null,
+        // phone: phone || null, // if added to schema and validation
         organization: organization || null,
         department: department || null,
-        workLocation: workLocation || null,
-        isActive: Boolean(isActive), // 确保 isActive 是布尔值
-        mustChangePassword: Boolean(mustChangePassword), // 确保 mustChangePassword 是布尔值
-        failedLoginAttempts: 0, // 新用户初始登录失败次数为0
-        // emailVerified 和 phoneVerified 字段根据 Prisma schema 的默认值 (通常是 false) 自动设置。
+        isActive: Boolean(isActive),
+        mustChangePassword: Boolean(mustChangePassword),
+        createdBy: performingAdmin?.id, // 记录创建者ID (Record creator ID)
+        failedLoginAttempts: 0,
       },
+      // 选择返回给客户端的字段 (Select fields to return to client)
+      select: {
+        id: true, username: true, email: true, firstName: true, lastName: true,
+        displayName: true, avatar: true, organization: true, department: true,
+        isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true,
+      }
     });
 
     // 步骤 6: 返回成功响应。
-    // 使用 201 Created 状态码表示资源创建成功。
-    // 返回创建的用户信息，但排除敏感字段 (如 passwordHash)。
-    return NextResponse.json(excludeSensitiveUserFields(newUser), { status: 201 });
+    // (No need to call excludeSensitiveUserFields as `select` already handles it)
+    return NextResponse.json(newUser, { status: 201 });
 
   } catch (error: any) {
     // 错误处理：
-    // 捕获 Prisma 特定的唯一约束冲突错误 (P2002)。
+    console.error(`Admin user creation error by ${performingAdmin?.id}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      // error.meta.target 通常包含导致冲突的字段名。
       const target = (error.meta?.target as string[]) || ['field'];
       return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
     }
-    // 记录其他未知错误，并返回500服务器错误。
-    console.error(`Admin user creation error by ${performingAdmin?.id}:`, error);
     return errorResponse('An unexpected error occurred during user creation. Please try again later.', 500, 'server_error');
   }
 }
 // 将 createUserHandler 函数与 'users:create' 权限绑定，并导出为 POST 请求的处理函数。
-export const POST = requirePermission('users:create', createUserHandler);
+export const POST = requirePermission('users:create')(createUserHandler); // Corrected: wrap with HOF
 
 
 // --- GET /api/v2/users (管理员获取用户列表) ---
@@ -164,6 +197,10 @@ async function listUsersHandler(req: AuthenticatedRequest): Promise<NextResponse
   const { searchParams } = new URL(req.url); // 解析 URL 中的查询参数。
 
   // 分页参数: page (页码) 和 pageSize (每页数量)。
+  // Define DEFAULT_PAGE_SIZE and MAX_PAGE_SIZE if not already defined at module level
+  const DEFAULT_PAGE_SIZE = 10;
+  const MAX_PAGE_SIZE = 100;
+
   const page = parseInt(searchParams.get('page') || '1', 10); // 默认为第1页。
   let pageSize = parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10); // 默认为 DEFAULT_PAGE_SIZE。
   if (pageSize <= 0) pageSize = DEFAULT_PAGE_SIZE; // 防止 pageSize 小于等于0。
@@ -204,19 +241,26 @@ async function listUsersHandler(req: AuthenticatedRequest): Promise<NextResponse
 
   try {
     // 步骤 3: 从数据库获取用户列表和用户总数。
-    // 使用 `prisma.user.findMany` 获取分页后的用户数据。
     const users = await prisma.user.findMany({
       where,    // 应用过滤条件
       orderBy,  // 应用排序条件
       skip: (page - 1) * pageSize, // 计算跳过的记录数，用于分页
       take: pageSize,             // 获取指定数量的记录
+      select: { // 确保排除敏感字段
+        id: true, username: true, email: true, firstName: true, lastName: true,
+        displayName: true, avatar: true, organization: true, department: true,
+        isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true, lastLoginAt: true,
+        // Explicitly exclude passwordHash, even though it's not selected above, good practice
+        // No, select *only* includes these. passwordHash is not here.
+      }
     });
     // 使用 `prisma.user.count` 获取满足过滤条件的用户总数，用于计算总页数。
     const totalUsers = await prisma.user.count({ where });
 
     // 步骤 4: 返回格式化的响应数据。
+    // excludeSensitiveUserFields is not strictly needed if `select` is used correctly.
     return NextResponse.json({
-      users: users.map(user => excludeSensitiveUserFields(user)), // 对每个用户对象排除敏感字段。
+      users: users, // users are already shaped by `select`
       total: totalUsers,          // 用户总数。
       page: page,                 // 当前页码。
       pageSize: pageSize,         // 每页数量。
@@ -230,7 +274,7 @@ async function listUsersHandler(req: AuthenticatedRequest): Promise<NextResponse
   }
 }
 // 将 listUsersHandler 函数与 'users:list' 权限绑定，并导出为 GET 请求的处理函数。
-export const GET = requirePermission('users:list', listUsersHandler);
+export const GET = requirePermission('users:list')(listUsersHandler); // Corrected: wrap with HOF
 
 
 // 类型声明，用于在其他模块中正确提示 isValidEmail 函数 (如果需要)。

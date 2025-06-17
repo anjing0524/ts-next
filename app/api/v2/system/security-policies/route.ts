@@ -1,105 +1,97 @@
 // /api/v2/system/security-policies
+// 描述: 管理系统安全策略 - 获取列表。
+// (Manages system security policies - List.)
 
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { Prisma, PolicyType } from '@prisma/client';
+
+// Zod Schema for listing security policies (query parameters)
+// 列出安全策略的Zod Schema (查询参数)
+const SecurityPolicyListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  type: z.nativeEnum(PolicyType).optional(),
+  isActive: z.preprocess(val => val === 'true' || val === true ? true : (val === 'false' || val === false ? false : undefined),
+    z.boolean().optional()
+  ),
+});
 
 /**
  * @swagger
  * /api/v2/system/security-policies:
  *   get:
  *     summary: 获取所有安全策略 (系统安全策略管理)
- *     description: 检索系统中定义的所有安全策略及其当前配置。
+ *     description: 检索系统中定义的所有安全策略及其当前配置。需要 'system:securitypolicies:read' 权限。
  *     tags: [System API - Security Policies]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - name: type
+ *       - name: page {description: "页码"}
  *         in: query
- *         required: false
- *         description: 按策略类型筛选 (例如 PASSWORD_STRENGTH, LOGIN_SECURITY)。
- *         schema:
- *           type: string
- *           # Ideally, enum values from Prisma.PolicyType if available for Swagger
- *       - name: isActive
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit {description: "每页数量"}
  *         in: query
- *         required: false
- *         description: 按策略是否激活筛选。
- *         schema:
- *           type: boolean
+ *         schema: { type: integer, default: 50 }
+ *       - name: type {description: "按策略类型筛选 (PASSWORD_STRENGTH, LOGIN_SECURITY, etc.)"}
+ *         in: query
+ *         schema: { $ref: '#/components/schemas/PolicyTypeEnum' } # Assuming PolicyTypeEnum is defined globally for Swagger
+ *       - name: isActive {description: "按策略是否激活筛选"}
+ *         in: query
+ *         schema: { type: boolean }
  *     responses:
- *       200:
- *         description: 成功获取安全策略列表。
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                   name:
- *                     type: string # e.g., "PasswordStrengthPolicy"
- *                   type:
- *                     type: string # e.g., "PASSWORD_STRENGTH"
- *                   policy:
- *                     type: object # JSON object with policy details
- *                     description: 具体策略配置。
- *                     example: {"minLength": 8, "requireUppercase": true}
- *                   isActive:
- *                     type: boolean
- *                   createdAt:
- *                     type: string
- *                     format: date-time
- *                   updatedAt:
- *                     type: string
- *                     format: date-time
- *       401:
- *         description: 未经授权。
- *       403:
- *         description: 禁止访问。
+ *       200: { description: "成功获取安全策略列表。" }
+ *       401: { description: "未经授权。" }
+ *       403: { description: "禁止访问。" }
+ * components:
+ *   schemas:
+ *     PolicyTypeEnum: # Define this if not already globally available for Swagger
+ *       type: string
+ *       enum: [PASSWORD_STRENGTH, PASSWORD_HISTORY, PASSWORD_EXPIRATION, LOGIN_SECURITY, ACCESS_CONTROL, CLIENT_SECURITY, SCOPE_SECURITY]
  */
-export async function GET(request: Request) {
-  // TODO: 实现获取所有安全策略的逻辑 (Implement logic to get all security policies)
-  // 1. 验证用户权限 (通常需要高级管理员权限)。
-  // 2. 从数据库查询 SecurityPolicy 记录。
-  // 3. 根据查询参数 (type, isActive) 过滤结果。
-  // 4. 返回策略列表。
+async function listSecurityPoliciesHandler(request: AuthenticatedRequest) {
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get('type');
-  const isActive = searchParams.get('isActive');
-  console.log(`GET /api/v2/system/security-policies request, type: ${type}, isActive: ${isActive}`);
+  const queryParams: Record<string, string | undefined> = {};
+  searchParams.forEach((value, key) => { queryParams[key] = value; });
 
-  // 示例数据 (Example data)
-  const policies = [
-    {
-      id: 'policy1',
-      name: 'Default Password Strength',
-      type: 'PASSWORD_STRENGTH',
-      policy: { minLength: 8, requireUppercase: true, requireNumber: true, requireSymbol: false },
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'policy2',
-      name: 'Login Security Settings',
-      type: 'LOGIN_SECURITY',
-      policy: { maxFailedAttempts: 5, lockoutDurationMinutes: 15 },
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-  ];
-
-  let filteredPolicies = policies;
-  if (type) {
-    filteredPolicies = filteredPolicies.filter(p => p.type === type);
+  const validationResult = SecurityPolicyListQuerySchema.safeParse(queryParams);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
-  if (isActive !== null && isActive !== undefined) {
-    filteredPolicies = filteredPolicies.filter(p => p.isActive === (isActive === 'true'));
-  }
+  const { page, limit, type, isActive } = validationResult.data;
 
-  return NextResponse.json(filteredPolicies);
+  const whereClause: Prisma.SecurityPolicyWhereInput = {};
+  if (type) whereClause.type = type;
+  if (isActive !== undefined) whereClause.isActive = isActive;
+
+  try {
+    const policies = await prisma.securityPolicy.findMany({
+      where: whereClause,
+      orderBy: { name: 'asc' }, // Or type, then name
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    const totalRecords = await prisma.securityPolicy.count({ where: whereClause });
+
+    // Prisma automatically parses JSON fields, so `policy.policy` will be an object.
+    return NextResponse.json({
+      data: policies, // The `policy` field is already an object/json by Prisma
+      pagination: {
+        page,
+        pageSize: limit,
+        totalItems: totalRecords,
+        totalPages: Math.ceil(totalRecords / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to list security policies:", error);
+    return NextResponse.json({ message: "Error listing security policies." }, { status: 500 });
+  }
 }
+export const GET = requirePermission('system:securitypolicies:read')(listSecurityPoliciesHandler);
 
-// POST for creating new policies could be added if needed,
-// but often policies are predefined or managed via a more specific PUT on existing ones.
-// PUT on /api/v2/system/security-policies/{policyIdOrName} or /api/v2/system/security-policies/{type} is more common.
+// POST for creating new policies is usually not a generic endpoint.
+// Policies are often seeded or managed via specific update (PUT/PATCH) endpoints for each type.
+// If a generic POST were needed, it would require a more complex Zod schema with discriminated unions for 'policy' based on 'type'.

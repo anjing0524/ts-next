@@ -1,224 +1,229 @@
-// 文件路径: app/api/v2/clients/route.ts
-// 描述: 管理OAuth客户端 (创建和列表) (Manage OAuth Clients - Create and List)
-
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { OAuthClient, ClientType, Prisma } from '@prisma/client';
+// app/api/v2/clients/route.ts
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification
-// isValidEmail is not directly needed here, but a URL validator is.
-// For simplicity, a basic URL validator will be included.
+import { prisma } from '@/lib/prisma';
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { ClientType, OAuthClient, Prisma } from '@prisma/client';
 
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 100;
-const CLIENT_ID_LENGTH_BYTES = 16; // Bytes, will be hex encoded to 32 chars
-const CLIENT_SECRET_LENGTH_BYTES = 32; // Bytes, will be base64url encoded to ~43 chars
-
-// --- 辅助函数 ---
-function errorResponse(message: string, status: number, errorCode?: string, details?: any) {
-  return NextResponse.json({ error: errorCode || 'request_failed', message, details }, { status });
-}
-
-async function isUserAdmin(userId: string): Promise<boolean> {
-  // TODO: Implement real RBAC check.
-  const userWithRoles = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
-  });
-  return userWithRoles?.userRoles.some(ur => ur.role.name === 'admin') || false;
-}
-
-// 基本的URL验证 (Basic URL validation)
-function isValidHttpUrl(str: string, allowHttpLocalhost: boolean = true): boolean {
-  if (!str) return false;
-  try {
-    const url = new URL(str);
-    if (allowHttpLocalhost && (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]')) { // Added IPv6 localhost
-      return url.protocol === "http:" || url.protocol === "https:";
-    }
-    return url.protocol === "https:";
-  } catch (_) {
+// --- Zod Schemas for Validation ---
+const clientCreateSchema = z.object({
+  clientId: z.string().min(3, "clientId must be at least 3 characters long / 客户端ID至少需要3个字符").max(100, "clientId must be at most 100 characters long / 客户端ID长度不超过100").optional(),
+  clientName: z.string().min(1, "clientName is required / 客户端名称不能为空").max(100, "clientName must be at most 100 characters long / 客户端名称长度不超过100"),
+  clientDescription: z.string().max(500, "clientDescription must be at most 500 characters long / 客户端描述长度不超过500").optional().nullable(),
+  clientType: z.enum([ClientType.PUBLIC, ClientType.CONFIDENTIAL], {
+    errorMap: () => ({ message: "clientType must be PUBLIC or CONFIDENTIAL / 客户端类型必须是 PUBLIC 或 CONFIDENTIAL" })
+  }),
+  clientSecret: z.string().min(8, "clientSecret must be at least 8 characters long for confidential clients / 机密客户端密钥至少需要8个字符").max(100).optional(),
+  redirectUris: z.array(z.string().url("Each redirectUri must be a valid URL / 每个重定向URI都必须是有效的URL")).min(1, "At least one redirectUri is required / 至少需要一个重定向URI"),
+  allowedScopes: z.array(z.string().min(1)).default([]),
+  grantTypes: z.array(z.string().min(1)).min(1, "At least one grantType is required / 至少需要一个授权类型"),
+  responseTypes: z.array(z.string().min(1)).default(['code']), // Default to ['code'] if not provided
+  accessTokenLifetime: z.number().int().positive("Access token lifetime must be a positive integer / 访问令牌生命周期必须是正整数").optional(),
+  refreshTokenLifetime: z.number().int().positive("Refresh token lifetime must be a positive integer / 刷新令牌生命周期必须是正整数").optional(),
+  authorizationCodeLifetime: z.number().int().positive("Authorization code lifetime must be a positive integer / 授权码生命周期必须是正整数").optional(),
+  requirePkce: z.boolean().default(true).optional(),
+  requireConsent: z.boolean().default(true).optional(),
+  logoUri: z.string().url("logoUri must be a valid URL / logoUri必须是有效的URL").optional().nullable(),
+  policyUri: z.string().url("policyUri must be a valid URL / policyUri必须是有效的URL").optional().nullable(),
+  tosUri: z.string().url("tosUri must be a valid URL / tosUri必须是有效的URL").optional().nullable(),
+  jwksUri: z.string().url("jwksUri must be a valid URL for private_key_jwt clients / jwksUri必须是有效的URL (用于private_key_jwt)").optional().nullable(),
+  tokenEndpointAuthMethod: z.enum(['client_secret_basic', 'client_secret_post', 'private_key_jwt', 'none']).default('client_secret_basic').optional(),
+  ipWhitelist: z.array(z.string().min(1)).optional().nullable(), // Array of IPs/CIDRs
+  strictRedirectUriMatching: z.boolean().default(true).optional(),
+  allowLocalhostRedirect: z.boolean().default(false).optional(),
+  requireHttpsRedirect: z.boolean().default(true).optional(),
+  isActive: z.boolean().default(true).optional(),
+}).refine(data => { // 如果是机密客户端且认证方法不是 none，则 clientSecret 是必需的 (除非是 private_key_jwt)
+  if (data.clientType === ClientType.CONFIDENTIAL &&
+      data.tokenEndpointAuthMethod !== 'none' &&
+      data.tokenEndpointAuthMethod !== 'private_key_jwt' &&
+      !data.clientSecret) {
     return false;
   }
+  return true;
+}, {
+  message: "clientSecret is required for confidential clients using secret-based authentication / 对于使用密钥认证的机密客户端，clientSecret是必需的",
+  path: ["clientSecret"],
+}).refine(data => { // private_key_jwt 需要 jwksUri
+  if (data.tokenEndpointAuthMethod === 'private_key_jwt' && !data.jwksUri) {
+    return false;
+  }
+  return true;
+}, {
+  message: "jwksUri is required for tokenEndpointAuthMethod 'private_key_jwt' / private_key_jwt认证方法需要jwksUri",
+  path: ["jwksUri"],
+}).refine(data => { // public client auth method
+  if (data.clientType === ClientType.PUBLIC && data.tokenEndpointAuthMethod !== 'none') {
+    return false;
+  }
+  return true;
+}, {
+  message: "Public clients must use 'none' as tokenEndpointAuthMethod / 公共客户端必须使用 'none' 作为认证方法",
+  path: ["tokenEndpointAuthMethod"],
+});
+
+
+// --- Helper Functions ---
+function generateRandomClientId(prefix: string = "client_"): string {
+  return `${prefix}${crypto.randomBytes(12).toString('hex')}`;
 }
 
-// 从OAuthClient对象中排除敏感字段 (Exclude sensitive fields from OAuthClient object)
-// 并将JSON字符串字段转换为数组 (And convert JSON string fields to arrays)
-function sanitizeClientForResponse(client: OAuthClient | Partial<OAuthClient>): Partial<OAuthClient> {
-  const { clientSecret, ...rest } = client as any; // clientSecret (hash) should not be returned in lists or GET by ID
+function generateRandomClientSecret(): string {
+  return crypto.randomBytes(32).toString('hex'); // 64 chars long
+}
+
+// 格式化客户端响应数据，转换JSON字符串为数组，并排除密钥哈希
+// (Formats client response data, converting JSON strings to arrays and excluding secret hash)
+function formatClientForResponse(client: OAuthClient | Partial<OAuthClient>): Partial<OAuthClient> {
+  const { clientSecret: _clientSecretHash, ...rest } = client as any; // _clientSecretHash is the hashed one from DB
 
   const output: Partial<OAuthClient> = { ...rest };
+  const arrayFields: (keyof OAuthClient)[] = ['redirectUris', 'allowedScopes', 'grantTypes', 'responseTypes'];
+  // ipWhitelist is also an array but stored as JSON string
+  if (rest.ipWhitelist && typeof rest.ipWhitelist === 'string') {
+    try { output.ipWhitelist = JSON.parse(rest.ipWhitelist); } catch (e) { output.ipWhitelist = []; }
+  } else if (Array.isArray(rest.ipWhitelist)) {
+    output.ipWhitelist = rest.ipWhitelist; // Already an array
+  } else {
+    output.ipWhitelist = null; // Or undefined, depending on desired output
+  }
 
-  const arrayFields: (keyof OAuthClient)[] = ['redirectUris', 'grantTypes', 'allowedScopes', 'responseTypes', 'ipWhitelist'];
+
   arrayFields.forEach(field => {
-    if (rest[field] && typeof rest[field] === 'string') {
+    const value = rest[field];
+    if (value && typeof value === 'string') {
       try {
-        output[field] = JSON.parse(rest[field] as string);
+        output[field] = JSON.parse(value);
       } catch (e) {
-        console.error(`Error parsing JSON string field '${field}' for client ID ${client.id}:`, e);
-        // 根据策略，可以清除解析失败的字段或保留原始字符串 (Depending on policy, clear failed field or keep original string)
-        // output[field] = []; // Or keep as is, or log error more formally
+        console.error(`Error parsing JSON string field '${String(field)}' for client ID ${client.id}:`, e);
+        output[field] = []; // Default to empty array on parse error
       }
-    } else if (rest[field] === null && Array.isArray(output[field])) {
-        // If the field was explicitly set to null (e.g. ipWhitelist), ensure it's null not an empty array from default parsing
-        output[field] = null;
+    } else if (Array.isArray(value)) {
+       output[field] = value; // Already an array
+    } else {
+       output[field] = []; // Default to empty array if null/undefined
     }
   });
   return output;
 }
 
 
-// --- POST /api/v2/clients (管理员创建OAuth客户端) ---
-export async function POST(req: NextRequest) {
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
+// --- POST /api/v2/clients (创建新客户端) ---
+async function createClientHandler(req: AuthenticatedRequest): Promise<NextResponse> {
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} attempting to create a new client.`);
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: Not an admin.', 403, 'forbidden');
-
-  // 2. 解析请求体 (Parse request body)
-  let requestBody;
+  let payload;
   try {
-    requestBody = await req.json();
-  } catch (e) {
-    return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
+    payload = await req.json();
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request body', message: 'Failed to parse JSON body.' }, { status: 400 });
   }
 
-  const {
-    clientName, clientType, redirectUris, grantTypes, allowedScopes, responseTypes: reqResponseTypes,
-    clientDescription, logoUri, policyUri, tosUri, jwksUri,
-    tokenEndpointAuthMethod: rawTokenEndpointAuthMethod,
-    requirePkce = true,
-    requireConsent = true,
-    ipWhitelist, // Expects array of strings
-  } = requestBody;
-
-  // 3. 输入数据验证 (Input data validation)
-  if (!clientName || typeof clientName !== 'string' || clientName.trim() === '') return errorResponse('clientName is required and must be a non-empty string.', 400, 'validation_error_clientName');
-  if (!clientType || !Object.values(ClientType).includes(clientType as ClientType)) return errorResponse(`clientType must be one of: ${Object.values(ClientType).join(', ')}.`, 400, 'validation_error_clientType');
-  if (!redirectUris || !Array.isArray(redirectUris) || redirectUris.length === 0 || !redirectUris.every(uri => typeof uri === 'string' && isValidHttpUrl(uri))) {
-    return errorResponse('redirectUris is required and must be a non-empty array of valid HTTPS URLs (HTTP for localhost is allowed).', 400, 'validation_error_redirectUris');
-  }
-  if (!grantTypes || !Array.isArray(grantTypes) || grantTypes.length === 0 || !grantTypes.every(gt => typeof gt === 'string')) {
-    return errorResponse('grantTypes is required and must be a non-empty array of strings.', 400, 'validation_error_grantTypes');
-  }
-  // TODO: Validate grantTypes against a list of server-supported grant types.
-  const supportedGrantTypes = ["authorization_code", "refresh_token", "client_credentials"];
-  if (!grantTypes.every(gt => supportedGrantTypes.includes(gt))) {
-      return errorResponse(`Unsupported grantType. Supported: ${supportedGrantTypes.join(', ')}`, 400, 'validation_error_unsupported_grantType');
+  const validationResult = clientCreateSchema.safeParse(payload);
+  if (!validationResult.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
 
-  if (!allowedScopes || !Array.isArray(allowedScopes) || !allowedScopes.every(s => typeof s === 'string')) {
-    // allow empty array for allowedScopes
-     if (allowedScopes !== undefined && !Array.isArray(allowedScopes)) return errorResponse('allowedScopes must be an array of strings if provided.', 400, 'validation_error_allowedScopes');
+  const data = validationResult.data;
+
+  // Client ID logic
+  const finalClientId = data.clientId || generateRandomClientId();
+  const existingClientById = await prisma.oAuthClient.findUnique({ where: { clientId: finalClientId } });
+  if (existingClientById) {
+    return NextResponse.json({ error: 'Conflict', message: 'Client ID already exists.' }, { status: 409 });
   }
 
-  const finalResponseTypes = reqResponseTypes || (grantTypes.includes('authorization_code') ? ['code'] : []);
-  if (!Array.isArray(finalResponseTypes) || !finalResponseTypes.every(rt => typeof rt === 'string')) { // Can be empty if no auth code grant
-      return errorResponse('responseTypes must be an array of strings.', 400, 'validation_error_responseTypes');
+  // Client Secret logic
+  let clientSecretHashed: string | null = null;
+  let plainTextSecret: string | undefined = data.clientSecret; // User-provided secret
+
+  if (data.clientType === ClientType.CONFIDENTIAL) {
+    if (data.tokenEndpointAuthMethod === 'client_secret_basic' || data.tokenEndpointAuthMethod === 'client_secret_post') {
+      if (!plainTextSecret) { // If no secret provided by admin for a type that needs one, generate it
+        plainTextSecret = generateRandomClientSecret();
+      }
+      clientSecretHashed = await bcrypt.hash(plainTextSecret, 12);
+    } else if (data.tokenEndpointAuthMethod === 'private_key_jwt') {
+      // No client secret stored for private_key_jwt
+      plainTextSecret = undefined; // Ensure no plain secret is returned
+    }
+    // 'none' for confidential client is not typical but possible if other mechanisms secure it.
+    // Zod schema already checks if 'none' is used for confidential, clientSecret is not required.
+  } else { // Public client
+      plainTextSecret = undefined; // Public clients never have a secret returned
   }
-  if (grantTypes.includes('authorization_code') && finalResponseTypes.length === 0) {
-      return errorResponse('responseTypes must include "code" if grantTypes includes "authorization_code".', 400, 'validation_error_responseTypes_for_code');
-  }
 
-
-  let tokenEndpointAuthMethod = rawTokenEndpointAuthMethod;
-  if (!tokenEndpointAuthMethod) {
-    if (clientType === ClientType.PUBLIC) tokenEndpointAuthMethod = 'none';
-    else if (clientType === ClientType.CONFIDENTIAL) tokenEndpointAuthMethod = 'client_secret_basic';
-  }
-  const validAuthMethods = ["client_secret_basic", "client_secret_post", "private_key_jwt", "none"];
-  if (!validAuthMethods.includes(tokenEndpointAuthMethod)) return errorResponse(`Invalid tokenEndpointAuthMethod. Supported: ${validAuthMethods.join(', ')}.`, 400, 'validation_error_authMethod');
-  if (clientType === ClientType.PUBLIC && tokenEndpointAuthMethod !== 'none') return errorResponse('Public clients must use "none" for tokenEndpointAuthMethod.', 400, 'validation_error_public_auth');
-  if (clientType === ClientType.CONFIDENTIAL && tokenEndpointAuthMethod === 'none') return errorResponse('Confidential clients must use an authentication method.', 400, 'validation_error_confidential_auth');
-  if (tokenEndpointAuthMethod === 'private_key_jwt' && (!jwksUri || !isValidHttpUrl(jwksUri, false))) return errorResponse('A valid HTTPS jwksUri is required for private_key_jwt.', 400, 'validation_error_jwksUri');
-  if (logoUri && !isValidHttpUrl(logoUri, false)) return errorResponse('logoUri must be a valid HTTPS URL.', 400, 'validation_error_logoUri');
-  if (policyUri && !isValidHttpUrl(policyUri, false)) return errorResponse('policyUri must be a valid HTTPS URL.', 400, 'validation_error_policyUri');
-  if (tosUri && !isValidHttpUrl(tosUri, false)) return errorResponse('tosUri must be a valid HTTPS URL.', 400, 'validation_error_tosUri');
-  if (ipWhitelist && (!Array.isArray(ipWhitelist) || !ipWhitelist.every(ip => typeof ip === 'string'))) return errorResponse('ipWhitelist must be an array of strings if provided.', 400, 'validation_error_ipWhitelist');
-
-
-  // 4. 生成 clientId 和 clientSecret (Generate clientId and clientSecret)
-  const clientId = crypto.randomBytes(CLIENT_ID_LENGTH_BYTES).toString('hex');
-  let clientSecretHash: string | null = null;
-  let generatedRawSecret: string | null = null;
-
-  if (clientType === ClientType.CONFIDENTIAL && (tokenEndpointAuthMethod === 'client_secret_basic' || tokenEndpointAuthMethod === 'client_secret_post')) {
-    generatedRawSecret = crypto.randomBytes(CLIENT_SECRET_LENGTH_BYTES).toString('base64url');
-    clientSecretHash = await bcrypt.hash(generatedRawSecret, 10);
-  }
 
   try {
     const newClientData: Prisma.OAuthClientCreateInput = {
-      clientId,
-      clientSecret: clientSecretHash,
-      clientName: clientName.trim(),
-      clientType: clientType as ClientType,
-      redirectUris: JSON.stringify(redirectUris),
-      grantTypes: JSON.stringify(grantTypes),
-      allowedScopes: JSON.stringify(allowedScopes || []), // Ensure it's an array string
-      responseTypes: JSON.stringify(finalResponseTypes),
-      clientDescription: clientDescription || null,
-      logoUri: logoUri || null,
-      policyUri: policyUri || null,
-      tosUri: tosUri || null,
-      jwksUri: jwksUri || null,
-      tokenEndpointAuthMethod,
-      requirePkce: Boolean(requirePkce),
-      requireConsent: Boolean(requireConsent),
-      ipWhitelist: ipWhitelist ? JSON.stringify(ipWhitelist) : null,
-      isActive: true,
+      clientId: finalClientId,
+      clientName: data.clientName,
+      clientDescription: data.clientDescription,
+      clientSecret: clientSecretHashed,
+      clientType: data.clientType,
+      redirectUris: JSON.stringify(data.redirectUris),
+      allowedScopes: JSON.stringify(data.allowedScopes || []),
+      grantTypes: JSON.stringify(data.grantTypes),
+      responseTypes: JSON.stringify(data.responseTypes || []),
+      accessTokenLifetime: data.accessTokenLifetime,
+      refreshTokenLifetime: data.refreshTokenLifetime,
+      authorizationCodeLifetime: data.authorizationCodeLifetime,
+      requirePkce: data.clientType === ClientType.PUBLIC ? true : (data.requirePkce ?? true), // PKCE must be true for public, optional for confidential (defaults to true)
+      requireConsent: data.requireConsent,
+      logoUri: data.logoUri,
+      policyUri: data.policyUri,
+      tosUri: data.tosUri,
+      jwksUri: data.jwksUri,
+      tokenEndpointAuthMethod: data.tokenEndpointAuthMethod,
+      ipWhitelist: data.ipWhitelist ? JSON.stringify(data.ipWhitelist) : null,
+      strictRedirectUriMatching: data.strictRedirectUriMatching,
+      allowLocalhostRedirect: data.allowLocalhostRedirect,
+      requireHttpsRedirect: data.requireHttpsRedirect,
+      isActive: data.isActive,
+      // createdBy: performingAdmin?.id, // Add if your OAuthClient model supports this
     };
 
     const newClient = await prisma.oAuthClient.create({ data: newClientData });
 
-    const responseClientData = sanitizeClientForResponse(newClient);
-    if (generatedRawSecret) {
-      (responseClientData as any).clientSecret = generatedRawSecret;
+    const responseClientData = formatClientForResponse(newClient);
+    if (plainTextSecret && data.clientType === ClientType.CONFIDENTIAL && (data.tokenEndpointAuthMethod === 'client_secret_basic' || data.tokenEndpointAuthMethod === 'client_secret_post')) {
+      (responseClientData as any).clientSecret = plainTextSecret; // Return plain text secret ONLY on creation
     }
 
     return NextResponse.json(responseClientData, { status: 201 });
 
   } catch (error: any) {
+    console.error('Client creation failed:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return errorResponse('Failed to create client due to a conflict (e.g., generated clientId was not unique). Please try again.', 409, 'conflict_clientId');
+      // This typically means the clientId (if provided) or another unique field caused a conflict.
+      const target = (error.meta?.target as string[]) || ['field'];
+      return NextResponse.json({ error: 'Conflict', message: `A client with the same ${target.join(', ')} already exists.` }, { status: 409 });
     }
-    console.error(`Admin client creation error by ${adminUserId}:`, error);
-    return errorResponse('An unexpected error occurred during client creation.', 500, 'server_error');
+    return NextResponse.json({ error: 'Internal Server Error', message: 'Failed to create client.' }, { status: 500 });
   }
 }
+export const POST = requirePermission('clients:create')(createClientHandler);
 
 
-// --- GET /api/v2/clients (管理员获取OAuth客户端列表) ---
-export async function GET(req: NextRequest) {
-  // 1. 管理员认证 (Admin Authentication)
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return errorResponse('Unauthorized: Missing Authorization header.', 401, 'unauthorized');
-  const token = authHeader.substring(7);
-  if (!token) return errorResponse('Unauthorized: Missing token.', 401, 'unauthorized');
+// --- GET /api/v2/clients (列出所有客户端) ---
+const DEFAULT_PAGE_SIZE_CLIENTS = 10;
+const MAX_PAGE_SIZE_CLIENTS = 50;
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
-  if (!valid || !payload) return errorResponse(`Unauthorized: Invalid token. ${tokenError || ''}`.trim(), 401, 'invalid_token');
-  const adminUserId = payload.userId as string | undefined;
-  if (!adminUserId) return errorResponse('Unauthorized: Invalid token payload (Admin ID missing).', 401, 'invalid_token_payload');
-  if (!(await isUserAdmin(adminUserId))) return errorResponse('Forbidden: Not an admin.', 403, 'forbidden');
+async function listClientsHandler(req: AuthenticatedRequest): Promise<NextResponse> {
+  const performingAdmin = req.user;
+  console.log(`Admin user ${performingAdmin?.id} listing clients.`);
 
-  // 2. 处理查询参数 (Process query parameters)
-  const { searchParams } = new URL(req.url);
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10)); // page must be >= 1
-  let pageSize = parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE.toString(), 10);
-  if (pageSize <= 0) pageSize = DEFAULT_PAGE_SIZE;
-  if (pageSize > MAX_PAGE_SIZE) pageSize = MAX_PAGE_SIZE;
+  const { searchParams } = new URL(req.url); // Correct way to get searchParams from NextRequest
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  let pageSize = parseInt(searchParams.get('pageSize') || DEFAULT_PAGE_SIZE_CLIENTS.toString(), 10);
+  if (pageSize <= 0) pageSize = DEFAULT_PAGE_SIZE_CLIENTS;
+  if (pageSize > MAX_PAGE_SIZE_CLIENTS) pageSize = MAX_PAGE_SIZE_CLIENTS;
 
   const clientNameQuery = searchParams.get('clientName');
-  const clientIdQuery = searchParams.get('clientId'); // The string client_id, not the CUID PK
+  const clientIdQuery = searchParams.get('clientId');
   const clientTypeQuery = searchParams.get('clientType') as ClientType | null;
 
   const sortBy = searchParams.get('sortBy') || 'createdAt';
@@ -227,7 +232,7 @@ export async function GET(req: NextRequest) {
 
   const where: Prisma.OAuthClientWhereInput = {};
   if (clientNameQuery) where.clientName = { contains: clientNameQuery, mode: 'insensitive' };
-  if (clientIdQuery) where.clientId = { contains: clientIdQuery }; // clientId is unique, but using contains for partial search by admin
+  if (clientIdQuery) where.clientId = { contains: clientIdQuery, mode: 'insensitive' }; // clientId is unique, but allow partial search by admin
   if (clientTypeQuery && Object.values(ClientType).includes(clientTypeQuery)) {
     where.clientType = clientTypeQuery;
   }
@@ -235,6 +240,7 @@ export async function GET(req: NextRequest) {
   const validSortByFields: (keyof OAuthClient)[] = ['clientName', 'clientId', 'clientType', 'createdAt', 'updatedAt', 'isActive'];
   const safeSortBy = validSortByFields.includes(sortBy as keyof OAuthClient) ? sortBy : 'createdAt';
   const orderBy: Prisma.OAuthClientOrderByWithRelationInput = { [safeSortBy]: sortOrder };
+
 
   try {
     const clients = await prisma.oAuthClient.findMany({
@@ -246,20 +252,20 @@ export async function GET(req: NextRequest) {
     const totalClients = await prisma.oAuthClient.count({ where });
 
     return NextResponse.json({
-      clients: clients.map(sanitizeClientForResponse),
+      clients: clients.map(formatClientForResponse),
       total: totalClients,
-      page: page,
-      pageSize: pageSize,
+      page,
+      pageSize,
       totalPages: Math.ceil(totalClients / pageSize),
     }, { status: 200 });
 
-  } catch (error: any) {
-    console.error(`Admin client listing error by ${adminUserId}:`, error);
-    return errorResponse('An unexpected error occurred while listing clients.', 500, 'server_error');
+  } catch (error) {
+    console.error('Failed to list clients:', error);
+    return NextResponse.json({ error: 'Internal Server Error', message: 'Failed to retrieve clients.' }, { status: 500 });
   }
 }
+export const GET = requirePermission('clients:list')(listClientsHandler);
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 存在
-/*
-declare module '@/lib/auth/oauth2' { ... }
-*/
+// Note: The `isUserAdmin` and `isValidHttpUrl` from the original file were removed as auth is now handled by `requirePermission`
+// and URL validation is handled by Zod.
+// The JWTUtils.verifyV2AuthAccessToken was specific to an older auth mechanism and is replaced by the Bearer token validation in `requirePermission`.

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-
 import { Prisma } from '@prisma/client';
-
-import { successResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/prisma';
-
+import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // Updated import
 import { AuditLogQuerySchema } from './schemas';
+// successResponse and withErrorHandler are assumed to be compatible or handled by requirePermission's structure
+// For now, let's assume requirePermission handles error responses adequately or we adapt.
+// If successResponse is a specific wrapper, it might need to be integrated after handler execution.
 
-async function getAuditLogsHandler(request: NextRequest) {
-  const requestId = (request as { requestId?: string }).requestId; // Injected by withErrorHandler
+
+async function getAuditLogsHandler(request: AuthenticatedRequest) { // Changed to AuthenticatedRequest
+  // const requestId = (request as { requestId?: string }).requestId; // request.user.id can be used if needed
   const { searchParams } = new URL(request.url);
 
   // Convert searchParams to a plain object for Zod parsing
@@ -78,23 +77,19 @@ async function getAuditLogsHandler(request: NextRequest) {
   });
 
   const responseData = {
-    logs: auditLogs,
+    // logs: auditLogs, // Keep original field name from existing code for now
+    data: auditLogs, // Or change to 'data' if that's the new standard from successResponse
     pagination: {
-      currentPage: page,
+      page: page, // Use 'page' consistent with Zod schema output
       pageSize: limit,
-      totalRecords,
+      totalItems: totalRecords, // Use 'totalItems' consistent with other list endpoints
       totalPages: Math.ceil(totalRecords / limit),
     },
   };
-
-  return NextResponse.json(
-    successResponse(responseData, 200, 'Audit logs retrieved successfully.', requestId)
-  );
+  // Assuming successResponse is not used with requirePermission, or handle it if needed.
+  // The requirePermission HOF typically doesn't use successResponse wrapper.
+  return NextResponse.json(responseData);
 }
 
-export const GET = withErrorHandler(
-  withAuth(getAuditLogsHandler, {
-    requiredPermissions: ['admin:audit-logs:read'], // Permission to read audit logs
-    requireUserContext: true, // Ensure an authenticated user/admin is making the request
-  })
-);
+// Updated to use requirePermission with a new permission string
+export const GET = requirePermission('auditlogs:list')(getAuditLogsHandler);

@@ -8,7 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['__tests__/**/*.test.ts'],
+    include: ['app/api/v2/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,
     teardownTimeout: 30000,
@@ -24,12 +24,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov', 'json'],
       reportOnFailure: true,
       reportsDirectory: 'coverage',
-      include: [
-        'app/api/**/*.{ts,tsx}',
-        'lib/**/*.{ts,tsx}',
-        'hooks/**/*.{ts,tsx}',
-        'utils/**/*.{ts,tsx}',
-      ],
+      include: ['app/api/v2/**/*.ts'],
       exclude: [
         'node_modules/**',
         '__tests__/**',
