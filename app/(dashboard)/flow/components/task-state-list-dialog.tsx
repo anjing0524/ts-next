@@ -19,7 +19,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtual';
-import { format } from 'date-fns';
+import { formatToCST } from '@/lib/utils/timezone';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { TASK_STATE_MAP } from '../cons';
@@ -192,7 +192,11 @@ export function TaskDetailsDialog() {
 
       try {
         setLoading(true);
-        const ret = await getTaskDetails(planId, format(redate, 'yyyy-MM-dd'), exeId);
+        const ret = await getTaskDetails(
+          planId,
+          formatToCST(new Date(redate), 'yyyy-MM-dd'),
+          exeId
+        );
 
         if (ret && Array.isArray(ret)) {
           setTasks(
@@ -499,7 +503,7 @@ export function TaskDetailsDialog() {
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         taskPk={selectedTaskPk}
-        redate={format(new Date(redate as number), 'yyyy-MM-dd')}
+        redate={formatToCST(new Date(redate as number), 'yyyy-MM-dd')}
         exeId={exeId}
       />
     </>

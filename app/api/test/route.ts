@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTimeWheelInstance } from '@/lib/instance/time-wheel';
+import { getCurrentCST } from '@/lib/utils/timezone';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
         delay: 1000 + i * 1000,
         repeat: true,
         callback: () => {
-          console.log(`Task ${i + 1} executed at ${new Date().toLocaleTimeString()}`);
+          console.log(`Task ${i + 1} executed at ${getCurrentCST('HH:mm:ss')}`);
         },
       });
     }

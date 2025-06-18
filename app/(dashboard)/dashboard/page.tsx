@@ -5,6 +5,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { Badge } from '@/components/ui/badge';
 import { v4 as uuidv4 } from 'uuid';
 import React from 'react';
+import { formatToCST } from '@/lib/utils/timezone';
 
 interface User {
   id: string;
@@ -105,7 +106,7 @@ const columns: ColumnDef<User>[] = [
     size: 150,
     cell: ({ row }) => {
       const date = new Date(row.getValue('lastLogin') as string);
-      return <span>{date.toLocaleString('zh-CN')}</span>;
+      return <span>{formatToCST(date, 'yyyy-MM-dd HH:mm:ss')}</span>;
     },
   },
   {
@@ -115,7 +116,7 @@ const columns: ColumnDef<User>[] = [
     size: 150,
     cell: ({ row }) => {
       const date = new Date(row.getValue('createdAt') as string);
-      return <span>{date.toLocaleString('zh-CN')}</span>;
+      return <span>{formatToCST(date, 'yyyy-MM-dd HH:mm:ss')}</span>;
     },
   },
 ];

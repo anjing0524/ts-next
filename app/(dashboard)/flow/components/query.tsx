@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { formatToCST } from '@/lib/utils/timezone';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -77,7 +77,7 @@ export function Query({ options, onSearch }: QueryProps) {
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {date ? format(date, 'PPP', { locale: zhCN }) : '选择日期'}
+              {date ? formatToCST(date, 'yyyy年MM月dd日') : '选择日期'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">

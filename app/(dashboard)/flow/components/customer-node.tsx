@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useFlowStore } from '../store/flow-store';
 import { useShallow } from 'zustand/react/shallow';
 import { rerunPlan, rerunFailedTasks, stopPlan, handleSearch } from '@/app/actions/flow-actions';
-import { format } from 'date-fns';
+import { formatToCST } from '@/lib/utils/timezone';
 import { toast } from '@/components/ui/use-toast';
 
 export const CustomNode = ({ data, isConnectable }: NodeProps) => {
@@ -68,7 +68,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
       if (!plan_id || !redate) return;
       try {
         setLoading('rerun');
-        const formattedDate = format(new Date(redate), 'yyyy-MM-dd');
+        const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await rerunPlan(plan_id as string, formattedDate);
         if (result.success) {
           toast({
@@ -105,7 +105,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
 
       try {
         setLoading('rerunFailed');
-        const formattedDate = format(new Date(redate), 'yyyy-MM-dd');
+        const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await rerunFailedTasks(plan_id as string, formattedDate, exe_id as number);
 
         if (result.success) {
@@ -143,7 +143,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
 
       try {
         setLoading('stop');
-        const formattedDate = format(new Date(redate), 'yyyy-MM-dd');
+        const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await stopPlan(plan_id as string, formattedDate, pid);
         if (result.success) {
           toast({

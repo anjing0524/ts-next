@@ -1,5 +1,11 @@
 # 使用基础镜像
 FROM node:lts AS base
+
+# 设置时区为东八区
+RUN apt-get update && apt-get install -y tzdata
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 WORKDIR /app
 
 # 安装 pnpm
@@ -98,7 +104,7 @@ EXPOSE 3000
 
 # 使用健康检查
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD /app/healthcheck.sh
+    CMD /app/healthcheck.sh
 
 # 使用更可靠的启动命令
 CMD ["node", "server.js"]

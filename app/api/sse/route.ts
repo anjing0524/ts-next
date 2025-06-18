@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCurrentCST } from '@/lib/utils/timezone';
 
 // SSE 响应所需的 HTTP 头
 const sseHeaders = {
@@ -12,7 +13,7 @@ const sseHeaders = {
 async function* sseStream() {
   try {
     while (true) {
-      const data = `data: ${new Date().toLocaleTimeString()}\n\n`;
+      const data = `data: ${getCurrentCST('HH:mm:ss')}\n\n`;
       yield data;
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }

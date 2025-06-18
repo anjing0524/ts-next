@@ -1,5 +1,5 @@
 'use server';
-import { format } from 'date-fns';
+import { formatToCST } from '@/lib/utils/timezone';
 import logger from '@/utils/logger';
 import mysqlPool from '@/lib/instance/mysql-client';
 import { PlanConf, PlanState, TaskState } from '@/types/db-types';
@@ -86,7 +86,7 @@ export async function handleSearch(
   selectedOptions: string[] | null
 ): Promise<FlowStage[] | null> {
   if (!date) return null;
-  const dateStr = format(date, 'yyyy-MM-dd');
+  const dateStr = formatToCST(date, 'yyyy-MM-dd');
   // 获取所有计划配置
   const allPlanConfs = await getAllPlanConf();
   // 构建数据映射关系
@@ -304,8 +304,12 @@ function createNode(
       plan_id: conf.plan_id,
       time_stage: timeStage, // 直接使用传入的时间阶段
       // 添加格式化的时间和进度信息
-      startTime: state?.start_time ? new Date(state.start_time).toLocaleString() : '未开始',
-      endTime: state?.end_time ? new Date(state.end_time).toLocaleString() : '未结束',
+      startTime: state?.start_time
+        ? formatToCST(new Date(state.start_time), 'yyyy-MM-dd HH:mm:ss')
+        : '未开始',
+      endTime: state?.end_time
+        ? formatToCST(new Date(state.end_time), 'yyyy-MM-dd HH:mm:ss')
+        : '未结束',
       costTime: state?.cost_time ? `${state.cost_time}秒` : '-',
       progress: state?.progress ? `${state.progress}%` : '0%',
       plan_state: state?.plan_state || 'U',
@@ -396,13 +400,13 @@ export async function getTaskDetails(
     const formattedRows = (rows as TaskConfState[]).map((row) => {
       // 创建格式化后的日期字符串用于显示
       const startTimeStr = row.start_time
-        ? format(new Date(row.start_time), 'yyyy-MM-dd HH:mm:ss')
+        ? formatToCST(new Date(row.start_time), 'yyyy-MM-dd HH:mm:ss')
         : null;
       const endTimeStr = row.end_time
-        ? format(new Date(row.end_time), 'yyyy-MM-dd HH:mm:ss')
+        ? formatToCST(new Date(row.end_time), 'yyyy-MM-dd HH:mm:ss')
         : null;
-      const redateStr = row.redate ? format(new Date(row.redate), 'yyyy-MM-dd') : null;
-
+      const redateStr = row.redate ? formatToCST(new Date(row.redate), 'yyyy-MM-dd') : null;
+      logger.info(`${row.redate}` + '/' + redateStr);
       return {
         ...row,
         // 添加格式化后的字符串作为新属性
@@ -681,12 +685,12 @@ export async function getTaskInfo(
       return {
         ...taskInfo,
         startTimeFormatted: taskInfo.start_time
-          ? format(taskInfo.start_time, 'yyyy-MM-dd HH:mm:ss')
+          ? formatToCST(taskInfo.start_time, 'yyyy-MM-dd HH:mm:ss')
           : null,
         endTimeFormatted: taskInfo.end_time
-          ? format(taskInfo.end_time, 'yyyy-MM-dd HH:mm:ss')
+          ? formatToCST(taskInfo.end_time, 'yyyy-MM-dd HH:mm:ss')
           : null,
-        redateFormatted: taskInfo.redate ? format(taskInfo.redate, 'yyyy-MM-dd') : null,
+        redateFormatted: taskInfo.redate ? formatToCST(taskInfo.redate, 'yyyy-MM-dd') : null,
       } as TaskStateDetailType;
     }
 
