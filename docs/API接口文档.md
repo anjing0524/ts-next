@@ -822,6 +822,572 @@ Content-Encoding: gzip
 Vary: Accept-Encoding
 ```
 
+## 11. V2 API 详细规范
+
+### 11.1 认证授权 API
+
+#### 11.1.1 授权端点
+
+**基本信息**
+- **路径**: `/api/v2/oauth/authorize`
+- **方法**: GET
+- **描述**: OAuth2.1 授权码流程的授权端点，支持PKCE扩展
+- **认证**: 无需Bearer Token（用户登录验证）
+
+**请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 示例 |
+|--------|------|------|------|------|
+| response_type | string | 是 | 响应类型，固定为"code" | code |
+| client_id | string | 是 | 客户端标识符 | my_client_app |
+| redirect_uri | string | 是 | 重定向URI | https://app.example.com/callback |
+| scope | string | 否 | 请求的权限范围 | read write |
+| state | string | 推荐 | 防CSRF攻击的随机字符串 | xyz123 |
+| code_challenge | string | 推荐 | PKCE代码挑战 | E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM |
+| code_challenge_method | string | 推荐 | PKCE挑战方法 | S256 |
+
+**请求示例**
+```http
+GET /api/v2/oauth/authorize?response_type=code&client_id=my_client_app&redirect_uri=https%3A//app.example.com/callback&scope=read%20write&state=xyz123&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256 HTTP/1.1
+Host: auth.example.com
+```
+
+**成功响应**
+- **状态码**: 302 Found
+- **描述**: 重定向到客户端指定的redirect_uri
+
+```http
+HTTP/1.1 302 Found
+Location: https://app.example.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz123
+```
+
+**错误响应**
+```http
+HTTP/1.1 302 Found
+Location: https://app.example.com/callback?error=invalid_request&error_description=Missing%20required%20parameter%3A%20client_id&state=xyz123
+```
+
+**错误码说明**
+- `invalid_request`: 请求缺少必需参数或格式错误
+- `unauthorized_client`: 客户端未授权使用此方法
+- `access_denied`: 用户拒绝授权请求
+- `unsupported_response_type`: 不支持的响应类型
+- `invalid_scope`: 请求的范围无效或未知
+- `server_error`: 服务器内部错误
+
+#### 11.1.2 令牌端点
+
+**基本信息**
+- **路径**: `/api/v2/oauth/token`
+- **方法**: POST
+- **描述**: 获取访问令牌，支持多种授权类型
+- **认证**: 客户端认证（Basic Auth或请求体）
+
+**请求头**
+```http
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
+```
+
+**授权码模式请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 示例 |
+|--------|------|------|------|------|
+| grant_type | string | 是 | 授权类型，值为"authorization_code" | authorization_code |
+| code | string | 是 | 授权码 | SplxlOBeZQQYbYS6WxSbIA |
+| redirect_uri | string | 是 | 重定向URI（必须与授权请求一致） | https://app.example.com/callback |
+| client_id | string | 是* | 客户端ID（如果未在Authorization头中提供） | my_client_app |
+| client_secret | string | 是* | 客户端密钥（如果未在Authorization头中提供） | client_secret_123 |
+| code_verifier | string | 否 | PKCE代码验证器 | dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk |
+
+**客户端凭证模式请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 示例 |
+|--------|------|------|------|------|
+| grant_type | string | 是 | 授权类型，值为"client_credentials" | client_credentials |
+| scope | string | 否 | 请求的权限范围 | read write |
+| client_id | string | 是* | 客户端ID | my_client_app |
+| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
+
+**刷新令牌请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 示例 |
+|--------|------|------|------|------|
+| grant_type | string | 是 | 授权类型，值为"refresh_token" | refresh_token |
+| refresh_token | string | 是 | 刷新令牌 | tGzv3JOkF0XG5Qx2TlKWIA |
+| scope | string | 否 | 请求的权限范围（不能超过原始范围） | read |
+| client_id | string | 是* | 客户端ID | my_client_app |
+| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
+
+**请求示例**
+```http
+POST /api/v2/oauth/token HTTP/1.1
+Host: auth.example.com
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
+
+grant_type=authorization_code&code=SplxlOBeZQQYbYS6WxSbIA&redirect_uri=https%3A//app.example.com/callback&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+```
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "2YotnFZFEjr1zCsicMWpAA",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "refresh_token": "tGzv3JOkF0XG5Qx2TlKWIA",
+    "scope": "read write"
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+**错误响应**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "invalid_grant",
+    "message": "The provided authorization grant is invalid, expired, revoked, or does not match the redirection URI",
+    "details": {
+      "grant_type": "authorization_code",
+      "error_uri": "https://docs.example.com/oauth/errors#invalid_grant"
+    }
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+#### 11.1.3 令牌撤销
+
+**基本信息**
+- **路径**: `/api/v2/oauth/revoke`
+- **方法**: POST
+- **描述**: 撤销访问令牌或刷新令牌
+- **认证**: 客户端认证
+
+**请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 示例 |
+|--------|------|------|------|------|
+| token | string | 是 | 要撤销的令牌 | 2YotnFZFEjr1zCsicMWpAA |
+| token_type_hint | string | 否 | 令牌类型提示 | access_token 或 refresh_token |
+| client_id | string | 是* | 客户端ID | my_client_app |
+| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
+
+**请求示例**
+```http
+POST /api/v2/oauth/revoke HTTP/1.1
+Host: auth.example.com
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
+
+token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
+```
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": {
+    "revoked": true,
+    "token_type": "access_token"
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+### 11.2 用户管理 API
+
+#### 11.2.1 用户列表
+
+**基本信息**
+- **路径**: `/api/v2/users`
+- **方法**: GET
+- **描述**: 获取用户列表，支持分页和筛选
+- **权限**: `users:list`
+
+**请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
+|--------|------|------|------|--------|------|
+| page | number | 否 | 页码 | 1 | 1 |
+| pageSize | number | 否 | 每页数量 | 20 | 10 |
+| search | string | 否 | 搜索关键词（用户名、邮箱） | - | john |
+| status | string | 否 | 用户状态筛选 | - | active |
+| sortBy | string | 否 | 排序字段 | createdAt | username |
+| sortOrder | string | 否 | 排序方向 | desc | asc |
+
+**请求示例**
+```http
+GET /api/v2/users?page=1&pageSize=10&search=john&status=active&sortBy=username&sortOrder=asc HTTP/1.1
+Host: auth.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+```
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "user_123",
+      "username": "john_doe",
+      "email": "john@example.com",
+      "displayName": "John Doe",
+      "isActive": true,
+      "lastLoginAt": "2024-12-19T09:30:00Z",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-12-19T09:30:00Z",
+      "roles": [
+        {
+          "id": "role_456",
+          "name": "user",
+          "displayName": "普通用户"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789",
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 150,
+      "totalPages": 15,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### 11.2.2 创建用户
+
+**基本信息**
+- **路径**: `/api/v2/users`
+- **方法**: POST
+- **描述**: 创建新用户
+- **权限**: `users:create`
+
+**请求体**
+```json
+{
+  "username": "jane_doe",
+  "email": "jane@example.com",
+  "password": "SecurePassword123!",
+  "displayName": "Jane Doe",
+  "isActive": true,
+  "roleIds": ["role_456"]
+}
+```
+
+**字段验证规则**
+
+| 字段名 | 类型 | 必需 | 验证规则 | 描述 |
+|--------|------|------|----------|------|
+| username | string | 是 | 3-50字符，字母数字下划线 | 用户名 |
+| email | string | 是 | 有效邮箱格式 | 邮箱地址 |
+| password | string | 是 | 8-128字符，包含大小写字母数字特殊字符 | 密码 |
+| displayName | string | 否 | 1-100字符 | 显示名称 |
+| isActive | boolean | 否 | true/false | 是否激活 |
+| roleIds | string[] | 否 | 有效的角色ID数组 | 角色列表 |
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user_789",
+    "username": "jane_doe",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "isActive": true,
+    "createdAt": "2024-12-19T10:30:00Z",
+    "updatedAt": "2024-12-19T10:30:00Z",
+    "roles": [
+      {
+        "id": "role_456",
+        "name": "user",
+        "displayName": "普通用户"
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+### 11.3 角色管理 API
+
+#### 11.3.1 角色列表
+
+**基本信息**
+- **路径**: `/api/v2/roles`
+- **方法**: GET
+- **描述**: 获取角色列表，支持分页和筛选
+- **权限**: `roles:list`
+
+**请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
+|--------|------|------|------|--------|------|
+| page | number | 否 | 页码 | 1 | 1 |
+| pageSize | number | 否 | 每页数量 | 20 | 10 |
+| search | string | 否 | 搜索关键词（角色名称） | - | admin |
+| isActive | boolean | 否 | 是否激活 | - | true |
+| includePermissions | boolean | 否 | 是否包含权限信息 | false | true |
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "role_123",
+      "name": "admin",
+      "displayName": "系统管理员",
+      "description": "拥有系统所有权限的管理员角色",
+      "isActive": true,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-12-19T10:30:00Z",
+      "permissions": [
+        {
+          "id": "perm_456",
+          "name": "users:*",
+          "resource": "users",
+          "action": "*",
+          "type": "api",
+          "description": "用户管理所有权限"
+        }
+      ],
+      "userCount": 5
+    }
+  ],
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789",
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 25,
+      "totalPages": 3,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### 11.3.2 创建角色
+
+**基本信息**
+- **路径**: `/api/v2/roles`
+- **方法**: POST
+- **描述**: 创建新角色
+- **权限**: `roles:create`
+
+**请求体**
+```json
+{
+  "name": "editor",
+  "displayName": "编辑员",
+  "description": "内容编辑权限",
+  "isActive": true,
+  "permissionIds": ["perm_789", "perm_012"]
+}
+```
+
+**字段验证规则**
+
+| 字段名 | 类型 | 必需 | 验证规则 | 描述 |
+|--------|------|------|----------|------|
+| name | string | 是 | 2-50字符，字母数字下划线 | 角色名称（唯一） |
+| displayName | string | 是 | 1-100字符 | 显示名称 |
+| description | string | 否 | 最大500字符 | 角色描述 |
+| isActive | boolean | 否 | true/false | 是否激活 |
+| permissionIds | string[] | 否 | 有效的权限ID数组 | 权限列表 |
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "role_345",
+    "name": "editor",
+    "displayName": "编辑员",
+    "description": "内容编辑权限",
+    "isActive": true,
+    "createdAt": "2024-12-19T10:30:00Z",
+    "updatedAt": "2024-12-19T10:30:00Z",
+    "permissions": [
+      {
+        "id": "perm_789",
+        "name": "content:write",
+        "resource": "content",
+        "action": "write",
+        "type": "api"
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+### 11.4 权限管理 API
+
+#### 11.4.1 权限列表
+
+**基本信息**
+- **路径**: `/api/v2/permissions`
+- **方法**: GET
+- **描述**: 获取权限列表，支持分页和筛选
+- **权限**: `permissions:list`
+
+**请求参数**
+
+| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
+|--------|------|------|------|--------|------|
+| page | number | 否 | 页码 | 1 | 1 |
+| pageSize | number | 否 | 每页数量 | 20 | 10 |
+| search | string | 否 | 搜索关键词（权限名称） | - | users |
+| type | string | 否 | 权限类型筛选 | - | api |
+| resource | string | 否 | 资源筛选 | - | users |
+| action | string | 否 | 操作筛选 | - | read |
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "perm_123",
+      "name": "users:read",
+      "resource": "users",
+      "action": "read",
+      "type": "api",
+      "description": "读取用户信息权限",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-12-19T10:30:00Z",
+      "roleCount": 3
+    }
+  ],
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789",
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 50,
+      "totalPages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+#### 11.4.2 创建权限
+
+**基本信息**
+- **路径**: `/api/v2/permissions`
+- **方法**: POST
+- **描述**: 创建新权限
+- **权限**: `permissions:create`
+
+**API权限请求体**
+```json
+{
+  "type": "api",
+  "name": "content:write",
+  "resource": "content",
+  "action": "write",
+  "description": "内容写入权限",
+  "apiConfig": {
+    "method": "POST",
+    "path": "/api/v2/content",
+    "requireAuth": true
+  }
+}
+```
+
+**菜单权限请求体**
+```json
+{
+  "type": "menu",
+  "name": "admin_panel",
+  "resource": "admin",
+  "action": "access",
+  "description": "管理面板访问权限",
+  "menuConfig": {
+    "menuId": "admin-panel",
+    "path": "/admin",
+    "icon": "admin",
+    "order": 1
+  }
+}
+```
+
+**数据权限请求体**
+```json
+{
+  "type": "data",
+  "name": "user_data_own",
+  "resource": "users",
+  "action": "read",
+  "description": "只能访问自己的用户数据",
+  "dataConfig": {
+    "scope": "own",
+    "conditions": {
+      "userId": "{{current_user_id}}"
+    }
+  }
+}
+```
+
+**成功响应**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "perm_456",
+    "name": "content:write",
+    "resource": "content",
+    "action": "write",
+    "type": "api",
+    "description": "内容写入权限",
+    "createdAt": "2024-12-19T10:30:00Z",
+    "updatedAt": "2024-12-19T10:30:00Z",
+    "apiConfig": {
+      "method": "POST",
+      "path": "/api/v2/content",
+      "requireAuth": true
+    }
+  },
+  "meta": {
+    "timestamp": "2024-12-19T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
 ---
 
 **注意**: 本规范是活文档，会根据项目发展和最佳实践的演进持续更新。所有API开发都应遵循此规范，确保API的一致性和开发者体验。
