@@ -1,51 +1,50 @@
 // 文件路径: app/api/v2/oauth/authorize/route.ts
+// File path: app/api/v2/oauth/authorize/route.ts
 // 描述: 此文件实现了 OAuth 2.0 授权端点 (Authorization Endpoint)。
-// 这是 OAuth 2.0 授权码流程 (Authorization Code Grant) 的第一步。
-// 主要职责:
+// Description: This file implements the OAuth 2.0 Authorization Endpoint.
+// (For detailed responsibilities, see original comments - preserved below)
+// 主要职责: (Main responsibilities preserved from original)
 // 1. 验证第三方客户端的请求参数 (client_id, redirect_uri, response_type, scope, PKCE parameters)。
 // 2. 验证第三方客户端身份。
 // 3. 确保用户已登录到认证中心 (Auth Center)。如果未登录，则重定向到认证中心的登录页面。
 // 4. 检查用户是否已授予第三方客户端所请求的权限 (scopes)。如果未授予或部分授予，则重定向到同意页面。
 // 5. 如果所有检查通过且用户已同意，则生成一个授权码 (Authorization Code) 并将其通过重定向发送给第三方客户端。
-// 此端点支持 PKCE (Proof Key for Code Exchange, RFC 7636) 以增强安全性，尤其适用于公共客户端 (如移动应用和SPA)。
+// 此端点支持 PKCE (Proof Key for Code Exchange, RFC 7636) 以增强安全性。
 
 import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
-// Prisma client is now imported from a central place, e.g., '@/lib/prisma'
-// import prisma from '@/lib/prisma'; // Assuming central prisma import
-import { prisma } from '@/lib/prisma'; // Using the existing import style
-import { User } from '@prisma/client'; // Prisma 生成的数据库模型类型
-// addMinutes is not directly used after refactor, storeAuthorizationCode handles expiry
-// import { addMinutes } from 'date-fns';
-// crypto is still used by existing helpers, but not directly for code generation after refactor
-// import crypto from 'crypto';
-import { PKCEUtils, ScopeUtils } from '@/lib/auth/oauth2'; // OAuth 2.0 相关的辅助工具函数
-import * as jose from 'jose'; // 用于 JWT (JSON Web Token) 的创建、验证等操作，此处用于验证认证中心UI的会话令牌
-import { authorizeQuerySchema } from './schemas'; // Import Zod schema from separate file
-import { storeAuthorizationCode } from '@/lib/auth/authorizationCodeFlow'; // Import new service
+import { prisma } from '@/lib/prisma';
+import { User } from '@prisma/client';
+import { PKCEUtils, ScopeUtils } from '@/lib/auth/oauth2';
+import * as jose from 'jose';
+import { authorizeQuerySchema } from './schemas';
+import { storeAuthorizationCode } from '@/lib/auth/authorizationCodeFlow';
+import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理 HOF (Error handling HOF)
+import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
 
-// --- 认证中心UI相关的常量 ---
-// (Constants related to Auth Center UI)
-// 这些常量定义了认证中心自身UI的交互行为，例如登录页面的URL、同意API的URL等。
-// 当用户访问第三方应用的授权请求，但尚未登录认证中心时，会使用这些配置。
+// --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';
 const CONSENT_API_URL = '/api/v2/oauth/consent';
 const AUTH_CENTER_UI_AUDIENCE = process.env.AUTH_CENTER_UI_AUDIENCE || 'urn:auth-center:ui';
 const AUTH_CENTER_UI_CLIENT_ID = process.env.AUTH_CENTER_UI_CLIENT_ID || 'auth-center-admin-client';
 
 /**
- * HTTP GET 处理函数
- * @param req NextRequest 对象，包含客户端的请求信息
- * @returns NextResponse 对象，用于将用户重定向到适当的URL或返回错误信息
+ * OAuth 2.0 授权端点 GET 请求处理函数。
+ * (OAuth 2.0 Authorization Endpoint GET request handler.)
+ * @param req NextRequest 对象，包含客户端的请求信息。 (NextRequest object, containing client's request information.)
+ * @returns NextResponse 对象，通常是重定向。错误将由 withErrorHandling 处理为JSON响应或特定OAuth重定向。
+ * (Returns NextResponse object, usually a redirect. Errors will be handled by withErrorHandling as JSON responses or specific OAuth redirects.)
+ * @throws {OAuth2Error} 如果发生OAuth特定错误，例如无效请求、无效客户端。 (If an OAuth-specific error occurs, e.g., invalid request, invalid client.)
+ * @throws {ValidationError} 如果请求参数验证失败。 (If request parameter validation fails.)
+ * @throws {ConfigurationError} 如果服务器端配置错误。 (If there's a server-side configuration error.)
+ * @throws {BaseError} 对于其他类型的内部服务器错误。 (For other types of internal server errors.)
  */
-export async function GET(req: NextRequest) {
+async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(req.url);
 
-  // 辅助函数: 构建错误重定向URL。
-  const buildErrorRedirect = (baseRedirectUri: string | null, error: string, description: string, originalState?: string | null): NextResponse => {
-    if (!baseRedirectUri) {
-      return NextResponse.json({ error, error_description: description, state: originalState }, { status: 400 });
-    }
+  // 辅助函数: 构建错误重定向URL (仅在 redirect_uri 已验证且必须重定向错误时使用)
+  // Helper function: Build error redirect URL (use only if redirect_uri is validated and error MUST be redirected)
+  const buildErrorRedirect = (baseRedirectUri: string, error: OAuth2ErrorCode, description: string, originalState?: string | null): NextResponse => {
     try {
       const errorUrl = new URL(baseRedirectUri);
       errorUrl.searchParams.set('error', error);
@@ -55,55 +54,46 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.redirect(errorUrl.toString(), 302);
     } catch (e) {
-      // If baseRedirectUri is invalid URL itself
-      return NextResponse.json({ error, error_description: `${description} (Additionally, the provided redirect_uri was invalid.)`, state: originalState }, { status: 400 });
+      // 如果 baseRedirectUri 无效，这是一个严重问题，可能表明早期验证不足或配置错误
+      // If baseRedirectUri is invalid, this is a serious issue, possibly indicating prior insufficient validation or misconfiguration.
+      console.error("CRITICAL: buildErrorRedirect called with invalid baseRedirectUri", baseRedirectUri, e);
+      // 抛出一个通用错误，让 withErrorHandling 处理
+      // Throw a generic error for withErrorHandling to process
+      throw new ConfigurationError(`Server error: Could not construct redirect URL due to invalid base redirect URI. Original error: ${error}`, 'REDIRECT_URI_CONSTRUCTION_FAILED');
     }
   };
 
-  // --- 步骤 2: 第三方客户端请求参数验证 (使用Zod) ---
+  // --- 步骤 1: 请求参数验证 (使用Zod) --- (Step 1: Request parameter validation (using Zod))
   const paramsToValidate: Record<string, any> = {};
-  searchParams.forEach((value, key) => {
-    paramsToValidate[key] = value;
-  });
+  searchParams.forEach((value, key) => { paramsToValidate[key] = value; });
 
-  // Use imported Zod schema
   const validationResult = authorizeQuerySchema.safeParse(paramsToValidate);
-
   if (!validationResult.success) {
     const firstError = validationResult.error.errors[0];
-    const baseRedirectUriForError =
-      typeof paramsToValidate.redirect_uri === 'string' && authorizeQuerySchema.shape.redirect_uri.safeParse(paramsToValidate.redirect_uri).success
-        ? paramsToValidate.redirect_uri
-        : null;
-    return buildErrorRedirect(
-      baseRedirectUriForError,
-      'invalid_request',
-      `${firstError.path.join('.')}: ${firstError.message}`,
-      paramsToValidate.state
+    // 对于参数验证错误，OAuth2 通常建议如果可能，重定向到 redirect_uri 并附带错误。
+    // 但如果 redirect_uri 本身就有问题或未提供，则不能重定向。
+    // For parameter validation errors, OAuth2 often suggests redirecting to redirect_uri with error if possible.
+    // However, if redirect_uri itself is problematic or not provided, redirection isn't feasible.
+    // 此处抛出 ValidationError，withErrorHandling 将其转换为 JSON 响应。
+    // Throw ValidationError here, withErrorHandling will convert it to a JSON response.
+    throw new ValidationError(
+      `Invalid authorization request: ${firstError.path.join('.')} - ${firstError.message}`,
+      { issues: validationResult.error.flatten().fieldErrors, state: paramsToValidate.state },
+      OAuth2ErrorCode.InvalidRequest // 使用 OAuth2 标准错误码 (Use OAuth2 standard error code)
     );
   }
 
   const {
-    client_id, // Renamed to client_id for consistency with schema
-    redirect_uri, // Renamed
-    response_type, // Already 'code' from schema
-    scope: requestedScopeString, // Renamed for clarity
-    state,
-    code_challenge,
-    code_challenge_method, // Already 'S256' from schema
-    nonce
+    client_id, redirect_uri, response_type, scope: requestedScopeString,
+    state, code_challenge, code_challenge_method, nonce
   } = validationResult.data;
 
-  // PKCE code_challenge format validation (Zod schema already has min/max length checks)
-  // PKCEUtils.validateCodeChallenge might do more specific character validation if needed.
-  if (!PKCEUtils.validateCodeChallenge(code_challenge)) { // Keep this for stricter format check if Zod's isn't enough
-     return buildErrorRedirect(redirect_uri, 'invalid_request', 'Invalid code_challenge format.', state);
-  }
-
-  // --- 步骤 3: 第三方客户端验证 ---
+  // --- 步骤 2: 第三方客户端验证 --- (Step 2: Third-party client validation)
   const thirdPartyClient = await prisma.oAuthClient.findUnique({ where: { clientId: client_id } });
   if (!thirdPartyClient || !thirdPartyClient.isActive) {
-    return NextResponse.json({ error: 'invalid_client', error_description: 'Client not found or not active.' }, { status: 400 });
+    // 客户端无效或未找到，不应重定向到其 redirect_uri。直接返回 JSON 错误。
+    // Invalid or not found client, should not redirect to its redirect_uri. Return JSON error directly.
+    throw new OAuth2Error('Client not found or not active.', OAuth2ErrorCode.InvalidClient, 400);
   }
 
   let registeredRedirectUrisList: string[] = [];
@@ -112,63 +102,78 @@ export async function GET(req: NextRequest) {
     if (!Array.isArray(registeredRedirectUrisList)) throw new Error("Redirect URIs are not an array.");
   } catch (e) {
     console.error("Failed to parse third-party client's redirectUris:", thirdPartyClient.redirectUris, e);
-    return NextResponse.json({ error: 'server_error', error_description: 'Invalid client configuration for redirectUris.' }, { status: 500 });
+    // 客户端配置错误是服务器端的问题
+    // Client configuration error is a server-side issue
+    throw new ConfigurationError('Invalid client configuration for redirectUris.', 'CLIENT_CONFIG_REDIRECT_URI_INVALID', { clientId: client_id });
   }
   if (!registeredRedirectUrisList.includes(redirect_uri)) {
-    return NextResponse.json({ error: 'invalid_request', error_description: 'Invalid redirect_uri.' }, { status: 400 });
+    // redirect_uri 不匹配，不应重定向。直接返回 JSON 错误。
+    // redirect_uri mismatch, should not redirect. Return JSON error directly.
+    throw new OAuth2Error('Invalid redirect_uri.', OAuth2ErrorCode.InvalidRequest, 400, undefined, { provided: redirect_uri, expected: registeredRedirectUrisList });
   }
 
-  // --- 步骤 4: 范围 (Scope) 验证 ---
-  // requestedScopeString comes from validated Zod schema, which checks for presence.
-  if (!requestedScopeString) {
-      return buildErrorRedirect(redirect_uri, 'invalid_scope', 'Scope parameter is required.', state);
+  // redirect_uri 已验证，现在可以使用 buildErrorRedirect 安全地重定向错误
+  // redirect_uri is validated, can now use buildErrorRedirect safely for redirecting errors
+
+  // PKCE code_challenge 格式验证
+  // PKCE code_challenge format validation
+  if (!PKCEUtils.validateCodeChallenge(code_challenge)) {
+     return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'Invalid code_challenge format.', state);
+  }
+
+  // --- 步骤 3: 范围 (Scope) 验证 --- (Step 3: Scope validation)
+  if (!requestedScopeString) { // Zod schema should enforce 'scope' presence
+      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidScope, 'Scope parameter is required.', state);
   }
   const parsedRequestedScopes = ScopeUtils.parseScopes(requestedScopeString);
   const scopeValidationResult = await ScopeUtils.validateScopes(parsedRequestedScopes, thirdPartyClient);
   if (!scopeValidationResult.valid) {
     const errorDesc = scopeValidationResult.error_description ||
                       `Invalid or not allowed scope(s): ${scopeValidationResult.invalidScopes.join(', ')}.`;
-    return buildErrorRedirect(redirect_uri, 'invalid_scope', errorDesc, state);
+    return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidScope, errorDesc, state);
   }
-  const finalGrantedScopesArray = parsedRequestedScopes.filter(s => scopeValidationResult.valid && // Ensure overall validity
-    !scopeValidationResult.invalidScopes.includes(s) // Filter out any specific invalid scopes (though validateScopes should ensure this if valid=true)
+  const finalGrantedScopesArray = parsedRequestedScopes.filter(s =>
+    !scopeValidationResult.invalidScopes.includes(s)
   );
 
-
-  // --- 步骤 5: 用户认证 (针对认证中心UI会话) ---
+  // --- 步骤 4: 用户认证 (针对认证中心UI会话) --- (Step 4: User authentication for Auth Center UI session)
   let currentUser: User | null = null;
   const internalAuthToken = req.cookies.get('auth_center_session_token')?.value;
 
   if (internalAuthToken) {
     try {
       const jwksUriString = process.env.JWKS_URI;
-      if (!jwksUriString) throw new Error('JWKS_URI not configured for internal auth.');
+      if (!jwksUriString) throw new ConfigurationError('JWKS_URI not configured for internal auth.', 'CONFIG_JWKS_URI_MISSING');
       const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
 
       const expectedIssuer = process.env.JWT_ISSUER;
-      if (!expectedIssuer) throw new Error('JWT_ISSUER not configured for internal auth.');
+      if (!expectedIssuer) throw new ConfigurationError('JWT_ISSUER not configured for internal auth.', 'CONFIG_JWT_ISSUER_MISSING');
 
       const { payload: internalAuthTokenPayload } = await jose.jwtVerify(internalAuthToken, JWKS, {
-        issuer: expectedIssuer,
-        audience: AUTH_CENTER_UI_AUDIENCE,
-        algorithms: ['RS256'],
+        issuer: expectedIssuer, audience: AUTH_CENTER_UI_AUDIENCE, algorithms: ['RS256'],
       });
 
       if (internalAuthTokenPayload && internalAuthTokenPayload.sub) {
         currentUser = await prisma.user.findUnique({ where: { id: internalAuthTokenPayload.sub as string, isActive: true }});
       }
-    } catch (error) {
-      console.warn('Auth Center UI session token verification failed during /authorize:', (error as Error).message);
+    } catch (error: any) {
+      // 如果内部令牌验证失败 (例如过期、签名无效)，清除它并继续，将用户视为未登录
+      // If internal token verification fails (e.g., expired, invalid signature), clear it and proceed, treating user as not logged in
+      console.warn('Auth Center UI session token verification failed during /authorize:', error.message);
+      // Potentially clear the invalid cookie here
+      // res.cookies.delete('auth_center_session_token'); // Need to return NextResponse to set cookie
     }
   }
 
   if (!currentUser) {
     const authCenterLoginUrl = new URL(AUTH_CENTER_LOGIN_PAGE_URL, req.nextUrl.origin);
     const paramsForUiLogin = new URLSearchParams({
-      client_id: AUTH_CENTER_UI_CLIENT_ID,
-      redirect_uri: req.nextUrl.href,
-      response_type: 'code',
-      scope: 'openid profile email auth-center:interact',
+      client_id: AUTH_CENTER_UI_CLIENT_ID, redirect_uri: req.nextUrl.href,
+      response_type: 'code', scope: 'openid profile email auth-center:interact',
+      // 将原始请求的 state 和 nonce（如果有）传递给登录流程，以便登录后可以恢复它们
+      // Pass original request's state and nonce (if any) to login flow so they can be restored after login
+      ...(state && { state_passthrough: state }),
+      ...(nonce && { nonce_passthrough: nonce }),
     });
     authCenterLoginUrl.search = paramsForUiLogin.toString();
     console.log(`User not authenticated with Auth Center. Redirecting to Auth Center login: ${authCenterLoginUrl.toString()}`);
@@ -176,7 +181,7 @@ export async function GET(req: NextRequest) {
   }
   console.log(`User ${currentUser.id} authenticated to Auth Center UI. Continuing /authorize flow for client ${client_id}.`);
 
-  // --- 步骤 6: 同意检查 (针对第三方客户端的请求) ---
+  // --- 步骤 5: 同意检查 --- (Step 5: Consent check)
   const existingConsent = await prisma.consentGrant.findFirst({
     where: { userId: currentUser.id, clientId: thirdPartyClient.id },
   });
@@ -197,27 +202,21 @@ export async function GET(req: NextRequest) {
     if (code_challenge_method) consentUrl.searchParams.set('code_challenge_method', code_challenge_method);
     if (nonce) consentUrl.searchParams.set('nonce', nonce);
 
-
     console.log(`Redirecting user ${currentUser.id} to consent page for client ${thirdPartyClient.clientId}`);
     return NextResponse.redirect(consentUrl.toString(), 302);
   }
-
   console.log(`User ${currentUser.id} already consented for client ${thirdPartyClient.clientId}. Issuing code.`);
 
-  // --- 步骤 7: 生成并存储授权码 (针对第三方客户端) ---
-  // Use the new storeAuthorizationCode service
+  // --- 步骤 6: 生成并存储授权码 --- (Step 6: Generate and store authorization code)
   const authCode = await storeAuthorizationCode(
-    thirdPartyClient.id, // Pass the Prisma CUID of the client
-    currentUser.id,
-    redirect_uri,
-    ScopeUtils.formatScopes(finalGrantedScopesArray), // Pass the validated and finalized scopes
-    code_challenge,
-    code_challenge_method, // 'S256' from schema validation
+    currentUser.id, thirdPartyClient.id, redirect_uri, code_challenge,
+    code_challenge_method as 'S256', // Zod schema ensures this is 'S256'
+    ScopeUtils.formatScopes(finalGrantedScopesArray),
     thirdPartyClient.authorizationCodeLifetime || undefined,
-    // TODO: Add nonce to storeAuthorizationCode if it needs to be stored with the code
+    nonce || undefined // 传递 nonce 给 storeAuthorizationCode (Pass nonce to storeAuthorizationCode)
   );
 
-  // --- 步骤 8: 重定向到第三方客户端的回调URL ---
+  // --- 步骤 7: 重定向到第三方客户端的回调URL --- (Step 7: Redirect to third-party client's callback URL)
   const successRedirectUrl = new URL(redirect_uri);
   successRedirectUrl.searchParams.set('code', authCode.code);
   if (state) {
@@ -225,3 +224,46 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.redirect(successRedirectUrl.toString(), 302);
 }
+
+// 使用 withErrorHandling 包装 authorizeHandlerInternal
+// Wrap authorizeHandlerInternal with withErrorHandling
+export const GET = withErrorHandling(authorizeHandlerInternal);
+
+// Swagger 定义的组件模式 (Swagger component schema definitions)
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     AuthorizeRequestQuery:
+ *       type: object
+ *       required:
+ *         - client_id
+ *         - redirect_uri
+ *         - response_type
+ *         - scope
+ *         - code_challenge
+ *         - code_challenge_method
+ *       properties:
+ *         client_id: { type: string, description: "客户端ID (Client ID)" }
+ *         redirect_uri: { type: string, format: uri, description: "重定向URI (Redirect URI)" }
+ *         response_type: { type: string, enum: [code], description: "必须是 'code' (Must be 'code')" }
+ *         scope: { type: string, description: "请求的权限范围 (空格分隔) (Requested scopes (space-separated))" }
+ *         state: { type: string, description: "客户端维护的CSRF保护状态值 (CSRF protection state value maintained by client)" }
+ *         code_challenge: { type: string, description: "PKCE代码质询 (PKCE code challenge)" }
+ *         code_challenge_method: { type: string, enum: [S256], description: "PKCE质询方法 (PKCE challenge method)" }
+ *         nonce: { type: string, description: "OIDC nonce值 (OIDC nonce value)" }
+ *     ApiResponseError: # 已在其他地方定义 (Already defined elsewhere)
+ *       type: object
+ *       properties:
+ *         success: { type: boolean, example: false }
+ *         error: { $ref: '#/components/schemas/ApiError' }
+ *     ApiError: # 已在其他地方定义 (Already defined elsewhere)
+ *       type: object
+ *       properties:
+ *         code: { type: string }
+ *         message: { type: string }
+ *         details: { type: object, additionalProperties: true, nullable: true }
+ */
+
+// 文件结束 (End Of File)
+// EOF

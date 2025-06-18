@@ -1,228 +1,296 @@
 // 文件路径: app/api/v2/users/route.ts
+// File path: app/api/v2/users/route.ts
 // 描述: 此文件处理用户集合的 API 请求，包括创建用户 (POST) 和列出用户 (GET)。
+// Description: This file handles API requests for the user collection, including creating users (POST) and listing users (GET).
 // 使用 `requirePermission` 中间件来保护这些端点，确保只有具有适当权限的用户才能执行操作。
+// It uses the `requirePermission` middleware to protect these endpoints, ensuring only users with appropriate permissions can perform actions.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。 // Corrected import to use the alias
-import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型，User 用于类型提示，Prisma 用于高级查询类型。
-import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。
-import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission 高阶函数和 AuthenticatedRequest 类型。
-// Zod is imported from schemas.ts
-// import { z } from 'zod';
-import { userCreatePayloadSchema, userListQuerySchema } from './schemas'; // Import Zod schemas
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。 (Prisma ORM client for database interaction.)
+import { User, Prisma } from '@prisma/client'; // Prisma 生成的类型 (Prisma generated types)
+import bcrypt from 'bcrypt'; // bcrypt 库，用于密码哈希。 (bcrypt library for password hashing.)
+import { requirePermission } from '@/lib/auth/middleware'; // 引入 requirePermission 高阶函数 (Import requirePermission Higher-Order Function)
+import type { AuthenticatedRequest } from '@/lib/auth/types'; // 引入 AuthenticatedRequest 类型定义 (Import AuthenticatedRequest type definition)
+import { userCreatePayloadSchema, userListQuerySchema, UserCreatePayload, UserListQuery } from './schemas'; // 导入 Zod 模式 (Import Zod schemas and inferred types)
+import { ApiResponse } from '@/lib/types/api'; // 标准API响应类型 (Standard API response type)
+import { ValidationError, BaseError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
+import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理高阶函数 (Error handling HOF)
 
 // 定义获取用户列表时分页的默认页面大小。
-const DEFAULT_PAGE_SIZE_CONST = 10; // Renamed to avoid conflict with schema default if any
+// Define the default page size for pagination when fetching the user list.
+const DEFAULT_PAGE_SIZE_CONST = 10;
 // 定义获取用户列表时分页允许的最大页面大小，以防止滥用。
-const MAX_PAGE_SIZE_CONST = 100; // Renamed
+// Define the maximum allowed page size for pagination when fetching the user list, to prevent abuse.
+const MAX_PAGE_SIZE_CONST = 100;
 
-// --- 辅助函数 ---
+// 定义成功创建用户时返回的用户信息结构 (不含敏感信息)
+// Define the structure of user information returned on successful user creation (without sensitive info)
+type UserResponse = Omit<User, 'passwordHash'>;
 
-/**
- * 创建并返回一个标准化的 JSON 错误响应。
- * @param message - 错误描述信息。
- * @param status - HTTP 状态码。
- * @param errorCode - (可选) 应用特定的错误代码字符串。
- * @returns NextResponse 对象，包含 JSON 格式的错误信息。
- */
-function errorResponse(message: string, status: number, errorCode?: string): NextResponse {
-  return NextResponse.json({ error: errorCode || 'request_failed', message }, { status });
-}
-
-// `isUserAdmin` 函数不再需要，因为权限检查现在由 `requirePermission` 中间件统一处理。
-// 之前的逻辑可能是检查请求者是否是管理员，现在通过检查请求者是否具有如 'users:create' 或 'users:list' 等权限来实现。
-
-/**
- * 从用户对象中排除敏感字段 (如 passwordHash)，以便安全地返回给客户端。
- * @param user - User 对象或部分 User 对象。
- * @returns 一个新的对象，其中不包含 passwordHash 字段。
- */
-function excludeSensitiveUserFields(user: User | Partial<User>): Partial<User> {
-  // 使用对象解构排除 passwordHash 字段。
-  // 'as any' 用于处理 User 和 Partial<User> 类型，因为 passwordHash 可能在 Partial<User> 中不存在。
-  const { passwordHash, ...rest } = user as any;
-  return rest; // 返回剩余的字段
+// 定义成功获取用户列表时返回的数据结构
+// Define the data structure returned on successful user list fetch
+interface ListUsersResponse {
+  users: UserResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 
 // --- POST /api/v2/users (管理员创建新用户) ---
+// --- POST /api/v2/users (Admin creates a new user) ---
 // 此端点用于创建新用户，受到 `requirePermission('users:create')` 的保护。
-// 只有拥有 'users:create' 权限的用户 (通常是管理员) 才能调用此接口。
-async function createUserHandler(req: AuthenticatedRequest): Promise<NextResponse> {
-  const performingAdmin = req.user;
+// This endpoint is used to create new users and is protected by `requirePermission('users:create')`.
+/**
+ * @swagger
+ * /api/v2/users:
+ *   post:
+ *     summary: 创建新用户 (Create New User)
+ *     description: (需要 'users:create' 权限) 管理员通过此接口创建新的用户账户。
+ *                  ((Requires 'users:create' permission) Admin creates a new user account via this interface.)
+ *     tags: [用户管理 (User Management)]
+ *     security:
+ *       - bearerAuth: [] # 表明需要 Bearer token 认证 (Indicates Bearer token authentication is required)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserCreatePayload' # 参考 Zod 模式生成的类型 (Reference to Zod schema generated type)
+ *     responses:
+ *       '201':
+ *         description: 用户创建成功。 (User created successfully.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponseUser' # 标准成功响应包裹 UserResponse (Standard success response wrapping UserResponse)
+ *       '400':
+ *         description: 请求体验证失败或JSON格式错误。 (Request body validation failed or malformed JSON.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponseError'
+ *       '401':
+ *         description: 未经授权的访问。 (Unauthorized access.)
+ *       '403':
+ *         description: 禁止访问（权限不足）。 (Forbidden (insufficient permissions).)
+ *       '409':
+ *         description: 用户名或邮箱已存在冲突。 (Username or email already exists (conflict).)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponseError'
+ *       '500':
+ *         description: 服务器内部错误。 (Internal server error.)
+ */
+async function createUserHandlerInternal(req: AuthenticatedRequest): Promise<NextResponse> {
+  const performingAdmin = req.user; // 从 AuthenticatedRequest 中获取执行操作的管理员信息 (Get admin info from AuthenticatedRequest)
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to create a new user.`);
 
   let requestBody;
   try {
     requestBody = await req.json();
   } catch (e) {
-    return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
+    // 无效的JSON请求体，抛出 ValidationError
+    // Invalid JSON request body, throw ValidationError
+    throw new ValidationError('Invalid JSON request body.', { detail: (e as Error).message }, 'INVALID_JSON');
   }
 
-  // 步骤 2: 使用 Zod 进行输入数据验证 (schema imported from ./schemas)
+  // 使用 Zod 进行输入数据验证
+  // Use Zod for input data validation
   const validationResult = userCreatePayloadSchema.safeParse(requestBody);
   if (!validationResult.success) {
-    // 返回400错误，包含Zod解析出的具体错误信息
-    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+    // Zod 验证失败，抛出 ValidationError，并将 Zod issues 包含在 context 中
+    // Zod validation failed, throw ValidationError and include Zod issues in context
+    throw new ValidationError('User creation payload validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'USER_VALIDATION_ERROR');
   }
 
-  // 从验证结果中获取处理过的数据 (Validated data)
   const {
     username, email, password, firstName, lastName, displayName, avatar,
-    organization, department, isActive, mustChangePassword, /* phone (if added) */
-  } = validationResult.data;
+    organization, department, isActive, mustChangePassword,
+  } = validationResult.data as UserCreatePayload; // 类型断言为 UserCreatePayload (Type assertion to UserCreatePayload)
 
+  // 检查用户名或邮箱是否已在数据库中存在 (冲突检查)
+  // Check if username or email already exists in the database (conflict check)
+  const trimmedUsername = username.trim();
+  const trimmedEmail = email ? email.trim().toLowerCase() : null;
 
-  try {
-    // 步骤 3: 检查用户名或邮箱是否已在数据库中存在 (冲突检查)。
-    const trimmedUsername = username.trim();
-    const trimmedEmail = email ? email.trim().toLowerCase() : null;
-
-    const existingUserConditions: Prisma.UserWhereInput[] = [{ username: trimmedUsername }];
-    if (trimmedEmail) {
-      existingUserConditions.push({ email: trimmedEmail });
-    }
-
-    const existingUser = await prisma.user.findFirst({
-      where: { OR: existingUserConditions },
-    });
-
-    if (existingUser) {
-      const conflictField = existingUser.username === trimmedUsername ? 'username' : 'email';
-      return errorResponse(`${conflictField} already exists. Please choose a different ${conflictField}.`, 409, 'conflict');
-    }
-
-    // 步骤 4: 哈希密码。
-    const saltRounds = 12; // Recommended salt rounds for bcrypt
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    // 步骤 5: 在数据库中创建用户记录。
-    const newUser = await prisma.user.create({
-      data: {
-        username: trimmedUsername,
-        email: trimmedEmail,
-        passwordHash,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        displayName: displayName || trimmedUsername,
-        avatar: avatar || null,
-        // phone: phone || null, // if added to schema and validation
-        organization: organization || null,
-        department: department || null,
-        isActive: Boolean(isActive),
-        mustChangePassword: Boolean(mustChangePassword),
-        createdBy: performingAdmin?.id, // 记录创建者ID (Record creator ID)
-        failedLoginAttempts: 0,
-      },
-      // 选择返回给客户端的字段 (Select fields to return to client)
-      select: {
-        id: true, username: true, email: true, firstName: true, lastName: true,
-        displayName: true, avatar: true, organization: true, department: true,
-        isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true,
-      }
-    });
-
-    // 步骤 6: 返回成功响应。
-    // (No need to call excludeSensitiveUserFields as `select` already handles it)
-    return NextResponse.json(newUser, { status: 201 });
-
-  } catch (error: any) {
-    // 错误处理：
-    console.error(`Admin user creation error by ${performingAdmin?.id}:`, error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const target = (error.meta?.target as string[]) || ['field'];
-      return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
-    }
-    return errorResponse('An unexpected error occurred during user creation. Please try again later.', 500, 'server_error');
+  const existingUserConditions: Prisma.UserWhereInput[] = [{ username: trimmedUsername }];
+  if (trimmedEmail) {
+    existingUserConditions.push({ email: trimmedEmail });
   }
+
+  const existingUser = await prisma.user.findFirst({
+    where: { OR: existingUserConditions },
+  });
+
+  if (existingUser) {
+    const conflictField = existingUser.username === trimmedUsername ? 'username' : 'email';
+    // 用户名或邮箱冲突，抛出 BaseError (或特定的 ConflictError 如果已定义)
+    // Username or email conflict, throw BaseError (or specific ConflictError if defined)
+    throw new BaseError(`${conflictField} already exists. Please choose a different ${conflictField}.`, 409, 'CONFLICT_USER_EXISTS', { field: conflictField });
+  }
+
+  // 哈希密码
+  // Hash the password
+  const saltRounds = 12;
+  const passwordHash = await bcrypt.hash(password, saltRounds);
+
+  // 在数据库中创建用户记录
+  // Create the user record in the database
+  const newUser = await prisma.user.create({
+    data: {
+      username: trimmedUsername,
+      email: trimmedEmail,
+      passwordHash,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      displayName: displayName || trimmedUsername,
+      avatar: avatar || null,
+      organization: organization || null,
+      department: department || null,
+      isActive: Boolean(isActive),
+      mustChangePassword: Boolean(mustChangePassword),
+      createdBy: performingAdmin?.id,
+      failedLoginAttempts: 0,
+    },
+    select: { // 选择返回的字段，排除 passwordHash (Select fields to return, excluding passwordHash)
+      id: true, username: true, email: true, firstName: true, lastName: true,
+      displayName: true, avatar: true, organization: true, department: true,
+      isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true,
+      lastLoginAt: true, // 确保与 UserResponse 类型匹配 (Ensure it matches UserResponse type)
+      phone: true, workLocation: true, emailVerified: true, // 确保与 UserResponse 类型匹配 (Ensure it matches UserResponse type)
+    }
+  });
+
+  // 返回遵循 ApiResponse 结构的成功响应
+  // Return a successful response following the ApiResponse structure
+  return NextResponse.json<ApiResponse<UserResponse>>({
+    success: true,
+    data: newUser as UserResponse, // newUser 已通过 select 塑形 (newUser is already shaped by select)
+    message: "User created successfully."
+  }, { status: 201 });
 }
-// 将 createUserHandler 函数与 'users:create' 权限绑定，并导出为 POST 请求的处理函数。
-export const POST = requirePermission('users:create')(createUserHandler); // Corrected: wrap with HOF
+// 使用 withErrorHandling 包装 createUserHandlerInternal，并与 'users:create' 权限绑定
+// Wrap createUserHandlerInternal with withErrorHandling and bind with 'users:create' permission
+export const POST = requirePermission('users:create')(withErrorHandling(createUserHandlerInternal));
 
 
 // --- GET /api/v2/users (管理员获取用户列表) ---
+// --- GET /api/v2/users (Admin gets user list) ---
 // 此端点用于获取用户列表，支持分页、过滤和排序。
+// This endpoint is used to get a list of users, supporting pagination, filtering, and sorting.
 // 受到 `requirePermission('users:list')` 的保护。
-async function listUsersHandler(req: AuthenticatedRequest): Promise<NextResponse> {
+// Protected by `requirePermission('users:list')`.
+/**
+ * @swagger
+ * /api/v2/users:
+ *   get:
+ *     summary: 获取用户列表 (Get User List)
+ *     description: (需要 'users:list' 权限) 管理员获取用户列表，支持分页、过滤和排序。
+ *                  ((Requires 'users:list' permission) Admin gets a list of users, with support for pagination, filtering, and sorting.)
+ *     tags: [用户管理 (User Management)]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserListQueryPage'
+ *       - $ref: '#/components/parameters/UserListQueryPageSize'
+ *       - $ref: '#/components/parameters/UserListQueryUsername'
+ *       // ... 其他查询参数的引用 (references to other query parameters)
+ *     responses:
+ *       '200':
+ *         description: 成功获取用户列表。 (Successfully fetched user list.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponseListUsers' # 标准成功响应包裹 ListUsersResponse (Standard success response wrapping ListUsersResponse)
+ *       '400':
+ *         description: 无效的查询参数。 (Invalid query parameters.)
+ *       '401':
+ *         description: 未经授权。 (Unauthorized.)
+ *       '403':
+ *         description: 禁止访问（权限不足）。 (Forbidden (insufficient permissions).)
+ */
+async function listUsersHandlerInternal(req: AuthenticatedRequest): Promise<NextResponse> {
   const performingAdmin = req.user;
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) listing users.`);
 
-  // 步骤 1: 使用 Zod 解析和验证查询参数。
   const { searchParams } = new URL(req.url);
-  const queryParamsRaw: Record<string, string> = {};
-  searchParams.forEach((value, key) => { queryParamsRaw[key] = value; });
+  const queryParamsRaw: Record<string, string | string[] | undefined> = {};
+  searchParams.forEach((value, key) => {
+    // 处理可能重复的查询参数 (例如 ?isActive=true&isActive=false，虽然不常见)
+    // Handle potentially repeated query parameters (e.g., ?isActive=true&isActive=false, though uncommon)
+    const existing = queryParamsRaw[key];
+    if (existing) {
+        if (Array.isArray(existing)) {
+            existing.push(value);
+        } else {
+            queryParamsRaw[key] = [existing, value];
+        }
+    } else {
+        queryParamsRaw[key] = value;
+    }
+  });
+
 
   const validationResult = userListQuerySchema.safeParse(queryParamsRaw);
   if (!validationResult.success) {
-    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+    // Zod 验证失败，抛出 ValidationError
+    // Zod validation failed, throw ValidationError
+    throw new ValidationError('User list query validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'USER_LIST_VALIDATION_ERROR');
   }
 
   let {
-    page,
-    pageSize,
-    username: usernameQuery,
-    email: emailQuery,
-    isActive: isActiveQuery,
-    sortBy,
-    sortOrder
-  } = validationResult.data;
+    page, pageSize, username: usernameQuery, email: emailQuery,
+    isActive: isActiveQuery, sortBy, sortOrder
+  } = validationResult.data as UserListQuery; // 类型断言 (Type assertion)
 
-  // Apply page size constraints
   pageSize = Math.min(pageSize ?? DEFAULT_PAGE_SIZE_CONST, MAX_PAGE_SIZE_CONST);
   if ((pageSize ?? DEFAULT_PAGE_SIZE_CONST) <=0) pageSize = DEFAULT_PAGE_SIZE_CONST;
 
-
-  // 步骤 2: 构建 Prisma 查询条件 (`where` 和 `orderBy`)。
   const where: Prisma.UserWhereInput = {};
   if (usernameQuery) where.username = { contains: usernameQuery, mode: 'insensitive' };
   if (emailQuery) where.email = { contains: emailQuery, mode: 'insensitive' };
-  if (isActiveQuery !== undefined) where.isActive = isActiveQuery; // Already boolean from Zod transform
+  if (isActiveQuery !== undefined) where.isActive = isActiveQuery;
 
   const validSortByFields: (keyof User)[] = ['username', 'email', 'createdAt', 'updatedAt', 'lastLoginAt', 'displayName', 'firstName', 'lastName'];
   const safeSortBy = validSortByFields.includes(sortBy as keyof User) ? sortBy : 'createdAt';
   const orderBy: Prisma.UserOrderByWithRelationInput = { [safeSortBy]: sortOrder };
 
-  try {
-    // 步骤 3: 从数据库获取用户列表和用户总数。
-    const users = await prisma.user.findMany({
-      where,    // 应用过滤条件
-      orderBy,  // 应用排序条件
-      skip: (page - 1) * pageSize, // 计算跳过的记录数，用于分页
-      take: pageSize,             // 获取指定数量的记录
-      select: { // 确保排除敏感字段
-        id: true, username: true, email: true, firstName: true, lastName: true,
-        displayName: true, avatar: true, organization: true, department: true,
-        isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true, createdBy: true, lastLoginAt: true,
-        // Explicitly exclude passwordHash, even though it's not selected above, good practice
-        // No, select *only* includes these. passwordHash is not here.
-      }
-    });
-    // 使用 `prisma.user.count` 获取满足过滤条件的用户总数，用于计算总页数。
-    const totalUsers = await prisma.user.count({ where });
+  const usersRaw = await prisma.user.findMany({
+    where, orderBy,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    select: { // 确保排除敏感字段 (Ensure sensitive fields are excluded)
+      id: true, username: true, email: true, firstName: true, lastName: true,
+      displayName: true, avatar: true, organization: true, department: true,
+      isActive: true, mustChangePassword: true, createdAt: true, updatedAt: true,
+      createdBy: true, lastLoginAt: true, phone: true, workLocation: true, emailVerified: true,
+    }
+  });
+  const totalUsers = await prisma.user.count({ where });
 
-    // 步骤 4: 返回格式化的响应数据。
-    // excludeSensitiveUserFields is not strictly needed if `select` is used correctly.
-    return NextResponse.json({
-      users: users, // users are already shaped by `select`
-      total: totalUsers,          // 用户总数。
-      page: page,                 // 当前页码。
-      pageSize: pageSize,         // 每页数量。
-      totalPages: Math.ceil(totalUsers / pageSize), // 总页数。
-    }, { status: 200 }); // HTTP 200 OK。
+  // 将 usersRaw 转换为 UserResponse[] (如果 select 不足以保证类型匹配)
+  // Convert usersRaw to UserResponse[] (if select isn't enough to guarantee type match)
+  const users: UserResponse[] = usersRaw as UserResponse[];
 
-  } catch (error: any) {
-    // 错误处理：记录错误并返回500服务器错误。
-    console.error(`Admin user listing error by ${performingAdmin?.id}:`, error);
-    return errorResponse('An unexpected error occurred while listing users. Please try again later.', 500, 'server_error');
-  }
+
+  return NextResponse.json<ApiResponse<ListUsersResponse>>({
+    success: true,
+    data: {
+      users,
+      total: totalUsers,
+      page: page,
+      pageSize: pageSize,
+      totalPages: Math.ceil(totalUsers / pageSize),
+    },
+    message: "Users listed successfully."
+  }, { status: 200 });
 }
-// 将 listUsersHandler 函数与 'users:list' 权限绑定，并导出为 GET 请求的处理函数。
-export const GET = requirePermission('users:list')(listUsersHandler); // Corrected: wrap with HOF
+// 使用 withErrorHandling 包装 listUsersHandlerInternal，并与 'users:list' 权限绑定
+// Wrap listUsersHandlerInternal with withErrorHandling and bind with 'users:list' permission
+export const GET = requirePermission('users:list')(withErrorHandling(listUsersHandlerInternal));
 
-
-// 类型声明，用于在其他模块中正确提示 isValidEmail 函数 (如果需要)。
-// 通常，如果 isValidEmail 是从 @/lib/utils 正确导出的，并且 tsconfig Paths 配置正确，
-// 则不需要在此处重新声明。这更像是一个占位符或提醒。
-// declare module '@/lib/utils' {
-//   export function isValidEmail(email: string): boolean;
-// }
+// 文件结束 (End Of File)
+// EOF
