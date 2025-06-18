@@ -1,20 +1,16 @@
 // 文件路径: app/api/v2/oauth/revoke/route.ts
+// File path: app/api/v2/oauth/revoke/route.ts
 // 描述: OAuth 2.0 令牌撤销端点 (RFC 7009)
+// Description: OAuth 2.0 Token Revocation Endpoint (RFC 7009)
 
 import { NextRequest, NextResponse } from 'next/server';
-// import { z } from 'zod'; // Zod is imported from schemas.ts
-// import crypto from 'crypto'; // crypto is used by JWTUtils.getTokenHash, not directly here
-
 import { prisma } from '@/lib/prisma';
-// successResponse and errorResponse are not used in this specific version of the file.
-// import { successResponse, errorResponse } from '@/lib/api/apiResponse';
-import { withErrorHandler, ApiError } from '@/lib/api/errorHandler';
-import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // Using JWTUtils from oauth2.ts
-import * as jose from 'jose'; // For decoding JWT to get JTI
-
-// Import Zod schema from the dedicated schema file
-import { revokeTokenRequestSchema, RevokeTokenRequestPayload } from './schemas';
-
+import { withErrorHandling } from '@/lib/utils/error-handler';
+import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes as OldOAuth2ErrorTypes } from '@/lib/auth/oauth2'; // OldOAuth2ErrorTypes will be replaced by OAuth2ErrorCode
+import * as jose from 'jose';
+import { revokeTokenRequestSchema } from './schemas';
+import { ApiResponse } from '@/lib/types/api';
+import { OAuth2Error, OAuth2ErrorCode, BaseError, ValidationError } from '@/lib/errors';
 
 /**
  * @swagger
@@ -22,9 +18,12 @@ import { revokeTokenRequestSchema, RevokeTokenRequestPayload } from './schemas';
  *   post:
  *     summary: OAuth 2.0 令牌撤销 (Token Revocation) - RFC 7009
  *     description: |
- *       撤销一个访问令牌或刷新令牌 (RFC 7009).
+ *       撤销一个访问令牌或刷新令牌 (RFC 7009)。
+ *       Revokes an access token or a refresh token (RFC 7009).
  *       客户端通过提供令牌来进行撤销。服务器将验证客户端身份（如果适用）和令牌。
+ *       The client makes a request by providing the token to be revoked. The server will validate client identity (if applicable) and the token.
  *       无论令牌是否有效或已被撤销，服务器通常都会返回 HTTP 200 OK，以防止信息泄露。
+ *       The server typically returns HTTP 200 OK regardless of whether the token was valid or already revoked, to prevent information leakage.
  *     tags:
  *       - OAuth V2
  *     consumes:
@@ -36,141 +35,132 @@ import { revokeTokenRequestSchema, RevokeTokenRequestPayload } from './schemas';
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *                 description: 需要撤销的令牌。
- *               token_type_hint:
- *                 type: string
- *                 enum: [access_token, refresh_token]
- *                 description: 可选的令牌类型提示。
- *               client_id:
- *                 type: string
- *                 description: (如果未使用Basic Auth且客户端是公共的) 进行请求的客户端ID。
- *               client_secret:
- *                 type: string
- *                 description: (如果未使用Basic Auth且客户端是机密的) 客户端密钥。
- *             required:
- *               - token
+ *             $ref: '#/components/schemas/RevokeTokenRequest'
  *     responses:
  *       '200':
- *         description: 令牌已成功撤销，或者令牌无效/未知（服务器不区分以防信息泄露）。
+ *         description: 令牌撤销请求已处理。 (Token revocation request processed.)
  *         content:
  *           application/json:
  *             schema:
- *               type: object # 通常为空响应体
+ *               $ref: '#/components/schemas/ApiResponseNull'
  *       '400':
- *         description: 无效的请求（例如，缺少 'token' 参数，或请求格式不正确）。
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/OAuthError'
+ *         description: 无效的请求。 (Invalid request.)
  *       '401':
- *         description: 客户端认证失败。
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/OAuthError'
+ *         description: 客户端认证失败。 (Client authentication failed.)
  *       '415':
- *         description: 不支持的媒体类型（请求体必须是 application/x-www-form-urlencoded）。
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/OAuthError'
+ *         description: 不支持的媒体类型。 (Unsupported Media Type.)
  *       '500':
- *         description: 服务器内部错误。
+ *         description: 服务器内部错误。 (Internal server error.)
+ * components:
+ *   schemas:
+ *     RevokeTokenRequest:
+ *       type: object
+ *       required: [token]
+ *       properties:
+ *         token: { type: string, description: "需要撤销的令牌。" }
+ *         token_type_hint: { type: string, enum: [access_token, refresh_token], description: "可选的令牌类型提示。" }
+ *         client_id: { type: string, description: "公共客户端的ID (如果未使用Basic Auth)。" }
+ *         client_secret: { type: string, description: "机密客户端的密钥 (如果未使用Basic Auth)。" }
+ *     ApiResponseNull: # 已在其他地方定义 (Defined elsewhere)
+ *       allOf:
+ *         - $ref: '#/components/schemas/ApiResponseBase'
+ *         - type: object
+ *           properties:
+ *             data: { type: 'null', nullable: true }
  */
-async function revocationHandler(request: NextRequest) {
-  const overallRequestId = (request as any).requestId; // from withErrorHandler
-
+// 令牌撤销端点处理函数
+// Token revocation endpoint handler function
+async function revocationHandlerInternal(request: NextRequest): Promise<NextResponse> {
+  // 检查请求的内容类型是否为 'application/x-www-form-urlencoded'
+  // Check if the request content type is 'application/x-www-form-urlencoded'
   if (request.headers.get('content-type') !== 'application/x-www-form-urlencoded') {
-    // Using a simplified error response structure here as errorResponse util is not in scope.
-    return NextResponse.json({ error: 'unsupported_media_type', error_description: 'Unsupported Media Type. Please use application/x-www-form-urlencoded.' }, { status: 415 });
+    // 不支持的媒体类型，抛出 OAuth2Error
+    // Unsupported media type, throw OAuth2Error
+    throw new OAuth2Error(
+      'Unsupported Media Type. Please use application/x-www-form-urlencoded.',
+      OAuth2ErrorCode.InvalidRequest, // RFC 规定 Content-Type 错误通常是 415，但 OAuth2Error 没有直接的 UNSUPPORTED_MEDIA_TYPE。InvalidRequest + 详细信息是可接受的。
+                                    // RFC states Content-Type errors are usually 415, but OAuth2Error doesn't have a direct UNSUPPORTED_MEDIA_TYPE. InvalidRequest + details is acceptable.
+      415, // HTTP 415 Unsupported Media Type
+      undefined,
+      { expectedContentType: 'application/x-www-form-urlencoded' }
+    );
   }
 
   const bodyParams = new URLSearchParams(await request.text());
   const rawBodyData: Record<string, any> = {};
   bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
 
+  // --- 客户端认证 ---
+  // ClientAuthUtils.authenticateClient 现在会抛出错误
+  // ClientAuthUtils.authenticateClient will now throw errors
+  let authenticatedClient = await ClientAuthUtils.authenticateClient(request, bodyParams);
 
-  // --- 客户端认证 (Client Authentication) ---
-  const clientAuthResult = await ClientAuthUtils.authenticateClient(request, bodyParams);
-  let authenticatedClient = clientAuthResult.client;
-
-  // Handle public clients that might provide client_id in body
-  if (!authenticatedClient && rawBodyData.client_id && !clientAuthResult.error) {
-    const publicClientCheck = await prisma.oAuthClient.findUnique({
-      where: { clientId: rawBodyData.client_id as string, isActive: true, clientType: 'PUBLIC' }
-    });
-    if (publicClientCheck) authenticatedClient = publicClientCheck;
+  // 公共客户端可能在请求体中提供 client_id，再次检查 (ClientAuthUtils 内部已处理，此逻辑可简化或移除)
+  // Public clients might provide client_id in body, re-check (ClientAuthUtils handles this internally, this logic can be simplified or removed)
+  if (!authenticatedClient && rawBodyData.client_id) { // ClientAuthUtils 会处理此情况 (ClientAuthUtils handles this case)
+     // 如果 ClientAuthUtils 未能通过 body 中的 client_id 识别公共客户端，则此逻辑可能需要调整或依赖 ClientAuthUtils 的实现
+     // If ClientAuthUtils failed to identify a public client via client_id in body, this logic might need adjustment or rely on ClientAuthUtils's impl.
+     // 当前 ClientAuthUtils 实现应该已经覆盖了公共客户端的 body client_id 场景。
+     // Current ClientAuthUtils implementation should already cover public client body client_id scenario.
   }
-
-  // If client authentication is required (e.g. confidential client) and failed, or no client identified
+  // 如果到这里 authenticatedClient 仍然未定义，ClientAuthUtils 应该已经抛出了错误。
+  // If authenticatedClient is still undefined here, ClientAuthUtils should have thrown an error.
+  // 为了健壮性，可以再加一个检查，尽管理论上不应该执行到。
+  // For robustness, an additional check can be added, though theoretically it shouldn't be reached.
   if (!authenticatedClient) {
-    return NextResponse.json(
-      clientAuthResult.error || { error: OAuth2ErrorTypes.INVALID_CLIENT, error_description: 'Client authentication or identification failed.' },
-      { status: 401 }
-    );
+    // This path should ideally not be reached if ClientAuthUtils.authenticateClient throws as expected.
+    throw new OAuth2Error('Client authentication or identification failed unexpectedly after initial check.', OAuth2ErrorCode.InvalidClient, 401);
   }
-  console.log(`Token revocation request potentially for client: ${authenticatedClient.clientId}`);
 
-  // --- 请求体验证 (Using imported Zod schema) ---
+  console.log(`Token revocation request authenticated for client: ${authenticatedClient.clientId}`);
+
+  // --- 请求体验证 ---
   const validationResult = revokeTokenRequestSchema.safeParse(rawBodyData);
   if (!validationResult.success) {
-    return NextResponse.json(
-      { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: validationResult.error.errors[0]?.message || 'Invalid revocation request parameters.', issues: validationResult.error.flatten().fieldErrors },
-      { status: 400 }
+    throw new OAuth2Error(
+      validationResult.error.errors[0]?.message || 'Invalid revocation request parameters.',
+      OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
+      { issues: validationResult.error.flatten().fieldErrors }
     );
   }
 
-  // client_id from body, if present, must match authenticated client
   if (validationResult.data.client_id && validationResult.data.client_id !== authenticatedClient.clientId) {
-    return NextResponse.json({ error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: "client_id in body does not match authenticated client." }, { status: 400 });
+    throw new OAuth2Error("client_id in body does not match authenticated client.", OAuth2ErrorCode.InvalidRequest, 400);
   }
 
   const { token: tokenToRevoke, token_type_hint: tokenTypeHint } = validationResult.data;
 
   // --- 令牌撤销逻辑 ---
-  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke); // From lib/auth/oauth2.ts
+  const tokenHash = JWTUtils.getTokenHash(tokenToRevoke);
   let tokenFoundAndRevoked = false;
-  let revokedTokenInfo = { type: "unknown", idForLog: "unknown" }; // Corrected variable name
-
-  // JWTs contain a 'jti' (JWT ID) claim. We should use this for blacklisting if possible.
-  // For opaque tokens stored by hash, we use the hash.
-  // Let's assume for now that our JWTs have 'jti' and we can decode them to get it.
-  // If not, AccessToken.id or RefreshToken.id (if they are unique like JTIs) can be used.
+  let revokedTokenDetails = { type: "unknown", idForLog: "unknown" };
 
   let decodedJwtPayload: jose.JWTPayload | null = null;
   try {
     decodedJwtPayload = jose.decodeJwt(tokenToRevoke);
   } catch (e) {
-    // Not a JWT, or malformed. Proceed with hash-based lookup.
-    console.warn("Revocation: Token provided is not a valid JWT, proceeding with hash-based lookup.", e);
+    console.warn("Revocation: Token provided is not a valid JWT, proceeding with hash-based lookup.", { error: (e as Error).message });
   }
   const jtiToBlacklist = decodedJwtPayload?.jti || null;
 
-
   // 尝试作为访问令牌处理
+  // Attempt to process as an access token
   if (tokenTypeHint === 'access_token' || !tokenTypeHint) {
     const accessToken = await prisma.accessToken.findFirst({
       where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
     });
 
     if (accessToken) {
-      // Add to TokenBlacklist. Use JTI if available, otherwise the token's own ID or hash.
-      // Assuming AccessToken.id can serve as a unique identifier if JTI is not part of its direct model.
-      // The JWTUtils.createAccessToken *does* add a JTI. So jwtPayload.jti should be preferred.
-      const effectiveJti = jtiToBlacklist || accessToken.id; // Fallback to accessToken.id if JTI not in JWT
-
+      const effectiveJti = jtiToBlacklist || accessToken.id;
       await prisma.tokenBlacklist.upsert({
           where: { jti: effectiveJti },
           create: { jti: effectiveJti, tokenType: 'access_token', expiresAt: accessToken.expiresAt },
-          update: { expiresAt: accessToken.expiresAt }, // Update expiry if somehow re-blacklisted
+          update: { expiresAt: accessToken.expiresAt },
       });
-      // Optionally, delete the AccessToken entry if it's not needed for audit/other purposes post-revocation
-      // await prisma.accessToken.delete({ where: { id: accessToken.id } });
-
+      // 可选：直接从 AccessToken 表删除记录 (Optional: directly delete record from AccessToken table)
+      // await prisma.accessToken.delete({ where: { id: accessToken.id }});
       tokenFoundAndRevoked = true;
       revokedTokenDetails = { type: "access_token", idForLog: accessToken.id };
       console.log(`Access token (ID: ${accessToken.id}) for client ${authenticatedClient.clientId} blacklisted.`);
@@ -178,16 +168,15 @@ async function revocationHandler(request: NextRequest) {
   }
 
   // 尝试作为刷新令牌处理
+  // Attempt to process as a refresh token
   if (!tokenFoundAndRevoked && (tokenTypeHint === 'refresh_token' || !tokenTypeHint)) {
     const refreshToken = await prisma.refreshToken.findFirst({
       where: { tokenHash: tokenHash, clientId: authenticatedClient.id },
     });
 
     if (refreshToken && !refreshToken.isRevoked) {
-      const effectiveJti = jtiToBlacklist || refreshToken.id; // Fallback to refreshToken.id
-
+      const effectiveJti = jtiToBlacklist || refreshToken.id;
       await prisma.$transaction(async (tx) => {
-        // 1. Revoke the refresh token itself (mark as revoked and add to blacklist)
         await tx.refreshToken.update({
           where: { id: refreshToken.id },
           data: { isRevoked: true, revokedAt: new Date() },
@@ -197,79 +186,59 @@ async function revocationHandler(request: NextRequest) {
             create: { jti: effectiveJti, tokenType: 'refresh_token', expiresAt: refreshToken.expiresAt },
             update: { expiresAt: refreshToken.expiresAt },
         });
-
         tokenFoundAndRevoked = true;
         revokedTokenDetails = { type: "refresh_token", idForLog: refreshToken.id };
         console.log(`Refresh token (ID: ${refreshToken.id}) for client ${authenticatedClient.clientId} revoked and blacklisted.`);
 
-        // 2. Cascading Revocation: Invalidate related Access Tokens
-        // Find access tokens that could have been derived from this refresh token family.
-        // This is a simplified approach; a more robust one might trace a chain of refresh tokens if rotation creates new DB IDs.
-        // For now, assume access tokens are linked by user and client, and their expiry is relevant.
+        // 级联撤销相关访问令牌 (Cascading revocation for related access tokens)
         if (refreshToken.userId) {
+          // 此处简化：实际级联可能更复杂，需要追踪令牌家族 (Simplified here: actual cascading might be more complex)
           const relatedAccessTokens = await tx.accessToken.findMany({
-            where: {
-              userId: refreshToken.userId,
-              clientId: authenticatedClient.id,
-              expiresAt: { gt: new Date() }, // Only active ones
-              // We need a way to get their JTIs if not directly stored on AccessToken model
-              // For now, we'll assume AccessToken.id is usable as a JTI for blacklisting.
-            }
+            where: { userId: refreshToken.userId, clientId: authenticatedClient.id, expiresAt: { gt: new Date() } }
           });
-
           if (relatedAccessTokens.length > 0) {
-            const blacklistEntries = relatedAccessTokens.map(at => {
-              // Attempt to decode each access token to get its JTI for blacklisting
-              // This is inefficient. Ideally, JTI is stored on AccessToken model.
-              let accessJti = at.id; // Fallback
-              try {
-                const decodedAt = jose.decodeJwt(at.token); // Assuming raw token is stored for this...
-                if(decodedAt.jti) accessJti = decodedAt.jti;
-              } catch(e) { console.warn("Could not decode AT to get JTI during cascading revoke, using ID as JTI."); }
-
-              return { jti: accessJti, tokenType: 'access_token', expiresAt: at.expiresAt };
-            });
-
-            // Batch upsert into blacklist
-            // Prisma createMany does not support `onConflict` or `upsert` directly in batch.
-            // Loop for upsert (can be slow for many tokens, consider raw SQL or batching logic for production)
-            for (const entry of blacklistEntries) {
-                await tx.tokenBlacklist.upsert({
-                    where: {jti: entry.jti},
-                    create: entry,
-                    update: {expiresAt: entry.expiresAt} // Keep it simple, just update expiry if re-blacklisted
-                });
+            const blacklistCascadeEntries = relatedAccessTokens.map(at => ({
+                jti: at.id, // 假设 AccessToken.id 可用作 JTI (Assume AccessToken.id can be used as JTI)
+                tokenType: 'access_token' as 'access_token' | 'refresh_token', // 类型断言 (Type assertion)
+                expiresAt: at.expiresAt
+            }));
+            for (const entry of blacklistCascadeEntries) {
+                await tx.tokenBlacklist.upsert({ where: {jti: entry.jti}, create: entry, update: {expiresAt: entry.expiresAt} });
             }
-            // Optional: Delete the AccessToken entries from their original table
-            // await tx.accessToken.deleteMany({ where: { id: { in: relatedAccessTokens.map(at => at.id) } } });
-            console.log(`Cascaded revocation: ${relatedAccessTokens.length} access tokens blacklisted for user ${refreshToken.userId}, client ${authenticatedClient.clientId}.`);
+            console.log(`Cascaded revocation: ${relatedAccessTokens.length} access tokens blacklisted for user ${refreshToken.userId}.`);
           }
         }
       });
     }
   }
 
+  // 记录审计事件 (Log audit event)
   await AuthorizationUtils.logAuditEvent({
-      clientId: authenticatedClient.id, // DB ID of the client
+      clientId: authenticatedClient.id,
       action: 'token_revocation_attempt',
       resource: `token_type_hint:${tokenTypeHint || 'any'}`,
       ipAddress: request.headers.get('x-forwarded-for') || request.ip || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
-      success: true, // Per RFC 7009, always return 200 for valid client requests
+      success: true, // RFC 7009: 总是返回 200 (Always return 200 per RFC 7009)
       metadata: {
           token_hash_prefix: tokenHash.substring(0, 10),
-          token_found_and_processed_as: tokenFoundAndRevoked ? revokedTokenInfo.type : 'none',
-          actually_revoked_in_db: tokenFoundAndRevoked, // Indicates if DB state was changed
+          token_found_and_processed_as: tokenFoundAndRevoked ? revokedTokenDetails.type : 'none',
+          actually_revoked_in_db: tokenFoundAndRevoked,
       },
   });
 
-  // RFC 7009: "The server responds with HTTP status code 200 if the token has been
-  // revoked successfully or if the client submitted an invalid token."
-  // 服务器不应泄露令牌是否存在或有效的具体信息。 (Server should not leak specific info about token existence/validity)
-  return new NextResponse(null, { status: 200 }); // HTTP 200 OK, 无内容 (No content)
+  // RFC 7009: 服务器以 HTTP 200 响应，无论令牌是否有效或已撤销。
+  // RFC 7009: Server responds with HTTP 200 if token revoked or client submitted invalid token.
+  return NextResponse.json<ApiResponse<null>>({
+    success: true,
+    message: "Token revocation request processed.", // 消息表明已处理，而非一定已撤销某个特定令牌 (Message indicates processed, not necessarily that a specific token was revoked)
+    data: null
+  }, { status: 200 });
 }
 
-// export const POST = withErrorHandler(withClientAuth(revocationHandler)); // 使用合适的客户端认证中间件
-export const POST = withErrorHandler(revocationHandler);
+// 使用 withErrorHandling 包装处理函数
+// Wrap the handler with withErrorHandling
+export const POST = withErrorHandling(revocationHandlerInternal);
 
-EOF
+// 文件结束 (End Of File)
+// EOF

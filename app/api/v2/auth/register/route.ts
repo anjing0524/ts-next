@@ -1,143 +1,210 @@
 // 文件路径: app/api/v2/auth/register/route.ts
-// 描述: 管理员创建新用户端点 (Admin creates new user endpoint)
+// File path: app/api/v2/auth/register/route.ts
+// 描述: 管理员创建新用户端点
+// Description: Admin creates new user endpoint
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { Prisma } from '@prisma/client'; // Prisma types, User type not directly used
-import bcrypt from 'bcrypt';
-// import { verifyV2SessionAccessToken, V2AccessTokenPayload } from '@/lib/auth/v2AuthUtils'; // REMOVED
-import { isValidEmail } from '@/lib/utils'; // Assuming a utility for email validation
-import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入 requirePermission (Import requirePermission)
+import { User, Prisma } from '@prisma/client'; // Prisma 类型 (Prisma types)
+import bcrypt from 'bcrypt'; // 用于密码哈希 (For password hashing)
+import { requirePermission } from '@/lib/auth/middleware'; // 引入 requirePermission HOF (Import requirePermission HOF)
+import type { AuthenticatedRequest } from '@/lib/auth/types'; // 引入 AuthenticatedRequest 类型 (Import AuthenticatedRequest type)
+import { userCreatePayloadSchema, UserCreatePayload } from '../users/schemas'; // 导入用户创建的Zod模式和类型 (Import Zod schema and type for user creation from users API)
+import { ApiResponse } from '@/lib/types/api'; // 标准API响应类型 (Standard API response type)
+import { ValidationError, BaseError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
+import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理高阶函数 (Error handling HOF)
 
-// 模拟的管理员用户ID列表或角色检查逻辑 (Simulated admin user ID list or role check logic)
-// 在实际应用中，这应该是一个更健壮的RBAC检查 (In a real application, this should be a more robust RBAC check)
-// This will be handled by requirePermission now.
-// const ADMIN_USER_IDS = ['cluser1test123456789012345']; // Example admin user ID
-// const REQUIRED_ROLE_FOR_REGISTRATION = 'admin'; // Or a specific permission needed
+// 定义成功创建用户时返回的用户信息结构 (不含敏感信息)
+// Define the structure of user information returned on successful user creation (without sensitive info)
+// UserResponse 将从 app/api/v2/users/schemas.ts 或直接从 Prisma select 构建
+// UserResponse will be constructed from Prisma select or could be imported from app/api/v2/users/schemas.ts if defined there
+type UserRegistrationResponse = Omit<User, 'passwordHash' | 'failedLoginAttempts' | 'lockedUntil'>;
 
-// 辅助函数：错误响应 (Helper function: Error response)
-function errorResponse(message: string, status: number, errorCode?: string) {
-  return NextResponse.json({ error: errorCode || 'registration_failed', message }, { status });
-}
 
-// 使用 requirePermission 包装原始的 POST 处理函数
-// (Wrap the original POST handler with requirePermission)
-// The 'event' parameter is not strictly needed here for basic Next.js route handlers but included for HOF consistency
-async function registerUserHandler(req: AuthenticatedRequest, event?: any) {
-  // 管理员认证和权限检查已由 requirePermission 处理
-  // (Admin authentication and permission check is handled by requirePermission)
-  // req.user now contains the OAuth Access Token payload for the admin
+/**
+ * @swagger
+ * /api/v2/auth/register:
+ *   post:
+ *     summary: 管理员注册新用户 (Admin Registers New User)
+ *     description: (需要 'auth:register' 权限) 管理员通过此接口创建新的用户账户。
+ *                  ((Requires 'auth:register' permission) Admin creates a new user account via this interface.)
+ *     tags: [认证 (Authentication)]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserCreatePayload'
+ *     responses:
+ *       '201':
+ *         description: 用户注册成功。 (User registered successfully.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponseUserRegistration'
+ *       '400':
+ *         description: 请求体验证失败或JSON格式错误。 (Request body validation failed or malformed JSON.)
+ *       '401':
+ *         description: 未经授权的访问。 (Unauthorized access.)
+ *       '403':
+ *         description: 禁止访问（权限不足）。 (Forbidden (insufficient permissions).)
+ *       '409':
+ *         description: 用户名或邮箱已存在冲突。 (Username or email already exists (conflict).)
+ *       '500':
+ *         description: 服务器内部错误。 (Internal server error.)
+ * components:
+ *   schemas:
+ *     UserCreatePayload: # 复用 users API 的 schema 定义 (Reuse schema definition from users API)
+ *       type: object
+ *       required: [username, email, password]
+ *       properties:
+ *         username: { type: string }
+ *         email: { type: string, format: email }
+ *         password: { type: string, minLength: 8 }
+ *         firstName: { type: string, nullable: true }
+ *         lastName: { type: string, nullable: true }
+ *         displayName: { type: string, nullable: true }
+ *         avatar: { type: string, format: url, nullable: true }
+ *         phone: { type: string, nullable: true }
+ *         organization: { type: string, nullable: true }
+ *         department: { type: string, nullable: true }
+ *         workLocation: { type: string, nullable: true }
+ *         isActive: { type: boolean, default: true }
+ *         mustChangePassword: { type: boolean, default: true }
+ *     UserRegistrationResponseData:
+ *       type: object
+ *       properties:
+ *         id: { type: string, format: cuid }
+ *         username: { type: string, nullable: true }
+ *         email: { type: string, format: email, nullable: true }
+ *         # ... 其他 UserRegistrationResponse 中的字段 ...
+ *         isActive: { type: boolean }
+ *         mustChangePassword: { type: boolean }
+ *         createdAt: { type: string, format: "date-time" }
+ *         updatedAt: { type: string, format: "date-time" }
+ *     ApiResponseUserRegistration:
+ *       allOf:
+ *         - $ref: '#/components/schemas/ApiResponseBase'
+ *         - type: object
+ *           properties:
+ *             data: { $ref: '#/components/schemas/UserRegistrationResponseData' }
+ *     ApiResponseBase:
+ *       type: object
+ *       properties:
+ *         success: { type: boolean }
+ *         message: { type: string, nullable: true }
+ *     ApiResponseError:
+ *       type: object
+ *       properties:
+ *         success: { type: boolean, example: false }
+ *         error: { $ref: '#/components/schemas/ApiError' }
+ *     ApiError:
+ *       type: object
+ *       properties:
+ *         code: { type: string }
+ *         message: { type: string }
+ *         details: { type: object, additionalProperties: true, nullable: true }
+ */
+// POST 处理函数，用于管理员创建新用户，由 withErrorHandling 包装
+// POST handler for admin creating a new user, wrapped by withErrorHandling
+async function registerUserHandlerInternal(req: AuthenticatedRequest): Promise<NextResponse> {
   const adminUser = req.user;
   console.log(`Admin (ID: ${adminUser?.id}, ClientID: ${adminUser?.clientId}) is registering a new user (permission 'auth:register' granted).`);
 
-  // 1. 解析请求体 (Parse request body) - (Was step 2)
   let requestBody;
   try {
     requestBody = await req.json();
   } catch (e) {
-    return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
+    // 无效的JSON，抛出 ValidationError
+    // Invalid JSON, throw ValidationError
+    throw new ValidationError('Invalid JSON request body.', { detail: (e as Error).message }, 'INVALID_JSON_BODY');
+  }
+
+  // 使用 Zod 模式验证请求体
+  // Validate request body using Zod schema
+  const validationResult = userCreatePayloadSchema.safeParse(requestBody);
+  if (!validationResult.success) {
+    // Zod 验证失败，抛出 ValidationError
+    // Zod validation failed, throw ValidationError
+    throw new ValidationError('User registration payload validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'REGISTRATION_VALIDATION_ERROR');
   }
 
   const {
-    username, email, password,
-    firstName, lastName, displayName, avatar, phone,
+    username, email, password, firstName, lastName, displayName, avatar, phone,
     organization, department, workLocation,
-    isActive = true, // 默认为激活状态 (Defaults to active)
-    mustChangePassword = true, // 默认需要修改密码 (Defaults to must change password)
-  } = requestBody;
+    isActive,
+    mustChangePassword,
+  } = validationResult.data as UserCreatePayload; // 类型断言 (Type assertion)
 
-  // 3. 输入数据验证 (Input data validation)
-  if (!username || !email || !password) {
-    return errorResponse('Username, email, and password are required.', 400, 'validation_error');
-  }
-  if (password.length < 8) { // 密码最小长度示例 (Example: minimum password length)
-    return errorResponse('Password must be at least 8 characters long.', 400, 'validation_error');
-  }
-  if (!isValidEmail(email)) { // 使用假设的工具函数验证邮箱格式 (Use assumed utility function to validate email format)
-      return errorResponse('Invalid email format.', 400, 'validation_error');
+  // 检查用户名或邮箱是否已存在
+  // Check if username or email already exists
+  const trimmedUsername = username.trim();
+  const trimmedEmail = email.trim().toLowerCase(); // 邮箱统一小写处理 (Standardize email to lowercase)
+
+  const existingUser = await prisma.user.findFirst({
+    where: { OR: [{ username: trimmedUsername }, { email: trimmedEmail }] },
+  });
+
+  if (existingUser) {
+    const conflictField = existingUser.username === trimmedUsername ? 'username' : 'email';
+    // 用户名或邮箱冲突，抛出 BaseError (或 ConflictError 如果已定义)
+    // Username or email conflict, throw BaseError (or ConflictError if defined)
+    throw new BaseError(`${conflictField} already exists.`, 409, 'CONFLICT_USER_EXISTS', { field: conflictField });
   }
 
-  try {
-    // 4. 检查用户名或邮箱是否已存在 (Check if username or email already exists)
-    const existingUser = await prisma.user.findFirst({
-      where: { OR: [{ username: username.trim() }, { email: email.trim().toLowerCase() }] },
-    });
-    if (existingUser) {
-      const conflictField = existingUser.username === username.trim() ? 'username' : 'email';
-      return errorResponse(`${conflictField} already exists.`, 409, 'conflict');
+  // 安全地哈希密码
+  // Securely hash the password
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  // 创建新用户记录
+  // Create new User record
+  const newUser = await prisma.user.create({
+    data: {
+      username: trimmedUsername,
+      email: trimmedEmail,
+      passwordHash,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      displayName: displayName || trimmedUsername,
+      avatar: avatar || null,
+      phone: phone || null,
+      organization: organization || null,
+      department: department || null,
+      workLocation: workLocation || null,
+      isActive: Boolean(isActive),
+      mustChangePassword: Boolean(mustChangePassword),
+      failedLoginAttempts: 0,
+      createdBy: adminUser?.id, // 记录创建者ID (Record creator ID)
+    },
+    // 选择返回给客户端的字段，确保不包含敏感信息
+    // Select fields to return to the client, ensuring no sensitive info is included
+    select: {
+        id: true, username: true, email: true, firstName: true, lastName: true,
+        displayName: true, avatar: true, phone: true, organization: true, department: true, workLocation: true,
+        isActive: true, emailVerified: true, mustChangePassword: true,
+        lastLoginAt: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true,
     }
+  });
 
-    // 5. 安全地哈希密码 (Securely hash the password)
-    const passwordHash = await bcrypt.hash(password, 10); // 10 is the salt rounds
-
-    // 6. 创建新用户记录 (Create new User record)
-    const newUser = await prisma.user.create({
-      data: {
-        username: username.trim(),
-        email: email.trim().toLowerCase(),
-        passwordHash,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        displayName: displayName || username.trim(), // 默认使用 username作为 displayName
-        avatar: avatar || null,
-        phone: phone || null,
-        organization: organization || null,
-        department: department || null,
-        workLocation: workLocation || null,
-        isActive: Boolean(isActive),
-        mustChangePassword: Boolean(mustChangePassword),
-        failedLoginAttempts: 0,
-        // createdAt, updatedAt are auto-generated by Prisma
-        // lastLoginAt, lockedUntil default to null
-      },
-    });
-
-    // 7. 构建并返回响应 (Construct and return response)
-    // 不应返回 passwordHash 或其他敏感内部字段 (Should not return passwordHash or other sensitive internal fields)
-    const userResponse = {
-      id: newUser.id,
-      username: newUser.username,
-      email: newUser.email,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      displayName: newUser.displayName,
-      avatar: newUser.avatar,
-      phone: newUser.phone,
-      organization: newUser.organization,
-      department: newUser.department,
-      workLocation: newUser.workLocation,
-      isActive: newUser.isActive,
-      mustChangePassword: newUser.mustChangePassword,
-      createdAt: newUser.createdAt,
-      updatedAt: newUser.updatedAt,
-    };
-
-    return NextResponse.json(userResponse, { status: 201 }); // 201 Created
-
-  } catch (error: any) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // 处理 Prisma 特定的已知请求错误 (Handle Prisma-specific known request errors)
-      if (error.code === 'P2002') { // Unique constraint failed
-        const target = (error.meta?.target as string[]) || ['field'];
-        return errorResponse(`Conflict: The ${target.join(', ')} you entered is already in use.`, 409, 'conflict');
-      }
-    }
-    console.error('User registration error by admin:', adminUser?.id, error); // 使用从req.user获取的adminId
-    return errorResponse('An unexpected error occurred during user registration.', 500, 'server_error');
-  }
+  // 返回遵循 ApiResponse 结构的成功响应
+  // Return a successful response following the ApiResponse structure
+  return NextResponse.json<ApiResponse<UserRegistrationResponse>>({
+    success: true,
+    data: newUser as UserRegistrationResponse, // newUser 已通过 select 塑形 (newUser is already shaped by select)
+    message: "User registered successfully by admin."
+  }, { status: 201 });
 }
 
-// 将包装后的处理函数导出为 POST
-// (Export the wrapped handler as POST)
-export const POST = requirePermission('auth:register')(registerUserHandler);
+// 使用 withErrorHandling 包装处理函数，并绑定 'auth:register' 权限
+// Wrap the handler with withErrorHandling and bind the 'auth:register' permission
+export const POST = requirePermission('auth:register')(withErrorHandling(registerUserHandlerInternal));
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 和 isValidEmail 存在
-// (Ensure JWTUtils.verifyV2AuthAccessToken and isValidEmail exist) - NO LONGER NEEDED for JWTUtils
-// 这些声明帮助TypeScript识别这些外部函数，实际实现应在各自的文件中。
-// (These declarations help TypeScript recognize these external functions; actual implementations should be in their respective files.)
-/*
-declare module '@/lib/utils' { // Assuming isValidEmail is still in lib/utils
-  export function isValidEmail(email: string): boolean;
-}
-*/
-// User type is not explicitly used in this file, Prisma types are used for operations.
+// isValidEmail 工具函数不再需要在此文件中声明，因其已由 Zod schema 处理
+// The isValidEmail utility function is no longer needed for declaration in this file as it's handled by Zod schema.
+// User 类型在此文件中未显式用作顶级类型，主要通过 Prisma Client 和推断类型交互。
+// The User type is not explicitly used as a top-level type in this file; interaction is mainly via Prisma Client and inferred types.
+
+// 文件结束 (End Of File)
+// EOF

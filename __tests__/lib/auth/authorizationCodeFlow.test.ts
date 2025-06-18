@@ -1,257 +1,349 @@
 // __tests__/lib/auth/authorizationCodeFlow.test.ts
+// 单元测试授权码流程函数
+// Unit tests for authorization code flow functions.
 
+import crypto from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import {
   storeAuthorizationCode,
   validateAuthorizationCode,
   DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS,
-} from '@/lib/auth/authorizationCodeFlow';
-import { setupTestDb, teardownTestDb } from '../../utils/test-helpers';
-import { TestDataManager } from '../../utils/test-helpers'; // To create user and client
-import crypto from 'crypto';
-import { addSeconds, differenceInSeconds } from 'date-fns';
+  generateSecureRandomString,
+} from '../../lib/auth/authorizationCodeFlow';
+import {
+  ResourceNotFoundError,
+  TokenError,
+  ValidationError,
+  AuthenticationError,
+  ConfigurationError,
+  BaseError
+} from '../../lib/errors'; // 导入自定义错误类 (Import custom error classes)
+import { Prisma } from '@prisma/client'; // 导入Prisma错误类型以进行测试 (Import Prisma error types for testing)
+
+// Mock Prisma client
+// 模拟 Prisma 客户端
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    authorizationCode: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+  },
+}));
+
+// Mock generateSecureRandomString for predictable codes in tests
+// 为测试中的可预测代码模拟 generateSecureRandomString
+jest.mock('../../lib/auth/authorizationCodeFlow', () => {
+  const originalModule = jest.requireActual('../../lib/auth/authorizationCodeFlow');
+  return {
+    ...originalModule,
+    generateSecureRandomString: jest.fn(() => 'mocked-secure-random-string-for-code'),
+  };
+});
+
+
+// Helper to generate PKCE challenge
+// 辅助函数生成PKCE质询
+const generateChallenge = (verifier: string): string => {
+  return crypto.createHash('sha256').update(verifier).digest('base64url');
+};
 
 describe('Authorization Code Flow', () => {
-  let testDataCreator: TestDataManager;
-  let testUser: any;
-  let testClient: any;
+  const testUserId = 'user-test-id-auth-code'; // 确保测试ID的唯一性 (Ensure test ID uniqueness)
+  const testClientId = 'client-cuid-for-auth-code'; // 假设这是OAuthClient的CUID (Assuming this is OAuthClient CUID)
+  const testRedirectUri = 'https://example.com/callback';
+  const testCodeVerifier = 'test-code-verifier-long-enough-for-s256-pkce-and-more-chars';
+  const testCodeChallenge = generateChallenge(testCodeVerifier);
+  const testCodeChallengeMethod = 'S256'; // 假设 storeAuthorizationCode 内部会验证或强制此方法 (Assume storeAuthorizationCode verifies or enforces this)
+  const testScope = 'openid profile email';
+  const mockedGeneratedCode = 'mocked-secure-random-string-for-code';
 
-  beforeAll(async () => {
-    await setupTestDb(); // Clear DB and set up basic scopes, etc.
-  });
-
-  beforeEach(async () => {
-    // Create a new TestDataManager for each test to ensure data isolation via prefixes
-    testDataCreator = new TestDataManager('auth_code_flow_');
-
-    // Create a standard test user and client for use in tests
-    // Note: `createUser` and `createClient` in TestDataManager return custom TestUser/TestClient types,
-    // but we need the actual Prisma User/OAuthClient IDs.
-    const rawUser = await testDataCreator.createUser({ username: 'authcode_user' });
-    const rawClient = await testDataCreator.createClient({ clientId: 'authcode_client', isPublic: false });
-
-    // Fetch the actual DB records to get their CUIDs
-    testUser = await prisma.user.findUnique({ where: { username: rawUser.username } });
-    if (!testUser) throw new Error('Test user not found in DB after creation');
-
-    const dbClient = await prisma.oAuthClient.findUnique({ where: { clientId: rawClient.clientId } });
-    if (!dbClient) throw new Error('Test client not found in DB after creation');
-    testClient = dbClient; // testClient will now have the cuid `id` field
-  });
-
-  afterEach(async () => {
-    await testDataCreator.cleanup(); // Clean up data created with the prefix
-  });
-
-  afterAll(async () => {
-    await teardownTestDb(); // Final full cleanup
+  beforeEach(() => {
+    // 在每个测试前重置所有 mock
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+    // 确保我们的 mocked generateSecureRandomString 用于每个相关测试
+    // Ensure our mocked generateSecureRandomString is used for each relevant test
+    (generateSecureRandomString as jest.Mock).mockReturnValue(mockedGeneratedCode);
   });
 
   describe('storeAuthorizationCode', () => {
-    it('should store an authorization code with correct details and S256 PKCE', async () => {
-      const redirectUri = 'https://client.example.com/callback';
-      const scope = JSON.stringify(['openid', 'profile']);
-      const codeChallenge = 'test_challenge_s256';
-      const codeChallengeMethod = 'S256';
+    it('应成功存储授权码并返回代码数据 // Should successfully store authorization code and return code data', async () => {
+      const mockExpectedCode = mockedGeneratedCode;
+      const mockStoredCode = {
+        id: 'mock-db-id',
+        code: mockExpectedCode,
+        userId: testUserId,
+        clientId: testClientId, // 应该是OAuthClient的CUID (Should be OAuthClient CUID)
+        redirectUri: testRedirectUri,
+        scope: testScope,
+        expiresAt: expect.any(Date),
+        isUsed: false,
+        codeChallenge: testCodeChallenge,
+        codeChallengeMethod: testCodeChallengeMethod,
+        nonce: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      (prisma.authorizationCode.create as jest.Mock).mockResolvedValue(mockStoredCode);
 
       const result = await storeAuthorizationCode(
-        testClient.id, // Pass the CUID of the client
-        testUser.id,
-        redirectUri,
-        scope,
-        codeChallenge,
-        codeChallengeMethod,
+        testUserId,
+        testClientId,
+        testRedirectUri,
+        testCodeChallenge,
+        testCodeChallengeMethod, // 传递 'S256'
+        testScope,
+        DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS,
+        'test-nonce'
       );
 
-      expect(result).toBeDefined();
-      expect(result.code).toBeTypeOf('string');
-      expect(result.code.length).toBeGreaterThan(32); // Expect a reasonably long random code
-      expect(result.clientId).toBe(testClient.id);
-      expect(result.userId).toBe(testUser.id);
-      expect(result.redirectUri).toBe(redirectUri);
-      expect(result.scope).toBe(scope);
-      expect(result.codeChallenge).toBe(codeChallenge);
-      expect(result.codeChallengeMethod).toBe(codeChallengeMethod);
-      expect(result.isUsed).toBe(false);
+      expect(prisma.authorizationCode.create).toHaveBeenCalledTimes(1);
+      const createArgs = (prisma.authorizationCode.create as jest.Mock).mock.calls[0][0].data;
 
-      const now = new Date();
-      const expectedExpiresAt = addSeconds(now, DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS);
-      // Allow a small difference (e.g., 5 seconds) due to execution time
-      expect(differenceInSeconds(result.expiresAt, expectedExpiresAt)).toBeLessThanOrEqual(5);
+      expect(createArgs.code).toBe(mockExpectedCode);
+      expect(createArgs.userId).toBe(testUserId);
+      expect(createArgs.clientId).toBe(testClientId);
+      expect(createArgs.redirectUri).toBe(testRedirectUri);
+      expect(createArgs.scope).toBe(testScope);
+      expect(createArgs.codeChallenge).toBe(testCodeChallenge);
+      expect(createArgs.codeChallengeMethod).toBe(testCodeChallengeMethod);
+      expect(createArgs.isUsed).toBe(false);
+      expect(createArgs.nonce).toBe('test-nonce');
 
-      // Verify in DB
-      const dbCode = await prisma.authorizationCode.findUnique({ where: { code: result.code } });
-      expect(dbCode).not.toBeNull();
-      expect(dbCode?.clientId).toBe(testClient.id);
-      expect(dbCode?.userId).toBe(testUser.id);
+      const now = Date.now();
+      const expectedExpiresAtTimestamp = now + DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS * 1000;
+      expect(createArgs.expiresAt.getTime()).toBeGreaterThanOrEqual(expectedExpiresAtTimestamp - 5000);
+      expect(createArgs.expiresAt.getTime()).toBeLessThanOrEqual(expectedExpiresAtTimestamp + 5000);
+
+      expect(result).toEqual(mockStoredCode);
     });
 
-    it('should use custom expiresInSeconds if provided', async () => {
-      const customLifetime = 300; // 5 minutes
-      const result = await storeAuthorizationCode(
-        testClient.id,
-        testUser.id,
-        'uri',
-        'scope',
-        'challenge',
-        'S256',
-        customLifetime,
-      );
-      const now = new Date();
-      const expectedExpiresAt = addSeconds(now, customLifetime);
-      expect(differenceInSeconds(result.expiresAt, expectedExpiresAt)).toBeLessThanOrEqual(5);
-    });
-
-    it('should throw an error if code_challenge_method is not S256', async () => {
+    it('如果 codeChallengeMethod 不是 S256，则应抛出 ConfigurationError // Should throw ConfigurationError if codeChallengeMethod is not S256', async () => {
       await expect(
         storeAuthorizationCode(
-          testClient.id,
-          testUser.id,
-          'uri',
-          'scope',
-          'challenge',
-          'plain' as any, // Force invalid method
-        ),
-      ).rejects.toThrow('Invalid code_challenge_method. Only S256 is supported.');
+          testUserId, testClientId, testRedirectUri, testCodeChallenge, 'plain', testScope
+        )
+      ).rejects.toThrow(ConfigurationError); // 验证错误类型 (Verify error type)
+      await expect(
+        storeAuthorizationCode(
+          testUserId, testClientId, testRedirectUri, testCodeChallenge, 'plain', testScope
+        )
+      ).rejects.toThrow("Unsupported code challenge method: plain. Only 'S256' is supported."); // 验证错误消息 (Verify error message)
+      expect(prisma.authorizationCode.create).not.toHaveBeenCalled();
+    });
+
+    it('如果 prisma.authorizationCode.create 抛出错误，则应抛出 BaseError // Should throw BaseError if prisma.authorizationCode.create throws an error', async () => {
+      const dbError = new Error('Database create error');
+      (prisma.authorizationCode.create as jest.Mock).mockRejectedValue(dbError);
+
+      await expect(
+        storeAuthorizationCode(
+          testUserId, testClientId, testRedirectUri, testCodeChallenge, 'S256', testScope
+        )
+      ).rejects.toThrow(BaseError); // 验证是否为 BaseError 或其子类 (Verify if it's BaseError or its subclass)
+      await expect(
+        storeAuthorizationCode(
+          testUserId, testClientId, testRedirectUri, testCodeChallenge, 'S256', testScope
+        )
+      ).rejects.toThrow('Database error while storing authorization code.');
     });
   });
 
   describe('validateAuthorizationCode', () => {
-    let storedCodeData: any; // Will hold the result of storeAuthorizationCode
-    const redirectUri = 'https://client.example.com/callback/validate';
-    const scope = JSON.stringify(['openid', 'email']);
-    const plainVerifier = 'valid_pkce_verifier_string_long_enough_for_sha256';
-    let s256Challenge: string;
+    const validCodeFromDb = {
+      id: 'db-code-id',
+      code: mockedGeneratedCode,
+      userId: testUserId,
+      clientId: testClientId, // 应该是OAuthClient的CUID (Should be OAuthClient CUID)
+      redirectUri: testRedirectUri,
+      scope: testScope,
+      expiresAt: new Date(Date.now() + 3600 * 1000),
+      isUsed: false,
+      codeChallenge: testCodeChallenge,
+      codeChallengeMethod: 'S256',
+      nonce: 'test-nonce-from-db',
+      createdAt: new Date(Date.now() - 60000),
+      updatedAt: new Date(Date.now() - 60000),
+    };
 
-    beforeEach(async () => {
-      // Generate S256 challenge from verifier
-      s256Challenge = crypto
-        .createHash('sha256')
-        .update(plainVerifier)
-        .digest('base64url');
+    it('应成功验证有效的、未过期的、未使用的代码，并将其标记为已使用 // Should successfully validate a valid, unexpired, unused code and mark it as used', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(validCodeFromDb);
+      const updatedCodeInDb = { ...validCodeFromDb, isUsed: true, updatedAt: new Date() };
+      (prisma.authorizationCode.update as jest.Mock).mockResolvedValue(updatedCodeInDb);
 
-      storedCodeData = await storeAuthorizationCode(
-        testClient.id,
-        testUser.id,
-        redirectUri,
-        scope,
-        s256Challenge,
-        'S256',
-      );
-    });
-
-    it('should validate a correct, unexpired, unused code with valid PKCE and mark it as used', async () => {
-      const validated = await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        redirectUri,
-        plainVerifier,
+      const result = await validateAuthorizationCode(
+        validCodeFromDb.code,
+        testClientId, // 传递 OAuthClient CUID (Pass OAuthClient CUID)
+        testRedirectUri,
+        testCodeVerifier
       );
 
-      expect(validated).not.toBeNull();
-      expect(validated?.userId).toBe(testUser.id);
-      expect(validated?.scope).toBe(scope);
-      expect(validated?.clientId).toBe(testClient.id);
-
-      // Verify it's marked as used in DB
-      const dbCode = await prisma.authorizationCode.findUnique({ where: { code: storedCodeData.code } });
-      expect(dbCode?.isUsed).toBe(true);
-    });
-
-    it('should return null for a non-existent code', async () => {
-      const validated = await validateAuthorizationCode(
-        'non_existent_code_12345',
-        testClient.id,
-        redirectUri,
-        plainVerifier,
-      );
-      expect(validated).toBeNull();
-    });
-
-    it('should return null if code is already used', async () => {
-      // First, use the code successfully
-      await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        redirectUri,
-        plainVerifier,
-      );
-
-      // Attempt to use it again
-      const validatedSecondAttempt = await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        redirectUri,
-        plainVerifier,
-      );
-      expect(validatedSecondAttempt).toBeNull();
-    });
-
-    it('should return null if code is expired', async () => {
-      const shortLivedCode = await storeAuthorizationCode(
-        testClient.id, testUser.id, redirectUri, scope, s256Challenge, 'S256', 1 // 1 second expiry
-      );
-      await new Promise(resolve => setTimeout(resolve, 1100)); // Wait for 1.1 seconds
-
-      const validated = await validateAuthorizationCode(
-        shortLivedCode.code, testClient.id, redirectUri, plainVerifier
-      );
-      expect(validated).toBeNull();
-
-      // Check if it was deleted from DB
-      const dbCode = await prisma.authorizationCode.findUnique({ where: { code: shortLivedCode.code } });
-      expect(dbCode).toBeNull();
-    });
-
-    it('should return null if client ID does not match', async () => {
-      const otherClient = await testDataCreator.createClient({ clientId: 'other_client_for_auth_code' });
-      const dbOtherClient = await prisma.oAuthClient.findUnique({where: {clientId: otherClient.clientId}});
-      if(!dbOtherClient) throw new Error("Failed to create other client");
-
-      const validated = await validateAuthorizationCode(
-        storedCodeData.code,
-        dbOtherClient.id, // Different client CUID
-        redirectUri,
-        plainVerifier,
-      );
-      expect(validated).toBeNull();
-    });
-
-    it('should return null if redirect URI does not match', async () => {
-      const validated = await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        'https://different.uri/callback',
-        plainVerifier,
-      );
-      expect(validated).toBeNull();
-    });
-
-    it('should return null if PKCE code_verifier is incorrect', async () => {
-      const validated = await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        redirectUri,
-        'incorrect_verifier_string_pkce',
-      );
-      expect(validated).toBeNull();
-    });
-
-    // This test handles the case where a code is found but its method is somehow not S256 (defensive)
-    it('should return null if stored code challenge method is not S256 (edge case)', async () => {
-      // Manually update a code to have an invalid method (not typical)
-      await prisma.authorizationCode.update({
-        where: { code: storedCodeData.code },
-        data: { codeChallengeMethod: 'plain' as any },
+      expect(prisma.authorizationCode.findUnique).toHaveBeenCalledWith({
+        where: { code: validCodeFromDb.code },
       });
+      expect(prisma.authorizationCode.update).toHaveBeenCalledWith({
+        where: { id: validCodeFromDb.id },
+        data: { isUsed: true },
+      });
+      expect(result).toEqual(updatedCodeInDb); // 现在返回更新后的记录 (Now returns the updated record)
+    });
 
-      const validated = await validateAuthorizationCode(
-        storedCodeData.code,
-        testClient.id,
-        redirectUri,
-        plainVerifier,
-      );
-      expect(validated).toBeNull();
+    it('如果代码未找到，则应抛出 ResourceNotFoundError // Should throw ResourceNotFoundError if code is not found', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        validateAuthorizationCode('non-existent-code', testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(ResourceNotFoundError);
+      await expect(
+        validateAuthorizationCode('non-existent-code', testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_NOT_FOUND' });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+      expect(prisma.authorizationCode.delete).not.toHaveBeenCalled();
+    });
+
+    it('如果代码已被使用，则应抛出 TokenError 并删除代码 // Should throw TokenError and delete code if it has already been used', async () => {
+      const usedCode = { ...validCodeFromDb, isUsed: true };
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(usedCode);
+      (prisma.authorizationCode.delete as jest.Mock).mockResolvedValue(usedCode);
+
+      await expect(
+        validateAuthorizationCode(usedCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(TokenError);
+      await expect(
+        validateAuthorizationCode(usedCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_USED' });
+
+      expect(prisma.authorizationCode.delete).toHaveBeenCalledWith({ where: { id: usedCode.id } });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果代码已过期，则应抛出 TokenError 并删除代码 // Should throw TokenError and delete code if it has expired', async () => {
+      const expiredTimestamp = Date.now() - 1000;
+      const expiredCode = { ...validCodeFromDb, expiresAt: new Date(expiredTimestamp) };
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(expiredCode);
+      (prisma.authorizationCode.delete as jest.Mock).mockResolvedValue(expiredCode);
+
+      await expect(
+        validateAuthorizationCode(expiredCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(TokenError);
+      await expect(
+        validateAuthorizationCode(expiredCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_EXPIRED' });
+
+      expect(prisma.authorizationCode.delete).toHaveBeenCalledWith({ where: { id: expiredCode.id } });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果 clientId 不匹配，则应抛出 ValidationError // Should throw ValidationError if clientId does not match', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(validCodeFromDb);
+
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, 'wrong-client-cuid', testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(ValidationError);
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, 'wrong-client-cuid', testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_CLIENT_ID_MISMATCH' });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果 redirectUri 不匹配，则应抛出 ValidationError // Should throw ValidationError if redirectUri does not match', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(validCodeFromDb);
+
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, 'https://wrong.uri/callback', testCodeVerifier)
+      ).rejects.toThrow(ValidationError);
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, 'https://wrong.uri/callback', testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_REDIRECT_URI_MISMATCH' });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果 PKCE 验证失败，则应抛出 AuthenticationError // Should throw AuthenticationError if PKCE verification fails', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(validCodeFromDb);
+
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, 'wrong-code-verifier-value')
+      ).rejects.toThrow(AuthenticationError);
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, 'wrong-code-verifier-value')
+      ).rejects.toMatchObject({ code: 'PKCE_VERIFICATION_FAILED' });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果存储的代码具有不受支持的 codeChallengeMethod，则应抛出 ConfigurationError // Should throw ConfigurationError if stored code has unsupported codeChallengeMethod', async () => {
+      const codeWithUnsupportedMethod = { ...validCodeFromDb, codeChallengeMethod: 'plain' };
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(codeWithUnsupportedMethod);
+
+      await expect(
+        validateAuthorizationCode(codeWithUnsupportedMethod.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(ConfigurationError);
+      await expect(
+        validateAuthorizationCode(codeWithUnsupportedMethod.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'UNSUPPORTED_STORED_CHALLENGE_METHOD' });
+      expect(prisma.authorizationCode.update).not.toHaveBeenCalled();
+    });
+
+    it('如果 prisma.authorizationCode.findUnique 抛出错误，则应抛出 BaseError // Should throw BaseError if prisma.authorizationCode.findUnique throws', async () => {
+      const dbError = new Error('DB findUnique error');
+      (prisma.authorizationCode.findUnique as jest.Mock).mockRejectedValue(dbError);
+
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(BaseError); // 验证是否为 BaseError 或其子类 (Verify if it's BaseError or its subclass)
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow('Database error during authorization code validation.');
+    });
+
+    it('如果 prisma.authorizationCode.update 抛出错误，则应抛出 BaseError // Should throw BaseError if prisma.authorizationCode.update throws', async () => {
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(validCodeFromDb);
+      const dbError = new Error('DB update error');
+      (prisma.authorizationCode.update as jest.Mock).mockRejectedValue(dbError);
+
+      await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(BaseError);
+       await expect(
+        validateAuthorizationCode(validCodeFromDb.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow('Database error during authorization code validation.');
+    });
+
+    it('如果 prisma.authorizationCode.delete 在代码过期时抛出错误，则应抛出 BaseError // Should throw BaseError if prisma.authorizationCode.delete throws when code is expired', async () => {
+      const expiredCode = { ...validCodeFromDb, expiresAt: new Date(Date.now() - 1000) };
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(expiredCode);
+      const dbDeleteError = new Error('DB delete error');
+      (prisma.authorizationCode.delete as jest.Mock).mockRejectedValue(dbDeleteError);
+
+      // 错误仍然是 TokenError，因为这是在删除之前检测到的
+      // The error is still TokenError because this is detected before delete
+      await expect(
+        validateAuthorizationCode(expiredCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(TokenError); // 仍然是 TokenError，因为过期检查优先
+      await expect(
+        validateAuthorizationCode(expiredCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_EXPIRED' });
+
+      // 确保 delete 仍然被调用 (即使它失败)
+      // Ensure delete was still called (even if it fails)
+      expect(prisma.authorizationCode.delete).toHaveBeenCalledWith({ where: { id: expiredCode.id } });
+    });
+
+     it('如果 prisma.authorizationCode.delete 在代码已使用时抛出错误，则应抛出 BaseError // Should throw BaseError if prisma.authorizationCode.delete throws when code is used', async () => {
+      const usedCode = { ...validCodeFromDb, isUsed: true };
+      (prisma.authorizationCode.findUnique as jest.Mock).mockResolvedValue(usedCode);
+      const dbDeleteError = new Error('DB delete error on used code');
+      (prisma.authorizationCode.delete as jest.Mock).mockRejectedValue(dbDeleteError);
+
+      await expect(
+        validateAuthorizationCode(usedCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toThrow(TokenError); // 仍然是 TokenError，因为已使用检查优先
+       await expect(
+        validateAuthorizationCode(usedCode.code, testClientId, testRedirectUri, testCodeVerifier)
+      ).rejects.toMatchObject({ code: 'AUTH_CODE_USED' });
+      expect(prisma.authorizationCode.delete).toHaveBeenCalledWith({ where: { id: usedCode.id } });
     });
   });
 });
