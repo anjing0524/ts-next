@@ -108,11 +108,17 @@ async function handleAuthorizationCodeGrant(
   // 验证请求体中的 client_id (如果提供) 是否与已认证的客户端匹配
   // Validate client_id from body (if provided) matches authenticated client
   if (data.client_id && data.client_id !== client.clientId) {
-     throw new OAuth2Error('client_id in body does not match authenticated client.', OAuth2ErrorCode.InvalidRequest);
+    // This is a client-side error, usually not a high-priority audit log unless repeated.
+    // For now, we'll let the OAuth2Error be the response.
+    throw new OAuth2Error('client_id in body does not match authenticated client.', OAuth2ErrorCode.InvalidRequest);
   }
 
   const { code, redirect_uri: redirectUri, code_verifier: codeVerifier } = data;
   let validatedAuthCode;
+  // Attempt to get ipAddress and userAgent if possible (assuming req might be accessible or passed)
+  // This is a placeholder; actual implementation might need to pass req or extract headers differently.
+  const ipAddress = undefined; // Placeholder: e.g., req.ip
+  const userAgent = undefined; // Placeholder: e.g., req.headers.get('user-agent')
   try {
     // validateAuthorizationCode 现在会抛出错误，而不是返回 null
     // validateAuthorizationCode will now throw errors instead of returning null
@@ -126,11 +132,44 @@ async function handleAuthorizationCodeGrant(
         error instanceof TokenError ||           // 代码已使用/过期 (Code used/expired)
         error instanceof ValidationError ||        // ClientID/RedirectURI 不匹配 (ClientID/RedirectURI mismatch)
         error instanceof AuthenticationError) {  // PKCE 失败 (PKCE failed)
+      await AuthorizationUtils.logAuditEvent({
+        actorType: 'CLIENT',
+        actorId: client.clientId,
+        clientId: client.clientId,
+        action: 'TOKEN_AUTH_CODE_VALIDATION_FAILURE',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: error.message,
+        details: JSON.stringify({
+          grantType: 'authorization_code',
+          errorName: error.name,
+          errorCode: error.code || (error as any).errorCode || OAuth2ErrorCode.InvalidGrant, // Extract error code if available
+          context: error.context,
+          codeUsed: code, // Log the code that failed
+        }),
+      });
       throw new OAuth2Error(error.message, OAuth2ErrorCode.InvalidGrant, error.status, undefined, error.context);
     }
     // 对于其他未知错误 (例如数据库错误)
     // For other unknown errors (e.g., database errors)
     console.error("Unexpected error during authorization code validation:", error); // 记录原始错误 (Log original error)
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'SYSTEM',
+        actorId: 'tokenEndpoint',
+        clientId: client.clientId,
+        action: 'TOKEN_AUTH_CODE_UNEXPECTED_ERROR',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Authorization code validation failed due to an unexpected server error.',
+        details: JSON.stringify({
+            grantType: 'authorization_code',
+            originalErrorName: error.name,
+            originalMessage: error.message,
+            codeUsed: code,
+        }),
+    });
     throw new OAuth2Error('Authorization code validation failed due to an unexpected server error.', OAuth2ErrorCode.ServerError, 500, undefined, { originalErrorName: error.name, originalMessage: error.message });
   }
 
@@ -138,6 +177,18 @@ async function handleAuthorizationCodeGrant(
   // Ensure user exists and is active
   const user = await prisma.user.findUnique({ where: { id: validatedAuthCode.userId }});
   if (!user || !user.isActive) {
+      await AuthorizationUtils.logAuditEvent({
+        userId: validatedAuthCode.userId, // User ID from the validated code
+        actorType: 'USER', // Action is implicitly by this user trying to get a token
+        actorId: validatedAuthCode.userId,
+        clientId: client.clientId,
+        action: 'TOKEN_AUTH_CODE_USER_INVALID',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'User associated with authorization code not found or inactive.',
+        details: JSON.stringify({ grantType: 'authorization_code', userId: validatedAuthCode.userId, codeUsed: validatedAuthCode.id }),
+      });
       throw new OAuth2Error('User associated with authorization code not found or inactive.', OAuth2ErrorCode.InvalidGrant);
   }
 
@@ -192,11 +243,47 @@ async function handleAuthorizationCodeGrant(
         },
       })
     ]);
-  } catch (dbError) {
-    console.error("Failed to store tokens:", dbError);
+
+    // Audit successful token issuance for authorization_code grant
+    await AuthorizationUtils.logAuditEvent({
+        userId: validatedAuthCode.userId,
+        actorType: 'USER',
+        actorId: validatedAuthCode.userId,
+        clientId: client.clientId,
+        action: 'TOKEN_ISSUED_AUTH_CODE',
+        status: 'SUCCESS',
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({
+            grantType: 'authorization_code',
+            scope: validatedAuthCode.scope,
+            accessTokenJti: (await JWTUtils.decodeTokenPayload(accessTokenString, process.env.JWT_ACCESS_TOKEN_SECRET || "")).jti, // Requires secret & decode ability
+            refreshTokenJti: (await JWTUtils.decodeTokenPayload(refreshTokenString, process.env.JWT_REFRESH_TOKEN_SECRET || "")).jti, // Requires secret & decode ability
+            idTokenJti: idTokenString ? (await JWTUtils.decodeTokenPayload(idTokenString, client.clientSecret || process.env.ID_TOKEN_SECRET || "")).jti : undefined, // Requires secret & decode
+        }),
+    });
+
+  } catch (dbError: any) {
+    console.error("Failed to store tokens for authorization_code grant:", dbError);
+    await AuthorizationUtils.logAuditEvent({
+        userId: validatedAuthCode?.userId,
+        actorType: 'SYSTEM',
+        actorId: 'tokenEndpoint',
+        clientId: client.clientId,
+        action: 'TOKEN_AUTH_CODE_DB_STORE_FAILURE',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Failed to store tokens due to a database issue.',
+        details: JSON.stringify({
+            grantType: 'authorization_code',
+            userId: validatedAuthCode?.userId,
+            errorName: dbError.name,
+            errorMessage: dbError.message,
+        }),
+    });
     throw new OAuth2Error("Failed to store tokens due to a server issue.", OAuth2ErrorCode.ServerError, 500);
   }
-
 
   const responsePayload: TokenSuccessResponse = {
     access_token: accessTokenString,
@@ -221,6 +308,73 @@ async function handleRefreshTokenGrant(
 
   const { refresh_token: refreshTokenValue, scope: requestedScopeString } = data;
 
+  // --- BEGIN: Refresh Token JTI Blacklist Check ---
+  // First, decode the refresh token to get its JTI.
+  let refreshTokenPayload: JWTUtils.RefreshTokenPayload; // Assuming this type is defined in JWTUtils
+  try {
+    // This utility function should verify the JWT's signature, expiry,
+    // and essential claims like client_id against the provided client.
+    // It should throw an error if the token is structurally invalid,
+    // signature is wrong, expired, or client_id claim doesn't match.
+    // It should return the payload if these basic checks pass.
+    // IMPORTANT: This step is crucial. It ensures we're dealing with a
+    // token that was legitimately issued by us for this client before checking blacklist.
+    refreshTokenPayload = await JWTUtils.verifyAndDecodeRefreshToken(refreshTokenValue, client);
+
+  } catch (error: any) {
+    let message = 'Invalid refresh token.';
+    if (error instanceof TokenError) message = error.message;
+    else if (error.name === 'JWSSignatureVerificationFailed' || error.name === 'JWSInvalid') message = 'Refresh token signature validation failed.';
+    else if (error.name === 'JWTExpired') message = 'Refresh token has expired (JWT validation).';
+    else if (error.message && typeof error.message === 'string' && error.message.includes('client_id')) message = error.message; // Propagate client_id mismatch messages
+    else console.warn("Refresh token JWT decoding/basic validation failed:", error.name, error.message);
+
+    await AuthorizationUtils.logAuditEvent({
+        clientId: client.clientId,
+        action: 'refresh_token_jwt_invalid',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: `Invalid refresh token provided: ${message}`,
+        metadata: { errorName: error.name, grant_type: 'refresh_token' },
+    });
+    throw new OAuth2Error(message, OAuth2ErrorCode.InvalidGrant, undefined, undefined, { detail: `Initial JWT validation: ${message}` });
+  }
+
+  if (!refreshTokenPayload.jti) {
+    // This case should be prevented by ensuring all refresh tokens are issued with a JTI.
+    console.error('Refresh token is missing JTI. This is a critical issue.');
+    await AuthorizationUtils.logAuditEvent({
+        userId: refreshTokenPayload.sub,
+        clientId: client.clientId,
+        action: 'refresh_token_missing_jti',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Refresh token is missing JTI.',
+        metadata: { client_id: client.clientId },
+    });
+    throw new OAuth2Error('Invalid refresh token: JTI missing.', OAuth2ErrorCode.InvalidGrant, undefined, undefined, { detail: "JTI missing from refresh token payload" });
+  }
+
+  // Now that we have the JTI, check against the blacklist
+  const isJtiBlacklisted = await prisma.tokenBlacklist.findUnique({
+    where: { jti: refreshTokenPayload.jti }
+  });
+
+  if (isJtiBlacklisted) {
+    await AuthorizationUtils.logAuditEvent({
+        userId: refreshTokenPayload.sub,
+        clientId: client.clientId,
+        action: 'refresh_token_jti_blacklisted',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Attempted to use a blacklisted refresh token JTI.',
+        metadata: { jti: refreshTokenPayload.jti, client_id: client.clientId },
+    });
+    throw new OAuth2Error('Token has been revoked.', OAuth2ErrorCode.InvalidGrant, undefined, undefined, { detail: "Refresh token JTI is blacklisted."});
+  }
+  // --- END: Refresh Token JTI Blacklist Check ---
+
+  // If JTI not blacklisted, proceed to fetch the token record from DB using its hash
   const refreshTokenHash = JWTUtils.getTokenHash(refreshTokenValue);
   const storedRefreshToken = await prisma.refreshToken.findUnique({
     where: { tokenHash: refreshTokenHash },
@@ -228,16 +382,84 @@ async function handleRefreshTokenGrant(
   });
 
   // 验证存储的刷新令牌 (Validate stored refresh token)
-  if (!storedRefreshToken) throw new OAuth2Error('Refresh token not found.', OAuth2ErrorCode.InvalidGrant);
-  if (storedRefreshToken.isRevoked) throw new OAuth2Error('Refresh token has been revoked.', OAuth2ErrorCode.InvalidGrant);
-  if (storedRefreshToken.expiresAt < new Date()) throw new OAuth2Error('Refresh token expired.', OAuth2ErrorCode.InvalidGrant);
-  if (storedRefreshToken.clientId !== client.id) {
-      throw new OAuth2Error('Refresh token was not issued to this client.', OAuth2ErrorCode.InvalidGrant);
+  // The JTI blacklist check ensures the token isn't globally revoked.
+  // Now, check its status in the RefreshToken table (e.g., if it was part of a rotation or other DB-level states).
+  if (!storedRefreshToken) {
+    // This scenario implies the token's JTI was not blacklisted, and the JWT itself was valid (signature, expiry, client_id claim),
+    // but its hash was not found in the database. This could happen if the token was deleted from the DB
+    // without its JTI being added to the blacklist, or if there's a data consistency issue.
+    await AuthorizationUtils.logAuditEvent({
+        userId: refreshTokenPayload.sub, // We have payload from earlier JWT decode
+        clientId: client.clientId,
+        action: 'refresh_token_not_in_db_after_valid_jwt_jti',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Valid refresh token (JWT structure and JTI not blacklisted) not found in database.',
+        metadata: { jti: refreshTokenPayload.jti, client_id: client.clientId, tokenHash: refreshTokenHash },
+    });
+    throw new OAuth2Error('Refresh token not found in database despite valid structure.', OAuth2ErrorCode.InvalidGrant);
   }
+
+  // If JTI was NOT blacklisted, but this specific DB record IS marked 'isRevoked',
+  // it typically means this token instance was superseded by refresh token rotation.
+  if (storedRefreshToken.isRevoked) {
+    await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken.userId, // Use userId from stored token as it's confirmed in DB
+        clientId: client.clientId,
+        action: 'refresh_token_already_rotated_or_db_revoked',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Attempted to use a refresh token that is marked as revoked in the database (likely rotated).',
+        metadata: { jti: refreshTokenPayload.jti, storedTokenId: storedRefreshToken.id, client_id: client.clientId },
+    });
+    throw new OAuth2Error('Refresh token has been used or specifically revoked.', OAuth2ErrorCode.InvalidGrant, undefined, undefined, { detail: "This refresh token instance is no longer valid."});
+  }
+
+  // Check expiry from the database record. This is a defense-in-depth check,
+  // as JWT 'exp' claim should have been validated already by verifyAndDecodeRefreshToken.
+  if (storedRefreshToken.expiresAt < new Date()) {
+     await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken.userId,
+        clientId: client.clientId,
+        action: 'refresh_token_db_expired',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Refresh token found to be expired based on database record.',
+        metadata: { jti: refreshTokenPayload.jti, storedTokenId: storedRefreshToken.id, client_id: client.clientId, expiry: storedRefreshToken.expiresAt },
+    });
+    throw new OAuth2Error('Refresh token expired (database record).', OAuth2ErrorCode.InvalidGrant);
+  }
+
+  // Validate that the client ID from the DB record matches the authenticated client.
+  // This is also a defense-in-depth, as client_id claim in JWT should've been checked.
+  if (storedRefreshToken.clientId !== client.id) {
+      await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken.userId,
+        clientId: client.clientId, // Authenticated client
+        action: 'refresh_token_client_mismatch_db',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'Refresh token record in DB belongs to a different client.',
+        metadata: { jti: refreshTokenPayload.jti, storedTokenClientId: storedRefreshToken.clientId, authenticatedClientId: client.id },
+    });
+      throw new OAuth2Error('Refresh token was not issued to this client (database validation).', OAuth2ErrorCode.InvalidGrant);
+  }
+
+  // Ensure user exists and is active (based on DB record).
   if (!storedRefreshToken.userId || !storedRefreshToken.user) {
-    throw new OAuth2Error('User information missing from refresh token or user is inactive.', OAuth2ErrorCode.InvalidGrant); // 确保用户仍然有效 (Ensure user is still valid)
+    // This should ideally not happen if a valid refresh token was issued.
+    throw new OAuth2Error('User information missing from refresh token record or user data inconsistent.', OAuth2ErrorCode.InvalidGrant);
   }
   if (!storedRefreshToken.user.isActive) {
+    await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken.userId,
+        clientId: client.clientId,
+        action: 'refresh_token_user_inactive_db',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: 'User associated with refresh token is inactive (database check).',
+        metadata: { jti: refreshTokenPayload.jti, userId: storedRefreshToken.userId },
+    });
     throw new OAuth2Error('User associated with refresh token is inactive.', OAuth2ErrorCode.InvalidGrant);
   }
 
@@ -307,8 +529,39 @@ async function handleRefreshTokenGrant(
         },
       })
     ]);
+
+    // Log successful token rotation
+    await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken.userId,
+        clientId: client.clientId,
+        action: 'refresh_token_rotated_successfully',
+        resource: '/api/v2/oauth/token',
+        success: true,
+        errorMessage: null, // No error
+        metadata: {
+            old_refresh_token_id: storedRefreshToken.id,
+            new_refresh_token_jti: (await JWTUtils.decodeTokenPayload(newRefreshTokenString, process.env.JWT_REFRESH_TOKEN_SECRET || '')).jti, // Assuming decode for JTI
+            new_access_token_jti: (await JWTUtils.decodeTokenPayload(newAccessTokenString, process.env.JWT_ACCESS_TOKEN_SECRET || '')).jti, // Assuming decode for JTI
+            granted_scope: finalGrantedScopeString,
+        },
+    });
+
   } catch (dbError) {
     console.error("Failed to rotate refresh token and store new tokens:", dbError);
+    // Attempt to log audit event for failed rotation if possible
+     await AuthorizationUtils.logAuditEvent({
+        userId: storedRefreshToken?.userId || refreshTokenPayload?.sub, // Use available user info
+        clientId: client.clientId,
+        action: 'refresh_token_rotation_failed_db_error',
+        resource: '/api/v2/oauth/token',
+        success: false,
+        errorMessage: "Database transaction failed during refresh token rotation.",
+        metadata: {
+            error: dbError.message,
+            old_refresh_token_id: storedRefreshToken?.id,
+            jti_of_token_presented: refreshTokenPayload?.jti,
+        },
+    });
     throw new OAuth2Error("Failed to process token refresh due to a server issue.", OAuth2ErrorCode.ServerError, 500);
   }
 
@@ -332,10 +585,26 @@ async function handleClientCredentialsGrant(
   client: OAuthClient
 ): Promise<NextResponse> {
   if (data.client_id && data.client_id !== client.clientId) {
+    // Client-side error, typically not a high-priority audit unless repeated.
     throw new OAuth2Error('client_id in body does not match authenticated client for client_credentials grant.', OAuth2ErrorCode.InvalidRequest);
   }
 
+  // Placeholders for IP and User Agent
+  const ipAddress = undefined; // Placeholder: e.g., req.ip
+  const userAgent = undefined; // Placeholder: e.g., req.headers.get('user-agent')
+
   if (client.clientType === PrismaClientType.PUBLIC) {
+      await AuthorizationUtils.logAuditEvent({
+        actorType: 'CLIENT',
+        actorId: client.clientId,
+        clientId: client.clientId,
+        action: 'TOKEN_CLIENT_CREDENTIALS_PUBLIC_CLIENT_DENIED',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Public clients are not permitted to use the client_credentials grant type.',
+        details: JSON.stringify({ grantType: 'client_credentials' }),
+      });
       throw new OAuth2Error('Public clients are not permitted to use the client_credentials grant type.', OAuth2ErrorCode.UnauthorizedClient);
   }
 
@@ -361,6 +630,21 @@ async function handleClientCredentialsGrant(
     const requestedScopesArray = ScopeUtils.parseScopes(requestedScopeString);
     const globalScopeValidation = await ScopeUtils.validateScopes(requestedScopesArray, client);
     if (!globalScopeValidation.valid) {
+        await AuthorizationUtils.logAuditEvent({
+            actorType: 'CLIENT',
+            actorId: client.clientId,
+            clientId: client.clientId,
+            action: 'TOKEN_CLIENT_CREDENTIALS_SCOPE_INVALID',
+            status: 'FAILURE',
+            ipAddress,
+            userAgent,
+            errorMessage: globalScopeValidation.error_description || 'Requested scope is invalid or not allowed for this client.',
+            details: JSON.stringify({
+                grantType: 'client_credentials',
+                requestedScope: requestedScopeString,
+                invalidScopes: globalScopeValidation.invalidScopes,
+            }),
+        });
         throw new OAuth2Error(globalScopeValidation.error_description || 'Requested scope is invalid or not allowed for this client.', OAuth2ErrorCode.InvalidScope);
     }
     finalGrantedScopeString = ScopeUtils.formatScopes(requestedScopesArray);
@@ -370,8 +654,21 @@ async function handleClientCredentialsGrant(
         const defaultScopeValidation = await ScopeUtils.validateScopes(clientAllowedScopesArray, client);
         if (!defaultScopeValidation.valid) {
             console.warn(`Client ${client.clientId} has default scopes that are no longer valid: ${defaultScopeValidation.invalidScopes.join(', ')}`);
-            // 策略：是颁发一个无scope的令牌，还是拒绝？此处拒绝。
-            // Policy: Issue token with no scope, or deny? Denying here.
+            await AuthorizationUtils.logAuditEvent({
+                actorType: 'CLIENT',
+                actorId: client.clientId,
+                clientId: client.clientId,
+                action: 'TOKEN_CLIENT_CREDENTIALS_DEFAULT_SCOPE_INVALID',
+                status: 'FAILURE',
+                ipAddress,
+                userAgent,
+                errorMessage: 'Client default scopes are currently invalid. Please check client configuration.',
+                details: JSON.stringify({
+                    grantType: 'client_credentials',
+                    defaultScopes: clientAllowedScopesArray,
+                    invalidScopes: defaultScopeValidation.invalidScopes,
+                }),
+            });
             throw new OAuth2Error('Client default scopes are currently invalid. Please check client configuration.', OAuth2ErrorCode.InvalidScope);
         }
         finalGrantedScopeString = ScopeUtils.formatScopes(clientAllowedScopesArray);
@@ -398,8 +695,41 @@ async function handleClientCredentialsGrant(
         expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
       },
     });
-  } catch (dbError) {
+
+    // Audit successful token issuance for client_credentials grant
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'CLIENT',
+        actorId: client.clientId, // The client is the actor and the resource owner
+        clientId: client.clientId,
+        action: 'TOKEN_ISSUED_CLIENT_CREDENTIALS',
+        status: 'SUCCESS',
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({
+            grantType: 'client_credentials',
+            scope: finalGrantedScopeString,
+            // Assuming JWTUtils.decodeTokenPayload can get JTI. Requires secret.
+            accessTokenJti: (await JWTUtils.decodeTokenPayload(accessTokenString, process.env.JWT_ACCESS_TOKEN_SECRET || "")).jti,
+        }),
+    });
+
+  } catch (dbError: any) {
     console.error("Failed to store client credentials access token:", dbError);
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'SYSTEM',
+        actorId: 'tokenEndpoint',
+        clientId: client.clientId,
+        action: 'TOKEN_CLIENT_CREDENTIALS_DB_STORE_FAILURE',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Failed to store access token due to a database issue.',
+        details: JSON.stringify({
+            grantType: 'client_credentials',
+            errorName: dbError.name,
+            errorMessage: dbError.message,
+        }),
+    });
     throw new OAuth2Error("Failed to store access token due to a server issue.", OAuth2ErrorCode.ServerError, 500);
   }
 
