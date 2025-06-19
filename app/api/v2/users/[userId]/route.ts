@@ -19,6 +19,7 @@ import { userUpdatePayloadSchema, userPatchPayloadSchema, UserPatchPayload, User
 import { ApiResponse } from '@/lib/types/api'; // 标准API响应类型 (Standard API response type)
 import { ResourceNotFoundError, ValidationError, BaseError, AuthorizationError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
 import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理高阶函数 (Error handling HOF)
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 
 
 // 定义成功获取/更新用户时返回的用户信息结构 (不含敏感信息)
@@ -72,6 +73,8 @@ async function getUserByIdHandlerInternal(req: AuthenticatedRequest, context: Ro
   const { params } = context;
   const targetUserId = params.userId;
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to GET user ${targetUserId}.`);
 
@@ -89,10 +92,34 @@ async function getUserByIdHandlerInternal(req: AuthenticatedRequest, context: Ro
   });
 
   if (!user) {
-    // 如果未找到用户，抛出 ResourceNotFoundError
-    // If user not found, throw ResourceNotFoundError
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_READ_FAILURE_NOT_FOUND',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User not found.',
+        details: JSON.stringify({ requestedUserId: targetUserId }),
+    });
     throw new ResourceNotFoundError('User not found.', 'USER_NOT_FOUND', { userId: targetUserId });
   }
+
+  await AuthorizationUtils.logAuditEvent({
+      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+      actorId: performingAdmin?.id || 'anonymous',
+      userId: performingAdmin?.id,
+      action: 'USER_READ_SUCCESS',
+      status: 'SUCCESS',
+      resourceType: 'User',
+      resourceId: targetUserId,
+      ipAddress,
+      userAgent,
+      details: JSON.stringify({ requestedUserId: targetUserId, returnedFields: Object.keys(user) }),
+  });
 
   // 返回遵循 ApiResponse 结构的成功响应
   // Return a successful response following the ApiResponse structure
@@ -146,17 +173,45 @@ async function updateUserHandlerInternal(req: AuthenticatedRequest, context: Rou
   const { params } = context;
   const targetUserId = params.userId;
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PUT (full update) user ${targetUserId}.`);
 
   let rawRequestBody;
   try {
     rawRequestBody = await req.json();
-  } catch (e) {
-    throw new ValidationError('Invalid JSON request body.', { detail: (e as Error).message }, 'INVALID_JSON_BODY_PUT');
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_UPDATE_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for PUT.',
+        details: JSON.stringify({ error: e.message }),
+    });
+    throw new ValidationError('Invalid JSON request body.', { detail: e.message }, 'INVALID_JSON_BODY_PUT');
   }
 
   const validationResult = userUpdatePayloadSchema.safeParse(rawRequestBody);
   if (!validationResult.success) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_UPDATE_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User update payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.flatten().fieldErrors, receivedBody: rawRequestBody }),
+    });
     throw new ValidationError('User update payload validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'USER_UPDATE_VALIDATION_ERROR');
   }
   const updateDataFromRequest = validationResult.data as UserUpdatePayload; // 类型断言 (Type assertion)
@@ -165,6 +220,19 @@ async function updateUserHandlerInternal(req: AuthenticatedRequest, context: Rou
   // Check if the target user exists.
   const existingUser = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!existingUser) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_UPDATE_FAILURE_NOT_FOUND',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User not found to update (PUT).',
+        details: JSON.stringify({ attemptedUpdateFor: targetUserId }),
+    });
     throw new ResourceNotFoundError('User not found to update.', 'USER_NOT_FOUND_ON_PUT', { userId: targetUserId });
   }
 
@@ -177,6 +245,19 @@ async function updateUserHandlerInternal(req: AuthenticatedRequest, context: Rou
         where: { email: trimmedEmail, id: { not: targetUserId } }
       });
       if (conflictingUser) {
+        await AuthorizationUtils.logAuditEvent({
+            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+            actorId: performingAdmin?.id || 'anonymous',
+            userId: performingAdmin?.id,
+            action: 'USER_UPDATE_FAILURE_EMAIL_CONFLICT',
+            status: 'FAILURE',
+            resourceType: 'User',
+            resourceId: targetUserId,
+            ipAddress,
+            userAgent,
+            errorMessage: 'Email already taken by another user.',
+            details: JSON.stringify({ triedEmail: trimmedEmail, conflictingUserId: conflictingUser.id }),
+        });
         throw new BaseError('Email already taken by another user.', 409, 'EMAIL_CONFLICT_ON_PUT', { email: trimmedEmail });
       }
     }
@@ -191,15 +272,46 @@ async function updateUserHandlerInternal(req: AuthenticatedRequest, context: Rou
   updateData.updatedAt = new Date();
   updateData.updatedBy = performingAdmin?.id; // 记录更新者 (Record updater)
 
-  const updatedUser = await prisma.user.update({
-    where: { id: targetUserId },
-    data: updateData,
-    select: { // 确保返回的数据不包含 passwordHash (Ensure returned data does not include passwordHash)
-        id: true, username: true, email: true, firstName: true, lastName: true,
-        displayName: true, avatar: true, phone: true, organization: true, department: true, workLocation: true,
-        isActive: true, emailVerified: true, mustChangePassword: true,
-        lastLoginAt: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true,
-      }
+  let updatedUser;
+  try {
+    updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: updateData,
+      select: { // 确保返回的数据不包含 passwordHash (Ensure returned data does not include passwordHash)
+          id: true, username: true, email: true, firstName: true, lastName: true,
+          displayName: true, avatar: true, phone: true, organization: true, department: true, workLocation: true,
+          isActive: true, emailVerified: true, mustChangePassword: true,
+          lastLoginAt: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true,
+        }
+    });
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_UPDATE_FAILURE_DB_ERROR',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Failed to update user in database (PUT).',
+        details: JSON.stringify({ error: error.message, updateData }),
+    });
+    throw new BaseError('Failed to update user due to a database issue.', 500, 'DB_UPDATE_USER_ERROR_PUT');
+  }
+
+  await AuthorizationUtils.logAuditEvent({
+      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+      actorId: performingAdmin?.id || 'anonymous',
+      userId: performingAdmin?.id,
+      action: 'USER_UPDATE_SUCCESS', // General update, could specify PUT if needed
+      status: 'SUCCESS',
+      resourceType: 'User',
+      resourceId: targetUserId,
+      ipAddress,
+      userAgent,
+      details: JSON.stringify({ updatedFields: Object.keys(updateDataFromRequest), userId: targetUserId }),
   });
 
   return NextResponse.json<ApiResponse<UserResponse>>({
@@ -244,31 +356,96 @@ async function patchUserHandlerInternal(req: AuthenticatedRequest, context: Rout
   const { params } = context;
   const targetUserId = params.userId;
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to PATCH user ${targetUserId}.`);
 
   let rawRequestBody;
   try {
     rawRequestBody = await req.json();
-  } catch (e) {
-    throw new ValidationError('Invalid JSON request body.', { detail: (e as Error).message }, 'INVALID_JSON_BODY_PATCH');
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for PATCH.',
+        details: JSON.stringify({ error: e.message }),
+    });
+    throw new ValidationError('Invalid JSON request body.', { detail: e.message }, 'INVALID_JSON_BODY_PATCH');
   }
   if (Object.keys(rawRequestBody).length === 0) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_EMPTY_BODY',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Request body cannot be empty for PATCH.',
+    });
     throw new ValidationError('Request body cannot be empty for PATCH operations.', undefined, 'EMPTY_PATCH_BODY');
   }
 
   const validationResult = userPatchPayloadSchema.safeParse(rawRequestBody);
   if (!validationResult.success) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User patch payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.flatten().fieldErrors, receivedBody: rawRequestBody }),
+    });
     throw new ValidationError('User patch payload validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'USER_PATCH_VALIDATION_ERROR');
   }
 
   const validatedData = validationResult.data as UserPatchPayload;
 
   if (validatedData.hasOwnProperty('username')) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_USERNAME_MODIFICATION',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Username modification is not allowed via PATCH.',
+        details: JSON.stringify({ attemptedUsername: (validatedData as any).username }),
+    });
     throw new ValidationError('Username modification is not allowed via PATCH request.', undefined, 'USERNAME_MODIFICATION_NOT_ALLOWED');
   }
 
   const existingUser = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!existingUser) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_NOT_FOUND',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User not found to update (PATCH).',
+    });
     throw new ResourceNotFoundError('User not found to update.', 'USER_NOT_FOUND_ON_PATCH', { userId: targetUserId });
   }
 
@@ -279,6 +456,19 @@ async function patchUserHandlerInternal(req: AuthenticatedRequest, context: Rout
         where: { email: trimmedEmail, id: { not: targetUserId } }
       });
       if (conflictingUser) {
+        await AuthorizationUtils.logAuditEvent({
+            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+            actorId: performingAdmin?.id || 'anonymous',
+            userId: performingAdmin?.id,
+            action: 'USER_PATCH_FAILURE_EMAIL_CONFLICT',
+            status: 'FAILURE',
+            resourceType: 'User',
+            resourceId: targetUserId,
+            ipAddress,
+            userAgent,
+            errorMessage: 'Email already taken by another user (PATCH).',
+            details: JSON.stringify({ triedEmail: trimmedEmail, conflictingUserId: conflictingUser.id }),
+        });
         throw new BaseError('Email already taken by another user.', 409, 'EMAIL_CONFLICT_ON_PATCH', { email: trimmedEmail });
       }
     }
@@ -286,7 +476,6 @@ async function patchUserHandlerInternal(req: AuthenticatedRequest, context: Rout
     // 允许将 email 设置为 null
     // Allow setting email to null
   }
-
 
   const patchData: Prisma.UserUpdateInput = {};
   Object.keys(validatedData).forEach(key => {
@@ -300,14 +489,45 @@ async function patchUserHandlerInternal(req: AuthenticatedRequest, context: Rout
   });
 
   if (validatedData.password) {
-    const saltRounds = 12;
-    patchData.passwordHash = await bcrypt.hash(validatedData.password, saltRounds);
-    if (validatedData.mustChangePassword === undefined) {
-      patchData.mustChangePassword = true;
+    try {
+        const saltRounds = 12;
+        patchData.passwordHash = await bcrypt.hash(validatedData.password, saltRounds);
+        if (validatedData.mustChangePassword === undefined) {
+        patchData.mustChangePassword = true;
+        }
+    } catch (error: any) {
+        await AuthorizationUtils.logAuditEvent({
+            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+            actorId: performingAdmin?.id || 'anonymous',
+            userId: performingAdmin?.id,
+            action: 'USER_PATCH_FAILURE_PASSWORD_HASHING',
+            status: 'FAILURE',
+            resourceType: 'User',
+            resourceId: targetUserId,
+            ipAddress,
+            userAgent,
+            errorMessage: 'Password hashing failed during PATCH.',
+            details: JSON.stringify({ error: error.message }),
+        });
+        throw new BaseError('Password processing failed during PATCH.', 500, 'PASSWORD_HASH_ERROR_PATCH');
     }
   }
 
   if (Object.keys(patchData).length === 0) {
+    // No actual changes to be made, but still log the attempt if desired, or just return.
+    // For now, treating as a "successful" no-op.
+     await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_NO_CHANGES',
+        status: 'SUCCESS', // Or 'INFO' if available
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({ message: "No valid fields provided for update." }),
+    });
     return NextResponse.json<ApiResponse<UserResponse>>({
         success: true,
         data: existingUser as UserResponse, // Prisma's select will exclude passwordHash
@@ -317,15 +537,46 @@ async function patchUserHandlerInternal(req: AuthenticatedRequest, context: Rout
   patchData.updatedAt = new Date();
   patchData.updatedBy = performingAdmin?.id; // 记录更新者 (Record updater)
 
-  const updatedUser = await prisma.user.update({
-    where: { id: targetUserId },
-    data: patchData,
-    select: { // 确保返回的数据不包含 passwordHash (Ensure returned data does not include passwordHash)
-        id: true, username: true, email: true, firstName: true, lastName: true,
-        displayName: true, avatar: true, phone: true, organization: true, department: true, workLocation: true,
-        isActive: true, emailVerified: true, mustChangePassword: true,
-        lastLoginAt: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true,
-    }
+  let updatedUser;
+  try {
+    updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: patchData,
+      select: { // 确保返回的数据不包含 passwordHash (Ensure returned data does not include passwordHash)
+          id: true, username: true, email: true, firstName: true, lastName: true,
+          displayName: true, avatar: true, phone: true, organization: true, department: true, workLocation: true,
+          isActive: true, emailVerified: true, mustChangePassword: true,
+          lastLoginAt: true, createdAt: true, updatedAt: true, createdBy: true, updatedBy: true,
+      }
+    });
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_PATCH_FAILURE_DB_ERROR',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Failed to partially update user in database (PATCH).',
+        details: JSON.stringify({ error: error.message, patchData }),
+    });
+    throw new BaseError('Failed to partially update user due to a database issue.', 500, 'DB_UPDATE_USER_ERROR_PATCH');
+  }
+
+  await AuthorizationUtils.logAuditEvent({
+      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+      actorId: performingAdmin?.id || 'anonymous',
+      userId: performingAdmin?.id,
+      action: 'USER_PATCH_SUCCESS',
+      status: 'SUCCESS',
+      resourceType: 'User',
+      resourceId: targetUserId,
+      ipAddress,
+      userAgent,
+      details: JSON.stringify({ updatedFields: Object.keys(validatedData), userId: targetUserId }),
   });
 
   return NextResponse.json<ApiResponse<UserResponse>>({
@@ -370,11 +621,25 @@ async function deleteUserHandlerInternal(req: AuthenticatedRequest, context: Rou
   const { params } = context;
   const targetUserId = params.userId;
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to DELETE user ${targetUserId}.`);
 
   // 防止管理员自我删除。
   // Prevent admin self-deletion.
   if (targetUserId === performingAdmin?.id) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER',
+        actorId: performingAdmin.id,
+        userId: performingAdmin.id,
+        action: 'USER_DELETE_FAILURE_SELF_DELETION',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Administrators cannot delete their own account.',
+    });
     throw new AuthorizationError('Action not allowed: Administrators cannot delete their own account using this method.', undefined, 'SELF_DELETION_NOT_ALLOWED');
   }
 
@@ -382,23 +647,92 @@ async function deleteUserHandlerInternal(req: AuthenticatedRequest, context: Rou
   // Check if the user exists.
   const userToDelete = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!userToDelete) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_DELETE_FAILURE_NOT_FOUND',
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'User not found to delete.',
+    });
     throw new ResourceNotFoundError('User not found to delete.', 'USER_NOT_FOUND_ON_DELETE', { userId: targetUserId });
   }
 
   try {
     await prisma.user.delete({ where: { id: targetUserId } });
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'USER_DELETE_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'User',
+        resourceId: targetUserId, // ID of the deleted user
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({ deletedUserId: targetUserId, username: userToDelete.username }),
+    });
+
   } catch (error: any) {
+    let errorMessage = 'Failed to delete user due to a database issue.';
+    let auditAction = 'USER_DELETE_FAILURE_DB_ERROR';
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003') { // 外键约束失败 (Foreign key constraint failed)
             const fieldName = (error.meta as any)?.field_name || 'related records';
-            throw new BaseError(`Cannot delete user: They are still referenced by other records (constraint: ${fieldName}). Consider deactivating the user instead.`, 409, 'CONFLICT_FOREIGN_KEY_ON_DELETE', { constraint: fieldName });
+            errorMessage = `Cannot delete user: They are still referenced by other records (constraint: ${fieldName}). Consider deactivating the user instead.`;
+            auditAction = 'USER_DELETE_FAILURE_FOREIGN_KEY';
+            await AuthorizationUtils.logAuditEvent({
+                actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+                actorId: performingAdmin?.id || 'anonymous',
+                userId: performingAdmin?.id,
+                action: auditAction,
+                status: 'FAILURE',
+                resourceType: 'User',
+                resourceId: targetUserId,
+                ipAddress,
+                userAgent,
+                errorMessage,
+                details: JSON.stringify({ error: error.message, constraint: fieldName }),
+            });
+            throw new BaseError(errorMessage, 409, 'CONFLICT_FOREIGN_KEY_ON_DELETE', { constraint: fieldName });
         } else if (error.code === 'P2025') { // 记录未找到 (理论上已被上面的 findUnique 覆盖) (Record not found - theoretically covered by findUnique above)
-             throw new ResourceNotFoundError('User not found to delete (Prisma P2025).', 'USER_NOT_FOUND_PRISMA_ON_DELETE', { userId: targetUserId });
+             errorMessage = 'User not found to delete (Prisma P2025).';
+             auditAction = 'USER_DELETE_FAILURE_NOT_FOUND_PRISMA';
+             await AuthorizationUtils.logAuditEvent({
+                actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+                actorId: performingAdmin?.id || 'anonymous',
+                userId: performingAdmin?.id,
+                action: auditAction,
+                status: 'FAILURE',
+                resourceType: 'User',
+                resourceId: targetUserId,
+                ipAddress,
+                userAgent,
+                errorMessage,
+             });
+             throw new ResourceNotFoundError(errorMessage, 'USER_NOT_FOUND_PRISMA_ON_DELETE', { userId: targetUserId });
         }
     }
-    // 对于其他 Prisma 错误或未知错误，让 withErrorHandling 处理
-    // For other Prisma errors or unknown errors, let withErrorHandling handle it
-    throw error;
+    // For other Prisma errors or unknown errors
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: auditAction, // Will be USER_DELETE_FAILURE_DB_ERROR if not caught by specific Prisma errors above
+        status: 'FAILURE',
+        resourceType: 'User',
+        resourceId: targetUserId,
+        ipAddress,
+        userAgent,
+        errorMessage,
+        details: JSON.stringify({ error: error.message }),
+    });
+    throw error; // Re-throw original error for withErrorHandling
   }
 
   // 返回遵循 ApiResponse 结构的成功响应 (状态码 200，因为 204 通常无响应体)

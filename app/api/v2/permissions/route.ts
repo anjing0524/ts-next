@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma'; // Prisma ORM 客户端。
 import { Prisma, PermissionType, HttpMethod } from '@prisma/client'; // Prisma 生成的类型，包括枚举。
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件。
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // --- 常量定义 ---
@@ -151,16 +152,42 @@ async function listPermissionsHandler(req: AuthenticatedRequest): Promise<NextRe
  * @returns NextResponse - 包含新创建的完整权限信息或错误信息的 JSON 响应。
  */
 async function createPermissionHandler(req: AuthenticatedRequest): Promise<NextResponse> {
+  const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
+
   let body;
   try {
     body = await req.json(); // 解析请求体。
-  } catch (e) {
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'PERMISSION_CREATE_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for permission creation.',
+        details: JSON.stringify({ error: e.message }),
+    });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
 
   // 使用 Zod Schema 验证请求体数据。
   const validationResult = CreatePermissionSchema.safeParse(body);
   if (!validationResult.success) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'PERMISSION_CREATE_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Permission creation payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+    });
     return NextResponse.json({
       message: '创建权限的输入数据验证失败 (Permission creation input validation failed)',
       errors: validationResult.error.format(),
@@ -174,6 +201,19 @@ async function createPermissionHandler(req: AuthenticatedRequest): Promise<NextR
     // 检查权限名称 (name) 是否已存在，因其需要唯一。
     const existingPermission = await prisma.permission.findUnique({ where: { name } });
     if (existingPermission) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'PERMISSION_CREATE_FAILURE_CONFLICT',
+          status: 'FAILURE',
+          ipAddress,
+          userAgent,
+          errorMessage: `Permission name "${name}" already exists.`,
+          resourceType: 'Permission',
+          resourceId: existingPermission.id,
+          details: JSON.stringify({ name }),
+      });
       return NextResponse.json({ message: `权限名称 "${name}" 已存在 (Permission name "${name}" already exists)` }, { status: 409 });
     }
 
@@ -212,22 +252,63 @@ async function createPermissionHandler(req: AuthenticatedRequest): Promise<NextR
         include: { apiPermission: true, menuPermission: { include: { menu: true } }, dataPermission: true } // 加载所有可能的关联详情。
     });
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'PERMISSION_CREATE_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'Permission',
+        resourceId: createdPermission.id,
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({
+            permissionId: createdPermission.id,
+            name: createdPermission.name,
+            type: createdPermission.type,
+            resource: createdPermission.resource,
+            action: createdPermission.action,
+            apiDetails, menuDetails, dataDetails // Log the input details
+        }),
+    });
     // 返回新创建的完整权限信息，HTTP状态码为 201 Created。
     return NextResponse.json(fullNewPermission, { status: 201 });
 
   } catch (error: any) {
-    // 错误处理。
     console.error('创建权限失败 (Failed to create permission):', error);
-    // 处理 Prisma 特定的唯一约束冲突错误。
+    let errorMessage = 'An unexpected server error occurred during permission creation';
+    let actionCode = 'PERMISSION_CREATE_FAILURE_DB_ERROR';
+    let httpStatus = 500;
+
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ message: `权限名称 "${name}" 已存在 (Permission name "${name}" already exists due to a database constraint)` }, { status: 409 });
+      errorMessage = `Permission name "${name}" already exists due to a database constraint`;
+      actionCode = 'PERMISSION_CREATE_FAILURE_CONFLICT_DB';
+      httpStatus = 409;
+    } else if (error.message.includes("菜单ID")) {
+      errorMessage = error.message;
+      actionCode = 'PERMISSION_CREATE_FAILURE_INVALID_MENU_ID';
+      httpStatus = 400;
     }
-    // 处理在事务中自定义抛出的关于菜单ID无效的错误。
-    if (error.message.includes("菜单ID")) {
-        return NextResponse.json({ message: error.message }, { status: 400 });
-    }
-    // 返回通用服务器错误。
-    return NextResponse.json({ message: '创建权限时发生服务器错误 (An unexpected server error occurred during permission creation)' }, { status: 500 });
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: actionCode,
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: errorMessage,
+        details: JSON.stringify({
+            name, displayName, type, resource, action, // Log main fields
+            apiDetailsAttempted: apiDetails,
+            menuDetailsAttempted: menuDetails,
+            dataDetailsAttempted: dataDetails,
+            error: error.message,
+            errorCode: (error as any).code,
+        }),
+    });
+    return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
 }
 

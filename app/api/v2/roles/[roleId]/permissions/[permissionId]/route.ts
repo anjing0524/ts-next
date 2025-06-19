@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 
 interface RouteContext {
   params: {
@@ -18,22 +19,47 @@ interface RouteContext {
 async function removePermissionFromRoleHandler(req: AuthenticatedRequest, context: RouteContext) {
   const { roleId, permissionId } = context.params;
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   console.log(`管理员 ${performingAdmin?.id} 正在从角色 ${roleId} 移除权限 ${permissionId}。(Admin ${performingAdmin?.id} removing permission ${permissionId} from role ${roleId}.)`);
 
   try {
-    // 检查角色和权限是否存在，以提供更明确的错误消息（可选，因为deleteMany不会因目标不存在而失败）
-    // (Optional: Check if role and permission exist for clearer error messages, as deleteMany won't fail if targets don't exist)
-    const roleExists = await prisma.role.count({ where: { id: roleId } });
-    if (roleExists === 0) {
+    const role = await prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSION_REMOVE_FAILURE_ROLE_NOT_FOUND',
+          status: 'FAILURE',
+          resourceType: 'Role',
+          resourceId: roleId,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Role not found when attempting to remove permission.',
+          details: JSON.stringify({ permissionIdToRemove: permissionId }),
+      });
       return NextResponse.json({ message: '角色未找到 (Role not found)' }, { status: 404 });
     }
-    const permissionExists = await prisma.permission.count({ where: { id: permissionId } });
-    if (permissionExists === 0) {
+    const permission = await prisma.permission.findUnique({ where: { id: permissionId } });
+    if (!permission) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSION_REMOVE_FAILURE_PERMISSION_NOT_FOUND',
+          status: 'FAILURE',
+          resourceType: 'Permission',
+          resourceId: permissionId,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Permission not found when attempting to remove from role.',
+          details: JSON.stringify({ roleId: roleId }),
+      });
       return NextResponse.json({ message: '权限未找到 (Permission not found)' }, { status: 404 });
     }
 
-    // 删除 RolePermission 关联记录 (Delete the RolePermission association record)
     const deleteResult = await prisma.rolePermission.deleteMany({
       where: {
         roleId: roleId,
@@ -42,17 +68,51 @@ async function removePermissionFromRoleHandler(req: AuthenticatedRequest, contex
     });
 
     if (deleteResult.count === 0) {
-      // 如果没有记录被删除，说明该角色原本就没有这个权限的分配
-      // (If no records were deleted, it means the role was not assigned this permission)
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSION_REMOVE_FAILURE_NOT_ASSIGNED',
+          status: 'FAILURE', // Or 'INFO' if such status exists, as it's not a system error but a client one.
+          resourceType: 'RolePermission',
+          resourceId: `${roleId}_${permissionId}`,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Permission was not assigned to this role or already removed.',
+          details: JSON.stringify({ roleName: role.name, permissionName: permission.name }),
+      });
       return NextResponse.json({ message: '权限未分配给此角色或已移除 (Permission not assigned to this role or already removed)' }, { status: 404 });
     }
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSION_REMOVE_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'RolePermission',
+        resourceId: `${roleId}_${permissionId}`, // Composite ID or similar for join table change
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({ roleName: role.name, removedPermissionName: permission.name, roleId, permissionId }),
+    });
     return new NextResponse(null, { status: 204 }); // No Content
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`从角色 ${roleId} 移除权限 ${permissionId} 失败 (Failed to remove permission ${permissionId} from role ${roleId}):`, error);
-    // PrismaClientKnownRequestError P2003 (Foreign key constraint) should ideally not happen here
-    // if we are just deleting from a join table, unless other direct relations exist on RolePermission.
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSION_REMOVE_FAILURE_DB_ERROR',
+        status: 'FAILURE',
+        resourceType: 'RolePermission',
+        resourceId: `${roleId}_${permissionId}`,
+        ipAddress,
+        userAgent,
+        errorMessage: `Failed to remove permission ${permissionId} from role ${roleId}.`,
+        details: JSON.stringify({ error: error.message }),
+    });
     return NextResponse.json({ message: '移除角色权限失败 (Failed to remove role permission)' }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware';
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 import { ClientType, OAuthClient, Prisma } from '@prisma/client';
 
 // --- Zod Schemas for Validation ---
@@ -113,17 +114,41 @@ function formatClientForResponse(client: OAuthClient | Partial<OAuthClient>): Pa
 // --- POST /api/v2/clients (创建新客户端) ---
 async function createClientHandler(req: AuthenticatedRequest): Promise<NextResponse> {
   const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
   console.log(`Admin user ${performingAdmin?.id} attempting to create a new client.`);
 
   let payload;
   try {
     payload = await req.json();
-  } catch (error) {
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'CLIENT_CREATE_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for client creation.',
+        details: JSON.stringify({ error: error.message }),
+    });
     return NextResponse.json({ error: 'Invalid request body', message: 'Failed to parse JSON body.' }, { status: 400 });
   }
 
   const validationResult = clientCreateSchema.safeParse(payload);
   if (!validationResult.success) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'CLIENT_CREATE_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Client creation payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.issues, receivedBody: payload }),
+    });
     return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
   }
 
@@ -133,6 +158,17 @@ async function createClientHandler(req: AuthenticatedRequest): Promise<NextRespo
   const finalClientId = data.clientId || generateRandomClientId();
   const existingClientById = await prisma.oAuthClient.findUnique({ where: { clientId: finalClientId } });
   if (existingClientById) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'CLIENT_CREATE_FAILURE_ID_CONFLICT',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Client ID already exists.',
+        details: JSON.stringify({ clientId: finalClientId }),
+    });
     return NextResponse.json({ error: 'Conflict', message: 'Client ID already exists.' }, { status: 409 });
   }
 
@@ -193,14 +229,51 @@ async function createClientHandler(req: AuthenticatedRequest): Promise<NextRespo
       (responseClientData as any).clientSecret = plainTextSecret; // Return plain text secret ONLY on creation
     }
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'CLIENT_CREATE_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'OAuthClient',
+        resourceId: newClient.id,
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({
+            clientId: newClient.clientId,
+            clientName: newClient.clientName,
+            clientType: newClient.clientType,
+        }),
+    });
     return NextResponse.json(responseClientData, { status: 201 });
 
   } catch (error: any) {
     console.error('Client creation failed:', error);
+    let errorMessage = 'Failed to create client.';
+    let actionCode = 'CLIENT_CREATE_FAILURE_DB_ERROR';
+    let details = { error: error.message, errorCode: (error as any).code, clientData: data };
+
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      // This typically means the clientId (if provided) or another unique field caused a conflict.
       const target = (error.meta?.target as string[]) || ['field'];
-      return NextResponse.json({ error: 'Conflict', message: `A client with the same ${target.join(', ')} already exists.` }, { status: 409 });
+      errorMessage = `A client with the same ${target.join(', ')} already exists.`;
+      actionCode = 'CLIENT_CREATE_FAILURE_DB_CONFLICT';
+      details = { ...details, conflictTarget: target };
+    }
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: actionCode,
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: errorMessage,
+        details: JSON.stringify(details),
+    });
+
+    if (actionCode === 'CLIENT_CREATE_FAILURE_DB_CONFLICT') {
+      return NextResponse.json({ error: 'Conflict', message: errorMessage }, { status: 409 });
     }
     return NextResponse.json({ error: 'Internal Server Error', message: 'Failed to create client.' }, { status: 500 });
   }

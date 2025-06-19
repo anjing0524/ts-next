@@ -86,6 +86,51 @@ export async function middleware(request: NextRequest) {
     payload = verificationResult.payload; // Assign to outer scope payload
     logger.info(`[Middleware] Token verified successfully. Payload: ${JSON.stringify(payload)}`);
 
+    // --- BEGIN: Token Blacklist Check ---
+    // This check is for access tokens being validated by the middleware.
+    if (payload && payload.jti) {
+      // Dynamically import prisma. Ensure this path is correct and prisma client is properly configured.
+      const { prisma } = await import('@/lib/prisma');
+      const isBlacklisted = await prisma.tokenBlacklist.findUnique({
+        where: { jti: payload.jti as string } // Ensure jti from payload is properly typed/cast
+      });
+
+      if (isBlacklisted) {
+        logger.warn(`[Middleware] Access Token JTI ${payload.jti} is blacklisted. Denying access.`);
+        // Log the audit event for security monitoring
+        await AuthorizationUtils.logAuditEvent({
+          userId: payload.sub || undefined, // subject claim usually holds user ID
+          action: 'middleware_access_token_blacklisted',
+          resource: pathname, // The path being accessed
+          ipAddress: request.ip || request.headers.get('x-forwarded-for') || undefined,
+          userAgent: request.headers.get('user-agent') || undefined,
+          success: false,
+          errorMessage: 'Access token has been revoked (blacklisted via JTI).',
+          metadata: {
+            jti: payload.jti,
+            token_type: 'access_token',
+            client_id: payload.client_id || 'unknown', // If client_id is in access token
+            scopes: payload.scope || payload.permissions || 'unknown' // If scope/permissions are in token
+          },
+        });
+        // Redirect to login with an error indicating token revocation
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('redirect_uri', pathname);
+        loginUrl.searchParams.set('error', 'invalid_token');
+        loginUrl.searchParams.set('error_description', 'Your session has been invalidated. Please login again.');
+        return NextResponse.redirect(loginUrl);
+      }
+    } else {
+      // Policy decision: What if a token has no JTI?
+      // For now, we log it but allow passage, assuming not all tokens might have JTIs (e.g. older tokens).
+      // If JTIs are mandatory for all new tokens, this could become a denial point in the future.
+      if (payload && !payload.jti) {
+        logger.debug('[Middleware] Access Token does not contain a JTI. Blacklist check skipped for this token.');
+      }
+      // If payload itself is missing, jwtVerify would have already thrown an error.
+    }
+    // --- END: Token Blacklist Check ---
+
     // 3. Extract user scopes/permissions from JWT payload
     let userScopes: string[] = [];
     if (payload) {

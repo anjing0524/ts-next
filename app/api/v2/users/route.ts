@@ -86,23 +86,44 @@ interface ListUsersResponse {
  */
 async function createUserHandlerInternal(req: AuthenticatedRequest): Promise<NextResponse> {
   const performingAdmin = req.user; // 从 AuthenticatedRequest 中获取执行操作的管理员信息 (Get admin info from AuthenticatedRequest)
+  // It's better to get ip and userAgent from the original NextRequest if AuthenticatedRequest doesn't carry them.
+  // Assuming 'req' has these properties or they can be accessed.
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
+
   console.log(`Admin user ${performingAdmin?.id} (ClientID: ${performingAdmin?.clientId}) attempting to create a new user.`);
 
   let requestBody;
   try {
     requestBody = await req.json();
-  } catch (e) {
-    // 无效的JSON请求体，抛出 ValidationError
-    // Invalid JSON request body, throw ValidationError
-    throw new ValidationError('Invalid JSON request body.', { detail: (e as Error).message }, 'INVALID_JSON');
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({ // Audit: Invalid JSON
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        action: 'USER_CREATE_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body.',
+        details: JSON.stringify({ error: e.message }),
+    });
+    throw new ValidationError('Invalid JSON request body.', { detail: e.message }, 'INVALID_JSON');
   }
 
   // 使用 Zod 进行输入数据验证
   // Use Zod for input data validation
   const validationResult = userCreatePayloadSchema.safeParse(requestBody);
   if (!validationResult.success) {
-    // Zod 验证失败，抛出 ValidationError，并将 Zod issues 包含在 context 中
-    // Zod validation failed, throw ValidationError and include Zod issues in context
+    await AuthorizationUtils.logAuditEvent({ // Audit: Payload validation failed
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        action: 'USER_CREATE_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'User creation payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.flatten().fieldErrors, receivedBody: requestBody }),
+    });
     throw new ValidationError('User creation payload validation failed.', { issues: validationResult.error.flatten().fieldErrors }, 'USER_VALIDATION_ERROR');
   }
 
@@ -127,21 +148,48 @@ async function createUserHandlerInternal(req: AuthenticatedRequest): Promise<Nex
 
   if (existingUser) {
     const conflictField = existingUser.username === trimmedUsername ? 'username' : 'email';
-    // 用户名或邮箱冲突，抛出 BaseError (或特定的 ConflictError 如果已定义)
-    // Username or email conflict, throw BaseError (or specific ConflictError if defined)
+    await AuthorizationUtils.logAuditEvent({ // Audit: Conflict
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        action: 'USER_CREATE_FAILURE_CONFLICT',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: `${conflictField} already exists.`,
+        resourceType: 'User',
+        resourceId: existingUser.id, // ID of the conflicting user
+        details: JSON.stringify({ field: conflictField, triedUsername: trimmedUsername, triedEmail: trimmedEmail }),
+    });
     throw new BaseError(`${conflictField} already exists. Please choose a different ${conflictField}.`, 409, 'CONFLICT_USER_EXISTS', { field: conflictField });
   }
 
   // 哈希密码
   // Hash the password
-  const saltRounds = 12;
-  const passwordHash = await bcrypt.hash(password, saltRounds);
+  let passwordHash;
+  try {
+    const saltRounds = 12;
+    passwordHash = await bcrypt.hash(password, saltRounds);
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+      actorId: performingAdmin?.id || 'anonymous',
+      action: 'USER_CREATE_FAILURE_PASSWORD_HASHING',
+      status: 'FAILURE',
+      ipAddress,
+      userAgent,
+      errorMessage: 'Password hashing failed.',
+      details: JSON.stringify({ username: trimmedUsername, error: error.message }),
+    });
+    throw new BaseError('Password processing failed.', 500, 'PASSWORD_HASH_ERROR');
+  }
 
   // 在数据库中创建用户记录
   // Create the user record in the database
-  const newUser = await prisma.user.create({
-    data: {
-      username: trimmedUsername,
+  let newUser;
+  try {
+    newUser = await prisma.user.create({
+      data: {
+        username: trimmedUsername,
       email: trimmedEmail,
       passwordHash,
       firstName: firstName || null,
@@ -162,6 +210,40 @@ async function createUserHandlerInternal(req: AuthenticatedRequest): Promise<Nex
       lastLoginAt: true, // 确保与 UserResponse 类型匹配 (Ensure it matches UserResponse type)
       phone: true, workLocation: true, emailVerified: true, // 确保与 UserResponse 类型匹配 (Ensure it matches UserResponse type)
     }
+    });
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        action: 'USER_CREATE_FAILURE_DB_ERROR',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Failed to create user in database.',
+        details: JSON.stringify({ username: trimmedUsername, email: trimmedEmail, error: error.message }),
+    });
+    // Prisma specific error codes could be checked here for more detail if needed
+    throw new BaseError('Failed to create user due to a database issue.', 500, 'DB_CREATE_USER_ERROR');
+  }
+
+  // Audit successful user creation
+  await AuthorizationUtils.logAuditEvent({
+      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+      actorId: performingAdmin?.id || 'anonymous', // ID of the admin performing the action
+      userId: performingAdmin?.id, // Admin's ID
+      action: 'USER_CREATE_SUCCESS',
+      status: 'SUCCESS',
+      resourceType: 'User',
+      resourceId: newUser.id, // ID of the newly created user
+      ipAddress,
+      userAgent,
+      details: JSON.stringify({
+          createdUserId: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          isActive: newUser.isActive,
+          mustChangePassword: newUser.mustChangePassword,
+      }),
   });
 
   // 返回遵循 ApiResponse 结构的成功响应
@@ -174,6 +256,9 @@ async function createUserHandlerInternal(req: AuthenticatedRequest): Promise<Nex
 }
 // 使用 withErrorHandling 包装 createUserHandlerInternal，并与 'users:create' 权限绑定
 // Wrap createUserHandlerInternal with withErrorHandling and bind with 'users:create' permission
+// Need to import AuthorizationUtils to make it available in this scope
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // Assuming this is the correct path
+
 export const POST = requirePermission('users:create')(withErrorHandling(createUserHandlerInternal));
 
 

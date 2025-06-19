@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。
 import { Prisma, Role } from '@prisma/client'; // Prisma 生成的类型，用于高级查询和类型定义。
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件和认证请求类型。
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义获取角色列表时分页的默认页面大小。
@@ -108,15 +109,41 @@ async function listRolesHandler(req: AuthenticatedRequest): Promise<NextResponse
  * @returns NextResponse - 包含新创建的角色信息或错误信息的 JSON 响应。
  */
 async function createRoleHandler(req: AuthenticatedRequest): Promise<NextResponse> {
+  const performingAdmin = req.user; // Available from AuthenticatedRequest
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
+
   let body;
   try {
     body = await req.json();
-  } catch (e) {
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_CREATE_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for role creation.',
+        details: JSON.stringify({ error: e.message }),
+    });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
 
   const validationResult = CreateRoleSchema.safeParse(body);
   if (!validationResult.success) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_CREATE_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: 'Role creation payload validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+    });
     return NextResponse.json({
       message: '创建角色验证失败 (Role creation input validation failed)',
       errors: validationResult.error.format(),
@@ -129,6 +156,19 @@ async function createRoleHandler(req: AuthenticatedRequest): Promise<NextRespons
     // 检查角色名称 (name) 是否已存在
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_CREATE_FAILURE_CONFLICT',
+          status: 'FAILURE',
+          ipAddress,
+          userAgent,
+          errorMessage: `Role name "${name}" already exists.`,
+          resourceType: 'Role',
+          resourceId: existingRole.id,
+          details: JSON.stringify({ name }),
+      });
       return NextResponse.json({ message: `角色名称 "${name}" 已存在 (Role name "${name}" already exists)` }, { status: 409 });
     }
 
@@ -140,6 +180,17 @@ async function createRoleHandler(req: AuthenticatedRequest): Promise<NextRespons
       });
       if (foundPermissions.length !== permissionIds.length) {
         const notFoundIds = permissionIds.filter(id => !foundPermissions.some(p => p.id === id));
+        await AuthorizationUtils.logAuditEvent({
+            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+            actorId: performingAdmin?.id || 'anonymous',
+            userId: performingAdmin?.id,
+            action: 'ROLE_CREATE_FAILURE_INVALID_PERMISSIONS',
+            status: 'FAILURE',
+            ipAddress,
+            userAgent,
+            errorMessage: 'Invalid or non-existent permissionIds provided.',
+            details: JSON.stringify({ providedIds: permissionIds, notFoundIds }),
+        });
         return NextResponse.json({
           message: `提供了无效或不存在的权限ID (Invalid or non-existent permissionIds provided): ${notFoundIds.join(', ')}`,
         }, { status: 400 });
@@ -186,12 +237,49 @@ async function createRoleHandler(req: AuthenticatedRequest): Promise<NextRespons
         permissions: rolePermissions.map(rp => rp.permission)
     };
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_CREATE_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'Role',
+        resourceId: newRoleWithPermissions.id,
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({
+            roleId: newRoleWithPermissions.id,
+            name: newRoleWithPermissions.name,
+            displayName: newRoleWithPermissions.displayName,
+            permissionIds: permissionIds,
+        }),
+    });
 
     return NextResponse.json(formattedRole, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('创建角色失败 (Failed to create role):', error);
+    let errorMessage = 'An unexpected server error occurred during role creation';
+    let actionCode = 'ROLE_CREATE_FAILURE_DB_ERROR';
+
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ message: `角色名称 "${name}" 已存在 (Role name "${name}" already exists due to a database constraint)` }, { status: 409 });
+      errorMessage = `Role name "${name}" already exists due to a database constraint`;
+      actionCode = 'ROLE_CREATE_FAILURE_CONFLICT_DB'; // More specific than the earlier check if transaction hits it
+    }
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: actionCode,
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        errorMessage: errorMessage,
+        details: JSON.stringify({ name, displayName, permissionIds, error: error.message, errorCode: (error as any).code }),
+    });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ message: errorMessage }, { status: 409 });
     }
     return NextResponse.json({ message: '创建角色时发生服务器错误 (An unexpected server error occurred during role creation)' }, { status: 500 });
   }

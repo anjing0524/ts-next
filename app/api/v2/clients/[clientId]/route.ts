@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { OAuthClient, ClientType, Prisma } from '@prisma/client';
-import { JWTUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification
+import { JWTUtils, AuthorizationUtils } from '@/lib/auth/oauth2'; // For V2 Auth session token verification & Audit Logging
 
 // --- 辅助函数 ---
 function errorResponse(message: string, status: number, errorCode?: string, details?: any) {
@@ -100,17 +100,37 @@ async function authenticateAdminAndGetId(req: NextRequest): Promise<{ adminUserI
 export async function GET(req: NextRequest, context: RouteContext) {
   const targetDbId = context.params.clientId; // This is the CUID 'id'
 
+  const targetDbId = context.params.clientId; // This is the CUID 'id'
+
   const authResult = await authenticateAdminAndGetId(req);
   if (authResult.errorResponse) return authResult.errorResponse;
-  // const adminUserId = authResult.adminUserId; // For logging if needed
+  const adminUserId = authResult.adminUserId;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   try {
     const client = await prisma.oAuthClient.findUnique({ where: { id: targetDbId } });
-    if (!client) return errorResponse('OAuth Client not found.', 404, 'client_not_found');
+    if (!client) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: 'USER', actorId: adminUserId!, userId: adminUserId, action: 'CLIENT_READ_FAILURE_NOT_FOUND', status: 'FAILURE',
+          resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent, errorMessage: 'OAuth Client not found.',
+      });
+      return errorResponse('OAuth Client not found.', 404, 'client_not_found');
+    }
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId!, userId: adminUserId, action: 'CLIENT_READ_SUCCESS', status: 'SUCCESS',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        details: JSON.stringify({ clientId: client.clientId, clientName: client.clientName }),
+    });
     return NextResponse.json(sanitizeClientForResponse(client), { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error fetching client ${targetDbId}:`, error);
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId!, userId: adminUserId, action: 'CLIENT_READ_FAILURE_DB_ERROR', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: 'Error fetching client.', details: JSON.stringify({ error: error.message }),
+    });
     return errorResponse('An unexpected error occurred while fetching the client.', 500, 'server_error');
   }
 }
@@ -119,14 +139,23 @@ export async function GET(req: NextRequest, context: RouteContext) {
 export async function PUT(req: NextRequest, context: RouteContext) {
   const targetDbId = context.params.clientId;
 
+  const targetDbId = context.params.clientId;
+
   const authResult = await authenticateAdminAndGetId(req);
   if (authResult.errorResponse) return authResult.errorResponse;
-  const adminUserId = authResult.adminUserId;
+  const adminUserId = authResult.adminUserId!; // Should be populated if no errorResponse
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   let requestBody: Partial<Omit<OAuthClient, 'id' | 'clientId' | 'clientSecret' | 'createdAt' | 'updatedAt'>>;
   try {
     requestBody = await req.json();
-  } catch (e) {
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_UPDATE_FAILURE_INVALID_JSON', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: 'Invalid JSON for client update (PUT).', details: JSON.stringify({ error: e.message }),
+    });
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
@@ -141,10 +170,17 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   // ... (此处添加更多针对PUT请求中所有字段的验证逻辑，与POST类似)
   // (Add more validation logic here for all fields in PUT, similar to POST)
   // For brevity in this example, focusing on a few key updatable fields and their specific logic.
+  // Proper validation for all fields as in clientCreateSchema should be implemented for a robust PUT.
 
   try {
     const existingClient = await prisma.oAuthClient.findUnique({ where: { id: targetDbId }});
-    if (!existingClient) return errorResponse('OAuth Client not found to update.', 404, 'client_not_found');
+    if (!existingClient) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_UPDATE_FAILURE_NOT_FOUND', status: 'FAILURE',
+          resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent, errorMessage: 'Client not found for PUT update.',
+      });
+      return errorResponse('OAuth Client not found to update.', 404, 'client_not_found');
+    }
 
     // 准备更新数据 (Prepare update data - PUT implies replacing the resource representation)
     // For this implementation, we update provided fields. Fields not provided remain unchanged or set to default if applicable by Prisma.
@@ -203,10 +239,21 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       where: { id: targetDbId },
       data: updateData,
     });
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_UPDATE_SUCCESS', status: 'SUCCESS',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        details: JSON.stringify({ updatedFields: Object.keys(requestBody), originalClientId: existingClient.clientId }),
+    });
     return NextResponse.json(sanitizeClientForResponse(updatedClient), { status: 200 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error PUT updating client ${targetDbId} by admin ${adminUserId}:`, error);
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_UPDATE_FAILURE_DB_ERROR', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: 'Error updating client (PUT).', details: JSON.stringify({ error: error.message, attemptedData: requestBody }),
+    });
     return errorResponse('An unexpected error occurred while updating client.', 500, 'server_error');
   }
 }
@@ -215,18 +262,31 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const targetDbId = context.params.clientId;
 
+  const targetDbId = context.params.clientId;
+
   const authResult = await authenticateAdminAndGetId(req);
   if (authResult.errorResponse) return authResult.errorResponse;
-  const adminUserId = authResult.adminUserId;
+  const adminUserId = authResult.adminUserId!; // Should be populated
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   let requestBody: Partial<Omit<OAuthClient, 'id' | 'clientId' | 'clientSecret' | 'createdAt' | 'updatedAt'>>;
   try {
     requestBody = await req.json();
-  } catch (e) {
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_PATCH_FAILURE_INVALID_JSON', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: 'Invalid JSON for client patch.', details: JSON.stringify({ error: e.message }),
+    });
     return errorResponse('Invalid JSON request body.', 400, 'invalid_request');
   }
 
   if (Object.keys(requestBody).length === 0) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_PATCH_FAILURE_EMPTY_BODY', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent, errorMessage: 'Empty body for client patch.',
+    });
     return errorResponse('Request body cannot be empty for PATCH operations.', 400, 'validation_error_empty_body');
   }
   if ((requestBody as any).clientId) return errorResponse('The human-readable clientId string cannot be changed.', 400, 'validation_error_clientId_immutable');
@@ -294,9 +354,28 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       where: { id: targetDbId },
       data: patchData,
     });
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_PATCH_SUCCESS', status: 'SUCCESS',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        details: JSON.stringify({ patchedFields: Object.keys(requestBody) }), // Log which fields were attempted
+    });
     return NextResponse.json(sanitizeClientForResponse(updatedClient), { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error PATCH updating client ${targetDbId} by admin ${adminUserId}:`, error);
+    // More specific error logging for not found during PATCH (if not caught before update attempt)
+    const existingClientCheck = await prisma.oAuthClient.findUnique({ where: { id: targetDbId }, select: {id: true}});
+    if (!existingClientCheck) {
+        await AuthorizationUtils.logAuditEvent({
+            actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_PATCH_FAILURE_NOT_FOUND', status: 'FAILURE',
+            resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent, errorMessage: 'Client not found for PATCH update (during DB operation).',
+        });
+         return errorResponse('OAuth Client not found to update.', 404, 'client_not_found');
+    }
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_PATCH_FAILURE_DB_ERROR', status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: 'Error patching client.', details: JSON.stringify({ error: error.message, attemptedPatchData: patchData }),
+    });
     return errorResponse('An unexpected error occurred while updating client.', 500, 'server_error');
   }
 }
@@ -306,28 +385,56 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 export async function DELETE(req: NextRequest, context: RouteContext) {
   const targetDbId = context.params.clientId;
 
+  const targetDbId = context.params.clientId;
+
   const authResult = await authenticateAdminAndGetId(req);
   if (authResult.errorResponse) return authResult.errorResponse;
-  const adminUserId = authResult.adminUserId;
+  const adminUserId = authResult.adminUserId!; // Should be populated
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
 
   try {
     const clientToDelete = await prisma.oAuthClient.findUnique({ where: { id: targetDbId } });
-    if (!clientToDelete) return errorResponse('OAuth Client not found to delete.', 404, 'client_not_found');
+    if (!clientToDelete) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_DELETE_FAILURE_NOT_FOUND', status: 'FAILURE',
+          resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent, errorMessage: 'Client not found to delete.',
+      });
+      return errorResponse('OAuth Client not found to delete.', 404, 'client_not_found');
+    }
 
     await prisma.oAuthClient.delete({ where: { id: targetDbId } });
 
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: 'CLIENT_DELETE_SUCCESS', status: 'SUCCESS',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        details: JSON.stringify({ deletedClientIdString: clientToDelete.clientId, clientName: clientToDelete.clientName }),
+    });
     return new NextResponse(null, { status: 204 });
 
   } catch (error: any) {
     console.error(`Error deleting client ${targetDbId} by admin ${adminUserId}:`, error);
+    let errorMessage = 'An unexpected error occurred while deleting client.';
+    let actionCode = 'CLIENT_DELETE_FAILURE_DB_ERROR';
+    let httpStatus = 500;
+
      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2003' || error.code === 'P2014') { // Foreign key constraint or relation violation
-            return errorResponse('Cannot delete client: It might be referenced by other records (e.g., consent grants, tokens not set to cascade or cleaned up).', 409, 'conflict_foreign_key');
-        } else if (error.code === 'P2025') {
-             return errorResponse('Client not found to delete (P2025).', 404, 'client_not_found_prisma');
+        if (error.code === 'P2003' || error.code === 'P2014') {
+            errorMessage = 'Cannot delete client: It might be referenced by other records.';
+            actionCode = 'CLIENT_DELETE_FAILURE_FOREIGN_KEY';
+            httpStatus = 409;
+        } else if (error.code === 'P2025') { // Should be caught by findUnique above, but as safeguard
+             errorMessage = 'Client not found to delete (P2025).';
+             actionCode = 'CLIENT_DELETE_FAILURE_NOT_FOUND_PRISMA';
+             httpStatus = 404;
         }
     }
-    return errorResponse('An unexpected error occurred while deleting client.', 500, 'server_error');
+    await AuthorizationUtils.logAuditEvent({
+        actorType: 'USER', actorId: adminUserId, userId: adminUserId, action: actionCode, status: 'FAILURE',
+        resourceType: 'OAuthClient', resourceId: targetDbId, ipAddress, userAgent,
+        errorMessage: errorMessage, details: JSON.stringify({ error: error.message, clientNameAttemptedDelete: (await prisma.oAuthClient.findUnique({where: {id:targetDbId}, select:{clientName:true}}))?.clientName || 'N/A' }),
+    });
+    return errorResponse(errorMessage, httpStatus, actionCode);
   }
 }
 

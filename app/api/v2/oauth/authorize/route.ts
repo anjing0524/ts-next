@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
 import { prisma } from '@/lib/prisma';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils } from '@/lib/auth/oauth2';
+import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@/lib/auth/oauth2'; // Added AuthorizationUtils
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
 import { storeAuthorizationCode } from '@/lib/auth/authorizationCodeFlow';
@@ -115,9 +115,50 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   // redirect_uri 已验证，现在可以使用 buildErrorRedirect 安全地重定向错误
   // redirect_uri is validated, can now use buildErrorRedirect safely for redirecting errors
 
-  // PKCE code_challenge 格式验证
-  // PKCE code_challenge format validation
-  if (!PKCEUtils.validateCodeChallenge(code_challenge)) {
+  // --- PKCE 强制执行检查 --- (PKCE Enforcement Check) ---
+  // 根据客户端类型或特定设置，强制要求PKCE参数。
+  // Enforce PKCE parameters based on client type or specific settings.
+  // The clientType and requirePkce fields are defined in the OAuthClient Prisma model.
+  if (thirdPartyClient.clientType === 'PUBLIC' || thirdPartyClient.requirePkce) {
+    if (!code_challenge || !code_challenge_method) {
+      await AuthorizationUtils.logAuditEvent({
+        actorType: 'CLIENT_APP',
+        actorId: thirdPartyClient.clientId,
+        clientId: thirdPartyClient.clientId,
+        action: 'AUTH_CODE_PKCE_REQUIRED_MISSING_PARAMS',
+        status: 'FAILURE',
+        ipAddress: req.ip || req.headers.get('x-forwarded-for'),
+        userAgent: req.headers.get('user-agent'),
+        errorMessage: 'PKCE (code_challenge and code_challenge_method) is required for this client but one or both were missing.',
+        details: JSON.stringify({
+            client_id: thirdPartyClient.clientId,
+            clientType: thirdPartyClient.clientType,
+            requirePkceField: thirdPartyClient.requirePkce,
+            hasCodeChallenge: !!code_challenge,
+            hasCodeChallengeMethod: !!code_challenge_method,
+        }),
+      });
+      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'PKCE (code_challenge and code_challenge_method) is required for this client.', state);
+    }
+  }
+
+  // PKCE code_challenge 格式验证 (如果提供了 code_challenge)
+  // PKCE code_challenge format validation (if code_challenge is provided)
+  if (code_challenge && !PKCEUtils.validateCodeChallenge(code_challenge)) {
+     await AuthorizationUtils.logAuditEvent({
+        actorType: 'CLIENT_APP',
+        actorId: thirdPartyClient.clientId,
+        clientId: thirdPartyClient.clientId,
+        action: 'AUTH_CODE_PKCE_INVALID_CHALLENGE_FORMAT',
+        status: 'FAILURE',
+        ipAddress: req.ip || req.headers.get('x-forwarded-for'),
+        userAgent: req.headers.get('user-agent'),
+        errorMessage: 'Invalid PKCE code_challenge format.',
+        details: JSON.stringify({
+            client_id: thirdPartyClient.clientId,
+            code_challenge_provided: code_challenge, // Be cautious logging the challenge itself if it's sensitive or too long
+        }),
+      });
      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'Invalid code_challenge format.', state);
   }
 

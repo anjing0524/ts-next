@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import Redis from 'ioredis'; // 引入 IORedis 客户端 (Import IORedis client)
+import logger from '@/lib/utils/logger'; // 假设有一个日志记录器 (Assuming a logger utility)
 
 // 定义批量权限检查请求的结构类型
 // Define a type for the structure of permission requests in checkBatchPermissions
@@ -28,18 +30,50 @@ export class PermissionService {
   private permissionCache = new Map<string, { permissions: Set<string>; timestamp: number }>();
   // 缓存持续时间（毫秒），默认为15分钟
   // Cache duration in milliseconds, defaults to 15 minutes
-  private cacheDurationMs = 15 * 60 * 1000;
+  private cacheDurationMs = 15 * 60 * 1000; // For in-memory cache fallback or if Redis is off
 
-  // Redis 客户端占位符（如果可用）
-  // Placeholder for a Redis client if it were available
-  // private redisClient; //: Redis | undefined;
-  // constructor() {
-  //   // 如果适用，在此处初始化 Redis 客户端
-  //   // Initialize Redis client here if applicable
-  //   // if (process.env.REDIS_URL) {
-  //   //   this.redisClient = new Redis(process.env.REDIS_URL);
-  //   // }
-  // }
+  private redisClient: Redis | undefined;
+  private redisTtlSeconds: number;
+
+  constructor() {
+    if (process.env.REDIS_URL) {
+      try {
+        this.redisClient = new Redis(process.env.REDIS_URL, {
+          // 防止连接错误导致应用崩溃 (Prevent connection errors from crashing the app)
+          // IORedis 会自动尝试重连 (IORedis will attempt to reconnect automatically)
+          maxRetriesPerRequest: 3, // Optional: Limit retries for a single command
+          connectTimeout: 10000, // 10 seconds
+          // lazyConnect: true, // Optional: connect only when a command is first issued
+        });
+
+        this.redisClient.on('connect', () => {
+          logger.info('[PermissionService] Connected to Redis successfully.');
+        });
+        this.redisClient.on('error', (err) => {
+          logger.error('[PermissionService] Redis connection error:', err);
+          // Consider a strategy if Redis connection is lost, e.g., disable client temporarily
+          // For now, operations will try/catch and fallback to DB.
+        });
+        this.redisClient.on('reconnecting', () => {
+          logger.info('[PermissionService] Reconnecting to Redis...');
+        });
+        this.redisClient.on('end', () => {
+            logger.info('[PermissionService] Redis connection ended.');
+        });
+
+
+      } catch (error) {
+        logger.error('[PermissionService] Failed to initialize Redis client:', error);
+        this.redisClient = undefined; // Ensure client is undefined if init fails
+      }
+    } else {
+      logger.info('[PermissionService] REDIS_URL not provided. Redis caching will be disabled.');
+      this.redisClient = undefined;
+    }
+    // 从环境变量获取 Redis TTL，默认为 900 秒 (15 分钟)
+    // Get Redis TTL from environment variable, default to 900 seconds (15 minutes)
+    this.redisTtlSeconds = parseInt(process.env.REDIS_TTL || '900', 10);
+  }
 
   /**
    * 获取指定用户的所有有效权限。
@@ -59,40 +93,33 @@ export class PermissionService {
     // Cache key format is "user:{userId}:permissions"
     const cacheKey = `user:${userId}:permissions`;
 
-    // 1. 尝试从内存缓存中获取
-    // 1. Try fetching from in-memory cache
-    const cachedEntry = this.permissionCache.get(cacheKey);
-    if (cachedEntry && Date.now() - cachedEntry.timestamp < this.cacheDurationMs) {
-      // 如果缓存命中且未过期，则返回缓存数据
-      // If cache hit and not expired, return cached data
-      // console.log(`[In-Memory Cache HIT] Permissions for user ${userId}`);
-      return new Set(cachedEntry.permissions); // 返回副本以防止外部修改 (Return a copy to prevent external modification)
+    // 1. 尝试从 Redis 缓存获取 (Try fetching from Redis cache first)
+    if (this.redisClient) {
+      try {
+        const cachedPermissionsJson = await this.redisClient.get(cacheKey);
+        if (cachedPermissionsJson) {
+          const permissionsArray = JSON.parse(cachedPermissionsJson) as string[];
+          logger.debug(`[Redis Cache HIT] Permissions for user ${userId}`);
+          // 可选：也更新内存缓存 (Optional: also update in-memory cache for very hot access)
+          // this.permissionCache.set(cacheKey, { permissions: new Set(permissionsArray), timestamp: Date.now() });
+          return new Set(permissionsArray);
+        }
+         logger.debug(`[Redis Cache MISS] Permissions for user ${userId} not found in Redis.`);
+      } catch (err) {
+        logger.error(`[PermissionService] Redis GET error for key ${cacheKey}:`, err);
+        // 如果 Redis 失败，则记录错误并回退到数据库获取 (If Redis fails, log error and fall through to DB fetch)
+      }
     }
 
-    // TODO: 如果 Redis 可用，则替换为实际的 Redis GET 调用
-    // TODO: Replace with actual Redis GET call if Redis is available
-    // if (this.redisClient) {
-    //   try {
-    //     // const cachedPermissionsJson = await this.redisClient.get(cacheKey);
-    //     // if (cachedPermissionsJson) {
-    //     //   const permissionsArray = JSON.parse(cachedPermissionsJson) as string[];
-    //     //   console.log(`[Redis Cache HIT] Permissions for user ${userId}`);
-    //     //   // 存入本地内存缓存以供短期热访问并设置时间戳
-    //     //   // Store in local in-memory cache for short-term hot access & set timestamp
-    //     //   const permissionsSet = new Set(permissionsArray);
-    //     //   this.permissionCache.set(cacheKey, { permissions: permissionsSet, timestamp: Date.now() });
-    //     //   return permissionsSet;
-    //     // }
-    //   } catch (err) {
-    //     // console.error(`Redis GET error for key ${cacheKey}:`, err);
-    //     // 如果 Redis 失败，则回退到数据库获取
-    //     // Fall through to DB fetch if Redis fails
-    //   }
-    // }
+    // 2. 如果 Redis 不可用或缓存未命中，尝试从内存缓存获取 (If Redis unavailable or cache miss, try in-memory cache)
+    const memoryCachedEntry = this.permissionCache.get(cacheKey);
+    if (memoryCachedEntry && Date.now() - memoryCachedEntry.timestamp < this.cacheDurationMs) {
+      logger.debug(`[In-Memory Cache HIT] Permissions for user ${userId}`);
+      return new Set(memoryCachedEntry.permissions); // 返回副本 (Return a copy)
+    }
 
-    // 2. 如果不在缓存中或缓存已过期，则从数据库获取
-    // 2. If not in cache or expired, fetch from database
-    // console.log(`[Cache MISS] Fetching permissions from DB for user ${userId}`);
+    // 3. 如果所有缓存都未命中，则从数据库获取 (If all caches miss, fetch from database)
+    logger.debug(`[DB Fetch] Fetching permissions from DB for user ${userId}`);
     const userWithRoles = await prisma.user.findUnique({
       where: { id: userId, isActive: true }, // 确保用户是活动的 (Ensure user is active)
       include: {
@@ -133,7 +160,14 @@ export class PermissionService {
         timestamp: Date.now(),
       });
       // 如果 Redis 可用，也存入 Redis 缓存 (If Redis is available, also store in Redis cache)
-      // if (this.redisClient) { try { await this.redisClient.set(cacheKey, JSON.stringify([]), 'EX', 900); } catch(e){ /* ignore */ } }
+      if (this.redisClient) {
+        try {
+          await this.redisClient.set(cacheKey, JSON.stringify([]), 'EX', this.redisTtlSeconds);
+          logger.debug(`[Redis Cache SET] Empty permissions for user ${userId} stored in Redis.`);
+        } catch(err){
+          logger.error(`[PermissionService] Redis SET error for empty permissions (key ${cacheKey}):`, err);
+        }
+      }
       return emptyPermissions;
     }
 
@@ -166,20 +200,17 @@ export class PermissionService {
       timestamp: Date.now(),
     });
 
-    // TODO: 如果 Redis 可用，则替换为实际的 Redis SET 调用
-    // TODO: Replace with actual Redis SET call if Redis is available
-    // if (this.redisClient) {
-    //   try {
-    //     // 在 Redis 中存储为 JSON 数组，设置15分钟过期时间 (900秒)
-    //     // Store as JSON array in Redis with 15 min expiry (900 seconds)
-    //     // await this.redisClient.set(cacheKey, JSON.stringify(Array.from(effectivePermissions)), 'EX', 900);
-    //   } catch (err) {
-    //     // console.error(`Redis SET error for key ${cacheKey}:`, err);
-    //     // 缓存失败不应影响主要操作
-    //     // Failure to cache should not fail the main operation
-    //   }
-    // }
-
+    // 4. 存入 Redis 缓存 (Store in Redis cache)
+    if (this.redisClient) {
+      try {
+        const permissionsArray = Array.from(effectivePermissions);
+        await this.redisClient.set(cacheKey, JSON.stringify(permissionsArray), 'EX', this.redisTtlSeconds);
+        logger.debug(`[Redis Cache SET] Permissions for user ${userId} stored in Redis.`);
+      } catch (err) {
+        logger.error(`[PermissionService] Redis SET error for key ${cacheKey}:`, err);
+        // 缓存失败不应影响主要操作 (Failure to cache should not fail the main operation)
+      }
+    }
     return effectivePermissions;
   }
 
@@ -194,20 +225,69 @@ export class PermissionService {
    */
   public async clearUserPermissionCache(userId: string): Promise<void> {
     const cacheKey = `user:${userId}:permissions`;
+    // 清除内存缓存 (Clear in-memory cache)
     this.permissionCache.delete(cacheKey);
-    // console.log(`[In-Memory Cache Cleared] Permissions for user ${userId}`);
+    logger.debug(`[In-Memory Cache Cleared] Permissions for user ${userId}`);
 
-    // TODO: 如果 Redis 可用，则替换为实际的 Redis DEL 调用
-    // TODO: Replace with actual Redis DEL call if Redis is available
-    // if (this.redisClient) {
-    //   try {
-    //     // await this.redisClient.del(cacheKey);
-    //     // console.log(`[Redis Cache Cleared] Permissions for user ${userId}`);
-    //   } catch (err) {
-    //     // console.error(`Redis DEL error for key ${cacheKey}:`, err);
-    //   }
-    // }
+    // 清除 Redis 缓存 (Clear Redis cache)
+    if (this.redisClient) {
+      try {
+        await this.redisClient.del(cacheKey);
+        logger.info(`[Redis Cache Cleared] Permissions for user ${userId}`);
+      } catch (err) {
+        logger.error(`[PermissionService] Redis DEL error for key ${cacheKey}:`, err);
+      }
+    }
   }
+
+  // --- 新增：用于角色权限更改时的缓存失效 ---
+  // --- NEW: Cache invalidation for role permission changes ---
+
+  /**
+   * 清除与特定角色相关的用户权限缓存。
+   * Clears user permission caches that might be affected by a role change.
+   * 这是一种简单的方法：使所有用户的缓存无效。更复杂的方法可能只针对具有该角色的用户。
+   * This is a simplified approach: invalidates all users' caches. A more complex approach might target only users with that role.
+   * 注意：这可能很昂贵，并且可能需要更精细的策略。
+   * Note: This can be expensive and may require a more granular strategy.
+   *
+   * @param roleId 更改了权限的角色ID。 (The ID of the role whose permissions changed.)
+   */
+  public async clearCachesAffectedByRoleChange(roleId: string): Promise<void> {
+    logger.info(`[Cache Invalidation] Role ${roleId} changed. Clearing all user permission caches.`);
+    // 简单策略：清除所有用户的内存缓存
+    // Simple strategy: clear all user caches from in-memory
+    this.permissionCache.clear();
+    logger.debug('[In-Memory Cache] All user permission caches cleared due to role change.');
+
+    // 对于 Redis，如果需要清除所有与用户权限相关的键，则需要一种模式匹配删除或键列表。
+    // For Redis, if needing to clear all user permission related keys, a pattern delete or list of keys is needed.
+    // 'SCAN' 和 'DEL' 的组合通常用于此目的，但要小心用于生产环境。
+    // A combination of 'SCAN' and 'DEL' is often used for this, but use with caution in production.
+    // 示例：(Example:)
+    if (this.redisClient) {
+      try {
+        logger.warn(`[Redis Cache] Role ${roleId} changed. Attempting to clear all 'user:*:permissions' keys. This could be slow.`);
+        let cursor = '0';
+        do {
+          const [nextCursor, keys] = await this.redisClient.scan(cursor, 'MATCH', 'user:*:permissions', 'COUNT', 100);
+          if (keys.length > 0) {
+            await this.redisClient.del(...keys);
+            logger.debug(`[Redis Cache] Deleted ${keys.length} user permission keys matching pattern.`);
+          }
+          cursor = nextCursor;
+        } while (cursor !== '0');
+        logger.info(`[Redis Cache] Finished clearing user permission keys for role ${roleId} change.`);
+      } catch (err) {
+        logger.error(`[PermissionService] Redis SCAN/DEL error during role change invalidation for role ${roleId}:`, err);
+      }
+    }
+    // TODO: 实现一种更细化的策略，例如，仅使具有此角色的用户的缓存无效。
+    // TODO: Implement a more granular strategy, e.g., invalidating caches only for users who have this role.
+    // 这将需要一种反向查找（角色 -> 用户）或在用户缓存键中包含角色信息。
+    // This would require a reverse lookup (role -> users) or including role info in user cache keys.
+  }
+
 
   /**
    * 检查用户是否拥有特定权限。

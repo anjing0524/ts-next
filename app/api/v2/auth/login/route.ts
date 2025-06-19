@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client'; // Prisma 类型，例如 Prisma.UserUp
 import { ApiResponse } from '@/lib/types/api'; // 标准API响应类型 (Standard API response type)
 import { AuthenticationError, ValidationError, BaseError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
 import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理高阶函数 (Error handling HOF)
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 
 // 最大登录失败次数
 // Max failed login attempts
@@ -132,22 +133,32 @@ interface UserLoginResponse {
 // POST 处理函数，用于用户登录，现在由 withErrorHandling 包装
 // POST handler function for user login, now wrapped by withErrorHandling
 async function loginHandler(req: NextRequest): Promise<NextResponse> {
+  const ipAddress = req.ip || req.headers.get('x-forwarded-for');
+  const userAgent = req.headers.get('user-agent');
+  let attemptedLoginIdentifier: string | undefined = undefined; // For logging
+
   let requestBody;
   try {
-    // 解析请求体为 JSON
-    // Parse request body as JSON
     requestBody = await req.json();
-  } catch (error) {
-    // 若解析失败，抛出 ValidationError
-    // If parsing fails, throw ValidationError
-    throw new ValidationError('Invalid JSON request body.', { context: (error as Error).message }, 'INVALID_JSON_BODY');
+    attemptedLoginIdentifier = requestBody.username || requestBody.email;
+  } catch (error: any) {
+    await AuthorizationUtils.logAuditEvent({
+        action: 'USER_LOGIN_FAILURE_INVALID_JSON', status: 'FAILURE', ipAddress, userAgent,
+        errorMessage: 'Invalid JSON request body for login.', actorType: 'ANONYMOUS', actorId: 'anonymous',
+        details: JSON.stringify({ error: error.message }),
+    });
+    throw new ValidationError('Invalid JSON request body.', { context: error.message }, 'INVALID_JSON_BODY');
   }
 
   const { username, email, password } = requestBody;
+  attemptedLoginIdentifier = username || email; // Update with actual parsed value
 
-  // 确保提供了用户名（或邮箱）和密码
-  // Ensure username (or email) and password are provided
   if ((!username && !email) || !password) {
+    await AuthorizationUtils.logAuditEvent({
+        action: 'USER_LOGIN_FAILURE_MISSING_CREDENTIALS', status: 'FAILURE', ipAddress, userAgent,
+        errorMessage: 'Username (or email) and password are required.', actorType: 'ANONYMOUS', actorId: 'anonymous',
+        details: JSON.stringify({ usernameProvided: !!username, emailProvided: !!email, passwordProvided: !!password }),
+    });
     throw new ValidationError('Username (or email) and password are required.', undefined, 'MISSING_CREDENTIALS');
   }
 
@@ -162,20 +173,27 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // 如果未找到用户，抛出 AuthenticationError
-  // If user not found, throw AuthenticationError
   if (!user) {
-    // 出于安全考虑，不明确指出是用户名还是密码错误
-    // For security reasons, do not specify whether username or password was incorrect
+    await AuthorizationUtils.logAuditEvent({
+        action: 'USER_LOGIN_FAILURE_USER_NOT_FOUND', status: 'FAILURE', ipAddress, userAgent,
+        errorMessage: 'Invalid credentials (user not found).', actorType: 'ANONYMOUS', actorId: attemptedLoginIdentifier || 'unknown_identifier',
+        details: JSON.stringify({ identifier: attemptedLoginIdentifier }),
+    });
     throw new AuthenticationError('Invalid credentials.', undefined, 'INVALID_CREDENTIALS');
   }
 
-  // 2. 检查账户是否被锁定
-  // 2. Check if account is locked
+  // For subsequent logs, we have user context
+  const actorIdForLog = user.id;
+  const actorTypeForLog = 'USER';
+
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     const minutesRemaining = Math.ceil((user.lockedUntil.getTime() - new Date().getTime()) / 60000);
-    // 账户被锁定，抛出 AuthenticationError 并提供特定错误码
-    // Account locked, throw AuthenticationError with specific error code
+    await AuthorizationUtils.logAuditEvent({
+        userId: user.id, actorType: actorTypeForLog, actorId: actorIdForLog, action: 'USER_LOGIN_FAILURE_ACCOUNT_LOCKED', status: 'FAILURE',
+        ipAddress, userAgent, errorMessage: `Account locked. Try again in ${minutesRemaining} minutes.`,
+        resourceType: 'User', resourceId: user.id,
+        details: JSON.stringify({ username: user.username, lockedUntil: user.lockedUntil.toISOString() }),
+    });
     throw new AuthenticationError(
       `Account locked due to too many failed login attempts. Try again in ${minutesRemaining} minutes.`,
       { lockedUntil: user.lockedUntil.toISOString(), minutesRemaining },
@@ -183,11 +201,12 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 3. 检查账户是否激活
-  // 3. Check if account is active
   if (!user.isActive) {
-    // 账户未激活，抛出 AuthenticationError 并提供特定错误码
-    // Account inactive, throw AuthenticationError with specific error code
+    await AuthorizationUtils.logAuditEvent({
+        userId: user.id, actorType: actorTypeForLog, actorId: actorIdForLog, action: 'USER_LOGIN_FAILURE_ACCOUNT_INACTIVE', status: 'FAILURE',
+        ipAddress, userAgent, errorMessage: 'Account is not active.', resourceType: 'User', resourceId: user.id,
+        details: JSON.stringify({ username: user.username }),
+    });
     throw new AuthenticationError('Account is not active. Please contact support.', undefined, 'ACCOUNT_INACTIVE');
   }
 
@@ -200,27 +219,37 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     // If password does not match, increment failed login attempts
     const newFailedAttempts = (user.failedLoginAttempts || 0) + 1;
     let updateData: Prisma.UserUpdateInput = { failedLoginAttempts: newFailedAttempts };
+    let isLockedNow = false;
 
     if (newFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-      // 如果失败次数达到最大限制，则锁定账户
-      // If failed attempts reach the maximum limit, lock the account
       updateData.lockedUntil = addMinutes(new Date(), LOCKOUT_DURATION_MINUTES);
-      await prisma.user.update({ where: { id: user.id }, data: updateData });
-      // 抛出 AuthenticationError，指示账户因多次失败尝试而被锁定
-      // Throw AuthenticationError indicating account locked due to multiple failed attempts
-      throw new AuthenticationError(
-        `Invalid credentials. Account locked for ${LOCKOUT_DURATION_MINUTES} minutes due to too many failed attempts.`,
-        { attempts: newFailedAttempts },
-        'ACCOUNT_LOCKED_ON_FAIL'
-      );
-    } else {
-      // 如果未达到锁定阈值，仅更新失败尝试次数
-      // If lockout threshold not reached, only update failed attempts
-      await prisma.user.update({ where: { id: user.id }, data: updateData });
+      isLockedNow = true;
     }
-    // 密码错误，抛出 AuthenticationError
-    // Incorrect password, throw AuthenticationError
-    throw new AuthenticationError('Invalid credentials.', undefined, 'INVALID_CREDENTIALS');
+
+    try {
+        await prisma.user.update({ where: { id: user.id }, data: updateData });
+    } catch (dbError: any) {
+        await AuthorizationUtils.logAuditEvent({
+            userId: user.id, actorType: actorTypeForLog, actorId: actorIdForLog, action: 'USER_LOGIN_FAILURE_DB_UPDATE_FAILED_ATTEMPT', status: 'FAILURE',
+            ipAddress, userAgent, errorMessage: 'DB error updating failed login attempts.', resourceType: 'User', resourceId: user.id,
+            details: JSON.stringify({ username: user.username, error: dbError.message, failedAttempts: newFailedAttempts }),
+        });
+        // Continue to throw auth error, but log DB issue
+    }
+
+    const failureAction = isLockedNow ? 'USER_LOGIN_FAILURE_ACCOUNT_LOCKED_NOW' : 'USER_LOGIN_FAILURE_INVALID_PASSWORD';
+    const errorMessage = isLockedNow ? `Invalid credentials. Account locked for ${LOCKOUT_DURATION_MINUTES} minutes due to too many failed attempts.`
+                                     : 'Invalid credentials.';
+    await AuthorizationUtils.logAuditEvent({
+        userId: user.id, actorType: actorTypeForLog, actorId: actorIdForLog, action: failureAction, status: 'FAILURE',
+        ipAddress, userAgent, errorMessage: errorMessage, resourceType: 'User', resourceId: user.id,
+        details: JSON.stringify({ username: user.username, failedAttempts: newFailedAttempts, locked: isLockedNow }),
+    });
+
+    if (isLockedNow) {
+        throw new AuthenticationError(errorMessage, { attempts: newFailedAttempts }, 'ACCOUNT_LOCKED_ON_FAIL');
+    }
+    throw new AuthenticationError(errorMessage, undefined, 'INVALID_CREDENTIALS');
   }
 
   // 5. 登录成功
@@ -235,6 +264,12 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
     data: successfulLoginUpdateData,
+  });
+
+  await AuthorizationUtils.logAuditEvent({
+      userId: user.id, actorType: actorTypeForLog, actorId: actorIdForLog, action: 'USER_LOGIN_SUCCESS', status: 'SUCCESS',
+      ipAddress, userAgent, resourceType: 'User', resourceId: user.id,
+      details: JSON.stringify({ username: user.username, lastLoginAt: updatedUser.lastLoginAt }),
   });
 
   // 6. 构建响应 (不再直接签发令牌)

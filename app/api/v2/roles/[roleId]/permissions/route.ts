@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma'; // Prisma ORM 客户端。
 import { Prisma } from '@prisma/client'; // Prisma 生成的类型。
 import { requirePermission, AuthenticatedRequest } from '@/lib/auth/middleware'; // 引入权限控制中间件。
+import { AuthorizationUtils } from '@/lib/auth/oauth2'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义路由上下文接口，用于从动态路由参数中获取 roleId。
@@ -35,6 +36,10 @@ const AssignPermissionsSchema = z.object({
  */
 async function listRolePermissionsHandler(req: AuthenticatedRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 从上下文中获取 roleId。
+  const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
+
   try {
     // 步骤 1: 查询角色是否存在，并同时包含其关联的 RolePermission 及 Permission 记录。
     const roleWithPermissions = await prisma.role.findUnique({
@@ -50,7 +55,18 @@ async function listRolePermissionsHandler(req: AuthenticatedRequest, context: Ro
     });
 
     if (!roleWithPermissions) {
-      // 如果角色未找到，返回404错误。
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSIONS_LIST_FAILURE_ROLE_NOT_FOUND',
+          status: 'FAILURE',
+          resourceType: 'Role',
+          resourceId: roleId,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Role not found when trying to list its permissions.',
+      });
       return NextResponse.json({ message: '角色未找到 (Role not found)' }, { status: 404 });
     }
 
@@ -61,11 +77,37 @@ async function listRolePermissionsHandler(req: AuthenticatedRequest, context: Ro
       .map(rp => rp.permission) // 提取 Permission 对象。
       .filter(p => p !== null && p.isActive === true); // 过滤掉可能为空或非激活的权限。
                                                       // 通常，只应展示和管理激活的权限。
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSIONS_LIST_SUCCESS',
+        status: 'SUCCESS',
+        resourceType: 'Role',
+        resourceId: roleId,
+        ipAddress,
+        userAgent,
+        details: JSON.stringify({ roleName: roleWithPermissions.name, listedPermissionsCount: permissions.length }),
+    });
     // 返回权限列表。
     return NextResponse.json({ permissions });
-  } catch (error) {
+  } catch (error: any) {
     // 错误处理。
     console.error(`列出角色 ${roleId} 的权限失败 (Failed to list permissions for role ${roleId}):`, error);
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSIONS_LIST_FAILURE_DB_ERROR',
+        status: 'FAILURE',
+        resourceType: 'Role',
+        resourceId: roleId,
+        ipAddress,
+        userAgent,
+        errorMessage: `Failed to list permissions for role ${roleId}.`,
+        details: JSON.stringify({ error: error.message }),
+    });
     return NextResponse.json({ message: '获取角色权限列表时发生错误 (An error occurred while retrieving role permissions)' }, { status: 500 });
   }
 }
@@ -84,18 +126,47 @@ async function listRolePermissionsHandler(req: AuthenticatedRequest, context: Ro
  */
 async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 目标角色ID。
+  const performingAdmin = req.user;
+  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const userAgent = req.headers?.get('user-agent');
+
   let body;
   try {
     // 解析请求体中的 JSON 数据。
     body = await req.json();
-  } catch (e) {
+  } catch (e: any) {
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSIONS_ASSIGN_FAILURE_INVALID_JSON',
+        status: 'FAILURE',
+        resourceType: 'Role',
+        resourceId: roleId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Invalid JSON request body for assigning permissions.',
+        details: JSON.stringify({ error: e.message }),
+    });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
 
   // 使用 Zod Schema 验证请求体数据。
   const validationResult = AssignPermissionsSchema.safeParse(body);
   if (!validationResult.success) {
-    // 如果验证失败，返回400错误及详细信息。
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: 'ROLE_PERMISSIONS_ASSIGN_FAILURE_VALIDATION',
+        status: 'FAILURE',
+        resourceType: 'Role',
+        resourceId: roleId,
+        ipAddress,
+        userAgent,
+        errorMessage: 'Assigning permissions input validation failed.',
+        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+    });
     return NextResponse.json({
       message: '分配权限的请求数据验证失败 (Assigning permissions input validation failed)',
       errors: validationResult.error.format(),
@@ -109,10 +180,23 @@ async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context
     // 步骤 1: 检查目标角色是否存在。
     const role = await prisma.role.findUnique({ where: { id: roleId } });
     if (!role) {
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSIONS_ASSIGN_FAILURE_ROLE_NOT_FOUND',
+          status: 'FAILURE',
+          resourceType: 'Role',
+          resourceId: roleId,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Role not found, cannot assign permissions.',
+      });
       return NextResponse.json({ message: '角色未找到，无法分配权限 (Role not found, cannot assign permissions)' }, { status: 404 });
     }
-    // 安全检查: 可能不希望修改某些核心系统角色的权限。
+    // 安全检查: (Example - currently commented out, but if enabled, would need audit log)
     // if (CORE_SYSTEM_ROLES.includes(role.name)) {
+    //   /* Audit Log for trying to modify core system role permissions */
     //   return NextResponse.json({ message: `核心系统角色 "${role.name}" 的权限不允许修改 (Permissions for core system role "${role.name}" cannot be modified)` }, { status: 403 });
     // }
 
@@ -128,8 +212,21 @@ async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context
 
     // 如果找到的有效权限数量与请求的权限ID数量不匹配，说明部分ID无效或权限未激活。
     if (validPermissions.length !== permissionIds.length) {
-      const foundIds = validPermissions.map(p => p.id); // 获取所有有效权限的ID。
-      const notFoundOrInactive = permissionIds.filter(id => !foundIds.includes(id)); // 找出无效或未激活的ID。
+      const foundIds = validPermissions.map(p => p.id);
+      const notFoundOrInactive = permissionIds.filter(id => !foundIds.includes(id));
+      await AuthorizationUtils.logAuditEvent({
+          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+          actorId: performingAdmin?.id || 'anonymous',
+          userId: performingAdmin?.id,
+          action: 'ROLE_PERMISSIONS_ASSIGN_FAILURE_INVALID_IDS',
+          status: 'FAILURE',
+          resourceType: 'Role',
+          resourceId: roleId,
+          ipAddress,
+          userAgent,
+          errorMessage: 'Some permission IDs are invalid or inactive.',
+          details: JSON.stringify({ roleName: role.name, requestedPIDs: permissionIds, invalidPIDs: notFoundOrInactive }),
+      });
       return NextResponse.json({ message: `以下权限ID无效或当前未激活: ${notFoundOrInactive.join(', ')} (Following permission IDs are invalid or currently inactive: ${notFoundOrInactive.join(', ')})` }, { status: 400 });
     }
 
@@ -175,17 +272,38 @@ async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context
         assignedPermissions: permissionsToReturn // 返回当前角色拥有的所有 (激活的) 权限。
     });
 
-  } catch (error) {
-    // 错误处理。
+  } catch (error: any) {
     console.error(`为角色 ${roleId} 分配权限失败 (Failed to assign permissions to role ${roleId}):`, error);
-    // 捕获 Prisma 特定的错误。
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        // P2003: 外键约束失败 (例如，提供的某个 permissionId 在 Permission 表中不存在，尽管前面的验证应已捕获此情况)。
-        if (error.code === 'P2003') {
-             return NextResponse.json({ message: '分配权限失败：一个或多个提供的权限ID无效 (Failed to assign permissions: one or more provided permission IDs are invalid)' }, { status: 400 });
-        }
+    let errorMessage = 'An unexpected server error occurred while assigning permissions';
+    let actionCode = 'ROLE_PERMISSIONS_ASSIGN_FAILURE_DB_ERROR';
+    let httpStatus = 500;
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        errorMessage = 'Failed to assign permissions: one or more provided permission IDs are invalid (foreign key constraint).';
+        actionCode = 'ROLE_PERMISSIONS_ASSIGN_FAILURE_FK_CONSTRAINT';
+        httpStatus = 400;
     }
-    return NextResponse.json({ message: '分配权限时发生服务器错误 (An unexpected server error occurred while assigning permissions)' }, { status: 500 });
+    // Other specific Prisma errors could be checked here.
+
+    await AuthorizationUtils.logAuditEvent({
+        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
+        actorId: performingAdmin?.id || 'anonymous',
+        userId: performingAdmin?.id,
+        action: actionCode,
+        status: 'FAILURE',
+        resourceType: 'Role',
+        resourceId: roleId,
+        ipAddress,
+        userAgent,
+        errorMessage: errorMessage,
+        details: JSON.stringify({
+            roleName: role?.name, // role might be null if not found earlier, though logic implies it should be found
+            requestedPIDs: permissionIds,
+            error: error.message,
+            errorCode: (error as any).code,
+        }),
+    });
+    return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
 }
 
