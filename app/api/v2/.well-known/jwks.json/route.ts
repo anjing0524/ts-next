@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import * as jose from 'jose';
 
-import logger from '../../../../utils/logger';
+import logger from '@/lib/utils/logger';
 
 export async function GET(): Promise<NextResponse> {
   try {

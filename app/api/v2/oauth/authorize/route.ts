@@ -96,6 +96,24 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     throw new OAuth2Error('Client not found or not active.', OAuth2ErrorCode.InvalidClient, 400);
   }
 
+  // --- 步骤 2.1: PKCE 强制检查 --- (Step 2.1: PKCE enforcement check)
+  if (thirdPartyClient.requirePkce && (!code_challenge || !code_challenge_method)) {
+    throw new OAuth2Error(
+      'PKCE is required for this client. code_challenge and code_challenge_method must be provided.',
+      OAuth2ErrorCode.InvalidRequest,
+      400
+    );
+  }
+
+  // 验证 PKCE 方法
+  if (code_challenge_method && code_challenge_method !== 'S256') {
+    throw new OAuth2Error(
+      'Unsupported code_challenge_method. Only S256 is supported.',
+      OAuth2ErrorCode.InvalidRequest,
+      400
+    );
+  }
+
   let registeredRedirectUrisList: string[] = [];
   try {
     registeredRedirectUrisList = JSON.parse(thirdPartyClient.redirectUris || '[]');

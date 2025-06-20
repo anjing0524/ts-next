@@ -106,14 +106,4 @@ export type AuthorizeQuery = z.infer<typeof authorizeQuerySchema>;
 // This means it IS treated as required.
 // The inline schema's `scope: z.string().optional()` was misleading given the code.
 // My schema file's original `scope: z.string({ required_error: 'scope is required.' ... }).min(1, 'scope cannot be empty.')` is better.
-// I will stick to my schema file's more strict definition of scope and keep the min/max for code_challenge.Okay, I've reviewed the Zod schema from the existing route and compared it to the one I created.
-My `authorizeQuerySchema` in `app/api/v2/oauth/authorize/schemas.ts` is actually more aligned with best practices (e.g., `scope` being explicitly required if the server doesn't have a default, min/max for `code_challenge`). The inline schema in the route was slightly more lenient on `scope` (optional) but then the code immediately checked for its presence, effectively making it mandatory.
-
-I will proceed with my existing `app/api/v2/oauth/authorize/schemas.ts` as it is slightly stricter and more detailed.
-
-Now, I will modify the `app/api/v2/oauth/authorize/route.ts` to:
-1.  Import `authorizeQuerySchema` from `./schemas.ts`.
-2.  Replace the inline Zod schema definition with the imported one.
-3.  Replace the manual authorization code creation logic with a call to `storeAuthorizationCode` from `@/lib/auth/authorizationCodeFlow`.
-
-This requires me to first read the content of `@/lib/auth/oauth2.ts` to understand `AuthorizationUtils.generateAuthorizationCode()` and other utils, to ensure `storeAuthorizationCode` is a suitable replacement.
+// I will stick to my schema file's more strict definition of scope and keep the min/max for code_challenge.

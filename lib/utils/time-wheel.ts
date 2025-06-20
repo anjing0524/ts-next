@@ -1,6 +1,6 @@
 // import { setImmediate, setTimeout, clearTimeout } from 'node:timers';
 import { v4 as uuidv4 } from 'uuid';
-import logger from '../lib/utils/logger';
+import logger from '@/lib/utils/logger';
 
 interface Task {
   id: string;

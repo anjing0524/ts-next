@@ -273,10 +273,8 @@ async function main() {
       lastName: '管理员', // Administrator
       displayName: '系统管理员',
       avatar: null,
-      phone: null,
       organization: '默认组织', // Default Organization
       department: 'IT部门', // IT Department
-      workLocation: '总部', // Headquarters
     },
   });
   console.log(`默认管理员用户已更新/创建: ${adminUser.username} (密码: ${adminPassword})`); // Default admin user upserted/created
@@ -381,21 +379,21 @@ async function main() {
     where: { clientId: 'auth-center-admin-client' },
     update: {
       clientSecret: hashedAdminClientSecret,
-      clientName: '认证中心管理后台客户端', // Auth Center Admin UI Client
+      name: '认证中心管理后台客户端', // Auth Center Admin UI Client
       allowedScopes: adminClientAllowedScopes, // Grant all permissions via scopes for simplicity
     },
     create: {
       clientId: 'auth-center-admin-client',
       clientSecret: hashedAdminClientSecret,
-      clientName: '认证中心管理后台客户端',
-      clientDescription: '用于认证中心管理后台UI的OAuth客户端。', // OAuth client for the Auth Center Admin UI.
+      name: '认证中心管理后台客户端',
+      description: '用于认证中心管理后台UI的OAuth客户端。', // OAuth client for the Auth Center Admin UI.
       clientType: 'CONFIDENTIAL',
       redirectUris: JSON.stringify(['http://localhost:3000/callback', 'http://localhost:8000/callback', 'https://admin.auth.example.com/callback']),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
       responseTypes: JSON.stringify(['code']),
       allowedScopes: adminClientAllowedScopes,
-      accessTokenLifetime: 3600, // 1 hour
-      refreshTokenLifetime: 86400 * 30, // 30 days
+      accessTokenTtl: 3600, // 1 hour
+      refreshTokenTtl: 86400 * 30, // 30 days
       authorizationCodeLifetime: 600, // 10 minutes
       requirePkce: true,
       requireConsent: false, // Admin client often doesn't require user consent for its own operations
@@ -411,8 +409,8 @@ async function main() {
     update: {}, // No secret to update
     create: {
       clientId: 'public-test-client',
-      clientName: '公共测试SPA客户端', // Public Test SPA Client
-      clientDescription: '用于测试的公共SPA客户端。', // Public SPA client for testing.
+      name: '公共测试SPA客户端', // Public Test SPA Client
+      description: '用于测试的公共SPA客户端。', // Public SPA client for testing.
       clientType: 'PUBLIC',
       redirectUris: JSON.stringify(['http://localhost:3001/callback', 'https://spa.example.com/callback']),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
@@ -422,7 +420,7 @@ async function main() {
       requireConsent: true,
       isActive: true,
       tokenEndpointAuthMethod: 'none',
-      accessTokenLifetime: 1800, // 30 minutes
+      accessTokenTtl: 1800, // 30 minutes
     },
   });
   console.log('OAuth客户端已更新/创建: public-test-client');
@@ -435,8 +433,8 @@ async function main() {
     update: { clientSecret: hashedConfidentialClientSecret },
     create: {
       clientId: 'confidential-test-client',
-      clientName: '机密测试Web客户端', // Confidential Test Web Client
-      clientDescription: '用于测试的机密Web应用程序客户端。', // Confidential client for testing web applications.
+      name: '机密测试Web客户端', // Confidential Test Web Client
+      description: '用于测试的机密Web应用程序客户端。', // Confidential client for testing web applications.
       clientSecret: hashedConfidentialClientSecret,
       clientType: 'CONFIDENTIAL',
       redirectUris: JSON.stringify(['http://localhost:3002/callback', 'https://webapp.example.com/callback']),
@@ -447,8 +445,8 @@ async function main() {
       requireConsent: true,
       isActive: true,
       tokenEndpointAuthMethod: 'client_secret_basic',
-      accessTokenLifetime: 3600, // 1 hour
-      refreshTokenLifetime: 86400 * 7, // 7 days
+      accessTokenTtl: 3600, // 1 hour
+      refreshTokenTtl: 86400 * 7, // 7 days
     },
   });
   console.log(`OAuth客户端已更新/创建: confidential-test-client (原始密钥: ${confidentialClientSecretRaw})`);

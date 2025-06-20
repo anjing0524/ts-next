@@ -120,6 +120,30 @@ async function handleAuthorizationCodeGrant(
   const ipAddress = undefined; // Placeholder: e.g., req.ip
   const userAgent = undefined; // Placeholder: e.g., req.headers.get('user-agent')
   try {
+    // 验证授权码
+    const authCode = await prisma.authorizationCode.findUnique({
+      where: { code: code },
+      include: { client: true, user: true },
+    });
+
+    if (!authCode || authCode.expiresAt < new Date()) {
+      throw new OAuth2Error('Invalid or expired authorization code', OAuth2ErrorCode.InvalidGrant, 400);
+    }
+
+    // 检查授权码是否已被使用（防止重放攻击）
+    if (authCode.used) {
+      // 撤销所有相关的令牌
+      await prisma.accessToken.updateMany({
+        where: { authorizationCodeId: authCode.id },
+        data: { revokedAt: new Date() }
+      });
+      await prisma.refreshToken.updateMany({
+        where: { authorizationCodeId: authCode.id },
+        data: { revokedAt: new Date() }
+      });
+      throw new OAuth2Error('Authorization code has already been used', OAuth2ErrorCode.InvalidGrant, 400);
+    }
+
     // validateAuthorizationCode 现在会抛出错误，而不是返回 null
     // validateAuthorizationCode will now throw errors instead of returning null
     validatedAuthCode = await import('@/lib/auth/authorizationCodeFlow').then(mod =>
