@@ -196,16 +196,16 @@ async function createClientHandler(req: AuthenticatedRequest): Promise<NextRespo
   try {
     const newClientData: Prisma.OAuthClientCreateInput = {
       clientId: finalClientId,
-      clientName: data.clientName,
-      clientDescription: data.clientDescription,
+      name: data.clientName,
+      description: data.clientDescription,
       clientSecret: clientSecretHashed,
       clientType: data.clientType,
       redirectUris: JSON.stringify(data.redirectUris),
       allowedScopes: JSON.stringify(data.allowedScopes || []),
       grantTypes: JSON.stringify(data.grantTypes),
       responseTypes: JSON.stringify(data.responseTypes || []),
-      accessTokenLifetime: data.accessTokenLifetime,
-      refreshTokenLifetime: data.refreshTokenLifetime,
+      accessTokenTtl: data.accessTokenLifetime,
+      refreshTokenTtl: data.refreshTokenLifetime,
       authorizationCodeLifetime: data.authorizationCodeLifetime,
       requirePkce: data.clientType === ClientType.PUBLIC ? true : (data.requirePkce ?? true), // PKCE must be true for public, optional for confidential (defaults to true)
       requireConsent: data.requireConsent,
@@ -241,7 +241,7 @@ async function createClientHandler(req: AuthenticatedRequest): Promise<NextRespo
         userAgent,
         details: JSON.stringify({
             clientId: newClient.clientId,
-            clientName: newClient.clientName,
+            clientName: newClient.name,
             clientType: newClient.clientType,
         }),
     });
@@ -304,13 +304,13 @@ async function listClientsHandler(req: AuthenticatedRequest): Promise<NextRespon
   const sortOrder = (sortOrderInput.toLowerCase() === 'asc' || sortOrderInput.toLowerCase() === 'desc') ? sortOrderInput.toLowerCase() as Prisma.SortOrder : 'desc';
 
   const where: Prisma.OAuthClientWhereInput = {};
-  if (clientNameQuery) where.clientName = { contains: clientNameQuery, mode: 'insensitive' };
+  if (clientNameQuery) where.name = { contains: clientNameQuery, mode: 'insensitive' };
   if (clientIdQuery) where.clientId = { contains: clientIdQuery, mode: 'insensitive' }; // clientId is unique, but allow partial search by admin
   if (clientTypeQuery && Object.values(ClientType).includes(clientTypeQuery)) {
     where.clientType = clientTypeQuery;
   }
 
-  const validSortByFields: (keyof OAuthClient)[] = ['clientName', 'clientId', 'clientType', 'createdAt', 'updatedAt', 'isActive'];
+  const validSortByFields: (keyof OAuthClient)[] = ['name', 'clientId', 'clientType', 'createdAt', 'updatedAt', 'isActive'];
   const safeSortBy = validSortByFields.includes(sortBy as keyof OAuthClient) ? sortBy : 'createdAt';
   const orderBy: Prisma.OAuthClientOrderByWithRelationInput = { [safeSortBy]: sortOrder };
 

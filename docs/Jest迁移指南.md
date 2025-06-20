@@ -56,7 +56,7 @@ module.exports = {
   ],
   
   // 模块路径映射
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/app/(.*)$': '<rootDir>/app/$1',
@@ -390,10 +390,10 @@ describe('PermissionService', () => {
 
 **错误**: `Cannot find module '@/lib/...'`
 
-**解决方案**: 确保 `jest.config.js` 中的 `moduleNameMapping` 配置正确
+**解决方案**: 确保 `jest.config.js` 中的 `moduleNameMapper` 配置正确
 
 ```javascript
-moduleNameMapping: {
+moduleNameMapper: {
   '^@/(.*)$': '<rootDir>/$1'
 }
 ```

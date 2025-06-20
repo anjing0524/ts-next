@@ -1,1393 +1,965 @@
-# API文档规范
+# OAuth2.1认证授权中心API文档
 
-> **文档版本**: v1.0.0  
+> **文档版本**: v3.0  
 > **创建日期**: 2024-01-20  
-> **最后更新**: 2024-01-20  
+> **最后更新**: 2024-12-21  
 > **文档状态**: 正式版  
-> **维护团队**: 开发团队
+> **维护团队**: 认证授权团队
 
 ## 文档摘要
 
-本文档定义了OAuth2.1认证授权中心API的设计规范、文档格式、版本管理和最佳实践，确保API的一致性、可维护性和开发者友好性。
+本文档定义了OAuth2.1认证授权中心API的设计规范、接口定义、安全机制和最佳实践。本系统严格遵循OAuth2.1标准，**绝对不提供任何独立的login API端点**，所有认证操作必须通过标准的OAuth2.1授权码流程完成。
+
+**🚨 重要声明**:
+- ❌ **绝对不存在** `/api/v2/auth/login` 端点
+- ❌ **完全不支持** 直接用户名/密码认证API
+- ❌ **绝不使用** jsonwebtoken库
+- ✅ **100%只支持** OAuth2.1授权码流程
+- ✅ **强制使用** PKCE (S256)
+- ✅ **100%使用** Jose库 (v6.0.11) 处理JWT
+- ✅ **固定采用** RSA256签名算法
+
+**技术栈确认**:
+```json
+{
+  "JWT库": "jose@6.0.11",
+  "签名算法": "RS256", 
+  "认证流程": "OAuth2.1 + 强制PKCE",
+  "令牌格式": "JWT (自包含)",
+  "框架": "Next.js 15",
+  "数据库": "Prisma + SQLite/PostgreSQL",
+  "jsonwebtoken": "绝对未使用"
+}
+```
 
 ## 目录
 
-- [1. API设计原则](#1-api设计原则)
-- [2. URL设计规范](#2-url设计规范)
-- [3. HTTP方法规范](#3-http方法规范)
+- [1. OAuth2.1认证授权流程](#1-oauth21认证授权流程)
+- [2. Jose库JWT令牌规范](#2-jose库jwt令牌规范)
+- [3. API端点详细设计](#3-api端点详细设计)
 - [4. 请求响应格式](#4-请求响应格式)
 - [5. 错误处理规范](#5-错误处理规范)
-- [6. 认证授权规范](#6-认证授权规范)
-- [7. 版本管理规范](#7-版本管理规范)
-- [8. 文档格式规范](#8-文档格式规范)
-- [9. 安全规范](#9-安全规范)
-- [10. 性能规范](#10-性能规范)
+- [6. 安全机制](#6-安全机制)
+- [7. 客户端集成指南](#7-客户端集成指南)
+- [8. 最佳实践](#8-最佳实践)
 
-## 1. API设计原则
+## 1. OAuth2.1认证授权流程
 
-### 1.1 核心原则
+### 1.1 架构说明
 
-- **RESTful设计**: 遵循REST架构风格
-- **一致性**: 统一的命名、格式和行为
-- **可预测性**: 开发者能够预期API行为
-- **向后兼容**: 保持API版本的向后兼容性
-- **安全优先**: 内置安全机制和最佳实践
-- **性能优化**: 考虑缓存、分页和限流
+本认证授权中心采用**去中心化认证设计**，完全基于OAuth2.1标准：
 
-### 1.2 设计哲学
+**设计原则**:
+- 🔒 **无直接登录API**: 系统内不存在任何login端点
+- 🔄 **标准OAuth2.1**: 100%遵循OAuth2.1规范
+- 🛡️ **强制PKCE**: 所有客户端必须使用S256方法
+- 🔑 **Jose处理**: 所有JWT操作使用Jose库
+- 📱 **多端支持**: Web/Mobile/SPA统一流程
 
-- **资源导向**: API围绕资源而非操作设计
-- **无状态**: 每个请求包含所有必要信息
-- **幂等性**: 相同请求多次执行结果一致
-- **可发现性**: 通过HATEOAS提供API导航
-- **开发者体验**: 优化开发者使用体验
+### 1.2 完整授权流程
 
-## 2. URL设计规范
-
-### 2.1 基础结构
-
+```mermaid
+sequenceDiagram
+    participant C as 客户端应用
+    participant U as 用户浏览器  
+    participant AS as 授权服务器<br/>(本系统)
+    participant UI as 认证中心UI
+    participant RS as 资源服务器
+    
+    Note over C,RS: OAuth2.1标准流程 - 无login API端点
+    
+    rect rgb(255, 248, 220)
+    Note over C: 步骤1: PKCE参数生成
+    C->>C: 1.1 生成code_verifier (随机字符串)
+    C->>C: 1.2 计算code_challenge = SHA256(code_verifier)
+    C->>C: 1.3 生成state (防CSRF)
+    end
+    
+    rect rgb(230, 255, 230)  
+    Note over C,AS: 步骤2-4: 授权请求
+    C->>U: 2. 重定向到授权端点
+    U->>AS: 3. GET /api/v2/oauth/authorize<br/>+ PKCE参数
+    AS->>AS: 4. 验证客户端、redirect_uri、PKCE
+    end
+    
+    rect rgb(255, 230, 230)
+    Note over AS,UI: 步骤5-6: 用户认证 (UI层面)
+    alt 用户未登录
+        AS->>U: 5. 重定向到认证中心UI (/login页面)
+        U->>UI: 6. 用户在UI输入凭据并提交
+        UI->>AS: 认证成功，建立会话
+    end
+    end
+    
+    rect rgb(230, 230, 255)
+    Note over AS,C: 步骤7-10: 授权确认与码发放
+    AS->>U: 7. 显示授权同意页面
+    U->>AS: 8. 用户确认授权
+    AS->>AS: 9. 生成授权码 (绑定PKCE challenge)
+    AS->>U: 10. 重定向回客户端 (携带授权码)
+    end
+    
+    rect rgb(255, 240, 255)
+    Note over C,AS: 步骤11-12: 令牌交换 (Jose库)
+    U->>C: 11. 授权码回调
+    C->>AS: 12. POST /api/v2/oauth/token<br/>+ code_verifier (PKCE验证)
+    AS->>AS: 验证授权码 + PKCE + 客户端
+    AS->>AS: 使用Jose库生成JWT (RS256签名)
+    AS->>C: 返回JWT令牌 (access_token + refresh_token)
+    end
+    
+    rect rgb(240, 255, 255)
+    Note over C,RS: 步骤13: API访问
+    C->>RS: 13. API请求 (Bearer JWT令牌)
+    RS->>RS: 使用JWKS验证JWT (Jose库)
+    RS->>C: 返回API响应
+    end
 ```
-https://api.example.com/v1/{resource}/{id}/{sub-resource}
-```
 
-### 2.2 命名规范
+### 1.3 端点概览
 
-- **使用名词**: URL应该表示资源，而非动作
-- **复数形式**: 集合资源使用复数名词
-- **小写字母**: 全部使用小写字母
-- **连字符分隔**: 使用连字符分隔多个单词
-- **避免深层嵌套**: 最多3层嵌套
+| 端点路径 | HTTP方法 | 功能描述 | 认证要求 | 状态 |
+|----------|----------|----------|----------|------|
+| `/api/v2/oauth/authorize` | GET | **启动OAuth2.1授权流程** | 无 | ✅ 核心端点 |
+| `/api/v2/oauth/token` | POST | **交换授权码获取JWT令牌** | 客户端认证 | ✅ 核心端点 |
+| `/api/v2/oauth/userinfo` | GET | **OIDC用户信息端点** | Bearer令牌(openid scope) | ✅ 已修复端点 |
+| `/api/v2/oauth/revoke` | POST | 撤销访问令牌 | 客户端认证 | ✅ 安全端点 |
+| `/api/v2/oauth/introspect` | POST | 令牌内省检查 | 客户端认证 | ✅ 验证端点 |
+| `/.well-known/jwks.json` | GET | **JWT验证公钥** | 无 | ✅ 必需端点 |
+| `/.well-known/openid-configuration` | GET | OIDC发现信息 | 无 | ✅ 发现端点 |
 
-### 2.3 URL示例
+**❌ 不存在的端点 (常见错误)**:
 
-```bash
-# 正确示例
-GET /api/v1/users                    # 获取用户列表
-GET /api/v1/users/123                # 获取特定用户
-GET /api/v1/users/123/permissions    # 获取用户权限
-POST /api/v1/oauth/authorize         # OAuth授权
-POST /api/v1/oauth/token             # 获取令牌
+| 错误端点 | 状态 | 正确做法 |
+|----------|------|----------|
+| `/api/v2/auth/login` | **不存在** | 使用 `/api/v2/oauth/authorize` |
+| `/api/v2/auth/logout` | **不存在** | 使用 `/api/v2/oauth/revoke` |
+| `/api/v2/login` | **不存在** | 遵循OAuth2.1流程 |
+| `/login` (API) | **不存在** | 这是UI页面，非API |
 
-# 错误示例
-GET /api/v1/getUsers                 # 动词形式
-GET /api/v1/user                     # 单数形式
-GET /api/v1/Users                    # 大写字母
-GET /api/v1/user_permissions         # 下划线分隔
-```
+## 2. Jose库JWT令牌规范
 
-### 2.4 查询参数规范
+### 2.1 JWT结构
 
-```bash
-# 分页参数
-GET /api/v1/users?page=1&limit=20&offset=0
+本系统使用Jose库生成的JWT令牌具有以下结构：
 
-# 排序参数
-GET /api/v1/users?sort=created_at&order=desc
-
-# 过滤参数
-GET /api/v1/users?status=active&role=admin
-
-# 字段选择
-GET /api/v1/users?fields=id,name,email
-
-# 搜索参数
-GET /api/v1/users?q=john&search_fields=name,email
-```
-
-## 3. HTTP方法规范
-
-### 3.1 标准方法
-
-| 方法    | 用途           | 幂等性 | 安全性 | 示例                |
-| ------- | -------------- | ------ | ------ | ------------------- |
-| GET     | 获取资源       | ✓      | ✓      | `GET /users/123`    |
-| POST    | 创建资源       | ✗      | ✗      | `POST /users`       |
-| PUT     | 完整更新资源   | ✓      | ✗      | `PUT /users/123`    |
-| PATCH   | 部分更新资源   | ✗      | ✗      | `PATCH /users/123`  |
-| DELETE  | 删除资源       | ✓      | ✗      | `DELETE /users/123` |
-| HEAD    | 获取资源元数据 | ✓      | ✓      | `HEAD /users/123`   |
-| OPTIONS | 获取支持的方法 | ✓      | ✓      | `OPTIONS /users`    |
-
-### 3.2 方法使用指南
-
-```bash
-# GET - 获取资源
-GET /api/v1/users/123
-GET /api/v1/users?status=active
-
-# POST - 创建新资源
-POST /api/v1/users
-Content-Type: application/json
+#### 2.1.1 JWT Header
+```json
 {
-  "name": "John Doe",
-  "email": "john@example.com"
+  "alg": "RS256",           // 固定使用RSA256算法
+  "kid": "key-2024-01",     // 密钥标识符 (用于JWKS匹配)
+  "typ": "JWT"              // 令牌类型
+}
+```
+
+#### 2.1.2 JWT Payload (访问令牌)
+```json
+{
+  // === OAuth2.1标准声明 ===
+  "iss": "https://auth.company.com",        // 签发者
+  "aud": "api_resource",                    // 受众 (API资源标识)
+  "sub": "user_123",                        // 主体 (用户ID)
+  "client_id": "web_client_001",            // 客户端ID
+  "iat": 1703001600,                        // 签发时间
+  "exp": 1703005200,                        // 过期时间 (通常1小时)
+  "jti": "550e8400-e29b-41d4-a716-446655440000", // 唯一令牌ID
+  
+  // === 权限相关声明 ===
+  "scope": "openid profile api:read",      // 权限范围
+  "permissions": [                          // 具体权限列表
+    "user:profile:read",
+    "api:data:read", 
+    "system:health:read"
+  ],
+  
+  // === 扩展声明 (可选) ===
+  "user_type": "admin",                     // 用户类型
+  "tenant_id": "tenant_001",                // 租户ID (多租户场景)
+  "session_id": "session_xyz"               // 会话ID
+}
+```
+
+### 2.2 Jose库核心操作
+
+#### 2.2.1 JWT生成 (系统内部)
+```typescript
+// 系统内部实现 - lib/auth/oauth2.ts
+import * as jose from 'jose';
+
+export class JWTUtils {
+  static async createAccessToken(tokenData: {
+    client_id: string;
+    user_id?: string;
+    scope?: string;
+    permissions?: string[];
+    expiresIn?: string;
+  }): Promise<string> {
+    // 1. 导入RSA私钥
+    const privateKey = await jose.importPKCS8(
+      process.env.JWT_PRIVATE_KEY_PEM!,
+      'RS256'
+    );
+
+    // 2. 构建JWT载荷
+    const payload: jose.JWTPayload = {
+      client_id: tokenData.client_id,
+      sub: tokenData.user_id || tokenData.client_id,
+      aud: process.env.JWT_AUDIENCE || 'api_resource',
+      iss: process.env.JWT_ISSUER || 'https://auth.company.com',
+      jti: crypto.randomUUID(),
+      scope: tokenData.scope,
+      permissions: tokenData.permissions || [],
+    };
+
+    // 3. 生成并签名JWT
+    return await new jose.SignJWT(payload)
+      .setProtectedHeader({ 
+        alg: 'RS256', 
+        kid: process.env.JWT_KEY_ID || 'default-kid' 
+      })
+      .setIssuedAt()
+      .setExpirationTime(tokenData.expiresIn || '1h')
+      .sign(privateKey);
+  }
+}
+```
+
+#### 2.2.2 JWT验证 (客户端应用)
+```typescript
+// 客户端应用中的JWT验证
+import * as jose from 'jose';
+
+export async function verifyAccessToken(token: string): Promise<jose.JWTPayload> {
+  // 1. 从JWKS端点获取公钥 (推荐方式)
+  const JWKS = jose.createRemoteJWKSet(
+    new URL('https://auth.company.com/.well-known/jwks.json')
+  );
+
+  // 2. 验证JWT
+  const { payload } = await jose.jwtVerify(token, JWKS, {
+    issuer: 'https://auth.company.com',
+    audience: 'api_resource',
+    algorithms: ['RS256'],
+  });
+
+  return payload;
 }
 
-# PUT - 完整替换资源
-PUT /api/v1/users/123
-Content-Type: application/json
-{
-  "name": "John Smith",
-  "email": "john.smith@example.com",
-  "status": "active"
+// 使用示例
+try {
+  const payload = await verifyAccessToken(accessToken);
+  console.log('用户ID:', payload.sub);
+  console.log('客户端ID:', payload.client_id);
+  console.log('权限范围:', payload.scope);
+  console.log('具体权限:', payload.permissions);
+} catch (error) {
+  if (error instanceof jose.errors.JWTExpired) {
+    console.error('令牌已过期，需要刷新');
+  } else if (error instanceof jose.errors.JWSSignatureVerificationFailed) {
+    console.error('令牌签名验证失败，可能被篡改');
+  } else {
+    console.error('令牌验证失败:', error.message);
+  }
 }
+```
 
-# PATCH - 部分更新资源
-PATCH /api/v1/users/123
-Content-Type: application/json
-{
-  "status": "inactive"
+## 3. API端点详细设计
+
+### 3.1 授权端点
+
+```http
+GET /api/v2/oauth/authorize
+```
+
+**功能描述**: 启动OAuth2.1授权码流程，支持OIDC  
+**认证要求**: 无需预认证  
+**PKCE要求**: 强制必须，只支持S256方法  
+
+#### 3.1.1 请求参数
+
+| 参数名 | 类型 | 必需性 | 描述 | 示例值 |
+|--------|------|--------|------|--------|
+| `response_type` | string | ✅ 必需 | 响应类型，固定为 `code` | `code` |
+| `client_id` | string | ✅ 必需 | 在系统中注册的客户端标识符 | `web_app_001` |
+| `redirect_uri` | string | ✅ 必需 | 授权成功后的回调URI，必须完全匹配注册值 | `https://app.com/callback` |
+| `scope` | string | ✅ 必需 | 请求的权限范围，空格分隔 | `openid profile api:read` |
+| `state` | string | ⚠️ 强烈推荐 | 随机字符串，防止CSRF攻击 | `xyz123random` |
+| `code_challenge` | string | ✅ 必需 | PKCE挑战码，SHA256(code_verifier)的base64url编码 | `E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM` |
+| `code_challenge_method` | string | ✅ 必需 | PKCE挑战方法，固定为 `S256` | `S256` |
+| `nonce` | string | ⚪ 可选 | OIDC随机数，当scope包含openid时推荐使用 | `abc789nonce` |
+
+#### 3.1.2 PKCE参数生成示例
+
+```typescript
+// 客户端生成PKCE参数
+import crypto from 'crypto';
+
+function generatePKCEParams() {
+  // 1. 生成code_verifier (43-128字符)
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  
+  // 2. 计算code_challenge = SHA256(code_verifier)
+  const codeChallenge = crypto
+    .createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+  
+  return {
+    codeVerifier,    // 存储在客户端，稍后交换令牌时使用
+    codeChallenge,   // 发送给授权服务器
+    codeChallengeMethod: 'S256'
+  };
 }
+```
 
-# DELETE - 删除资源
-DELETE /api/v1/users/123
+#### 3.1.3 请求示例
+
+```http
+GET /api/v2/oauth/authorize?response_type=code&client_id=web_app_001&redirect_uri=https%3A//app.com/callback&scope=openid%20profile%20api%3Aread&state=xyz123random&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&nonce=abc789nonce HTTP/1.1
+Host: auth.company.com
+User-Agent: Mozilla/5.0 (compatible)
+```
+
+#### 3.1.4 响应行为
+
+| 场景 | HTTP状态码 | 行为描述 |
+|------|------------|----------|
+| **用户未登录** | `302 Found` | 重定向到认证中心UI登录页面 `/login` |
+| **需要授权同意** | `302 Found` | 重定向到授权同意页面 `/api/v2/oauth/consent` |
+| **授权成功** | `302 Found` | 重定向回客户端，携带授权码 |
+| **参数错误** | `400 Bad Request` | 返回JSON错误响应 |
+| **客户端无效** | `400 Bad Request` | 返回JSON错误响应 |
+
+**成功重定向示例**:
+```http
+HTTP/1.1 302 Found
+Location: https://app.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz123random
+```
+
+**错误响应示例**:
+```json
+{
+  "error": "invalid_request",
+  "error_description": "PKCE is required for this client. code_challenge and code_challenge_method must be provided.",
+  "state": "xyz123random"
+}
+```
+
+### 3.2 令牌端点
+
+```http
+POST /api/v2/oauth/token
+```
+
+**功能描述**: 交换授权码获取JWT访问令牌  
+**认证要求**: 客户端认证 (推荐Authorization Header)  
+**内容类型**: `application/x-www-form-urlencoded`  
+**响应格式**: JSON  
+
+#### 3.2.1 客户端认证方式
+
+**方式1: HTTP Basic认证 (推荐)**
+```http
+POST /api/v2/oauth/token
+Authorization: Basic d2ViX2FwcF8wMDE6c2VjcmV0X2tleQ==
+Content-Type: application/x-www-form-urlencoded
+```
+
+**方式2: 请求体认证**
+```http
+POST /api/v2/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=web_app_001&client_secret=secret_key&grant_type=authorization_code&...
+```
+
+#### 3.2.2 授权码模式参数
+
+| 参数名 | 类型 | 必需性 | 描述 | 示例值 |
+|--------|------|--------|------|--------|
+| `grant_type` | string | ✅ 必需 | 授权类型，固定为 `authorization_code` | `authorization_code` |
+| `code` | string | ✅ 必需 | 从授权端点获取的授权码 | `SplxlOBeZQQYbYS6WxSbIA` |
+| `redirect_uri` | string | ✅ 必需 | 必须与授权请求中的完全一致 | `https://app.com/callback` |
+| `client_id` | string | ✅ 必需 | 客户端标识符 | `web_app_001` |
+| `code_verifier` | string | ✅ 必需 | PKCE验证码，原始的code_verifier | `dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk` |
+
+#### 3.2.3 请求示例
+
+```http
+POST /api/v2/oauth/token HTTP/1.1
+Host: auth.company.com
+Authorization: Basic d2ViX2FwcF8wMDE6c2VjcmV0X2tleQ==
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 234
+
+grant_type=authorization_code&code=SplxlOBeZQQYbYS6WxSbIA&redirect_uri=https%3A//app.com/callback&client_id=web_app_001&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+```
+
+#### 3.2.4 成功响应
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS0yMDI0LTAxIn0.eyJpc3MiOiJodHRwczovL2F1dGguY29tcGFueS5jb20iLCJhdWQiOiJhcGlfcmVzb3VyY2UiLCJzdWIiOiJ1c2VyXzEyMyIsImNsaWVudF9pZCI6IndlYl9hcHBfMDAxIiwiaWF0IjoxNzAzMDAxNjAwLCJleHAiOjE3MDMwMDUyMDAsImp0aSI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgYXBpOnJlYWQiLCJwZXJtaXNzaW9ucyI6WyJ1c2VyOnByb2ZpbGU6cmVhZCIsImFwaTpkYXRhOnJlYWQiXX0.signature",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS0yMDI0LTAxIn0.eyJpc3MiOiJodHRwczovL2F1dGguY29tcGFueS5jb20iLCJhdWQiOiJhcGlfcmVzb3VyY2UiLCJzdWIiOiJ1c2VyXzEyMyIsImNsaWVudF9pZCI6IndlYl9hcHBfMDAxIiwiaWF0IjoxNzAzMDAxNjAwLCJleHAiOjE3MDU1OTM2MDAsImp0aSI6Ijc3MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsInR5cCI6InJlZnJlc2hfdG9rZW4ifQ.signature",
+  "scope": "openid profile api:read",
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS0yMDI0LTAxIn0.eyJpc3MiOiJodHRwczovL2F1dGguY29tcGFueS5jb20iLCJhdWQiOiJ3ZWJfYXBwXzAwMSIsInN1YiI6InVzZXJfMTIzIiwiaWF0IjoxNzAzMDAxNjAwLCJleHAiOjE3MDMwMDUyMDAsIm5vbmNlIjoiYWJjNzg5bm9uY2UiLCJhdXRoX3RpbWUiOjE3MDMwMDE2MDAsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoi5byg5LiJIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiemhhbmdzYW4ifQ.signature"
+}
+```
+
+#### 3.2.5 刷新令牌模式
+
+**参数**:
+| 参数名 | 类型 | 必需性 | 描述 |
+|--------|------|--------|------|
+| `grant_type` | string | ✅ 必需 | 固定为 `refresh_token` |
+| `refresh_token` | string | ✅ 必需 | 有效的刷新令牌 |
+| `scope` | string | ⚪ 可选 | 请求的权限范围 (不能超过原始范围) |
+
+**请求示例**:
+```http
+POST /api/v2/oauth/token
+Authorization: Basic d2ViX2FwcF8wMDE6c2VjcmV0X2tleQ==
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&refresh_token=eyJhbGciOiJSUzI1NiIs...
+```
+
+#### 3.2.6 客户端凭证模式 
+
+**参数**:
+| 参数名 | 类型 | 必需性 | 描述 |
+|--------|------|--------|------|
+| `grant_type` | string | ✅ 必需 | 固定为 `client_credentials` |
+| `scope` | string | ⚪ 可选 | 请求的权限范围 |
+
+**请求示例**:
+```http
+POST /api/v2/oauth/token
+Authorization: Basic Y29uZmlkZW50aWFsX2NsaWVudDpjbGllbnRfc2VjcmV0
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&scope=api:read
+```
+
+### 3.3 用户信息端点
+
+```http
+GET /api/v2/oauth/userinfo
+```
+
+**功能描述**: 获取当前用户的详细信息  
+**认证要求**: Bearer访问令牌  
+**范围要求**: 令牌必须包含 `openid` 范围  
+
+#### 3.3.1 请求示例
+
+```http
+GET /api/v2/oauth/userinfo HTTP/1.1
+Host: auth.company.com
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS0yMDI0LTAxIn0...
+Accept: application/json
+```
+
+#### 3.3.2 响应示例
+
+```json
+{
+  "sub": "user_123",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "张三",
+  "given_name": "三",
+  "family_name": "张",
+  "preferred_username": "zhangsan",
+  "profile": "https://example.com/profiles/zhangsan",
+  "picture": "https://example.com/avatars/zhangsan.jpg",
+  "website": "https://zhangsan.dev",
+  "gender": "male",
+  "birthdate": "1990-01-01",
+  "zoneinfo": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "phone_number": "+86-138-0013-8000",
+  "phone_number_verified": true,
+  "address": {
+    "formatted": "北京市朝阳区某某街道123号",
+    "street_address": "某某街道123号",
+    "locality": "朝阳区",
+    "region": "北京市",
+    "postal_code": "100000",
+    "country": "CN"
+  },
+  "updated_at": 1703001600
+}
+```
+
+### 3.4 JWKS端点
+
+```http
+GET /.well-known/jwks.json
+```
+
+**功能描述**: 提供JWT验证所需的公钥  
+**认证要求**: 无需认证  
+**缓存策略**: `Cache-Control: public, max-age=3600`  
+
+#### 3.4.1 响应示例
+
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "key-2024-01",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "0vx7agoebGcQSWuuiUiUJxu2K7YiNj6v...",
+      "e": "AQAB",
+      "x5c": [
+        "MIIDQjCCAiqgAwIBAgIGATz/FuLiMA0GCSqGSIb3DQEBBQUAMGIxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDTzEPMA0GA1UEBxMGRGVudmVyMRwwGgYDVQQKExNQaW5nIElkZW50aXR5IENvcnAxFzAVBgNVBAMTDkJyaWFuIENhbXBiZWxsMB4XDTE..."
+      ],
+      "x5t": "OQmrWuAPiNZmYGg..."
+    }
+  ]
+}
+```
+
+### 3.5 OpenID Connect配置端点
+
+```http  
+GET /.well-known/openid-configuration
+```
+
+**功能描述**: OIDC发现端点，提供服务配置信息  
+**认证要求**: 无需认证  
+
+#### 3.5.1 响应示例
+
+```json
+{
+  "issuer": "https://auth.company.com",
+  "authorization_endpoint": "https://auth.company.com/api/v2/oauth/authorize",
+  "token_endpoint": "https://auth.company.com/api/v2/oauth/token",
+  "userinfo_endpoint": "https://auth.company.com/api/v2/oauth/userinfo",
+  "revocation_endpoint": "https://auth.company.com/api/v2/oauth/revoke",
+  "introspection_endpoint": "https://auth.company.com/api/v2/oauth/introspect",
+  "jwks_uri": "https://auth.company.com/.well-known/jwks.json",
+  "response_types_supported": ["code"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["RS256"],
+  "scopes_supported": ["openid", "profile", "email", "address", "phone"],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post",
+    "private_key_jwt"
+  ],
+  "claims_supported": [
+    "sub", "iss", "aud", "exp", "iat", "auth_time", "nonce",
+    "email", "email_verified", "name", "given_name", "family_name",
+    "preferred_username", "profile", "picture", "website", "gender",
+    "birthdate", "zoneinfo", "locale", "phone_number", "phone_number_verified",
+    "address"
+  ],
+  "code_challenge_methods_supported": ["S256"],
+  "grant_types_supported": [
+    "authorization_code",
+    "refresh_token", 
+    "client_credentials"
+  ]
+}
 ```
 
 ## 4. 请求响应格式
 
 ### 4.1 请求格式
 
-#### 4.1.1 Content-Type
-
-```bash
-# JSON格式（推荐）
-Content-Type: application/json
-
-# 表单格式
+#### 4.1.1 OAuth2.1令牌端点
+```http
+POST /api/v2/oauth/token
 Content-Type: application/x-www-form-urlencoded
+Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
 
-# 文件上传
-Content-Type: multipart/form-data
+grant_type=authorization_code&code=abc123&redirect_uri=https%3A//app.com/callback&code_verifier=xyz789
 ```
 
-#### 4.1.2 请求头规范
-
-```bash
-# 必需头部
-Authorization: Bearer <access_token>
-Content-Type: application/json
+#### 4.1.2 API调用
+```http
+GET /api/v2/users/me
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9...
 Accept: application/json
-
-# 可选头部
-X-Request-ID: uuid-string          # 请求追踪ID
-X-Client-Version: 1.0.0            # 客户端版本
-User-Agent: MyApp/1.0.0             # 用户代理
-Accept-Language: zh-CN,en;q=0.9     # 语言偏好
 ```
 
-### 4.2 响应格式
+### 4.2 成功响应格式
 
-#### 4.2.1 成功响应
-
+#### 4.2.1 OAuth2.1令牌响应
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "123",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "created_at": "2024-01-20T10:00:00Z",
-    "updated_at": "2024-01-20T10:00:00Z"
-  },
-  "meta": {
-    "request_id": "req_123456789",
-    "timestamp": "2024-01-20T10:00:00Z",
-    "version": "v1"
-  }
-}
-```
-
-#### 4.2.2 列表响应
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "123",
-      "name": "John Doe",
-      "email": "john@example.com"
-    },
-    {
-      "id": "124",
-      "name": "Jane Smith",
-      "email": "jane@example.com"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "total_pages": 5,
-    "has_next": true,
-    "has_prev": false
-  },
-  "meta": {
-    "request_id": "req_123456789",
-    "timestamp": "2024-01-20T10:00:00Z",
-    "version": "v1"
-  }
-}
-```
-
-#### 4.2.3 空响应
-
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "Resource deleted successfully",
-  "meta": {
-    "request_id": "req_123456789",
-    "timestamp": "2024-01-20T10:00:00Z",
-    "version": "v1"
-  }
-}
-```
-
-### 4.3 响应头规范
-
-```bash
-# 标准响应头
-Content-Type: application/json; charset=utf-8
-X-Request-ID: req_123456789
-X-Response-Time: 150ms
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 999
-X-RateLimit-Reset: 1642694400
-
-# 缓存控制
-Cache-Control: no-cache, no-store, must-revalidate
-ETag: "33a64df551425fcc55e4d42a148795d9f25f89d4"
-Last-Modified: Sat, 20 Jan 2024 10:00:00 GMT
-
-# 安全头部
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-X-XSS-Protection: 1; mode=block
-```
-
-## 5. 错误处理规范
-
-### 5.1 HTTP状态码
-
-| 状态码 | 含义                  | 使用场景               |
-| ------ | --------------------- | ---------------------- |
-| 200    | OK                    | 请求成功               |
-| 201    | Created               | 资源创建成功           |
-| 204    | No Content            | 请求成功但无返回内容   |
-| 400    | Bad Request           | 请求参数错误           |
-| 401    | Unauthorized          | 未认证或认证失败       |
-| 403    | Forbidden             | 已认证但无权限         |
-| 404    | Not Found             | 资源不存在             |
-| 409    | Conflict              | 资源冲突               |
-| 422    | Unprocessable Entity  | 请求格式正确但语义错误 |
-| 429    | Too Many Requests     | 请求频率超限           |
-| 500    | Internal Server Error | 服务器内部错误         |
-| 502    | Bad Gateway           | 网关错误               |
-| 503    | Service Unavailable   | 服务不可用             |
-
-### 5.2 错误响应格式
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "请求参数验证失败",
-    "details": [
-      {
-        "field": "email",
-        "code": "INVALID_FORMAT",
-        "message": "邮箱格式不正确"
-      },
-      {
-        "field": "password",
-        "code": "TOO_SHORT",
-        "message": "密码长度至少8位"
-      }
-    ]
-  },
-  "meta": {
-    "request_id": "req_123456789",
-    "timestamp": "2024-01-20T10:00:00Z",
-    "version": "v1"
-  }
-}
-```
-
-### 5.3 错误代码规范
-
-```typescript
-// 通用错误代码
-export enum CommonErrorCode {
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  AUTHENTICATION_REQUIRED = 'AUTHENTICATION_REQUIRED',
-  INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
-  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND',
-  RESOURCE_CONFLICT = 'RESOURCE_CONFLICT',
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
-  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
-}
-
-// OAuth2特定错误代码
-export enum OAuth2ErrorCode {
-  INVALID_REQUEST = 'invalid_request',
-  INVALID_CLIENT = 'invalid_client',
-  INVALID_GRANT = 'invalid_grant',
-  UNAUTHORIZED_CLIENT = 'unauthorized_client',
-  UNSUPPORTED_GRANT_TYPE = 'unsupported_grant_type',
-  INVALID_SCOPE = 'invalid_scope',
-  ACCESS_DENIED = 'access_denied',
-}
-```
-
-## 6. 认证授权规范
-
-### 6.1 OAuth2.1流程
-
-#### 6.1.1 授权码流程
-
-```bash
-# 1. 授权请求
-GET /api/v1/oauth/authorize?
-  response_type=code&
-  client_id=your_client_id&
-  redirect_uri=https://your-app.com/callback&
-  scope=openid profile&
-  state=random_state&
-  code_challenge=challenge&
-  code_challenge_method=S256
-
-# 2. 授权响应
-HTTP/1.1 302 Found
-Location: https://your-app.com/callback?
-  code=authorization_code&
-  state=random_state
-
-# 3. 令牌请求
-POST /api/v1/oauth/token
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=authorization_code&
-code=authorization_code&
-redirect_uri=https://your-app.com/callback&
-client_id=your_client_id&
-code_verifier=verifier
-
-# 4. 令牌响应
-{
-  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9...",
   "token_type": "Bearer",
   "expires_in": 3600,
-  "refresh_token": "def50200...",
-  "scope": "openid profile"
+  "refresh_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9...",
+  "scope": "openid profile api:read"
 }
 ```
 
-#### 6.1.2 刷新令牌流程
-
-```bash
-# 刷新令牌请求
-POST /api/v1/oauth/token
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=refresh_token&
-refresh_token=def50200...&
-client_id=your_client_id
-
-# 刷新令牌响应
-{
-  "access_token": "eyJhbGciOiJSUzI1NiIs...",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "refresh_token": "def50200...",
-  "scope": "openid profile"
-}
-```
-
-### 6.2 API认证
-
-```bash
-# Bearer Token认证
-Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
-
-# API Key认证（备用方案）
-X-API-Key: your_api_key
-
-# 基础认证（仅用于客户端认证）
-Authorization: Basic base64(client_id:client_secret)
-```
-
-### 6.3 权限验证
-
+#### 4.2.2 标准API响应
 ```json
 {
-  "user_id": "123",
-  "client_id": "your_client_id",
-  "scope": ["openid", "profile", "users:read"],
-  "permissions": [
-    {
-      "resource": "users",
-      "actions": ["read", "write"]
-    },
-    {
-      "resource": "roles",
-      "actions": ["read"]
-    }
-  ]
-}
-```
-
-## 7. 版本管理规范
-
-### 7.1 版本策略
-
-- **URL版本控制**: `/api/v1/`, `/api/v2/`
-- **语义化版本**: 主版本.次版本.修订版本
-- **向后兼容**: 同一主版本内保持向后兼容
-- **废弃通知**: 提前6个月通知API废弃
-
-### 7.2 版本生命周期
-
-```bash
-# 当前支持的版本
-v1.0 - 稳定版本（推荐使用）
-v1.1 - 最新版本
-v0.9 - 废弃版本（6个月后停止支持）
-
-# 版本响应头
-API-Version: v1.1
-API-Supported-Versions: v1.0, v1.1
-API-Deprecated-Versions: v0.9
-```
-
-### 7.3 版本迁移指南
-
-```markdown
-# v1.0 到 v1.1 迁移指南
-
-## 新增功能
-
-- 添加用户头像字段
-- 支持批量操作API
-
-## 变更内容
-
-- `created_time` 字段重命名为 `created_at`
-- 分页参数 `page_size` 重命名为 `limit`
-
-## 废弃功能
-
-- `GET /api/v1/user` 已废弃，请使用 `GET /api/v1/users/{id}`
-
-## 兼容性
-
-- 所有v1.0 API在v1.1中仍然可用
-- 建议在2024年6月前完成迁移
-```
-
-## 8. 文档格式规范
-
-### 8.1 OpenAPI规范
-
-```yaml
-openapi: 3.0.3
-info:
-  title: OAuth2.1 认证授权中心 API
-  description: 企业级OAuth2.1认证授权中心API文档
-  version: 1.0.0
-  contact:
-    name: 开发团队
-    email: dev@example.com
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
-
-servers:
-  - url: https://api.example.com/v1
-    description: 生产环境
-  - url: https://staging-api.example.com/v1
-    description: 测试环境
-
-paths:
-  /users:
-    get:
-      summary: 获取用户列表
-      description: 分页获取系统用户列表
-      tags:
-        - Users
-      parameters:
-        - name: page
-          in: query
-          description: 页码
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: limit
-          in: query
-          description: 每页数量
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        '200':
-          description: 成功获取用户列表
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-      security:
-        - BearerAuth: []
-
-components:
-  schemas:
-    User:
-      type: object
-      required:
-        - id
-        - name
-        - email
-      properties:
-        id:
-          type: string
-          description: 用户ID
-          example: '123'
-        name:
-          type: string
-          description: 用户姓名
-          example: '张三'
-        email:
-          type: string
-          format: email
-          description: 用户邮箱
-          example: 'zhangsan@example.com'
-        created_at:
-          type: string
-          format: date-time
-          description: 创建时间
-          example: '2024-01-20T10:00:00Z'
-
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  responses:
-    Unauthorized:
-      description: 未认证
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-```
-
-### 8.2 API文档结构
-
-````markdown
-# API端点文档模板
-
-## GET /api/v1/users/{id}
-
-### 描述
-
-根据用户ID获取用户详细信息。
-
-### 请求参数
-
-#### 路径参数
-
-| 参数名 | 类型   | 必需 | 描述   |
-| ------ | ------ | ---- | ------ |
-| id     | string | 是   | 用户ID |
-
-#### 查询参数
-
-| 参数名 | 类型   | 必需 | 默认值   | 描述                   |
-| ------ | ------ | ---- | -------- | ---------------------- |
-| fields | string | 否   | 全部字段 | 返回字段列表，逗号分隔 |
-
-#### 请求头
-
-| 头部名称      | 类型   | 必需 | 描述         |
-| ------------- | ------ | ---- | ------------ |
-| Authorization | string | 是   | Bearer token |
-
-### 响应
-
-#### 成功响应 (200)
-
-```json
-{
-  "success": true,
   "data": {
-    "id": "123",
-    "name": "张三",
-    "email": "zhangsan@example.com",
-    "created_at": "2024-01-20T10:00:00Z"
-  }
-}
-```
-````
-
-#### 错误响应
-
-**404 Not Found**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "用户不存在"
+    "id": "user_123",
+    "username": "zhangsan",
+    "email": "zhangsan@example.com"
+  },
+  "meta": {
+    "timestamp": "2024-12-20T10:30:00Z",
+    "version": "v2"
   }
 }
 ```
 
-### 示例
-
-#### cURL
-
-```bash
-curl -X GET "https://api.example.com/v1/users/123" \
-  -H "Authorization: Bearer your_access_token" \
-  -H "Accept: application/json"
-```
-
-#### JavaScript
-
-```javascript
-const response = await fetch('https://api.example.com/v1/users/123', {
-  headers: {
-    Authorization: 'Bearer your_access_token',
-    Accept: 'application/json',
-  },
-});
-const user = await response.json();
-```
-
-#### Python
-
-```python
-import requests
-
-headers = {
-    'Authorization': 'Bearer your_access_token',
-    'Accept': 'application/json'
-}
-
-response = requests.get('https://api.example.com/v1/users/123', headers=headers)
-user = response.json()
-```
-
-````
-
-## 9. 安全规范
-
-### 9.1 传输安全
-
-- **HTTPS强制**: 所有API必须使用HTTPS
-- **TLS版本**: 最低支持TLS 1.2
-- **证书验证**: 严格验证SSL证书
-- **HSTS**: 启用HTTP严格传输安全
-
-### 9.2 认证安全
-
-```bash
-# JWT令牌安全
-- 使用RS256算法签名
-- 设置合理的过期时间（15分钟-1小时）
-- 实现令牌轮换机制
-- 维护令牌黑名单
-
-# PKCE安全
-- 强制使用S256方法
-- code_verifier长度至少43字符
-- 一次性使用授权码
-````
-
-### 9.3 输入验证
-
-```typescript
-// 输入验证示例
-export const userCreateSchema = {
-  type: 'object',
-  required: ['name', 'email', 'password'],
-  properties: {
-    name: {
-      type: 'string',
-      minLength: 2,
-      maxLength: 50,
-      pattern: '^[\u4e00-\u9fa5a-zA-Z\s]+$',
-    },
-    email: {
-      type: 'string',
-      format: 'email',
-      maxLength: 100,
-    },
-    password: {
-      type: 'string',
-      minLength: 8,
-      maxLength: 128,
-      pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]',
-    },
-  },
-  additionalProperties: false,
-};
-```
-
-### 9.4 速率限制
-
-```bash
-# 速率限制策略
-- 全局限制: 1000请求/小时
-- 认证端点: 10请求/分钟
-- 敏感操作: 5请求/分钟
-- IP白名单: 无限制
-
-# 响应头
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 999
-X-RateLimit-Reset: 1642694400
-Retry-After: 60
-```
-
-## 10. 性能规范
-
-### 10.1 响应时间
-
-| 操作类型 | 目标响应时间 | 最大响应时间 |
-| -------- | ------------ | ------------ |
-| 简单查询 | < 100ms      | < 500ms      |
-| 复杂查询 | < 500ms      | < 2s         |
-| 数据创建 | < 200ms      | < 1s         |
-| 数据更新 | < 200ms      | < 1s         |
-| 文件上传 | < 5s         | < 30s        |
-
-### 10.2 缓存策略
-
-```bash
-# 缓存控制头
-Cache-Control: public, max-age=3600        # 公共资源，1小时
-Cache-Control: private, max-age=300         # 私有资源，5分钟
-Cache-Control: no-cache, no-store           # 敏感数据，不缓存
-
-# ETag支持
-ETag: "33a64df551425fcc55e4d42a148795d9f25f89d4"
-If-None-Match: "33a64df551425fcc55e4d42a148795d9f25f89d4"
-```
-
-### 10.3 分页优化
-
+#### 4.2.3 分页响应
 ```json
 {
   "data": [...],
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 1000,
-    "total_pages": 50,
-    "has_next": true,
-    "has_prev": false,
-    "next_cursor": "eyJpZCI6MTIzfQ==",
-    "prev_cursor": null
-  },
-  "links": {
-    "first": "/api/v1/users?page=1&limit=20",
-    "last": "/api/v1/users?page=50&limit=20",
-    "next": "/api/v1/users?page=2&limit=20",
-    "prev": null
-  }
-}
-```
-
-### 10.4 压缩支持
-
-```bash
-# 请求压缩
-Accept-Encoding: gzip, deflate, br
-
-# 响应压缩
-Content-Encoding: gzip
-Vary: Accept-Encoding
-```
-
-## 11. V2 API 详细规范
-
-### 11.1 认证授权 API
-
-#### 11.1.1 授权端点
-
-**基本信息**
-- **路径**: `/api/v2/oauth/authorize`
-- **方法**: GET
-- **描述**: OAuth2.1 授权码流程的授权端点，支持PKCE扩展
-- **认证**: 无需Bearer Token（用户登录验证）
-
-**请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 示例 |
-|--------|------|------|------|------|
-| response_type | string | 是 | 响应类型，固定为"code" | code |
-| client_id | string | 是 | 客户端标识符 | my_client_app |
-| redirect_uri | string | 是 | 重定向URI | https://app.example.com/callback |
-| scope | string | 否 | 请求的权限范围 | read write |
-| state | string | 推荐 | 防CSRF攻击的随机字符串 | xyz123 |
-| code_challenge | string | 推荐 | PKCE代码挑战 | E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM |
-| code_challenge_method | string | 推荐 | PKCE挑战方法 | S256 |
-
-**请求示例**
-```http
-GET /api/v2/oauth/authorize?response_type=code&client_id=my_client_app&redirect_uri=https%3A//app.example.com/callback&scope=read%20write&state=xyz123&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256 HTTP/1.1
-Host: auth.example.com
-```
-
-**成功响应**
-- **状态码**: 302 Found
-- **描述**: 重定向到客户端指定的redirect_uri
-
-```http
-HTTP/1.1 302 Found
-Location: https://app.example.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz123
-```
-
-**错误响应**
-```http
-HTTP/1.1 302 Found
-Location: https://app.example.com/callback?error=invalid_request&error_description=Missing%20required%20parameter%3A%20client_id&state=xyz123
-```
-
-**错误码说明**
-- `invalid_request`: 请求缺少必需参数或格式错误
-- `unauthorized_client`: 客户端未授权使用此方法
-- `access_denied`: 用户拒绝授权请求
-- `unsupported_response_type`: 不支持的响应类型
-- `invalid_scope`: 请求的范围无效或未知
-- `server_error`: 服务器内部错误
-
-#### 11.1.2 令牌端点
-
-**基本信息**
-- **路径**: `/api/v2/oauth/token`
-- **方法**: POST
-- **描述**: 获取访问令牌，支持多种授权类型
-- **认证**: 客户端认证（Basic Auth或请求体）
-
-**请求头**
-```http
-Content-Type: application/x-www-form-urlencoded
-Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
-```
-
-**授权码模式请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 示例 |
-|--------|------|------|------|------|
-| grant_type | string | 是 | 授权类型，值为"authorization_code" | authorization_code |
-| code | string | 是 | 授权码 | SplxlOBeZQQYbYS6WxSbIA |
-| redirect_uri | string | 是 | 重定向URI（必须与授权请求一致） | https://app.example.com/callback |
-| client_id | string | 是* | 客户端ID（如果未在Authorization头中提供） | my_client_app |
-| client_secret | string | 是* | 客户端密钥（如果未在Authorization头中提供） | client_secret_123 |
-| code_verifier | string | 否 | PKCE代码验证器 | dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk |
-
-**客户端凭证模式请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 示例 |
-|--------|------|------|------|------|
-| grant_type | string | 是 | 授权类型，值为"client_credentials" | client_credentials |
-| scope | string | 否 | 请求的权限范围 | read write |
-| client_id | string | 是* | 客户端ID | my_client_app |
-| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
-
-**刷新令牌请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 示例 |
-|--------|------|------|------|------|
-| grant_type | string | 是 | 授权类型，值为"refresh_token" | refresh_token |
-| refresh_token | string | 是 | 刷新令牌 | tGzv3JOkF0XG5Qx2TlKWIA |
-| scope | string | 否 | 请求的权限范围（不能超过原始范围） | read |
-| client_id | string | 是* | 客户端ID | my_client_app |
-| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
-
-**请求示例**
-```http
-POST /api/v2/oauth/token HTTP/1.1
-Host: auth.example.com
-Content-Type: application/x-www-form-urlencoded
-Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
-
-grant_type=authorization_code&code=SplxlOBeZQQYbYS6WxSbIA&redirect_uri=https%3A//app.example.com/callback&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
-```
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": {
-    "access_token": "2YotnFZFEjr1zCsicMWpAA",
-    "token_type": "Bearer",
-    "expires_in": 3600,
-    "refresh_token": "tGzv3JOkF0XG5Qx2TlKWIA",
-    "scope": "read write"
+    "total": 100,
+    "pages": 5
   },
   "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
+    "timestamp": "2024-12-20T10:30:00Z"
   }
 }
 ```
 
-**错误响应**
+## 5. 错误处理规范
+
+### 5.1 OAuth2.1错误格式
+
+符合RFC 6749标准：
+
 ```json
 {
-  "success": false,
+  "error": "invalid_request",
+  "error_description": "Missing required parameter: code_verifier",
+  "error_uri": "https://auth.company.com/docs/errors#invalid_request",
+  "state": "xyz"
+}
+```
+
+### 5.2 标准API错误格式
+
+```json
+{
   "error": {
-    "code": "invalid_grant",
-    "message": "The provided authorization grant is invalid, expired, revoked, or does not match the redirection URI",
-    "details": {
-      "grant_type": "authorization_code",
-      "error_uri": "https://docs.example.com/oauth/errors#invalid_grant"
-    }
-  },
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
-  }
-}
-```
-
-#### 11.1.3 令牌撤销
-
-**基本信息**
-- **路径**: `/api/v2/oauth/revoke`
-- **方法**: POST
-- **描述**: 撤销访问令牌或刷新令牌
-- **认证**: 客户端认证
-
-**请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 示例 |
-|--------|------|------|------|------|
-| token | string | 是 | 要撤销的令牌 | 2YotnFZFEjr1zCsicMWpAA |
-| token_type_hint | string | 否 | 令牌类型提示 | access_token 或 refresh_token |
-| client_id | string | 是* | 客户端ID | my_client_app |
-| client_secret | string | 是* | 客户端密钥 | client_secret_123 |
-
-**请求示例**
-```http
-POST /api/v2/oauth/revoke HTTP/1.1
-Host: auth.example.com
-Content-Type: application/x-www-form-urlencoded
-Authorization: Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=
-
-token=2YotnFZFEjr1zCsicMWpAA&token_type_hint=access_token
-```
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": {
-    "revoked": true,
-    "token_type": "access_token"
-  },
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
-  }
-}
-```
-
-### 11.2 用户管理 API
-
-#### 11.2.1 用户列表
-
-**基本信息**
-- **路径**: `/api/v2/users`
-- **方法**: GET
-- **描述**: 获取用户列表，支持分页和筛选
-- **权限**: `users:list`
-
-**请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
-|--------|------|------|------|--------|------|
-| page | number | 否 | 页码 | 1 | 1 |
-| pageSize | number | 否 | 每页数量 | 20 | 10 |
-| search | string | 否 | 搜索关键词（用户名、邮箱） | - | john |
-| status | string | 否 | 用户状态筛选 | - | active |
-| sortBy | string | 否 | 排序字段 | createdAt | username |
-| sortOrder | string | 否 | 排序方向 | desc | asc |
-
-**请求示例**
-```http
-GET /api/v2/users?page=1&pageSize=10&search=john&status=active&sortBy=username&sortOrder=asc HTTP/1.1
-Host: auth.example.com
-Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-```
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "user_123",
-      "username": "john_doe",
-      "email": "john@example.com",
-      "displayName": "John Doe",
-      "isActive": true,
-      "lastLoginAt": "2024-12-19T09:30:00Z",
-      "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-12-19T09:30:00Z",
-      "roles": [
-        {
-          "id": "role_456",
-          "name": "user",
-          "displayName": "普通用户"
-        }
-      ]
-    }
-  ],
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789",
-    "pagination": {
-      "page": 1,
-      "pageSize": 10,
-      "total": 150,
-      "totalPages": 15,
-      "hasNext": true,
-      "hasPrev": false
-    }
-  }
-}
-```
-
-#### 11.2.2 创建用户
-
-**基本信息**
-- **路径**: `/api/v2/users`
-- **方法**: POST
-- **描述**: 创建新用户
-- **权限**: `users:create`
-
-**请求体**
-```json
-{
-  "username": "jane_doe",
-  "email": "jane@example.com",
-  "password": "SecurePassword123!",
-  "displayName": "Jane Doe",
-  "isActive": true,
-  "roleIds": ["role_456"]
-}
-```
-
-**字段验证规则**
-
-| 字段名 | 类型 | 必需 | 验证规则 | 描述 |
-|--------|------|------|----------|------|
-| username | string | 是 | 3-50字符，字母数字下划线 | 用户名 |
-| email | string | 是 | 有效邮箱格式 | 邮箱地址 |
-| password | string | 是 | 8-128字符，包含大小写字母数字特殊字符 | 密码 |
-| displayName | string | 否 | 1-100字符 | 显示名称 |
-| isActive | boolean | 否 | true/false | 是否激活 |
-| roleIds | string[] | 否 | 有效的角色ID数组 | 角色列表 |
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "user_789",
-    "username": "jane_doe",
-    "email": "jane@example.com",
-    "displayName": "Jane Doe",
-    "isActive": true,
-    "createdAt": "2024-12-19T10:30:00Z",
-    "updatedAt": "2024-12-19T10:30:00Z",
-    "roles": [
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input parameters",
+    "details": [
       {
-        "id": "role_456",
-        "name": "user",
-        "displayName": "普通用户"
+        "field": "email",
+        "message": "Invalid email format"
       }
     ]
   },
   "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
+    "timestamp": "2024-12-20T10:30:00Z",
+    "request_id": "req_123456"
   }
 }
 ```
 
-### 11.3 角色管理 API
+### 5.3 HTTP状态码
 
-#### 11.3.1 角色列表
+| 状态码 | 含义 | 使用场景 |
+|--------|------|----------|
+| `200` | 成功 | 标准成功响应 |
+| `201` | 已创建 | 资源创建成功 |
+| `400` | 请求错误 | 参数验证失败，OAuth2.1错误 |
+| `401` | 未认证 | 缺少或无效的访问令牌 |
+| `403` | 权限不足 | 令牌有效但权限不够 |
+| `404` | 未找到 | 资源不存在 |
+| `429` | 限流 | 请求频率超限 |
+| `500` | 服务器错误 | 内部错误 |
 
-**基本信息**
-- **路径**: `/api/v2/roles`
-- **方法**: GET
-- **描述**: 获取角色列表，支持分页和筛选
-- **权限**: `roles:list`
+## 6. 安全机制
 
-**请求参数**
+### 6.1 OAuth2.1安全增强
 
-| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
-|--------|------|------|------|--------|------|
-| page | number | 否 | 页码 | 1 | 1 |
-| pageSize | number | 否 | 每页数量 | 20 | 10 |
-| search | string | 否 | 搜索关键词（角色名称） | - | admin |
-| isActive | boolean | 否 | 是否激活 | - | true |
-| includePermissions | boolean | 否 | 是否包含权限信息 | false | true |
+- **强制PKCE**: 所有客户端必须使用PKCE
+- **State参数**: 防止CSRF攻击
+- **短期令牌**: Access Token默认1小时过期
+- **令牌撤销**: 支持主动令牌撤销
+- **HTTPS强制**: 生产环境必须使用HTTPS
 
-**成功响应**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "role_123",
-      "name": "admin",
-      "displayName": "系统管理员",
-      "description": "拥有系统所有权限的管理员角色",
-      "isActive": true,
-      "createdAt": "2024-01-01T00:00:00Z",
-      "updatedAt": "2024-12-19T10:30:00Z",
-      "permissions": [
-        {
-          "id": "perm_456",
-          "name": "users:*",
-          "resource": "users",
-          "action": "*",
-          "type": "api",
-          "description": "用户管理所有权限"
-        }
-      ],
-      "userCount": 5
+### 6.2 JWT安全特性
+
+- **RSA256签名**: 使用非对称加密算法
+- **令牌绑定**: 令牌绑定特定客户端和用户
+- **过期验证**: 自动过期时间检查
+- **JTI追踪**: 唯一令牌标识符，支持黑名单
+- **公钥分发**: 通过JWKS端点分发验证公钥
+
+### 6.3 API安全措施
+
+- **限流保护**: IP和客户端级别限流
+- **输入验证**: Zod schema严格验证
+- **权限检查**: 基于角色和权限的访问控制
+- **审计日志**: 完整的操作审计记录
+- **敏感信息保护**: 不在日志中记录敏感数据
+
+## 7. 客户端集成指南
+
+### 7.1 安全的令牌存储
+```typescript
+// ✅ 推荐做法
+class TokenManager {
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  
+  // Access Token存储在内存中
+  setAccessToken(token: string) {
+    this.accessToken = token;
+  }
+  
+  // Refresh Token存储在HttpOnly Cookie中
+  setRefreshToken(token: string) {
+    // 由服务器设置HttpOnly Cookie
+    // document.cookie = `refresh_token=${token}; HttpOnly; Secure; SameSite=Strict`;
+  }
+  
+  // 自动刷新令牌
+  async getValidAccessToken(): Promise<string> {
+    if (this.accessToken && !this.isTokenExpired(this.accessToken)) {
+      return this.accessToken;
     }
-  ],
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789",
-    "pagination": {
-      "page": 1,
-      "pageSize": 10,
-      "total": 25,
-      "totalPages": 3,
-      "hasNext": true,
-      "hasPrev": false
-    }
+    
+    // 使用refresh token获取新的access token
+    return await this.refreshAccessToken();
   }
 }
 ```
 
-#### 11.3.2 创建角色
-
-**基本信息**
-- **路径**: `/api/v2/roles`
-- **方法**: POST
-- **描述**: 创建新角色
-- **权限**: `roles:create`
-
-**请求体**
-```json
-{
-  "name": "editor",
-  "displayName": "编辑员",
-  "description": "内容编辑权限",
-  "isActive": true,
-  "permissionIds": ["perm_789", "perm_012"]
-}
-```
-
-**字段验证规则**
-
-| 字段名 | 类型 | 必需 | 验证规则 | 描述 |
-|--------|------|------|----------|------|
-| name | string | 是 | 2-50字符，字母数字下划线 | 角色名称（唯一） |
-| displayName | string | 是 | 1-100字符 | 显示名称 |
-| description | string | 否 | 最大500字符 | 角色描述 |
-| isActive | boolean | 否 | true/false | 是否激活 |
-| permissionIds | string[] | 否 | 有效的权限ID数组 | 权限列表 |
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "role_345",
-    "name": "editor",
-    "displayName": "编辑员",
-    "description": "内容编辑权限",
-    "isActive": true,
-    "createdAt": "2024-12-19T10:30:00Z",
-    "updatedAt": "2024-12-19T10:30:00Z",
-    "permissions": [
-      {
-        "id": "perm_789",
-        "name": "content:write",
-        "resource": "content",
-        "action": "write",
-        "type": "api"
+### 7.2 错误处理
+```typescript
+// ✅ 完整的错误处理
+async function apiCall(endpoint: string, options?: RequestInit) {
+  try {
+    const token = await tokenManager.getValidAccessToken();
+    
+    const response = await fetch(endpoint, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options?.headers
       }
-    ]
-  },
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
-  }
-}
-```
-
-### 11.4 权限管理 API
-
-#### 11.4.1 权限列表
-
-**基本信息**
-- **路径**: `/api/v2/permissions`
-- **方法**: GET
-- **描述**: 获取权限列表，支持分页和筛选
-- **权限**: `permissions:list`
-
-**请求参数**
-
-| 参数名 | 类型 | 必需 | 描述 | 默认值 | 示例 |
-|--------|------|------|------|--------|------|
-| page | number | 否 | 页码 | 1 | 1 |
-| pageSize | number | 否 | 每页数量 | 20 | 10 |
-| search | string | 否 | 搜索关键词（权限名称） | - | users |
-| type | string | 否 | 权限类型筛选 | - | api |
-| resource | string | 否 | 资源筛选 | - | users |
-| action | string | 否 | 操作筛选 | - | read |
-
-**成功响应**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "perm_123",
-      "name": "users:read",
-      "resource": "users",
-      "action": "read",
-      "type": "api",
-      "description": "读取用户信息权限",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "updatedAt": "2024-12-19T10:30:00Z",
-      "roleCount": 3
+    });
+    
+    if (response.status === 401) {
+      // 令牌无效，重新认证
+      window.location.href = '/oauth/authorize';
+      return;
     }
-  ],
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789",
-    "pagination": {
-      "page": 1,
-      "pageSize": 10,
-      "total": 50,
-      "totalPages": 5,
-      "hasNext": true,
-      "hasPrev": false
+    
+    if (response.status === 403) {
+      throw new Error('权限不足');
     }
-  }
-}
-```
-
-#### 11.4.2 创建权限
-
-**基本信息**
-- **路径**: `/api/v2/permissions`
-- **方法**: POST
-- **描述**: 创建新权限
-- **权限**: `permissions:create`
-
-**API权限请求体**
-```json
-{
-  "type": "api",
-  "name": "content:write",
-  "resource": "content",
-  "action": "write",
-  "description": "内容写入权限",
-  "apiConfig": {
-    "method": "POST",
-    "path": "/api/v2/content",
-    "requireAuth": true
-  }
-}
-```
-
-**菜单权限请求体**
-```json
-{
-  "type": "menu",
-  "name": "admin_panel",
-  "resource": "admin",
-  "action": "access",
-  "description": "管理面板访问权限",
-  "menuConfig": {
-    "menuId": "admin-panel",
-    "path": "/admin",
-    "icon": "admin",
-    "order": 1
-  }
-}
-```
-
-**数据权限请求体**
-```json
-{
-  "type": "data",
-  "name": "user_data_own",
-  "resource": "users",
-  "action": "read",
-  "description": "只能访问自己的用户数据",
-  "dataConfig": {
-    "scope": "own",
-    "conditions": {
-      "userId": "{{current_user_id}}"
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error_description || 'API调用失败');
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API调用错误:', error);
+    throw error;
   }
 }
 ```
 
-**成功响应**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "perm_456",
-    "name": "content:write",
-    "resource": "content",
-    "action": "write",
-    "type": "api",
-    "description": "内容写入权限",
-    "createdAt": "2024-12-19T10:30:00Z",
-    "updatedAt": "2024-12-19T10:30:00Z",
-    "apiConfig": {
-      "method": "POST",
-      "path": "/api/v2/content",
-      "requireAuth": true
+## 8. 最佳实践
+
+### 8.1 客户端实现
+
+#### 8.1.1 安全的令牌存储
+```typescript
+// ✅ 推荐做法
+class TokenManager {
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  
+  // Access Token存储在内存中
+  setAccessToken(token: string) {
+    this.accessToken = token;
+  }
+  
+  // Refresh Token存储在HttpOnly Cookie中
+  setRefreshToken(token: string) {
+    // 由服务器设置HttpOnly Cookie
+    // document.cookie = `refresh_token=${token}; HttpOnly; Secure; SameSite=Strict`;
+  }
+  
+  // 自动刷新令牌
+  async getValidAccessToken(): Promise<string> {
+    if (this.accessToken && !this.isTokenExpired(this.accessToken)) {
+      return this.accessToken;
     }
-  },
-  "meta": {
-    "timestamp": "2024-12-19T10:30:00Z",
-    "requestId": "req_123456789"
+    
+    // 使用refresh token获取新的access token
+    return await this.refreshAccessToken();
+  }
+}
+```
+
+#### 8.1.2 错误处理
+```typescript
+// ✅ 完整的错误处理
+async function apiCall(endpoint: string, options?: RequestInit) {
+  try {
+    const token = await tokenManager.getValidAccessToken();
+    
+    const response = await fetch(endpoint, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options?.headers
+      }
+    });
+    
+    if (response.status === 401) {
+      // 令牌无效，重新认证
+      window.location.href = '/oauth/authorize';
+      return;
+    }
+    
+    if (response.status === 403) {
+      throw new Error('权限不足');
+    }
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error_description || 'API调用失败');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API调用错误:', error);
+    throw error;
+  }
+}
+```
+
+### 8.2 服务端实现
+
+#### 8.2.1 JWT中间件
+```typescript
+// ✅ 使用Jose库的验证中间件
+import * as jose from 'jose';
+
+export async function jwtMiddleware(request: Request) {
+  const authorization = request.headers.get('authorization');
+  
+  if (!authorization?.startsWith('Bearer ')) {
+    return { error: 'Missing or invalid authorization header' };
+  }
+  
+  const token = authorization.substring(7);
+  
+  try {
+    const JWKS = jose.createRemoteJWKSet(
+      new URL(process.env.JWKS_URI!)
+    );
+    
+    const { payload } = await jose.jwtVerify(token, JWKS, {
+      issuer: process.env.JWT_ISSUER,
+      audience: process.env.JWT_AUDIENCE,
+      algorithms: ['RS256'],
+    });
+    
+    return { 
+      userId: payload.sub,
+      clientId: payload.client_id,
+      scopes: payload.scope?.split(' ') || [],
+      permissions: payload.permissions || []
+    };
+  } catch (error) {
+    return { error: 'Invalid token' };
+  }
+}
+```
+
+#### 8.2.2 权限检查
+```typescript
+// ✅ 权限检查装饰器
+function requireScope(requiredScope: string) {
+  return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = async function(...args: any[]) {
+      const authContext = args[0].authContext; // 从请求中获取认证上下文
+      
+      if (!authContext.scopes.includes(requiredScope)) {
+        throw new Error(`Required scope: ${requiredScope}`);
+      }
+      
+      return originalMethod.apply(this, args);
+    };
+  };
+}
+
+// 使用示例
+class UserController {
+  @requireScope('user:read')
+  async getUser(request: AuthenticatedRequest) {
+    // 实现用户获取逻辑
+  }
+  
+  @requireScope('user:write')
+  async updateUser(request: AuthenticatedRequest) {
+    // 实现用户更新逻辑
+  }
+}
+```
+
+### 8.3 监控与日志
+
+#### 8.3.1 审计日志
+```typescript
+// ✅ 结构化审计日志
+interface AuditEvent {
+  timestamp: string;
+  userId?: string;
+  clientId?: string;
+  action: string;
+  resource: string;
+  success: boolean;
+  errorMessage?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+async function logAuditEvent(event: AuditEvent) {
+  const auditLog = {
+    ...event,
+    timestamp: new Date().toISOString(),
+    id: crypto.randomUUID()
+  };
+  
+  // 记录到数据库或日志系统
+  await prisma.auditLog.create({ data: auditLog });
+  
+  // 安全敏感事件额外告警
+  if (!event.success && ['token_issued', 'permission_granted'].includes(event.action)) {
+    await sendSecurityAlert(auditLog);
   }
 }
 ```
 
 ---
 
-**注意**: 本规范是活文档，会根据项目发展和最佳实践的演进持续更新。所有API开发都应遵循此规范，确保API的一致性和开发者体验。
+**注意**: 本系统完全基于OAuth2.1标准实现，不提供独立的login端点。所有认证操作必须通过标准的OAuth2.1授权码流程完成。JWT令牌使用Jose库处理，确保安全性和标准兼容性。
+
