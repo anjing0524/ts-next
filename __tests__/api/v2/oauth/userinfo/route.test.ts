@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/v2/oauth/userinfo/route';
 import { prisma } from '@/lib/prisma';
 import { authenticateBearer } from '@/lib/auth/middleware';
-import { generateTestJWT, createTestUser, clearTestData } from '../../../setup/test-helpers';
+import { createTestAuthCenterSessionToken, createTestUser, cleanupTestData } from '../../../../setup/test-helpers';
 
 // 模拟依赖
 jest.mock('@/lib/prisma', () => ({
@@ -28,27 +28,17 @@ describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
 
   beforeAll(async () => {
     // 生成有效的访问令牌
-    validAccessToken = await generateTestJWT({
-      sub: 'test_user_001',
-      client_id: 'test_client_001',
-      scope: 'openid profile email',
-      aud: 'api_resource',
-      permissions: ['user:read'],
-    });
+    validAccessToken = await createTestAuthCenterSessionToken('test_user_001');
   });
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
     // 创建测试用户
-    testUser = createTestUser({
+    testUser = await createTestUser({
       id: 'test_user_001',
       email: 'test@example.com',
-      firstName: 'John',
-      lastName: 'Doe',
       username: 'johndoe',
-      picture: 'https://example.com/avatar.jpg',
-      emailVerified: true,
       isActive: true,
     });
 

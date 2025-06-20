@@ -9,7 +9,7 @@ import { describe, it, expect } from '@jest/globals';
 
 // 简单的Mock实现来验证基本逻辑
 class MockRBACService {
-  static async getUserPermissions(userId: string) {
+  static async getUserPermissions(userId: string): Promise<any> {
     if (userId === 'nonexistent') {
       return null;
     }

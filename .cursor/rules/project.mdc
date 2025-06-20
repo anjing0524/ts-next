@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 1. 本项目使用nextjs@15，结合shadcn/ui tailwindcss
 2. 本项目可能需要rust 以及 wasm-pack 编译webassemble
@@ -28,7 +28,7 @@ alwaysApply: false
 16. 需要符合软件设计最佳实践
 17. 在停止之前一定要向我确认，直到我确认停止才能停止。
 18. 需要先完善文档，符合我的需要再修改代码，最后执行测试，形成 文档-编码-测试一体的思路
-19. 需要向我确认的内容实用对话的方式
+19. 需要向我确认的内容实用对话让我点击确认
 20. 文档日期选择今天最新日期
-21. 团队名字为
+21. 多个task需要合并调用模型
 
