@@ -21,21 +21,31 @@ export async function cleanupTestData(): Promise<void> {
   await prisma.authorizationCode.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.rolePermission.deleteMany();
+  await prisma.consentGrant.deleteMany();
+  await prisma.revokedAuthJti.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.passwordHistory.deleteMany();
+  await prisma.loginAttempt.deleteMany();
   await prisma.oAuthClient.deleteMany();
   await prisma.user.deleteMany();
   await prisma.role.deleteMany();
   await prisma.permission.deleteMany();
+  await prisma.apiPermission.deleteMany();
+  await prisma.menuPermission.deleteMany();
+  await prisma.dataPermission.deleteMany();
+  await prisma.menu.deleteMany();
   await prisma.scope.deleteMany();
+  await prisma.systemConfiguration.deleteMany();
+  await prisma.securityPolicy.deleteMany();
 }
 
 /**
- * 初始化测试数据库
+ * 初始化测试数据
  */
-export async function initTestDatabase(): Promise<void> {
-  await cleanupTestData();
+export async function initializeTestData(): Promise<void> {
   await createTestPermissions();
   await createTestRoles();
-  await createTestScopes();
+  await createTestRolePermissions();
 }
 
 // ===== 测试数据创建 =====
@@ -43,8 +53,7 @@ export async function initTestDatabase(): Promise<void> {
 export interface TestUser {
   id: string;
   username: string;
-  email: string;
-  password: string;
+  email?: string;
   isActive: boolean;
 }
 
@@ -54,270 +63,83 @@ export interface TestClient {
   clientSecret?: string;
   name: string;
   redirectUris: string[];
-  allowedScopes: string[];
   grantTypes: string[];
-  clientType: 'PUBLIC' | 'CONFIDENTIAL';
-  requirePkce: boolean;
+  responseTypes: string[];
+  allowedScopes: string[];
 }
 
 /**
  * 创建测试用户
  */
-export async function createTestUser(overrides: Partial<TestUser> = {}): Promise<TestUser> {
-  const bcrypt = await import('bcrypt');
+export async function createTestUser(userData: TestUser): Promise<any> {
+  const hashedPassword = await hashPassword('testpassword123');
   
-  const defaultUser: TestUser = {
-    id: `test_user_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-    username: `testuser_${Date.now()}`,
-    email: `test_${Date.now()}@example.com`,
-    password: 'TestPassword123!',
-    isActive: true,
-  };
-
-  const userData = { ...defaultUser, ...overrides };
-  const hashedPassword = await bcrypt.hash(userData.password, 12);
-
   const createdUser = await prisma.user.create({
     data: {
       id: userData.id,
       username: userData.username,
       passwordHash: hashedPassword,
       isActive: userData.isActive,
-      firstName: 'Test',
-      lastName: 'User',
       displayName: `${userData.username} Display`,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
   });
-
-  return {
-    ...userData,
-    id: createdUser.id,
-  };
+  
+  return createdUser;
 }
 
 /**
  * 创建测试OAuth客户端
  */
-export async function createTestOAuthClient(overrides: Partial<TestClient> = {}): Promise<TestClient> {
-  const bcrypt = await import('bcrypt');
+export async function createTestClient(clientData: TestClient): Promise<any> {
+  const hashedSecret = clientData.clientSecret ? await hashPassword(clientData.clientSecret) : undefined;
   
-  const defaultClient: TestClient = {
-    id: `test_client_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-    clientId: `test_client_${Date.now()}`,
-    name: 'Test OAuth Client',
-    redirectUris: ['http://localhost:3000/callback', 'https://app.example.com/auth/callback'],
-    allowedScopes: ['openid', 'profile', 'email', 'api:read', 'api:write'],
-    grantTypes: ['authorization_code', 'refresh_token'],
-    clientType: 'CONFIDENTIAL',
-    requirePkce: true,
-  };
-
-  const clientData = { ...defaultClient, ...overrides };
-  
-  // 生成客户端密钥（如果是机密客户端）
-  let hashedSecret: string | null = null;
-  let plainSecret: string | undefined = undefined;
-  
-  if (clientData.clientType === 'CONFIDENTIAL') {
-    plainSecret = `secret_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
-    hashedSecret = await bcrypt.hash(plainSecret, 12);
-  }
-
   const createdClient = await prisma.oAuthClient.create({
     data: {
+      id: clientData.id,
       clientId: clientData.clientId,
-      name: clientData.name,
-      description: `Test client for OAuth2.1 testing`,
       clientSecret: hashedSecret,
-      clientType: clientData.clientType,
+      name: clientData.name,
       redirectUris: JSON.stringify(clientData.redirectUris),
-      allowedScopes: JSON.stringify(clientData.allowedScopes),
       grantTypes: JSON.stringify(clientData.grantTypes),
-      responseTypes: JSON.stringify(['code']),
-      requirePkce: clientData.requirePkce,
-      requireConsent: false, // 测试时跳过同意页面
+      responseTypes: JSON.stringify(clientData.responseTypes),
+      allowedScopes: JSON.stringify(clientData.allowedScopes),
+      clientType: 'CONFIDENTIAL',
+      requirePkce: true,
+      requireConsent: false,
       isActive: true,
-      accessTokenTtl: 3600, // 1小时
-      refreshTokenTtl: 2592000, // 30天
-      authorizationCodeLifetime: 600, // 10分钟
-      tokenEndpointAuthMethod: clientData.clientType === 'CONFIDENTIAL' ? 'client_secret_basic' : 'none',
       createdAt: new Date(),
       updatedAt: new Date(),
     },
   });
-
-  return {
-    ...clientData,
-    id: createdClient.id,
-    clientSecret: plainSecret,
-  };
+  
+  return createdClient;
 }
 
 /**
- * 创建测试授权码
+ * 创建测试访问令牌
  */
-export async function createTestAuthCode(params: {
-  userId: string;
-  clientId: string;
-  redirectUri: string;
-  scope: string;
-  codeChallenge?: string;
-  codeChallengeMethod?: string;
-}): Promise<{
-  code: string;
-  codeVerifier?: string;
-}> {
-  const code = crypto.randomBytes(32).toString('base64url');
-  const codeVerifier = params.codeChallenge ? generateCodeVerifier() : undefined;
-  const actualCodeChallenge = codeVerifier ? generateCodeChallenge(codeVerifier) : params.codeChallenge;
-
-  await prisma.authorizationCode.create({
+export async function createTestAccessToken(userId: string, clientId: string, scopes: string[] = ['read']): Promise<string> {
+  const token = generateRandomToken();
+  const tokenHash = await hashToken(token);
+  
+  await prisma.accessToken.create({
     data: {
-      code,
-      userId: params.userId,
-      clientId: params.clientId,
-      redirectUri: params.redirectUri,
-      scope: params.scope,
-      codeChallenge: actualCodeChallenge,
-      codeChallengeMethod: params.codeChallengeMethod || 'S256',
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10分钟后过期
+      token,
+      tokenHash,
+      userId,
+      clientId,
+      scope: JSON.stringify(scopes),
+      expiresAt: new Date(Date.now() + 3600000), // 1小时后过期
       createdAt: new Date(),
     },
   });
-
-  return {
-    code,
-    codeVerifier,
-  };
-}
-
-// ===== PKCE 辅助函数 =====
-
-/**
- * 生成PKCE参数
- */
-export function generatePKCEParams(): {
-  codeVerifier: string;
-  codeChallenge: string;
-  codeChallengeMethod: string;
-} {
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = generateCodeChallenge(codeVerifier);
   
-  return {
-    codeVerifier,
-    codeChallenge,
-    codeChallengeMethod: 'S256',
-  };
+  return token;
 }
 
-function generateCodeVerifier(): string {
-  return crypto.randomBytes(32).toString('base64url');
-}
-
-function generateCodeChallenge(verifier: string): string {
-  return crypto.createHash('sha256').update(verifier).digest('base64url');
-}
-
-// ===== JWT 辅助函数 =====
-
-/**
- * 创建测试JWT令牌
- */
-export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
-  const privateKey = await jose.importPKCS8(
-    process.env.JWT_PRIVATE_KEY!,
-    'RS256'
-  );
-
-  const jwt = await new jose.SignJWT({
-    sub: userId,
-    type: 'auth_center_session',
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 3600, // 1小时
-  })
-    .setProtectedHeader({ alg: 'RS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(privateKey);
-
-  return jwt;
-}
-
-/**
- * 验证JWT结构
- */
-export function validateJWTStructure(token: string): {
-  header: jose.JWTHeaderParameters;
-  payload: jose.JWTPayload;
-} {
-  const parts = token.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT format');
-  }
-
-  const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
-  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-
-  return { header, payload };
-}
-
-// ===== HTTP 请求辅助函数 =====
-
-/**
- * 创建测试请求
- */
-export function createTestRequest(
-  url: string,
-  options: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: any;
-    cookies?: Record<string, string>;
-  } = {}
-): NextRequest {
-  const headers = new Headers(options.headers);
-  
-  if (options.cookies) {
-    const cookieString = Object.entries(options.cookies)
-      .map(([key, value]) => `${key}=${value}`)
-      .join('; ');
-    headers.set('Cookie', cookieString);
-  }
-
-  const requestInit: any = {
-    method: options.method || 'GET',
-    headers,
-  };
-
-  if (options.body) {
-    if (typeof options.body === 'string') {
-      requestInit.body = options.body;
-    } else if (options.body instanceof FormData) {
-      requestInit.body = options.body;
-    } else {
-      requestInit.body = JSON.stringify(options.body);
-      headers.set('Content-Type', 'application/json');
-    }
-  }
-
-  return new NextRequest(url, requestInit);
-}
-
-/**
- * 创建表单数据
- */
-export function createTokenRequestFormData(data: Record<string, string>): FormData {
-  const formData = new FormData();
-  Object.entries(data).forEach(([key, value]) => {
-    formData.append(key, value);
-  });
-  return formData;
-}
-
-// ===== 数据库初始化函数 =====
+// ===== 权限和角色管理 =====
 
 async function createTestPermissions(): Promise<void> {
   await prisma.permission.createMany({
@@ -363,35 +185,119 @@ async function createTestRoles(): Promise<void> {
   });
 }
 
-async function createTestScopes(): Promise<void> {
-  await prisma.scope.createMany({
-    data: [
-      { name: 'openid', description: 'OpenID Connect' },
-      { name: 'profile', description: 'Profile information' },
-      { name: 'email', description: 'Email address' },
-      { name: 'api:read', description: 'Read API access' },
-      { name: 'api:write', description: 'Write API access' },
-    ],
-  });
+async function createTestRolePermissions(): Promise<void> {
+  const roles = await prisma.role.findMany();
+  const permissions = await prisma.permission.findMany();
+  
+  const userRole = roles.find(r => r.name === 'user');
+  const adminRole = roles.find(r => r.name === 'admin');
+  const readPermission = permissions.find(p => p.name === 'api:read');
+  const writePermission = permissions.find(p => p.name === 'api:write');
+  const userMgmtPermission = permissions.find(p => p.name === 'admin:users');
+  const clientMgmtPermission = permissions.find(p => p.name === 'admin:clients');
+  
+  if (userRole && adminRole && readPermission && writePermission && userMgmtPermission && clientMgmtPermission) {
+    await prisma.rolePermission.createMany({
+      data: [
+        { roleId: userRole.id, permissionId: readPermission.id },
+        { roleId: adminRole.id, permissionId: readPermission.id },
+        { roleId: adminRole.id, permissionId: writePermission.id },
+        { roleId: adminRole.id, permissionId: userMgmtPermission.id },
+        { roleId: adminRole.id, permissionId: clientMgmtPermission.id },
+      ],
+    });
+  }
 }
 
-// ===== 测试套件设置 =====
+// ===== JWT工具函数 =====
 
-export function setupTestSuite() {
-  beforeAll(async () => {
-    await initTestDatabase();
-  });
+/**
+ * 创建测试JWT令牌（用于认证中心会话）
+ */
+export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
+  const privateKey = process.env.JWT_PRIVATE_KEY;
+  if (!privateKey) {
+    throw new Error('JWT_PRIVATE_KEY environment variable is required');
+  }
+  
+  const key = await jose.importPKCS8(privateKey, 'RS256');
+  
+  const jwt = await new jose.SignJWT({
+    sub: userId,
+    aud: 'auth-center',
+    iss: 'auth-center',
+    permissions: ['user:read'],
+  })
+    .setProtectedHeader({ alg: 'RS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(key);
+  
+  return jwt;
+}
 
-  afterAll(async () => {
-    await cleanupTestData();
-  });
+// ===== HTTP请求工具 =====
 
-  beforeEach(async () => {
-    // 每个测试前不需要清理，因为我们使用事务
-  });
+export interface RequestOptions {
+  method?: string;
+  body?: any;
+  headers?: Record<string, string>;
+  query?: Record<string, string>;
+}
 
-  afterEach(async () => {
-    // 每个测试后清理数据
-    await cleanupTestData();
-  });
-} 
+/**
+ * 创建测试请求对象
+ */
+export function createTestRequest(url: string, options: RequestOptions = {}): NextRequest {
+  const fullUrl = new URL(url, 'http://localhost:3000');
+  
+  // 添加查询参数
+  if (options.query) {
+    Object.entries(options.query).forEach(([key, value]) => {
+      fullUrl.searchParams.set(key, value);
+    });
+  }
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  const requestInit: any = {
+    method: options.method || 'GET',
+    headers,
+  };
+  
+  if (options.body && options.method !== 'GET') {
+    requestInit.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+  }
+  
+  return new NextRequest(fullUrl, requestInit);
+}
+
+// ===== 工具函数 =====
+
+/**
+ * 生成随机令牌
+ */
+function generateRandomToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * 对密码进行哈希
+ */
+async function hashPassword(password: string): Promise<string> {
+  // 简化的哈希实现，实际应用中应使用bcrypt
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+/**
+ * 对令牌进行哈希
+ */
+async function hashToken(token: string): Promise<string> {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// ===== 导出Jest函数以便在测试中使用 =====
+export { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach }; 

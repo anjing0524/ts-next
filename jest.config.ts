@@ -47,7 +47,7 @@ const config: Config = {
     '**/?(*.)+(spec|test).{js,ts}',
   ],
   
-  // 模块名映射（路径别名）
+  // 模块路径映射 (支持 @ 别名)
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
@@ -62,28 +62,11 @@ const config: Config = {
   
   // 转换忽略模式 - 允许转换jose等ES模块
   transformIgnorePatterns: [
-    'node_modules/(?!(jose|@panva/hkdf|preact-render-to-string|@babel/runtime)/)',
+    'node_modules/(?!(jose|@panva/hkdf|@babel/runtime)/)',
   ],
   
   // 模块文件扩展名
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-  
-  // ES模块支持
-  extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true,
-    },
-  },
-  
-  // 测试超时时间（30秒，适合数据库操作）
-  testTimeout: 30000,
-  
-  // 最大并发数（避免数据库连接问题）
-  maxWorkers: 1,
-  
-  // 详细输出
-  verbose: true,
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
