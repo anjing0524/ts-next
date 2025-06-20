@@ -145,7 +145,7 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
         clientId: thirdPartyClient.clientId,
         action: 'AUTH_CODE_PKCE_REQUIRED_MISSING_PARAMS',
         status: 'FAILURE',
-        ipAddress: req.ip || req.headers.get('x-forwarded-for'),
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
         userAgent: req.headers.get('user-agent'),
         errorMessage: 'PKCE (code_challenge and code_challenge_method) is required for this client but one or both were missing.',
         details: JSON.stringify({
@@ -169,7 +169,7 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
         clientId: thirdPartyClient.clientId,
         action: 'AUTH_CODE_PKCE_INVALID_CHALLENGE_FORMAT',
         status: 'FAILURE',
-        ipAddress: req.ip || req.headers.get('x-forwarded-for'),
+        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
         userAgent: req.headers.get('user-agent'),
         errorMessage: 'Invalid PKCE code_challenge format.',
         details: JSON.stringify({
