@@ -1,42 +1,202 @@
 // __tests__/setup/test-helpers.ts
-// 统一的测试辅助函数，基于Jest框架
+// 统一的测试辅助函数，基于TDD最佳实践
 // 连接真实Prisma数据库进行集成测试
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as jose from 'jose';
 import crypto from 'crypto';
+import { generateCodeVerifier, generateCodeChallenge } from '@/lib/auth/pkce';
 
-// ===== 测试数据库管理 =====
+// ===== 测试用户预设 =====
+
+/**
+ * 预定义测试用户类型
+ */
+export interface TestUserType {
+  id: string;
+  username: string;
+  email: string;
+  displayName: string;
+  isActive: boolean;
+  roles: string[];
+  permissions: string[];
+}
+
+/**
+ * 系统预设的测试用户
+ */
+export const TEST_USERS: Record<string, TestUserType> = {
+  SYSTEM_ADMIN: {
+    id: 'test-system-admin',
+    username: 'system_admin',
+    email: 'system.admin@test.com',
+    displayName: 'System Administrator',
+    isActive: true,
+    roles: ['system_admin'],
+    permissions: ['system:all', 'admin:all', 'api:all'],
+  },
+  USER_ADMIN: {
+    id: 'test-user-admin',
+    username: 'user_admin',
+    email: 'user.admin@test.com',
+    displayName: 'User Administrator',
+    isActive: true,
+    roles: ['user_admin'],
+    permissions: ['admin:users', 'api:read', 'api:write'],
+  },
+  PERMISSION_ADMIN: {
+    id: 'test-permission-admin',
+    username: 'permission_admin',
+    email: 'permission.admin@test.com',
+    displayName: 'Permission Administrator',
+    isActive: true,
+    roles: ['permission_admin'],
+    permissions: ['admin:permissions', 'admin:roles', 'api:read'],
+  },
+  REGULAR_USER: {
+    id: 'test-regular-user',
+    username: 'regular_user',
+    email: 'regular.user@test.com',
+    displayName: 'Regular User',
+    isActive: true,
+    roles: ['user'],
+    permissions: ['api:read'],
+  },
+  NO_PERMISSION_USER: {
+    id: 'test-no-permission',
+    username: 'no_permission_user',
+    email: 'no.permission@test.com',
+    displayName: 'No Permission User',
+    isActive: true,
+    roles: [],
+    permissions: [],
+  },
+};
+
+// ===== OAuth客户端预设 =====
+
+/**
+ * 预定义测试客户端类型
+ */
+export interface TestClientType {
+  id: string;
+  clientId: string;
+  clientSecret?: string;
+  name: string;
+  redirectUris: string[];
+  grantTypes: string[];
+  responseTypes: string[];
+  allowedScopes: string[];
+  clientType: 'CONFIDENTIAL' | 'PUBLIC';
+  requirePkce: boolean;
+}
+
+/**
+ * 系统预设的测试客户端
+ */
+export const TEST_CLIENTS: Record<string, TestClientType> = {
+  WEB_APP: {
+    id: 'test-web-app',
+    clientId: 'test_web_app_client',
+    clientSecret: 'test_web_app_secret',
+    name: 'Test Web Application',
+    redirectUris: ['http://localhost:3000/auth/callback'],
+    grantTypes: ['authorization_code', 'refresh_token'],
+    responseTypes: ['code'],
+    allowedScopes: ['openid', 'profile', 'email', 'read', 'write'],
+    clientType: 'CONFIDENTIAL',
+    requirePkce: true,
+  },
+  PUBLIC_CLIENT: {
+    id: 'test-public-client',
+    clientId: 'test_public_client',
+    name: 'Test Public Client',
+    redirectUris: ['http://localhost:3000/callback'],
+    grantTypes: ['authorization_code'],
+    responseTypes: ['code'],
+    allowedScopes: ['openid', 'profile', 'read'],
+    clientType: 'PUBLIC',
+    requirePkce: true,
+  },
+  MOBILE_APP: {
+    id: 'test-mobile-app',
+    clientId: 'test_mobile_app',
+    name: 'Test Mobile Application',
+    redirectUris: ['com.example.app://callback'],
+    grantTypes: ['authorization_code', 'refresh_token'],
+    responseTypes: ['code'],
+    allowedScopes: ['openid', 'profile', 'email', 'read'],
+    clientType: 'PUBLIC',
+    requirePkce: true,
+  },
+};
+
+// ===== PKCE工具函数 =====
+
+/**
+ * 生成PKCE参数
+ */
+export interface PKCEParams {
+  codeVerifier: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+}
+
+/**
+ * 生成PKCE参数
+ */
+export function generatePKCE(): PKCEParams {
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(codeVerifier);
+  
+  return {
+    codeVerifier,
+    codeChallenge,
+    codeChallengeMethod: 'S256',
+  };
+}
+
+// ===== 数据库管理 =====
 
 /**
  * 清理所有测试数据
  */
 export async function cleanupTestData(): Promise<void> {
   // 按依赖关系顺序删除
-  await prisma.tokenBlacklist.deleteMany();
-  await prisma.accessToken.deleteMany();
-  await prisma.refreshToken.deleteMany();
-  await prisma.authorizationCode.deleteMany();
-  await prisma.userRole.deleteMany();
-  await prisma.rolePermission.deleteMany();
-  await prisma.consentGrant.deleteMany();
-  await prisma.revokedAuthJti.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.passwordHistory.deleteMany();
-  await prisma.loginAttempt.deleteMany();
-  await prisma.oAuthClient.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.role.deleteMany();
-  await prisma.permission.deleteMany();
-  await prisma.apiPermission.deleteMany();
-  await prisma.menuPermission.deleteMany();
-  await prisma.dataPermission.deleteMany();
-  await prisma.menu.deleteMany();
-  await prisma.scope.deleteMany();
-  await prisma.systemConfiguration.deleteMany();
-  await prisma.securityPolicy.deleteMany();
+  const tables = [
+    'tokenBlacklist',
+    'accessToken',
+    'refreshToken',
+    'authorizationCode',
+    'userRole',
+    'rolePermission',
+    'consentGrant',
+    'revokedAuthJti',
+    'auditLog',
+    'passwordHistory',
+    'loginAttempt',
+    'oAuthClient',
+    'user',
+    'role',
+    'permission',
+    'apiPermission',
+    'menuPermission',
+    'dataPermission',
+    'menu',
+    'scope',
+    'systemConfiguration',
+    'securityPolicy',
+  ];
+
+  for (const table of tables) {
+    try {
+      await (prisma as any)[table].deleteMany();
+    } catch (error) {
+      // 忽略不存在的表
+      console.warn(`表 ${table} 清理失败:`, error);
+    }
+  }
 }
 
 /**
@@ -46,198 +206,221 @@ export async function initializeTestData(): Promise<void> {
   await createTestPermissions();
   await createTestRoles();
   await createTestRolePermissions();
+  await createTestScopes();
+  await createTestUsers();
+  await createTestClients();
 }
 
-// ===== 测试数据创建 =====
+// ===== 数据创建函数 =====
 
-export interface TestUser {
-  id: string;
-  username: string;
-  email?: string;
-  isActive: boolean;
+/**
+ * 创建测试权限
+ */
+async function createTestPermissions(): Promise<void> {
+  const permissions = [
+    // 系统权限
+    { name: 'system:all', displayName: 'System All', description: 'System all permissions', resource: 'system', action: 'all' },
+    
+    // 管理权限
+    { name: 'admin:all', displayName: 'Admin All', description: 'Admin all permissions', resource: 'admin', action: 'all' },
+    { name: 'admin:users', displayName: 'User Management', description: 'User management', resource: 'users', action: 'manage' },
+    { name: 'admin:permissions', displayName: 'Permission Management', description: 'Permission management', resource: 'permissions', action: 'manage' },
+    { name: 'admin:roles', displayName: 'Role Management', description: 'Role management', resource: 'roles', action: 'manage' },
+    { name: 'admin:clients', displayName: 'Client Management', description: 'Client management', resource: 'clients', action: 'manage' },
+    
+    // API权限
+    { name: 'api:all', displayName: 'API All', description: 'All API permissions', resource: 'api', action: 'all' },
+    { name: 'api:read', displayName: 'API Read', description: 'API read access', resource: 'api', action: 'read' },
+    { name: 'api:write', displayName: 'API Write', description: 'API write access', resource: 'api', action: 'write' },
+  ];
+
+  for (const permission of permissions) {
+    await prisma.permission.upsert({
+      where: { name: permission.name },
+      update: permission,
+      create: permission,
+    });
+  }
 }
 
-export interface TestClient {
-  id: string;
-  clientId: string;
-  clientSecret?: string;
-  name: string;
-  redirectUris: string[];
-  grantTypes: string[];
-  responseTypes: string[];
-  allowedScopes: string[];
+/**
+ * 创建测试角色
+ */
+async function createTestRoles(): Promise<void> {
+  const roles = [
+    { name: 'system_admin', displayName: 'System Administrator', description: 'System administrator with all permissions' },
+    { name: 'user_admin', displayName: 'User Administrator', description: 'User management administrator' },
+    { name: 'permission_admin', displayName: 'Permission Administrator', description: 'Permission and role management administrator' },
+    { name: 'user', displayName: 'Regular User', description: 'Regular user with basic permissions' },
+  ];
+
+  for (const role of roles) {
+    await prisma.role.upsert({
+      where: { name: role.name },
+      update: role,
+      create: role,
+    });
+  }
+}
+
+/**
+ * 创建测试角色权限关联
+ */
+async function createTestRolePermissions(): Promise<void> {
+  const rolePermissionMappings = [
+    { roleName: 'system_admin', permissionName: 'system:all' },
+    { roleName: 'system_admin', permissionName: 'admin:all' },
+    { roleName: 'system_admin', permissionName: 'api:all' },
+    
+    { roleName: 'user_admin', permissionName: 'admin:users' },
+    { roleName: 'user_admin', permissionName: 'api:read' },
+    { roleName: 'user_admin', permissionName: 'api:write' },
+    
+    { roleName: 'permission_admin', permissionName: 'admin:permissions' },
+    { roleName: 'permission_admin', permissionName: 'admin:roles' },
+    { roleName: 'permission_admin', permissionName: 'api:read' },
+    
+    { roleName: 'user', permissionName: 'api:read' },
+  ];
+
+  for (const mapping of rolePermissionMappings) {
+    const role = await prisma.role.findUnique({ where: { name: mapping.roleName } });
+    const permission = await prisma.permission.findUnique({ where: { name: mapping.permissionName } });
+    
+    if (role && permission) {
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * 创建测试作用域
+ */
+async function createTestScopes(): Promise<void> {
+  const scopes = [
+    { name: 'openid', displayName: 'OpenID', description: 'OpenID Connect scope' },
+    { name: 'profile', displayName: 'Profile', description: 'User profile information' },
+    { name: 'email', displayName: 'Email', description: 'User email address' },
+    { name: 'read', displayName: 'Read', description: 'Read access' },
+    { name: 'write', displayName: 'Write', description: 'Write access' },
+  ];
+
+  for (const scope of scopes) {
+    await prisma.scope.upsert({
+      where: { name: scope.name },
+      update: scope,
+      create: scope,
+    });
+  }
 }
 
 /**
  * 创建测试用户
  */
-export async function createTestUser(userData: TestUser): Promise<any> {
-  const hashedPassword = await hashPassword('testpassword123');
-  
-  const createdUser = await prisma.user.create({
-    data: {
-      id: userData.id,
-      username: userData.username,
-      passwordHash: hashedPassword,
-      isActive: userData.isActive,
-      displayName: `${userData.username} Display`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  });
-  
-  return createdUser;
+async function createTestUsers(): Promise<void> {
+  for (const [key, userData] of Object.entries(TEST_USERS)) {
+    const hashedPassword = await hashPassword('testpassword123');
+    
+    // 创建用户
+    const user = await prisma.user.upsert({
+      where: { username: userData.username },
+      update: {
+        email: userData.email,
+        displayName: userData.displayName,
+        isActive: userData.isActive,
+        passwordHash: hashedPassword,
+      },
+      create: {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        displayName: userData.displayName,
+        isActive: userData.isActive,
+        passwordHash: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    // 分配角色
+    for (const roleName of userData.roles) {
+      const role = await prisma.role.findUnique({ where: { name: roleName } });
+      if (role) {
+        await prisma.userRole.upsert({
+          where: {
+            userId_roleId: {
+              userId: user.id,
+              roleId: role.id,
+            },
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            roleId: role.id,
+          },
+        });
+      }
+    }
+  }
 }
 
 /**
- * 创建测试OAuth客户端
+ * 创建测试客户端
  */
-export async function createTestClient(clientData: TestClient): Promise<any> {
-  const hashedSecret = clientData.clientSecret ? await hashPassword(clientData.clientSecret) : undefined;
-  
-  const createdClient = await prisma.oAuthClient.create({
-    data: {
-      id: clientData.id,
-      clientId: clientData.clientId,
-      clientSecret: hashedSecret,
-      name: clientData.name,
-      redirectUris: JSON.stringify(clientData.redirectUris),
-      grantTypes: JSON.stringify(clientData.grantTypes),
-      responseTypes: JSON.stringify(clientData.responseTypes),
-      allowedScopes: JSON.stringify(clientData.allowedScopes),
-      clientType: 'CONFIDENTIAL',
-      requirePkce: true,
-      requireConsent: false,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  });
-  
-  return createdClient;
-}
-
-/**
- * 创建测试访问令牌
- */
-export async function createTestAccessToken(userId: string, clientId: string, scopes: string[] = ['read']): Promise<string> {
-  const token = generateRandomToken();
-  const tokenHash = await hashToken(token);
-  
-  await prisma.accessToken.create({
-    data: {
-      token,
-      tokenHash,
-      userId,
-      clientId,
-      scope: JSON.stringify(scopes),
-      expiresAt: new Date(Date.now() + 3600000), // 1小时后过期
-      createdAt: new Date(),
-    },
-  });
-  
-  return token;
-}
-
-// ===== 权限和角色管理 =====
-
-async function createTestPermissions(): Promise<void> {
-  await prisma.permission.createMany({
-    data: [
-      { 
-        name: 'api:read', 
-        displayName: 'Read API Access',
-        description: 'Read API access',
-        resource: 'api',
-        action: 'read'
+async function createTestClients(): Promise<void> {
+  for (const [key, clientData] of Object.entries(TEST_CLIENTS)) {
+    const hashedSecret = clientData.clientSecret ? await hashPassword(clientData.clientSecret) : undefined;
+    
+    await prisma.oAuthClient.upsert({
+      where: { clientId: clientData.clientId },
+      update: {
+        name: clientData.name,
+        clientSecret: hashedSecret,
+        redirectUris: JSON.stringify(clientData.redirectUris),
+        grantTypes: JSON.stringify(clientData.grantTypes),
+        responseTypes: JSON.stringify(clientData.responseTypes),
+        allowedScopes: JSON.stringify(clientData.allowedScopes),
+        clientType: clientData.clientType,
+        requirePkce: clientData.requirePkce,
+        isActive: true,
       },
-      { 
-        name: 'api:write', 
-        displayName: 'Write API Access',
-        description: 'Write API access',
-        resource: 'api',
-        action: 'write'
+      create: {
+        id: clientData.id,
+        clientId: clientData.clientId,
+        clientSecret: hashedSecret,
+        name: clientData.name,
+        redirectUris: JSON.stringify(clientData.redirectUris),
+        grantTypes: JSON.stringify(clientData.grantTypes),
+        responseTypes: JSON.stringify(clientData.responseTypes),
+        allowedScopes: JSON.stringify(clientData.allowedScopes),
+        clientType: clientData.clientType,
+        requirePkce: clientData.requirePkce,
+        requireConsent: false,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
-      { 
-        name: 'admin:users', 
-        displayName: 'User Management',
-        description: 'User management',
-        resource: 'users',
-        action: 'manage'
-      },
-      { 
-        name: 'admin:clients', 
-        displayName: 'Client Management',
-        description: 'Client management',
-        resource: 'clients',
-        action: 'manage'
-      },
-    ],
-  });
-}
-
-async function createTestRoles(): Promise<void> {
-  await prisma.role.createMany({
-    data: [
-      { name: 'user', displayName: 'Regular User', description: 'Regular user' },
-      { name: 'admin', displayName: 'Administrator', description: 'Administrator' },
-    ],
-  });
-}
-
-async function createTestRolePermissions(): Promise<void> {
-  const roles = await prisma.role.findMany();
-  const permissions = await prisma.permission.findMany();
-  
-  const userRole = roles.find(r => r.name === 'user');
-  const adminRole = roles.find(r => r.name === 'admin');
-  const readPermission = permissions.find(p => p.name === 'api:read');
-  const writePermission = permissions.find(p => p.name === 'api:write');
-  const userMgmtPermission = permissions.find(p => p.name === 'admin:users');
-  const clientMgmtPermission = permissions.find(p => p.name === 'admin:clients');
-  
-  if (userRole && adminRole && readPermission && writePermission && userMgmtPermission && clientMgmtPermission) {
-    await prisma.rolePermission.createMany({
-      data: [
-        { roleId: userRole.id, permissionId: readPermission.id },
-        { roleId: adminRole.id, permissionId: readPermission.id },
-        { roleId: adminRole.id, permissionId: writePermission.id },
-        { roleId: adminRole.id, permissionId: userMgmtPermission.id },
-        { roleId: adminRole.id, permissionId: clientMgmtPermission.id },
-      ],
     });
   }
 }
 
-// ===== JWT工具函数 =====
+// ===== 辅助工具函数 =====
 
 /**
- * 创建测试JWT令牌（用于认证中心会话）
+ * 创建测试请求
  */
-export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
-  const privateKey = process.env.JWT_PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error('JWT_PRIVATE_KEY environment variable is required');
-  }
-  
-  const key = await jose.importPKCS8(privateKey, 'RS256');
-  
-  const jwt = await new jose.SignJWT({
-    sub: userId,
-    aud: 'auth-center',
-    iss: 'auth-center',
-    permissions: ['user:read'],
-  })
-    .setProtectedHeader({ alg: 'RS256' })
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(key);
-  
-  return jwt;
-}
-
-// ===== HTTP请求工具 =====
-
 export interface RequestOptions {
   method?: string;
   body?: any;
@@ -246,58 +429,83 @@ export interface RequestOptions {
 }
 
 /**
- * 创建测试请求对象
+ * 创建测试请求
  */
 export function createTestRequest(url: string, options: RequestOptions = {}): NextRequest {
-  const fullUrl = new URL(url, 'http://localhost:3000');
+  const { method = 'GET', body, headers = {}, query = {} } = options;
+  
+  // 构建完整URL
+  const baseUrl = 'http://localhost:3000';
+  const fullUrl = new URL(url, baseUrl);
   
   // 添加查询参数
-  if (options.query) {
-    Object.entries(options.query).forEach(([key, value]) => {
-      fullUrl.searchParams.set(key, value);
-    });
-  }
+  Object.entries(query).forEach(([key, value]) => {
+    fullUrl.searchParams.set(key, value);
+  });
   
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...options.headers,
+  // 构建请求配置
+  const requestInit: RequestInit = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
   };
   
-  const requestInit: any = {
-    method: options.method || 'GET',
-    headers,
-  };
-  
-  if (options.body && options.method !== 'GET') {
-    requestInit.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+  if (body && method !== 'GET') {
+    requestInit.body = typeof body === 'string' ? body : JSON.stringify(body);
   }
   
-  return new NextRequest(fullUrl, requestInit);
+  return new NextRequest(fullUrl.toString(), requestInit);
 }
-
-// ===== 工具函数 =====
 
 /**
  * 生成随机令牌
  */
-function generateRandomToken(): string {
+export function generateRandomToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
 /**
- * 对密码进行哈希
+ * 哈希密码
  */
 async function hashPassword(password: string): Promise<string> {
-  // 简化的哈希实现，实际应用中应使用bcrypt
-  return crypto.createHash('sha256').update(password).digest('hex');
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * 对令牌进行哈希
+ * 哈希令牌
  */
 async function hashToken(token: string): Promise<string> {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return hashPassword(token);
 }
 
-// ===== 导出Jest函数以便在测试中使用 =====
-export { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach }; 
+/**
+ * 创建JWT令牌（用于测试）
+ */
+export async function createTestJWT(payload: Record<string, any>, secret: string = 'test-secret'): Promise<string> {
+  const algorithm = 'HS256';
+  const secretKey = new TextEncoder().encode(secret);
+  
+  const jwt = await new jose.SignJWT(payload)
+    .setProtectedHeader({ alg: algorithm })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(secretKey);
+    
+  return jwt;
+}
+
+/**
+ * 验证JWT令牌（用于测试）
+ */
+export async function verifyTestJWT(token: string, secret: string = 'test-secret'): Promise<any> {
+  const secretKey = new TextEncoder().encode(secret);
+  
+  const { payload } = await jose.jwtVerify(token, secretKey);
+  return payload;
+} 
