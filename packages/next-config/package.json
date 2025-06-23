@@ -2,10 +2,7 @@
   "name": "@repo/next-config",
   "version": "0.1.0",
   "private": true,
-  "files": [
-    "next.config.js"
-  ],
-  "dependencies": {
-    "next": "^15.3.2"
-  }
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts"]
 }

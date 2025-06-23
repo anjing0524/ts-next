@@ -4,14 +4,14 @@
 
 import { jest } from '@jest/globals'; // 新增导入
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/v2/oauth/userinfo/route';
-import { prisma } from '@/lib/prisma';
-import { authenticateBearer } from '@/lib/auth/middleware';
+import { GET } from 'oauth-service/app/api/v2/oauth/userinfo/route';
+import { prisma } from '@repo/database/client';
+import { authenticateBearer } from '@repo/lib/auth';
 import { createTestAuthCenterSessionToken, createTestUser, cleanupTestData } from '../../../../setup/test-helpers';
 
 // 模拟依赖
 const mockPrismaUserFindUnique = jest.fn();
-jest.mock('@/lib/prisma', () => ({
+jest.mock('@repo/database/client', () => ({
   prisma: {
     user: {
       findUnique: mockPrismaUserFindUnique,
@@ -20,7 +20,7 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 const mockAuthenticateBearer = jest.fn();
-jest.mock('@/lib/auth/middleware', () => ({
+jest.mock('@repo/lib/auth', () => ({
   authenticateBearer: mockAuthenticateBearer,
 }));
 

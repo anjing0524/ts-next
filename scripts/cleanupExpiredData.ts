@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import logger from '@/lib/utils/logger';
+import { logger } from '@repo/lib/utils'; // 导入自定义logger (Import custom logger)
 
 const prisma = new PrismaClient();
 

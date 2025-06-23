@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { GET as authorizeHandler } from '@/app/api/v2/oauth/authorize/route'; // Adjust path as necessary
-import { prisma } from '@/lib/prisma';
+import { GET as authorizeHandler } from 'oauth-service/app/api/v2/oauth/authorize/route'; // Adjust path as necessary
+import { prisma } from '@repo/database/client';
 import { createTestClient, createTestUser, cleanupTestData, initializeTestData, createTestRequest, createTestAuthCenterSessionToken } from '../../../setup/test-helpers'; // Adjust path
 import { OAuthClient, User } from '@prisma/client';
 

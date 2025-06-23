@@ -1,6 +1,6 @@
 // Jest setup file for Next.js 15 with Prisma database testing
 import { beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@repo/database/client';
 
 // 设置测试环境变量
 // NODE_ENV 应该在Jest配置中设置，这里只设置数据库URL

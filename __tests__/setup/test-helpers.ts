@@ -3,10 +3,10 @@
 // 连接真实Prisma数据库进行集成测试
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@repo/database/client';
 import * as jose from 'jose';
 import crypto from 'crypto';
-import { generateCodeVerifier, generateCodeChallenge } from '@/lib/auth/pkce';
+import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/auth';
 
 // ===== 测试用户预设 =====
 
