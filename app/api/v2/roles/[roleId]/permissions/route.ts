@@ -21,9 +21,9 @@ interface RouteContext {
 // 用于验证分配权限请求体的数据结构和规则。
 const AssignPermissionsSchema = z.object({
   // permissionIds 必须是一个字符串数组，每个字符串都应是有效的 CUID (Prisma ID格式)。
-  // 数组至少需要包含一个权限ID。
+  // 数组可以为空，表示移除所有权限。
   permissionIds: z.array(z.string().cuid("无效的权限ID格式 (Invalid permission ID format: must be a CUID)"))
-    .min(1, "至少需要一个权限ID才能执行分配操作 (At least one permission ID is required for assignment)"),
+    .min(0, "权限ID列表可以为空，表示移除所有权限 (Permission IDs array can be empty to remove all permissions)"),
 });
 
 /**
@@ -235,16 +235,25 @@ async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context
     // - 如果角色和权限之间的关联已存在 (通过 `where` 条件判断)，则不执行 `update` (空对象 `{}` 表示不更新)。
     // - 如果关联不存在，则执行 `create` 操作，创建新的 RolePermission 记录。
     // 这确保了即使重复发送相同的权限ID列表，也不会创建重复的关联记录。
-    const operations = permissionIds.map(permissionId =>
-      prisma.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId, permissionId } }, // 唯一约束，用于查找现有记录。
-        update: {}, // 如果记录已存在，不执行任何更新操作。
-        create: { roleId, permissionId }, // 如果记录不存在，则创建。
-      })
-    );
+    // **修改开始：实现替换逻辑**
+    await prisma.$transaction(async (tx) => {
+      // 1. 删除当前角色所有已关联的权限
+      await tx.rolePermission.deleteMany({
+        where: { roleId: roleId },
+      });
 
-    // 在一个事务中执行所有 upsert 操作，确保原子性。
-    await prisma.$transaction(operations);
+      // 2. 如果请求中提供了新的权限ID，则创建新的关联
+      if (permissionIds.length > 0) {
+        const newRolePermissionsData = permissionIds.map(permissionId => ({
+          roleId: roleId,
+          permissionId: permissionId,
+        }));
+        await tx.rolePermission.createMany({
+          data: newRolePermissionsData,
+        });
+      }
+    });
+    // **修改结束**
 
     // (可选) 步骤 4: 如果需要实现权限的完全同步 (即移除角色不再拥有的权限)，
     // 则在此处需要添加逻辑：
@@ -311,7 +320,7 @@ async function assignPermissionsToRoleHandler(req: AuthenticatedRequest, context
 // GET 请求需要 'role:permissions:list' 权限 (或 'roles:permissions:read')。
 // POST 请求需要 'roles:permissions:assign' 权限。
 // 注意: 'role:permissions:list' 是根据种子数据中可能的权限命名推测的，实际应使用定义好的权限字符串。
-export const GET = requirePermission('role:permissions:list')(listRolePermissionsHandler);
+export const GET = requirePermission('roles:permissions:read')(listRolePermissionsHandler);
 export const POST = requirePermission('roles:permissions:assign')(assignPermissionsToRoleHandler);
 
 [end of app/api/v2/roles/[roleId]/permissions/route.ts]

@@ -6,6 +6,21 @@ import { prisma } from '@/lib/prisma';
 // NODE_ENV 应该在Jest配置中设置，这里只设置数据库URL
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'file:./test.db';
 
+// JWT and OIDC related environment variables for testing
+// IMPORTANT: These are dummy values for testing only. Use secure, real values in production.
+// Replace dummy content with structurally valid PEM strings
+process.env.JWT_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEILft995n2CH3utZGk2d6C8Q4MGCcMLPQUr3/A745d9hR
+-----END PRIVATE KEY-----`; // Dummy EdDSA private key (structurally valid)
+process.env.JWT_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAVa53253F5N9N/N0L9A5f7L0D8K7i4Jj0v2Y8Z8VwZ8I=
+-----END PUBLIC KEY-----`; // Dummy EdDSA public key (structurally valid)
+process.env.JWT_ISSUER = 'http://localhost:3000/test-issuer';
+process.env.JWT_AUDIENCE = 'test-audience';
+process.env.JWT_KEY_ID = 'test-key-id-2024';
+process.env.JWKS_URI = 'http://localhost:3000/api/v2/.well-known/jwks.json'; // Mock JWKS URI
+process.env.ID_TOKEN_SECRET = 'test-id-token-secret-string-for-hs256-if-needed'; // For symmetric ID token if used, though RSA is preferred
+
 // 全局测试设置
 beforeAll(async () => {
   // 确保数据库连接

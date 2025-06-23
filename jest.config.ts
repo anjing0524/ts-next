@@ -62,11 +62,16 @@ const config: Config = {
   
   // 转换忽略模式 - 允许转换jose等ES模块
   transformIgnorePatterns: [
-    'node_modules/(?!(jose|@panva/hkdf|@babel/runtime)/)',
+    '/node_modules/(?!(jose|@panva/hkdf|@babel/runtime))/',
   ],
   
   // 模块文件扩展名
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'mjs'], // Added mjs
+  extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts'], // Treat these as ESM
+
+  // 当使用 ESM 时，ts-jest/SWC 需要配置为输出 ESM
+  // next/jest 应该会处理好 SWC 的配置
+  // preset: 'ts-jest/presets/default-esm', // 通常 next/jest 会处理，但如果问题持续，这是一个可选项
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

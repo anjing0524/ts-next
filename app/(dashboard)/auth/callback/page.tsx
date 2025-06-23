@@ -43,7 +43,7 @@ export default function AuthCallbackPage() {
           code_verifier: codeVerifier,
         });
 
-        const response = await fetch('/api/oauth/token', {
+        const response = await fetch('/api/v2/oauth/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',

@@ -105,7 +105,7 @@ export default function LoginPage() {
         crypto.getRandomValues(stateArray);
         const state = Array.from(stateArray, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
-        const authUrl = new URL(getFullUrl('/api/oauth/authorize'));
+        const authUrl = new URL(getFullUrl('/api/v2/oauth/authorize'));
         authUrl.searchParams.set('client_id', 'auth-center-self');
         authUrl.searchParams.set('redirect_uri', getOAuthRedirectUri());
         authUrl.searchParams.set('response_type', 'code');
@@ -122,7 +122,7 @@ export default function LoginPage() {
       }
 
       // Step 2: For external OAuth flows, redirect to authorize endpoint with user session
-      const oauthUrl = new URL(getFullUrl('/api/oauth/authorize'));
+      const oauthUrl = new URL(getFullUrl('/api/v2/oauth/authorize'));
       oauthUrl.searchParams.set('client_id', clientId);
       oauthUrl.searchParams.set('redirect_uri', redirectUri);
       oauthUrl.searchParams.set('response_type', responseType || 'code');

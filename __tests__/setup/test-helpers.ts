@@ -150,11 +150,34 @@ export function generatePKCE(): PKCEParams {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
   
+
+  const createdClient = await prisma.oAuthClient.create({
+    data: {
+      id: clientData.id,
+      clientId: clientData.clientId,
+      clientSecret: hashedSecret,
+      name: clientData.name,
+      redirectUris: JSON.stringify(clientData.redirectUris),
+      grantTypes: JSON.stringify(clientData.grantTypes || ['authorization_code']), // Provide default if undefined
+      responseTypes: JSON.stringify(clientData.responseTypes || ['code']), // Provide default
+      allowedScopes: JSON.stringify(clientData.allowedScopes || ['openid']), // Provide default
+      clientType: 'CONFIDENTIAL',
+      requirePkce: true,
+      requireConsent: false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+  
+  return createdClient;
+
   return {
     codeVerifier,
     codeChallenge,
     codeChallengeMethod: 'S256',
   };
+
 }
 
 // ===== 数据库管理 =====
@@ -217,6 +240,41 @@ export async function initializeTestData(): Promise<void> {
  * 创建测试权限
  */
 async function createTestPermissions(): Promise<void> {
+
+  await prisma.permission.createMany({
+    data: [
+      { 
+        name: 'api:read', 
+        displayName: 'Read API Access',
+        description: 'Read API access',
+        resource: 'api',
+        action: 'read'
+      },
+      { 
+        name: 'api:write', 
+        displayName: 'Write API Access',
+        description: 'Write API access',
+        resource: 'api',
+        action: 'write'
+      },
+      { 
+        name: 'admin:users', 
+        displayName: 'User Management',
+        description: 'User management',
+        resource: 'users',
+        action: 'manage'
+      },
+      { 
+        name: 'admin:clients', 
+        displayName: 'Client Management',
+        description: 'Client management',
+        resource: 'clients',
+        action: 'manage',
+        isSystemPerm: true, // Added
+      },
+    ],
+  });
+
   const permissions = [
     // 系统权限
     { name: 'system:all', displayName: 'System All', description: 'System all permissions', resource: 'system', action: 'all' },
@@ -241,6 +299,7 @@ async function createTestPermissions(): Promise<void> {
       create: permission,
     });
   }
+
 }
 
 /**
@@ -379,6 +438,28 @@ async function createTestUsers(): Promise<void> {
 /**
  * 创建测试客户端
  */
+
+export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
+  const privateKeyPem = process.env.JWT_PRIVATE_KEY_PEM;
+  if (!privateKeyPem) {
+    throw new Error('JWT_PRIVATE_KEY_PEM environment variable is required for createTestAuthCenterSessionToken');
+  }
+  
+  const key = await jose.importPKCS8(privateKeyPem, 'RS256');
+  
+  const jwt = await new jose.SignJWT({
+    sub: userId,
+    aud: 'auth-center',
+    iss: 'auth-center',
+    permissions: ['user:read'],
+  })
+    .setProtectedHeader({ alg: 'RS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(key);
+  
+  return jwt;
+
 async function createTestClients(): Promise<void> {
   for (const [key, clientData] of Object.entries(TEST_CLIENTS)) {
     const hashedSecret = clientData.clientSecret ? await hashPassword(clientData.clientSecret) : undefined;
@@ -414,6 +495,7 @@ async function createTestClients(): Promise<void> {
       },
     });
   }
+
 }
 
 // ===== 辅助工具函数 =====

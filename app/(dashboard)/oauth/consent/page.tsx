@@ -84,7 +84,7 @@ export default function ConsentPage() {
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-6 pt-6 border-t">
           <form
-            action="/api/oauth/consent"
+            action="/api/v2/oauth/consent"
             method="POST"
             className="w-full sm:w-auto flex-grow sm:flex-grow-0"
           >
@@ -103,7 +103,7 @@ export default function ConsentPage() {
             </Button>
           </form>
           <form
-            action="/api/oauth/consent"
+            action="/api/v2/oauth/consent"
             method="POST"
             className="w-full sm:w-auto flex-grow sm:flex-grow-0"
           >
