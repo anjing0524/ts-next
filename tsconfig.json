@@ -13,22 +13,32 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@repo/*": ["packages/*"],
+      "oauth-service/*": ["apps/oauth-service/*"],
+      "admin-portal/*": ["apps/admin-portal/*"],
+      "kline-service/*": ["apps/kline-service/*"],
+      "flow-service/*": ["apps/flow-service/*"],
+      "test-service/*": ["apps/test-service/*"]
+      // Consider if a general "@apps/*": ["apps/*"] is better or needed
     }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "app/dashboard/kline/main.tsx",
-    "test.js"
+    // ".next/types/**/*.ts", // This is usually for a specific app, not root
+    "apps/**/*", // Include files from apps
+    "packages/**/*", // Include files from packages
+    "__tests__/**/*" // Include test files
+    // Remove specific old app files like "app/dashboard/kline/main.tsx"
+    // "test.js" // If this is a root test file, keep it. Otherwise, specify.
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "**/dist", "**/.next", "**/out"]
 }

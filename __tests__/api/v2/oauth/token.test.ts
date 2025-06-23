@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { POST as tokenHandler } from '@/app/api/v2/oauth/token/route'; // Adjust path as necessary
-import { prisma } from '@/lib/prisma';
+import { POST as tokenHandler } from 'oauth-service/app/api/v2/oauth/token/route'; // Adjust path as necessary
+import { prisma } from '@repo/database/client';
 import { createTestClient, createTestUser, cleanupTestData, initializeTestData, createTestRequest } from '../../../setup/test-helpers'; // Adjust path
 import { OAuthClient, User, AuthorizationCode } from '@prisma/client';
-import { JWTUtils, PKCEUtils, ScopeUtils } from '@/lib/auth/oauth2'; // Assuming PKCEUtils exist for verifier generation
+import { JWTUtils, ScopeUtils } from 'oauth-service/src/lib/auth/oauth2';
+import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/auth';
 
 
 describe('/api/v2/oauth/token', () => {
@@ -40,8 +41,8 @@ describe('/api/v2/oauth/token', () => {
     });
 
     // Generate PKCE pair for tests
-    pkceVerifier = PKCEUtils.generateCodeVerifier();
-    pkceChallenge = await PKCEUtils.generateCodeChallenge(pkceVerifier);
+    pkceVerifier = generateCodeVerifier();
+    pkceChallenge = await generateCodeChallenge(pkceVerifier);
 
     // Create a valid authorization code for the authorization_code grant tests
     validAuthCode = await prisma.authorizationCode.create({

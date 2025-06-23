@@ -16,10 +16,10 @@ import {
   createTestJWT,
   verifyTestJWT,
 } from '../setup/test-helpers';
-import { GET as authorizeHandler } from '@/app/api/v2/oauth/authorize/route';
-import { POST as tokenHandler } from '@/app/api/v2/oauth/token/route';
-import { GET as userinfoHandler } from '@/app/api/v2/oauth/userinfo/route';
-import { prisma } from '@/lib/prisma';
+import { GET as authorizeHandler } from 'oauth-service/app/api/v2/oauth/authorize/route';
+import { POST as tokenHandler } from 'oauth-service/app/api/v2/oauth/token/route';
+import { GET as userinfoHandler } from 'oauth-service/app/api/v2/oauth/userinfo/route';
+import { prisma } from '@repo/database/client';
 
 
 /**

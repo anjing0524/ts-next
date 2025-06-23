@@ -14,10 +14,7 @@
     "noUnusedParameters": false,
     "preserveWatchOutput": true,
     "skipLibCheck": true,
-    "strict": true,
-    "lib": ["es2022", "dom", "dom.iterable"],
-    "module": "esnext",
-    "target": "es2022"
+    "strict": true
   },
   "exclude": ["node_modules"]
 }
