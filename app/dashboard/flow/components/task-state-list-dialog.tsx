@@ -14,8 +14,8 @@ import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtua
 import { format } from 'date-fns';
 import { useShallow } from 'zustand/react/shallow';
 
-import { useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
-import { TaskStateDetailType } from '@/app/(dashboard)/flow/types/type';
+import { useFlowStore } from '@/app/dashboard/flow/store/flow-store';
+import { TaskStateDetailType } from '@/app/dashboard/flow/types/type';
 import { getTaskDetails } from '@/app/actions/flow-actions';
 import {
   Dialog,

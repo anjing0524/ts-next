@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 
-import { FlowStage, useFlowStore } from '@/app/(dashboard)/flow/store/flow-store';
+import { FlowStage, useFlowStore } from '@/app/dashboard/flow/store/flow-store';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';

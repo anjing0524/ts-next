@@ -27,7 +27,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "app/(dashboard)/kline/main.tsx",
+    "app/dashboard/kline/main.tsx",
     "test.js"
   ],
   "exclude": ["node_modules"]

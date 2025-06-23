@@ -5,7 +5,7 @@ import * as React from 'react';
 import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { useShallow } from 'zustand/react/shallow'; // 添加 shallow 导入
 
-import { useFlowStore, FlowStats } from '@/app/(dashboard)/flow/store/flow-store';
+import { useFlowStore, FlowStats } from '@/app/dashboard/flow/store/flow-store';
 import { Badge } from '@/components/ui/badge';
 import {
   Table as UITable,

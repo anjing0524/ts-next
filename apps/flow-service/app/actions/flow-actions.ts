@@ -2,7 +2,7 @@
 import { Edge, Node } from '@xyflow/react';
 import { format } from 'date-fns';
 
-import { FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
+import { FlowStage } from '@/app/dashboard/flow/store/flow-store';
 import mysqlPool from '@/lib/instance/mysql-client';
 import { PlanConf, PlanState, TaskState } from '@/types/db-types';
 import logger from '@/lib/utils/logger';

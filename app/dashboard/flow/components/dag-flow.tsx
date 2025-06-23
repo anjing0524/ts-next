@@ -7,7 +7,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useShallow } from 'zustand/react/shallow';
 
-import { useFlowStore, FlowStage } from '@/app/(dashboard)/flow/store/flow-store';
+import { useFlowStore, FlowStage } from '@/app/dashboard/flow/store/flow-store';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { nodeTypes } from './customer-node';
