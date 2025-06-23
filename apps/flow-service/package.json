@@ -1,0 +1,33 @@
+{
+  "name": "flow-service",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3004 --turbopack",
+    "build": "next build",
+    "start": "next start -p 3004",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.3.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@repo/ui": "workspace:*",
+    "@repo/lib": "workspace:*",
+    "@xyflow/react": "^12.4.4",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@repo/next-config": "workspace:*",
+    "typescript": "^5",
+    "@types/react": "^19.1.6",
+    "@types/node": "^20.19.1",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.0"
+  }
+}
