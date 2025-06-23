@@ -4,7 +4,23 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { cleanupTestData, createTestUser, createTestClient } from '../setup/test-helpers';
+
+import { cleanupTestData, createTestUser, createTestOAuthClient } from '../setup/test-helpers';
+import { 
+  initializeTestData,
+  createTestRequest,
+  generatePKCE,
+  TEST_USERS,
+  TEST_CLIENTS,
+  PKCEParams,
+  createTestJWT,
+  verifyTestJWT,
+} from '../setup/test-helpers';
+import { GET as authorizeHandler } from '@/app/api/v2/oauth/authorize/route';
+import { POST as tokenHandler } from '@/app/api/v2/oauth/token/route';
+import { GET as userinfoHandler } from '@/app/api/v2/oauth/userinfo/route';
+import { prisma } from '@/lib/prisma';
+
 
 /**
  * OAuth2.1集成测试 - 完整授权码流程
@@ -12,6 +28,10 @@ import { cleanupTestData, createTestUser, createTestClient } from '../setup/test
 describe('OAuth2.1 完整授权码流程集成测试', () => {
   let testClient: any;
   let testUser: any;
+  let pkceParams: PKCEParams;
+  let authorizationCode: string;
+  let accessToken: string;
+  let refreshToken: string;
   
   beforeAll(async () => {
     // 清理测试环境
@@ -35,6 +55,9 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
       scopes: ['read', 'write', 'profile'],
       isPublic: false,
     });
+    
+    // 初始化测试数据
+    await initializeTestData();
   });
   
   afterAll(async () => {
@@ -44,6 +67,10 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
   beforeEach(async () => {
     // 每个测试前清理动态数据（保留用户和客户端）
     // 这里可以清理授权码、令牌等
+    pkceParams = generatePKCE();
+    authorizationCode = '';
+    accessToken = '';
+    refreshToken = '';
   });
 
   describe('授权码流程 - 步骤1: 授权请求', () => {
@@ -54,8 +81,8 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
         redirect_uri: 'https://example.com/callback',
         scope: 'read write',
         state: 'random_state_123',
-        code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-        code_challenge_method: 'S256',
+        code_challenge: pkceParams.codeChallenge,
+        code_challenge_method: pkceParams.codeChallengeMethod,
       };
       
       // 模拟授权请求
@@ -164,8 +191,8 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
         userId: testUser.id,
         redirectUri: 'https://example.com/callback',
         scope: 'read write',
-        codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-        codeChallengeMethod: 'S256',
+        codeChallenge: pkceParams.codeChallenge,
+        codeChallengeMethod: pkceParams.codeChallengeMethod,
         expiresAt: Date.now() + 10 * 60 * 1000, // 10分钟
       };
       
@@ -213,7 +240,7 @@ import crypto from 'crypto'; // Added import
 
     it('应该验证PKCE', () => {
       const codeVerifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
-      const codeChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+      const codeChallenge = pkceParams.codeChallenge;
       
       // 模拟PKCE验证
       // const crypto = require('crypto'); // Removed require
@@ -257,7 +284,7 @@ import crypto from 'crypto'; // Added import
     
     it('应该拒绝错误的code_verifier', () => {
       const codeVerifier = 'wrong_code_verifier';
-      const codeChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+      const codeChallenge = pkceParams.codeChallenge;
       
       // 模拟PKCE验证
       // const crypto = require('crypto'); // Already imported at the top
@@ -412,8 +439,8 @@ import crypto from 'crypto'; // Added import
         client_id: testClient.id,
         redirect_uri: 'https://example.com/callback',
         scope: 'read',
-        code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-        code_challenge_method: 'S256',
+        code_challenge: pkceParams.codeChallenge,
+        code_challenge_method: pkceParams.codeChallengeMethod,
       };
       
       const hasPKCE = !!(authRequest.code_challenge && authRequest.code_challenge_method);
@@ -438,4 +465,474 @@ import crypto from 'crypto'; // Added import
       expect(lifetime).toBeLessThanOrEqual(maxCodeLifetime);
     });
   });
+
+  describe('授权请求阶段', () => {
+    it('应该接受有效的授权请求并返回授权码', async () => {
+      // Given: 有效的授权请求参数
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      // 创建授权请求
+      const request = createTestRequest('/api/v2/oauth/authorize', {
+        method: 'GET',
+        query: {
+          response_type: 'code',
+          client_id: client.clientId,
+          redirect_uri: client.redirectUris[0],
+          scope: 'openid profile read',
+          state: 'test-state-123',
+          code_challenge: pkceParams.codeChallenge,
+          code_challenge_method: pkceParams.codeChallengeMethod,
+        },
+        headers: {
+          // 模拟已登录用户的session
+          'Authorization': `Bearer ${await createTestJWT({ sub: user.id, scope: 'session' })}`,
+        },
+      });
+
+      // When: 处理授权请求
+      const response = await authorizeHandler(request);
+
+      // Then: 应该返回重定向到客户端
+      expect(response.status).toBe(302);
+      
+      const location = response.headers.get('Location');
+      expect(location).toBeTruthy();
+      
+      const redirectUrl = new URL(location!);
+      expect(redirectUrl.searchParams.get('code')).toBeTruthy();
+      expect(redirectUrl.searchParams.get('state')).toBe('test-state-123');
+      
+      // 保存授权码用于后续测试
+      authorizationCode = redirectUrl.searchParams.get('code')!;
+    });
+
+    it('应该拒绝缺少PKCE参数的授权请求', async () => {
+      // Given: 缺少PKCE参数的授权请求
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      const request = createTestRequest('/api/v2/oauth/authorize', {
+        method: 'GET',
+        query: {
+          response_type: 'code',
+          client_id: client.clientId,
+          redirect_uri: client.redirectUris[0],
+          scope: 'openid profile read',
+          state: 'test-state-123',
+          // 故意缺少code_challenge和code_challenge_method
+        },
+        headers: {
+          'Authorization': `Bearer ${await createTestJWT({ sub: user.id, scope: 'session' })}`,
+        },
+      });
+
+      // When: 处理授权请求
+      const response = await authorizeHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(400);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_request');
+      expect(responseData.error_description).toContain('PKCE');
+    });
+
+    it('应该拒绝无效客户端的授权请求', async () => {
+      // Given: 无效的客户端ID
+      const user = TEST_USERS.REGULAR_USER;
+      
+      const request = createTestRequest('/api/v2/oauth/authorize', {
+        method: 'GET',
+        query: {
+          response_type: 'code',
+          client_id: 'invalid_client_id',
+          redirect_uri: 'http://localhost:3000/callback',
+          scope: 'openid profile read',
+          state: 'test-state-123',
+          code_challenge: pkceParams.codeChallenge,
+          code_challenge_method: pkceParams.codeChallengeMethod,
+        },
+        headers: {
+          'Authorization': `Bearer ${await createTestJWT({ sub: user.id, scope: 'session' })}`,
+        },
+      });
+
+      // When: 处理授权请求
+      const response = await authorizeHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(400);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_client');
+    });
+
+    it('应该拒绝未登录用户的授权请求', async () => {
+      // Given: 未登录用户的授权请求
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/authorize', {
+        method: 'GET',
+        query: {
+          response_type: 'code',
+          client_id: client.clientId,
+          redirect_uri: client.redirectUris[0],
+          scope: 'openid profile read',
+          state: 'test-state-123',
+          code_challenge: pkceParams.codeChallenge,
+          code_challenge_method: pkceParams.codeChallengeMethod,
+        },
+        // 故意不包含Authorization头
+      });
+
+      // When: 处理授权请求
+      const response = await authorizeHandler(request);
+
+      // Then: 应该返回未授权错误
+      expect(response.status).toBe(401);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('access_denied');
+    });
+  });
+
+  describe('令牌交换阶段', () => {
+    beforeEach(async () => {
+      // 在每个令牌测试前，先获取授权码
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      // 创建授权码
+      authorizationCode = await createAuthorizationCode(user.id, client.clientId, pkceParams);
+    });
+
+    it('应该接受有效的令牌交换请求并返回访问令牌', async () => {
+      // Given: 有效的令牌交换请求
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'authorization_code',
+          code: authorizationCode,
+          redirect_uri: client.redirectUris[0],
+          client_id: client.clientId,
+          client_secret: client.clientSecret,
+          code_verifier: pkceParams.codeVerifier,
+        },
+      });
+
+      // When: 处理令牌交换请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回访问令牌
+      expect(response.status).toBe(200);
+      
+      const responseData = await response.json();
+      expect(responseData.access_token).toBeTruthy();
+      expect(responseData.refresh_token).toBeTruthy();
+      expect(responseData.token_type).toBe('Bearer');
+      expect(responseData.expires_in).toBeGreaterThan(0);
+      expect(responseData.scope).toBeTruthy();
+      
+      // 保存令牌用于后续测试
+      accessToken = responseData.access_token;
+      refreshToken = responseData.refresh_token;
+    });
+
+    it('应该拒绝无效的PKCE验证码', async () => {
+      // Given: 无效的PKCE验证码
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'authorization_code',
+          code: authorizationCode,
+          redirect_uri: client.redirectUris[0],
+          client_id: client.clientId,
+          client_secret: client.clientSecret,
+          code_verifier: 'invalid_code_verifier',
+        },
+      });
+
+      // When: 处理令牌交换请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(400);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_grant');
+      expect(responseData.error_description).toContain('PKCE');
+    });
+
+    it('应该拒绝过期的授权码', async () => {
+      // Given: 过期的授权码
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      // 创建过期的授权码
+      const expiredCode = await createExpiredAuthorizationCode(user.id, client.clientId, pkceParams);
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'authorization_code',
+          code: expiredCode,
+          redirect_uri: client.redirectUris[0],
+          client_id: client.clientId,
+          client_secret: client.clientSecret,
+          code_verifier: pkceParams.codeVerifier,
+        },
+      });
+
+      // When: 处理令牌交换请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(400);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_grant');
+      expect(responseData.error_description).toContain('expired');
+    });
+
+    it('应该拒绝无效的客户端凭据', async () => {
+      // Given: 无效的客户端凭据
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'authorization_code',
+          code: authorizationCode,
+          redirect_uri: client.redirectUris[0],
+          client_id: client.clientId,
+          client_secret: 'invalid_client_secret',
+          code_verifier: pkceParams.codeVerifier,
+        },
+      });
+
+      // When: 处理令牌交换请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(401);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_client');
+    });
+  });
+
+  describe('用户信息获取阶段', () => {
+    beforeEach(async () => {
+      // 在每个用户信息测试前，先获取访问令牌
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      // 创建授权码并交换令牌
+      authorizationCode = await createAuthorizationCode(user.id, client.clientId, pkceParams);
+      const tokens = await exchangeCodeForTokens(authorizationCode, client, pkceParams);
+      accessToken = tokens.accessToken;
+    });
+
+    it('应该返回有效访问令牌对应的用户信息', async () => {
+      // Given: 有效的访问令牌
+      const request = createTestRequest('/api/v2/oauth/userinfo', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      // When: 获取用户信息
+      const response = await userinfoHandler(request);
+
+      // Then: 应该返回用户信息
+      expect(response.status).toBe(200);
+      
+      const responseData = await response.json();
+      expect(responseData.sub).toBe(TEST_USERS.REGULAR_USER.id);
+      expect(responseData.username).toBe(TEST_USERS.REGULAR_USER.username);
+      expect(responseData.email).toBe(TEST_USERS.REGULAR_USER.email);
+      expect(responseData.name).toBe(TEST_USERS.REGULAR_USER.displayName);
+    });
+
+    it('应该拒绝无效的访问令牌', async () => {
+      // Given: 无效的访问令牌
+      const request = createTestRequest('/api/v2/oauth/userinfo', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer invalid_access_token',
+        },
+      });
+
+      // When: 获取用户信息
+      const response = await userinfoHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(401);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_token');
+    });
+
+    it('应该拒绝缺少访问令牌的请求', async () => {
+      // Given: 缺少访问令牌的请求
+      const request = createTestRequest('/api/v2/oauth/userinfo', {
+        method: 'GET',
+        // 故意不包含Authorization头
+      });
+
+      // When: 获取用户信息
+      const response = await userinfoHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(401);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_request');
+    });
+  });
+
+  describe('刷新令牌流程', () => {
+    beforeEach(async () => {
+      // 在每个刷新令牌测试前，先获取令牌
+      const client = TEST_CLIENTS.WEB_APP;
+      const user = TEST_USERS.REGULAR_USER;
+      
+      // 创建授权码并交换令牌
+      authorizationCode = await createAuthorizationCode(user.id, client.clientId, pkceParams);
+      const tokens = await exchangeCodeForTokens(authorizationCode, client, pkceParams);
+      accessToken = tokens.accessToken;
+      refreshToken = tokens.refreshToken;
+    });
+
+    it('应该接受有效的刷新令牌请求并返回新的访问令牌', async () => {
+      // Given: 有效的刷新令牌请求
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: client.clientId,
+          client_secret: client.clientSecret,
+        },
+      });
+
+      // When: 处理刷新令牌请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回新的访问令牌
+      expect(response.status).toBe(200);
+      
+      const responseData = await response.json();
+      expect(responseData.access_token).toBeTruthy();
+      expect(responseData.access_token).not.toBe(accessToken); // 新令牌应该不同
+      expect(responseData.refresh_token).toBeTruthy();
+      expect(responseData.token_type).toBe('Bearer');
+      expect(responseData.expires_in).toBeGreaterThan(0);
+    });
+
+    it('应该拒绝无效的刷新令牌', async () => {
+      // Given: 无效的刷新令牌
+      const client = TEST_CLIENTS.WEB_APP;
+      
+      const request = createTestRequest('/api/v2/oauth/token', {
+        method: 'POST',
+        body: {
+          grant_type: 'refresh_token',
+          refresh_token: 'invalid_refresh_token',
+          client_id: client.clientId,
+          client_secret: client.clientSecret,
+        },
+      });
+
+      // When: 处理刷新令牌请求
+      const response = await tokenHandler(request);
+
+      // Then: 应该返回错误
+      expect(response.status).toBe(400);
+      
+      const responseData = await response.json();
+      expect(responseData.error).toBe('invalid_grant');
+    });
+  });
+
+  // ===== 测试辅助函数 =====
+
+  /**
+   * 创建授权码
+   */
+  async function createAuthorizationCode(userId: string, clientId: string, pkce: PKCEParams): Promise<string> {
+    const code = `test_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    await prisma.authorizationCode.create({
+      data: {
+        code,
+        userId,
+        clientId,
+        redirectUri: TEST_CLIENTS.WEB_APP.redirectUris[0],
+        scope: 'openid profile read',
+        codeChallenge: pkce.codeChallenge,
+        codeChallengeMethod: pkce.codeChallengeMethod,
+        expiresAt: new Date(Date.now() + 600000), // 10分钟后过期
+        createdAt: new Date(),
+      },
+    });
+    
+    return code;
+  }
+
+  /**
+   * 创建过期的授权码
+   */
+  async function createExpiredAuthorizationCode(userId: string, clientId: string, pkce: PKCEParams): Promise<string> {
+    const code = `expired_auth_code_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    await prisma.authorizationCode.create({
+      data: {
+        code,
+        userId,
+        clientId,
+        redirectUri: TEST_CLIENTS.WEB_APP.redirectUris[0],
+        scope: 'openid profile read',
+        codeChallenge: pkce.codeChallenge,
+        codeChallengeMethod: pkce.codeChallengeMethod,
+        expiresAt: new Date(Date.now() - 600000), // 10分钟前过期
+        createdAt: new Date(),
+      },
+    });
+    
+    return code;
+  }
+
+  /**
+   * 交换授权码获取令牌
+   */
+  async function exchangeCodeForTokens(code: string, client: any, pkce: PKCEParams): Promise<{ accessToken: string; refreshToken: string }> {
+    const request = createTestRequest('/api/v2/oauth/token', {
+      method: 'POST',
+      body: {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: client.redirectUris[0],
+        client_id: client.clientId,
+        client_secret: client.clientSecret,
+        code_verifier: pkce.codeVerifier,
+      },
+    });
+
+    const response = await tokenHandler(request);
+    const responseData = await response.json();
+    
+    return {
+      accessToken: responseData.access_token,
+      refreshToken: responseData.refresh_token,
+    };
+  }
 }); 

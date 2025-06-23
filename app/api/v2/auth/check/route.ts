@@ -2,8 +2,8 @@
 // 描述: 统一权限检查端点 (Unified permission check endpoint)
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { JWTUtils } from '@/lib/auth/oauth2'; // 假设 JWTUtils 包含验证V2认证令牌的方法
+import { prisma } from '@/lib/prisma';
+import { JWTUtils } from '@/lib/auth/oauth2';
 // import { PermissionService } from '@/lib/services/permissionService'; // 理想情况下，权限检查逻辑应位于服务层
 
 // --- 辅助函数 ---
@@ -73,11 +73,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized', message: 'Access token is missing.' }, { status: 401 });
   }
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyV2AuthAccessToken(token);
+  const { valid, payload, error: tokenError } = await JWTUtils.verifyAccessToken(token);
   if (!valid || !payload) {
     return NextResponse.json({ error: 'invalid_token', message: `Invalid or expired token. ${tokenError || ''}`.trim() }, { status: 401 });
   }
-  const userId = payload.userId as string | undefined;
+  const userId = payload.user_id as string | undefined;
   if (!userId) {
     return NextResponse.json({ error: 'invalid_token_payload', message: 'Invalid token: User ID missing.' }, { status: 401 });
   }
@@ -110,14 +110,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// 确保 JWTUtils.verifyV2AuthAccessToken 在 lib/auth/oauth2.ts 中声明或实现
-// (Ensure JWTUtils.verifyV2AuthAccessToken is declared or implemented in lib/auth/oauth2.ts)
+// 确保 JWTUtils.verifyAccessToken 在 lib/auth/oauth2.ts 中声明或实现
+// (Ensure JWTUtils.verifyAccessToken is declared or implemented in lib/auth/oauth2.ts)
 /*
 declare module '@/lib/auth/oauth2' {
   export class JWTUtils {
-    static async verifyV2AuthAccessToken(token: string): Promise<{
+    static async verifyAccessToken(token: string): Promise<{
       valid: boolean;
-      payload?: { userId: string; username: string; roles?: string[], aud?: string, [key: string]: any };
+      payload?: { user_id: string; username: string; roles?: string[], aud?: string, [key: string]: any };
       error?: string;
     }>;
     // ... other methods
