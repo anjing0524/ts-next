@@ -2,6 +2,7 @@
 // 描述: OAuth2.1 UserInfo端点完整测试套件
 // 测试重点: JWT令牌认证(Jose库)、scope验证、用户信息返回、OIDC合规性
 
+import { jest } from '@jest/globals'; // 新增导入
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/v2/oauth/userinfo/route';
 import { prisma } from '@/lib/prisma';
@@ -9,16 +10,18 @@ import { authenticateBearer } from '@/lib/auth/middleware';
 import { createTestAuthCenterSessionToken, createTestUser, cleanupTestData } from '../../../../setup/test-helpers';
 
 // 模拟依赖
+const mockPrismaUserFindUnique = jest.fn();
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      findUnique: jest.fn(),
+      findUnique: mockPrismaUserFindUnique,
     },
   },
 }));
 
+const mockAuthenticateBearer = jest.fn();
 jest.mock('@/lib/auth/middleware', () => ({
-  authenticateBearer: jest.fn(),
+  authenticateBearer: mockAuthenticateBearer,
 }));
 
 describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
@@ -43,17 +46,17 @@ describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
     });
 
     // 设置模拟返回值
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(testUser);
+    mockPrismaUserFindUnique.mockResolvedValue(testUser);
   });
 
   afterEach(async () => {
-    await clearTestData();
+    await cleanupTestData();
   });
 
   describe('✅ 成功获取用户信息', () => {
     test('应该成功返回基本用户信息 (openid scope)', async () => {
       // 模拟成功的Bearer认证
-      (authenticateBearer as jest.Mock).mockResolvedValue({
+      mockAuthenticateBearer.mockResolvedValue({
         success: true,
         context: {
           userId: testUser.id,
@@ -88,7 +91,7 @@ describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
     });
 
     test('应该拒绝缺少openid scope的令牌', async () => {
-      (authenticateBearer as jest.Mock).mockResolvedValue({
+      mockAuthenticateBearer.mockResolvedValue({
         success: false,
         response: new Response(JSON.stringify({
           success: false,
@@ -118,7 +121,7 @@ describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
 
   describe('❌ 认证失败', () => {
     test('应该拒绝无效的JWT令牌', async () => {
-      (authenticateBearer as jest.Mock).mockResolvedValue({
+      mockAuthenticateBearer.mockResolvedValue({
         success: false,
         response: new Response(JSON.stringify({
           success: false,
@@ -161,8 +164,8 @@ describe('🌐 OIDC合规性测试', () => {
       isActive: true,
     });
 
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(testUser);
-    (authenticateBearer as jest.Mock).mockResolvedValue({
+    mockPrismaUserFindUnique.mockResolvedValue(testUser);
+    mockAuthenticateBearer.mockResolvedValue({
       success: true,
       context: {
         userId: testUser.id,
@@ -198,7 +201,7 @@ describe('🌐 OIDC合规性测试', () => {
 // 性能测试
 describe('🚀 性能测试', () => {
   test('应该在合理时间内响应', async () => {
-    (authenticateBearer as jest.Mock).mockResolvedValue({
+    mockAuthenticateBearer.mockResolvedValue({
       success: true,
       context: {
         userId: 'perf_test_user',

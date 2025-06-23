@@ -16,170 +16,175 @@ datasource db {
 
 // 用户表 - 认证系统的核心（内网环境，管理员创建用户）
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  passwordHash String // BCrypt哈希存储
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  lastLoginAt  DateTime?
+  id           String    @id @default(cuid()) // 用户唯一标识符
+  username     String    @unique // 用户名，全局唯一
+  passwordHash String    // 存储用户密码的BCrypt哈希值
+  isActive     Boolean   @default(true) // 账户是否激活
+  createdAt    DateTime  @default(now()) // 账户创建时间
+  updatedAt    DateTime  @updatedAt // 账户最后更新时间
+  lastLoginAt  DateTime? // 用户最后登录时间
 
   // 用户基本信息
-  displayName         String? // 显示名称
-  firstName           String? // 名
-  lastName            String? // 姓
-  avatar              String? // 头像URL
-  organization        String? // 用户所属组织
-  department          String? // 用户所属部门
-  mustChangePassword  Boolean   @default(true) // 是否需要在下次登录时强制修改密码
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-  createdBy           String? // 创建者ID（管理员）
+  displayName         String?   // 用户在UI上显示的名称
+  firstName           String?   // 名字
+  lastName            String?   // 姓氏
+  avatar              String?   // 用户头像图片的URL
+  organization        String?   // 用户所属的组织或公司
+  department          String?   // 用户所属的部门
+  mustChangePassword  Boolean   @default(true) // 标记用户是否需要在下次登录时强制更改密码
+  failedLoginAttempts Int       @default(0) // 记录连续登录失败的次数
+  lockedUntil         DateTime? // 如果账户因多次登录失败而被锁定，记录锁定解除的时间
+  createdBy           String?   // 创建此用户的管理员ID或标识
 
   // 关联关系
-  userRoles          UserRole[]
-  authorizationCodes AuthorizationCode[]
-  accessTokens       AccessToken[]
-  refreshTokens      RefreshToken[]
-  auditLogs          AuditLog[]
-  passwordHistories  PasswordHistory[]
-  consentGrants      ConsentGrant[]
-  revokedAuthJtis    RevokedAuthJti[]
+  userRoles          UserRole[] // 用户拥有的角色
+  authorizationCodes AuthorizationCode[] // 用户发起的授权码请求
+  accessTokens       AccessToken[] // 颁发给用户的访问令牌
+  refreshTokens      RefreshToken[] // 颁发给用户的刷新令牌
+  auditLogs          AuditLog[] // 与用户相关的审计日志
+  passwordHistories  PasswordHistory[] // 用户的密码历史记录
+  consentGrants      ConsentGrant[] // 用户对客户端的授权同意记录
+  revokedAuthJtis    RevokedAuthJti[] // 用户已撤销的V2认证刷新令牌JTI
 
-  @@index([username])
-  @@index([isActive])
-  @@index([organization])
-  @@index([department])
-  @@map("users")
+  @@index([username]) // 为用户名创建索引以加速查找
+  @@index([isActive]) // 为账户激活状态创建索引
+  @@index([organization]) // 为组织字段创建索引
+  @@index([department]) // 为部门字段创建索引
+  @@map("users") // 数据库表映射名称
 }
 
 // OAuth客户端表
 model OAuthClient {
-  id                      String     @id @default(cuid())
-  clientId                String     @unique // 客户端唯一标识符
-  clientSecret            String? // 机密客户端的密钥 (BCrypt哈希存储)
-  redirectUris            String // JSON字符串存储重定向URI列表
-  grantTypes              String // JSON字符串存储此客户端允许的授权类型 (e.g., ["authorization_code", "client_credentials"])
-  responseTypes           String // JSON字符串存储此客户端允许的响应类型 (e.g., ["code"])
-  allowedScopes           String // JSON字符串存储此客户端允许请求的权限范围
-  name                    String // 客户端名称 (对应文档中的 'name')
-  description             String? // 客户端描述 (对应文档中的 'description')
-  clientType              ClientType @default(PUBLIC) // 客户端类型: PUBLIC (公开) 或 CONFIDENTIAL (机密)
-  logoUri                 String? // 客户端Logo的URL
-  policyUri               String? // 客户端策略文档的URL
-  tosUri                  String? // 客户端服务条款的URL
-  jwksUri                 String? // 客户端JSON Web Key Set (JWKS) 的URL (用于JWT客户端断言等)
-  tokenEndpointAuthMethod String     @default("client_secret_basic") // 令牌端点的客户端认证方法
-  requirePkce             Boolean    @default(true) // 是否强制要求PKCE (Proof Key for Code Exchange)
-  requireConsent          Boolean    @default(true) // 是否需要用户同意此客户端的授权请求
-  ipWhitelist             String? // IP白名单 (JSON字符串格式，如 ["192.168.1.1", "10.0.0.0/8"])
-  isActive                Boolean    @default(true) // 客户端是否激活
-  createdAt               DateTime   @default(now()) // 创建时间
-  updatedAt               DateTime   @updatedAt // 更新时间
+  id                      String     @id @default(cuid()) // 客户端唯一标识符
+  clientId                String     @unique // 客户端ID，对外暴露的标识符
+  clientSecret            String?    // 机密客户端的密钥 (推荐BCrypt哈希存储)
+  redirectUris            String     // JSON字符串数组，存储允许重定向的URI列表
+  grantTypes              String     // JSON字符串数组，存储此客户端允许的授权类型 (例如：["authorization_code", "client_credentials", "refresh_token"])
+  responseTypes           String     // JSON字符串数组，存储此客户端允许的响应类型 (例如：["code", "token"])
+  allowedScopes           String     // JSON字符串数组，存储此客户端允许请求的权限范围
+  name                    String     // 客户端应用的名称
+  description             String?    // 客户端应用的描述
+  clientType              ClientType @default(PUBLIC) // 客户端类型: PUBLIC (例如单页应用) 或 CONFIDENTIAL (例如后端服务)
+  logoUri                 String?    // 客户端Logo图片的URL
+  policyUri               String?    // 客户端隐私政策文档的URL
+  tosUri                  String?    // 客户端服务条款文档的URL
+  jwksUri                 String?    // 客户端JSON Web Key Set (JWKS) 的URL (用于JWT客户端断言等高级场景)
+  tokenEndpointAuthMethod String     @default("client_secret_basic") // 令牌端点客户端认证方法 (例如: "client_secret_basic", "client_secret_post", "private_key_jwt")
+  requirePkce             Boolean    @default(true) // 是否强制要求此客户端使用PKCE (Proof Key for Code Exchange)
+  requireConsent          Boolean    @default(true) // 是否需要用户明确同意此客户端的授权请求
+  ipWhitelist             String?    // IP白名单 (JSON字符串数组格式，例如：["192.168.1.1", "10.0.0.0/8"])，用于限制访问来源
+  isActive                Boolean    @default(true) // 客户端是否激活可用
+  createdAt               DateTime   @default(now()) // 客户端记录创建时间
+  updatedAt               DateTime   @updatedAt // 客户端记录最后更新时间
+
+  accessTokenTtl            Int      @default(3600) // 访问令牌的默认生命周期（秒），例如3600秒 (1小时)
+  refreshTokenTtl           Int      @default(2592000) // 刷新令牌的默认生命周期（秒），例如2592000秒 (30天)
+  authorizationCodeLifetime Int?     // 授权码的生命周期（秒），例如600秒 (10分钟)
+  strictRedirectUriMatching Boolean  @default(true) // 是否严格匹配重定向URI (不允许通配符或部分匹配)
+  allowLocalhostRedirect    Boolean  @default(false) // 是否允许将重定向URI设置为localhost (主要用于开发环境)
+  requireHttpsRedirect      Boolean  @default(true) // 是否要求所有重定向URI都使用HTTPS协议
 
   // 关联关系
-  authorizationCodes        AuthorizationCode[]
-  accessTokens              AccessToken[]
-  refreshTokens             RefreshToken[]
-  consentGrants             ConsentGrant[] // 用户对此客户端的同意记录
-  accessTokenTtl            Int                 @default(3600) // 访问令牌生命周期（秒），对应文档 (原accessTokenLifetime)
-  refreshTokenTtl           Int                 @default(2592000) // 刷新令牌生命周期（秒），对应文档 (原refreshTokenLifetime)
-  authorizationCodeLifetime Int? // 授权码生命周期（秒）
-  strictRedirectUriMatching Boolean             @default(true) // 是否严格匹配重定向URI
-  allowLocalhostRedirect    Boolean             @default(false) // 是否允许重定向到localhost (开发时可能有用)
-  requireHttpsRedirect      Boolean             @default(true) // 是否要求重定向URI使用HTTPS
+  authorizationCodes AuthorizationCode[] // 此客户端发起的授权码
+  accessTokens       AccessToken[] // 颁发给此客户端的访问令牌
+  refreshTokens      RefreshToken[] // 颁发给此客户端的刷新令牌
+  consentGrants      ConsentGrant[] // 用户对此客户端的同意授权记录
 
-  @@index([clientId])
-  @@index([isActive])
-  @@index([clientType])
-  @@index([clientId, isActive])
-  @@map("oauth_clients")
+  @@index([clientId]) // 为客户端ID创建索引
+  @@index([isActive]) // 为激活状态创建索引
+  @@index([clientType]) // 为客户端类型创建索引
+  @@index([clientId, isActive]) // 复合索引
+  @@map("oauth_clients") // 数据库表映射名称
 }
 
+// OAuth客户端类型枚举
 enum ClientType {
-  PUBLIC // 公开客户端
-  CONFIDENTIAL // 机密客户端
+  PUBLIC       // 公开客户端，不能安全存储密钥 (例如：浏览器应用、移动原生应用)
+  CONFIDENTIAL // 机密客户端，能够安全存储密钥 (例如：后端Web服务)
 }
 
 // 授权码表 (OAuth 2.1 Authorization Code)
 model AuthorizationCode {
-  id                  String   @id @default(cuid()) // 唯一标识符
-  code                String   @unique // 授权码本身
-  userId              String // 关联的用户ID
-  clientId            String // 关联的OAuth客户端ID
-  redirectUri         String // 授权时提供的重定向URI
-  scope               String // JSON字符串存储授权的权限范围
-  expiresAt           DateTime // 授权码过期时间
-  codeChallenge       String? // PKCE代码挑战
-  codeChallengeMethod String? // PKCE代码挑战方法 (e.g., "S256")
-  nonce               String? // OIDC Nonce值，用于防止重放攻击
-  isUsed              Boolean  @default(false) // 授权码是否已被使用
-  createdAt           DateTime @default(now()) // 创建时间
+  id                  String   @id @default(cuid()) // 授权码记录的唯一标识符
+  code                String   @unique // 授权码本身，一次性使用
+  userId              String   // 关联的用户ID
+  clientId            String   // 关联的OAuth客户端ID
+  redirectUri         String   // 授权请求中提供的重定向URI，用于验证令牌请求
+  scope               String   // JSON字符串数组，存储此次授权的权限范围
+  expiresAt           DateTime // 授权码的过期时间
+  codeChallenge       String?  // PKCE代码挑战 (S256哈希值)
+  codeChallengeMethod String?  // PKCE代码挑战方法 (通常是 "S256")
+  nonce               String?  // OIDC (OpenID Connect) Nonce值，用于防止重放攻击，确保ID Token的真实性
+  isUsed              Boolean  @default(false) // 标记此授权码是否已被使用以兑换令牌
+  createdAt           DateTime @default(now()) // 授权码创建时间
 
   // 关联关系
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联到用户，用户删除时级联删除其授权码
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade) // 关联到客户端，客户端删除时级联删除其授权码
 
-  @@index([code])
-  @@index([userId])
-  @@index([clientId])
-  @@index([expiresAt])
-  @@index([isUsed])
-  @@map("authorization_codes")
+  @@index([code]) // 为授权码本身创建索引
+  @@index([userId]) // 为用户ID创建索引
+  @@index([clientId]) // 为客户端ID创建索引
+  @@index([expiresAt]) // 为过期时间创建索引，方便清理过期授权码
+  @@index([isUsed]) // 为是否已使用标记创建索引
+  @@map("authorization_codes") // 数据库表映射名称
 }
 
 // 访问令牌表
 model AccessToken {
-  id        String   @id @default(cuid()) // 唯一标识符
-  token     String   @unique // 原始令牌字符串 (如果直接存储) - 注意：高安全性要求下通常存储哈希值
-  tokenHash String?  @unique // 令牌的哈希值 (推荐用于安全查找和验证)
-  userId    String? // 关联的用户ID (客户端凭证模式下可能为空)
-  clientId  String // 关联的OAuth客户端ID
-  scope     String // JSON字符串存储授权的权限范围
-  expiresAt DateTime // 令牌过期时间
-  // isRevoked Boolean  @default(false) // 访问令牌通常较短命，不推荐实现撤销逻辑，依赖过期。若需撤销，考虑JTI黑名单。
+  id        String   @id @default(cuid()) // 访问令牌记录的唯一标识符
+  token     String   @unique // 原始令牌字符串 (如果直接存储) - 注意：高安全性要求下通常不直接存储完整令牌，而是存储其哈希值或部分标识
+  tokenHash String?  @unique // 令牌的哈希值 (推荐用于安全查找和验证，避免存储完整令牌)
+  jti       String?  @unique // JWT ID (可选, 如果令牌是JWT格式且需要通过JTI撤销)
+  userId    String?  // 关联的用户ID (对于客户端凭证授权类型可能为空)
+  clientId  String   // 关联的OAuth客户端ID
+  scope     String   // JSON字符串数组，存储此令牌授权的权限范围
+  expiresAt DateTime // 令牌的过期时间
+  createdAt DateTime @default(now()) // 令牌创建时间
+  // isRevoked Boolean  @default(false) // 访问令牌通常生命周期较短，不推荐在此层面实现撤销逻辑，依赖过期。若需撤销，考虑使用JTI黑名单机制 (TokenBlacklist)。
   // revokedAt DateTime?
-  createdAt DateTime @default(now()) // 创建时间
 
   // 关联关系
-  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户，用户删除时级联删除其访问令牌
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade) // 关联客户端，客户端删除时级联删除其访问令牌
 
-  @@index([tokenHash]) // 为令牌哈希值创建索引以提高查询效率
-  @@index([userId])
-  @@index([clientId])
-  @@index([expiresAt])
-  // @@index([isRevoked])
-  @@map("access_tokens")
+  @@index([tokenHash]) // 为令牌哈希值创建索引
+  @@index([jti])       // 为JTI创建索引
+  @@index([userId])    // 为用户ID创建索引
+  @@index([clientId])  // 为客户端ID创建索引
+  @@index([expiresAt]) // 为过期时间创建索引，方便清理
+  @@map("access_tokens") // 数据库表映射名称
 }
 
 // 刷新令牌表
 model RefreshToken {
-  id              String    @id @default(cuid()) // 唯一标识符
-  token           String    @unique // 原始令牌字符串 (如果直接存储) - 注意：高安全性要求下通常存储哈希值
-  tokenHash       String?   @unique // 令牌的哈希值 (推荐用于安全查找和验证)
-  userId          String // 关联的用户ID
-  clientId        String // 关联的OAuth客户端ID
-  scope           String // JSON字符串存储授权的权限范围 (通常与原始访问令牌一致)
-  expiresAt       DateTime // 令牌过期时间
-  isRevoked       Boolean   @default(false) // 令牌是否已被撤销
-  revokedAt       DateTime? // 令牌撤销时间
-  createdAt       DateTime  @default(now()) // 创建时间
-  previousTokenId String?   @unique // 可选: 用于刷新令牌轮换机制，指向被替换的旧令牌ID
-  // replacedByTokenId String? @unique // 可选: 指向替换此令牌的新令牌ID (用于跟踪轮换链)
+  id              String    @id @default(cuid()) // 刷新令牌记录的唯一标识符
+  token           String    @unique // 原始令牌字符串 (同访问令牌，高安全性下推荐存储哈希)
+  tokenHash       String?   @unique // 令牌的哈希值 (推荐)
+  jti             String?   @unique // JWT ID (可选, 如果令牌是JWT格式且需要通过JTI撤销)
+  userId          String    // 关联的用户ID
+  clientId        String    // 关联的OAuth客户端ID
+  scope           String    // JSON字符串数组，存储授权的权限范围 (通常与原始访问令牌一致或其子集)
+  expiresAt       DateTime  // 令牌的过期时间
+  isRevoked       Boolean   @default(false) // 标记此刷新令牌是否已被撤销
+  revokedAt       DateTime? // 令牌撤销的具体时间
+  createdAt       DateTime  @default(now()) // 令牌创建时间
+  previousTokenId String?   @unique // 可选: 用于实现刷新令牌轮换 (rotation) 机制，指向被此令牌替换掉的旧刷新令牌ID
 
   // 关联关系
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  // previousToken RefreshToken? @relation("RefreshTokenRotationPrevious", fields: [previousTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_previous_refresh_token")
-  // nextToken     RefreshToken? @relation("RefreshTokenRotationNext", fields: [replacedByTokenId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_next_refresh_token")
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade) // 关联客户端
+  // previousToken RefreshToken? @relation("RefreshTokenRotation", fields: [previousTokenId], references: [id], onDelete:NoAction, onUpdate:NoAction)
+  // nextToken     RefreshToken? @relation("RefreshTokenRotation", fields: [id], references: [previousTokenId])
 
-  @@index([tokenHash]) // 为令牌哈希值创建索引以提高查询效率
-  @@index([userId])
-  @@index([clientId])
-  @@index([expiresAt])
-  @@index([isRevoked])
-  @@map("refresh_tokens")
+
+  @@index([tokenHash]) // 为令牌哈希值创建索引
+  @@index([jti])       // 为JTI创建索引
+  @@index([userId])    // 为用户ID创建索引
+  @@index([clientId])  // 为客户端ID创建索引
+  @@index([expiresAt]) // 为过期时间创建索引
+  @@index([isRevoked]) // 为撤销状态创建索引
+  @@map("refresh_tokens") // 数据库表映射名称
 }
 
 // ================================
@@ -188,58 +193,62 @@ model RefreshToken {
 
 // 角色表
 model Role {
-  id          String   @id @default(cuid()) // 唯一标识符
-  name        String   @unique // 角色唯一名称 (e.g., "admin", "editor")
-  displayName String // 角色的显示名称 (本地化或UI友好名称)
-  description String? // 角色描述
-  isActive    Boolean  @default(true) // 角色是否激活
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
+  id          String   @id @default(cuid()) // 角色唯一标识符
+  name        String   @unique // 角色唯一名称 (例如: "administrator", "content_editor", "viewer")
+  displayName String   // 角色的显示名称 (用于UI展示，例如: "系统管理员", "内容编辑员")
+  description String?  // 角色的详细描述
+  isSystemRole Boolean @default(false) // 是否为系统内置角色 (通常不可删除)
+  isActive    Boolean  @default(true) // 角色是否激活可用
+  createdAt   DateTime @default(now()) // 角色创建时间
+  updatedAt   DateTime @updatedAt // 角色最后更新时间
 
   // 关联关系
-  userRoles       UserRole[] // 关联到用户角色表
-  rolePermissions RolePermission[] // 关联到角色权限表
+  userRoles       UserRole[] // 拥有此角色的用户列表
+  rolePermissions RolePermission[] // 此角色拥有的权限列表
 
-  @@index([name])
-  @@index([isActive])
-  @@map("roles")
+  @@index([name]) // 为角色名称创建索引
+  @@index([isActive]) // 为激活状态创建索引
+  @@map("roles") // 数据库表映射名称
 }
 
-// 权限表 - 统一的权限资源表
+// 权限表 - 统一的权限资源定义表
 model Permission {
-  id          String         @id @default(cuid())
-  name        String         @unique // 权限唯一标识
-  displayName String // 显示名称
-  description String? // 权限描述
-  resource    String // 资源标识
-  action      String // 操作类型 (read, write, delete, execute等)
-  type        PermissionType @default(API) // 权限类型
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String         @id @default(cuid()) // 权限唯一标识符
+  name          String         @unique // 权限的唯一编程名称 (例如: "user:create", "article:publish", "settings:edit")
+  displayName   String         // 权限的显示名称 (用于UI展示，例如: "创建用户", "发布文章")
+  description   String?        // 权限的详细描述
+  resource      String         // 权限所关联的资源标识 (例如: "User", "Article", "SystemSettings")
+  action        String         // 权限允许执行的操作 (例如: "CREATE", "READ", "UPDATE", "DELETE", "LIST", "PUBLISH")
+  type          PermissionType @default(API) // 权限类型，区分是API权限、菜单权限还是数据权限
+  isSystemPerm  Boolean        @default(false) // 是否为系统内置权限 (通常不可删除)
+  isActive      Boolean        @default(true) // 权限是否激活可用
+  createdAt     DateTime       @default(now()) // 权限创建时间
+  updatedAt     DateTime       @updatedAt // 权限最后更新时间
 
   // 关联关系
-  rolePermissions RolePermission[]
+  rolePermissions RolePermission[] // 包含此权限的角色列表
 
-  // 类型化资源关联
-  apiPermission  ApiPermission?
-  menuPermission MenuPermission?
-  dataPermission DataPermission?
+  // 类型化资源关联 (一对一，一个Permission记录对应一个特定类型的权限详情)
+  apiPermission  ApiPermission?  // 如果 type = API, 则关联到ApiPermission详情
+  menuPermission MenuPermission? // 如果 type = MENU, 则关联到MenuPermission详情
+  dataPermission DataPermission? // 如果 type = DATA, 则关联到DataPermission详情
 
-  @@index([name])
-  @@index([resource])
-  @@index([action])
-  @@index([type])
-  @@index([isActive])
-  @@map("permissions")
+  @@index([name]) // 为权限名称创建索引
+  @@index([resource]) // 为资源标识创建索引
+  @@index([action]) // 为操作类型创建索引
+  @@index([type]) // 为权限类型创建索引
+  @@index([isActive]) // 为激活状态创建索引
+  @@map("permissions") // 数据库表映射名称
 }
 
+// 权限类型枚举
 enum PermissionType {
-  API // API权限
-  MENU // 菜单权限
-  DATA // 数据权限
+  API  // API接口访问权限
+  MENU // 用户界面菜单或导航项的可见性/可访问性权限
+  DATA // 对特定数据记录或字段的访问/操作权限 (行级/列级权限)
 }
 
+// HTTP方法枚举 (用于API权限)
 enum HttpMethod {
   GET
   POST
@@ -250,288 +259,326 @@ enum HttpMethod {
   HEAD
 }
 
-// API权限详细信息表
+// API权限详细信息表 (当Permission.type = API时使用)
 model ApiPermission {
-  id           String     @id @default(cuid()) // 唯一标识符
+  id           String     @id @default(cuid()) // API权限详情记录的唯一标识符
   permissionId String     @unique // 关联到主权限表 (Permission) 的ID
-  httpMethod   HttpMethod // HTTP方法 (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD)
-  endpoint     String // API端点路径 (e.g., "/users/:id")
-  rateLimit    Int? // API调用速率限制 (每分钟请求数，可选)
+  httpMethod   HttpMethod // 允许的HTTP方法 (GET, POST, PUT, DELETE等)
+  endpoint     String     // API端点路径 (例如: "/api/v2/users/:id", 支持路径参数)
+  rateLimit    Int?       // API调用速率限制 (每分钟允许的请求数，可选)
 
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  // 关联关系
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade) // 关联到主权限记录
 
-  @@index([httpMethod])
-  @@index([endpoint])
-  @@map("api_permissions")
+  @@index([httpMethod]) // 为HTTP方法创建索引
+  @@index([endpoint]) // 为API端点路径创建索引
+  @@map("api_permissions") // 数据库表映射名称
 }
 
-// 菜单权限详细信息表
+// 菜单权限详细信息表 (当Permission.type = MENU时使用)
 model MenuPermission {
-  id           String @id @default(cuid()) // 唯一标识符
+  id           String @id @default(cuid()) // 菜单权限详情记录的唯一标识符
   permissionId String @unique // 关联到主权限表 (Permission) 的ID
-  menuId       String // 关联到菜单表 (Menu) 的ID
+  menuId       String // 关联到菜单表 (Menu) 的ID，指明此权限控制哪个菜单项
 
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  // 关联关系
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade) // 关联到主权限记录
+  menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade) // 关联到菜单记录
 
-  @@index([menuId]) // 为menuId创建索引以提高查询效率
-  @@map("menu_permissions")
+  @@index([menuId]) // 为菜单ID创建索引
+  @@map("menu_permissions") // 数据库表映射名称
 }
 
-// 数据权限详细信息表
+// 数据权限详细信息表 (当Permission.type = DATA时使用)
 model DataPermission {
-  id           String  @id @default(cuid()) // 唯一标识符
+  id           String  @id @default(cuid()) // 数据权限详情记录的唯一标识符
   permissionId String  @unique // 关联到主权限表 (Permission) 的ID
-  tableName    String // 目标数据表名
-  columnName   String? // 目标列名 (可选，用于列级权限)
-  conditions   String? // 数据过滤条件 (JSON格式，e.g., {"departmentId": "${user.departmentId}"})
+  tableName    String  // 权限作用的目标数据表名
+  columnName   String? // 权限作用的目标列名 (可选，用于实现列级权限控制)
+  conditions   String? // 数据过滤条件 (JSON字符串格式，例如: {"departmentId": "${user.departmentId}", "status": "ACTIVE"})
+                       // 支持变量替换，如 ${user.id}, ${user.departmentId}
 
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  // 关联关系
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade) // 关联到主权限记录
 
-  @@index([tableName])
-  @@index([columnName])
-  @@map("data_permissions")
+  @@index([tableName]) // 为表名创建索引
+  @@index([columnName]) // 为列名创建索引
+  @@map("data_permissions") // 数据库表映射名称
 }
 
-// 菜单表 - 独立的菜单资源表
+// 菜单表 - 定义系统中的菜单结构
 model Menu {
-  id        String  @id @default(cuid()) // 唯一标识符
-  name      String // 菜单名称 (UI显示)
-  key       String  @unique // 菜单唯一标识符 (程序中使用)
-  path      String? // 前端路由路径
-  component String? // 前端组件路径 (可选)
-  icon      String? // 菜单图标 (可选)
-  order     Int     @default(0) // 菜单排序字段
-  isHidden  Boolean @default(false) // 菜单是否在UI中隐藏
-  isActive  Boolean @default(true) // 菜单是否激活 (可用)
-  parentId  String? // 父菜单ID (用于层级结构)
+  id        String  @id @default(cuid()) // 菜单项唯一标识符
+  name      String  // 菜单名称 (在UI上显示)
+  key       String  @unique // 菜单唯一键 (程序内部使用，例如用于路由或权限匹配)
+  path      String? // 前端路由路径 (例如: "/dashboard", "/users/list")
+  component String? // 前端组件的路径或标识 (可选，用于动态加载组件)
+  icon      String? // 菜单图标的标识或URL (可选)
+  order     Int     @default(0) // 菜单项的排序顺序，值越小越靠前
+  isHidden  Boolean @default(false) // 菜单项是否在UI中默认隐藏
+  isActive  Boolean @default(true) // 菜单项是否激活可用
+  parentId  String? // 父菜单ID，用于构建层级菜单结构
 
-  // 层级关系
-  parent   Menu?  @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction) // 父菜单
-  children Menu[] @relation("MenuHierarchy") // 子菜单列表
+  // 层级关系 (自关联)
+  parent   Menu?  @relation("MenuHierarchy", fields: [parentId], references: [id], onDelete:NoAction, onUpdate:NoAction) // 指向父菜单项
+  children Menu[] @relation("MenuHierarchy") // 包含的子菜单项列表
 
   // 权限关联
-  menuPermissions MenuPermission[] // 关联到菜单权限表
+  menuPermissions MenuPermission[] // 关联到控制此菜单项访问的权限记录
 
-  createdAt DateTime @default(now()) // 创建时间
-  updatedAt DateTime @updatedAt // 更新时间
+  createdAt DateTime @default(now()) // 菜单项创建时间
+  updatedAt DateTime @updatedAt // 菜单项最后更新时间
 
-  @@index([key])
-  @@index([parentId])
-  @@index([order])
-  @@index([isActive])
-  @@map("menus")
+  @@index([key]) // 为菜单键创建索引
+  @@index([parentId]) // 为父菜单ID创建索引
+  @@index([order]) // 为排序字段创建索引
+  @@index([isActive]) // 为激活状态创建索引
+  @@map("menus") // 数据库表映射名称
 }
 
-// 用户角色关联表
+// 用户角色关联表 (多对多关系)
 model UserRole {
-  userId String // 用户ID
-  roleId String // 角色ID
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  userId String   // 关联的用户ID
+  roleId String   // 关联的角色ID
+
+  // 关联关系
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade) // 关联角色
 
   // ABAC (Attribute-Based Access Control) 扩展属性
-  context    String? // 上下文条件 (JSON格式, e.g., {"ip": "192.168.1.100", "timeOfDay": "09:00-17:00"})
-  expiresAt  DateTime? // 此角色分配的过期时间
-  assignedBy String? // 分配此角色的管理员用户ID
-  assignedAt DateTime  @default(now()) // 分配时间
+  context    String?   // 上下文条件 (JSON字符串格式, 例如: {"ip_range": "192.168.1.0/24", "time_of_day": "09:00-17:00"})
+                       // 用于在特定条件下才激活此角色分配
+  expiresAt  DateTime? // 此角色分配的过期时间 (可选)
+  assignedBy String?   // 分配此角色的管理员用户ID或系统标识
+  assignedAt DateTime  @default(now()) // 角色分配的时间
 
-  @@id([userId, roleId]) // 复合主键
-  @@index([expiresAt])
-  @@map("user_roles")
+  @@id([userId, roleId]) // 使用用户ID和角色ID作为复合主键
+  @@index([expiresAt]) // 为过期时间创建索引
+  @@map("user_roles") // 数据库表映射名称
 }
 
-// 角色权限关联表
+// 角色权限关联表 (多对多关系)
 model RolePermission {
-  roleId       String // 角色ID
-  permissionId String // 权限ID
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  roleId       String // 关联的角色ID
+  permissionId String // 关联的权限ID
+
+  // 关联关系
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade) // 关联角色
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade) // 关联权限
 
   // ABAC (Attribute-Based Access Control) 扩展属性
-  conditions String? // 权限生效的特定条件 (JSON格式, e.g., {"resourceOwner": true})
-  assignedAt DateTime @default(now()) // 分配时间
+  conditions String?   // 权限生效的特定条件 (JSON字符串格式, 例如: {"resource_owner": true, "region": "US"})
+                       // 用于在特定条件下才授予此权限给角色
+  assignedAt DateTime  @default(now()) // 权限分配给角色的时间
 
-  @@id([roleId, permissionId]) // 复合主键
-  @@map("role_permissions")
+  @@id([roleId, permissionId]) // 使用角色ID和权限ID作为复合主键
+  @@map("role_permissions") // 数据库表映射名称
 }
 
-// ===== 审计与监控 =====
+// ===== 审计与监控 (Auditing & Monitoring) =====
+
 // 审计日志表
 model AuditLog {
-  id           String   @id @default(uuid()) // 唯一标识符 (使用UUID以提高分布式环境下的兼容性)
-  timestamp    DateTime @default(now()) // 日志记录时间
-  userId       String? // 操作用户ID (如果操作由用户发起)
-  actorType    String // 操作者类型 (e.g., "USER", "SYSTEM", "CLIENT_APP", "ADMIN")
-  actorId      String // 操作者标识 (可以是用户ID, 系统进程ID, 或客户端ID)
-  action       String // 执行的操作 (e.g., "USER_LOGIN", "CLIENT_CREATE", "PERMISSION_ASSIGN")
-  resourceType String? // 操作影响的资源类型 (e.g., "User", "OAuthClient", "Role")
-  resourceId   String? // 操作影响的资源ID
-  details      String? // 操作详情 (JSON字符串存储结构化信息，如请求参数、变更内容)
-  status       String // 操作状态 (e.g., "SUCCESS", "FAILURE", "PENDING", "DENIED")
-  ipAddress    String? // 发起操作的IP地址
-  userAgent    String? // 发起操作的用户代理
+  id           String   @id @default(uuid()) // 唯一标识符 (推荐使用UUID以提高分布式环境下的兼容性)
+  timestamp    DateTime @default(now()) // 日志记录的时间戳
+  userId       String?  // 操作用户的ID (如果操作由已认证用户发起)
+  actorType    String   // 操作者的类型 (例如: "USER", "SYSTEM_PROCESS", "API_CLIENT", "ADMIN_CONSOLE")
+  actorId      String   // 操作者的具体标识 (可以是用户ID, 系统进程名, OAuth客户端ID等)
+  action       String   // 执行的具体操作 (例如: "USER_LOGIN_SUCCESS", "CREATE_OAUTH_CLIENT", "ASSIGN_ROLE_TO_USER", "DELETE_ARTICLE")
+  resourceType String?  // 操作影响的资源类型 (例如: "User", "OAuthClient", "Role", "Article")
+  resourceId   String?  // 操作影响的具体资源ID
+  details      Json?    // 操作的详细信息 (JSON对象，用于存储结构化数据，如请求参数、变更前后的值等)
+  status       String   // 操作结果状态 (例如: "SUCCESS", "FAILURE", "PENDING", "ACCESS_DENIED")
+  ipAddress    String?  // 发起操作的源IP地址
+  userAgent    String?  // 发起操作的用户代理信息 (例如浏览器类型和版本)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // 关联用户，用户删除时审计日志中的userId置为NULL
+  // 关联关系
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // 关联到用户，如果用户被删除，审计日志中的userId将设为NULL
 
-  @@index([timestamp])
-  @@index([userId])
-  @@index([action])
-  @@index([resourceType, resourceId])
-  @@index([status])
-  @@index([userId, timestamp]) // For user-specific audit trails
-  @@map("audit_logs")
+  @@index([timestamp]) // 为时间戳创建索引
+  @@index([userId]) // 为用户ID创建索引
+  @@index([action]) // 为操作类型创建索引
+  @@index([resourceType, resourceId]) // 为资源类型和资源ID创建复合索引
+  @@index([status]) // 为状态创建索引
+  @@index([actorId, actorType]) // 为操作者创建索引
+  @@index([userId, timestamp]) // 方便查询特定用户的审计轨迹
+  @@map("audit_logs") // 数据库表映射名称
 }
 
 // ================================
 // 密码历史 (Password History)
 // ================================
-// 记录用户密码变更历史，用于防止重复使用旧密码
+// 记录用户密码的变更历史，用于实施密码策略，例如防止重复使用最近N次密码
 model PasswordHistory {
-  id           String   @id @default(cuid()) // 唯一标识符
-  userId       String // 关联的用户ID
-  passwordHash String // 已哈希的旧密码
-  createdAt    DateTime @default(now()) // 此密码的创建时间 (即被替换的时间)
+  id           String   @id @default(cuid()) // 密码历史记录的唯一标识符
+  userId       String   // 关联的用户ID
+  passwordHash String   // 已哈希的旧密码值
+  createdAt    DateTime @default(now()) // 此密码被设置为历史记录的时间 (即被新密码替换的时间)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
 
-  @@index([userId, createdAt]) // 为用户ID和创建时间创建复合索引
-  @@map("password_histories")
+  @@index([userId, createdAt]) // 为用户ID和创建时间创建复合索引，方便查询用户的密码历史
+  @@map("password_histories") // 数据库表映射名称
 }
 
 // ================================
 // OAuth Scopes (权限范围)
 // ================================
-// 定义系统中可用的OAuth权限范围
+// 定义系统中可用的OAuth权限范围 (scopes)
 model Scope {
-  id          String   @id @default(cuid()) // 唯一标识符
-  name        String   @unique // Scope的名称 (e.g., "openid", "profile", "email", "user:read", "order:create")
-  description String? // Scope的描述信息
-  isPublic    Boolean  @default(false) // 此Scope是否对所有公开客户端可用 (无需特殊分配)
-  isActive    Boolean  @default(true) // Scope是否激活可用
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
+  id          String   @id @default(cuid()) // Scope的唯一标识符
+  name        String   @unique // Scope的名称 (例如: "openid", "profile", "email", "user:read", "order:create")
+                               // 应遵循一定的命名规范，例如 OIDC 标准 scope 或 资源:操作 格式
+  description String?  // Scope的详细描述，解释此范围授权的权限
+  isPublic    Boolean  @default(false) // 此Scope是否对所有公开客户端自动可用 (无需管理员特殊分配给客户端)
+  isOidcScope Boolean  @default(false) // 标记此Scope是否为标准的OIDC Scope (如 openid, profile, email, address, phone)
+  isActive    Boolean  @default(true) // Scope是否当前激活可用
+  createdAt   DateTime @default(now()) // Scope创建时间
+  updatedAt   DateTime @updatedAt // Scope最后更新时间
 
-  // 可选: 如果需要将Scope限制到特定客户端，可以添加关联表 ClientScope
+  // 可选: 如果需要将Scope限制到特定客户端，可以添加一个 ClientScope 的多对多关联表
   // clientScopes ClientScope[]
 
-  @@map("scopes")
+  @@map("scopes") // 数据库表映射名称
 }
 
 // ================================
 // User Consent Grants (用户同意授权记录)
 // ================================
-// 记录用户对特定客户端授予的权限范围 (scopes)
+// 记录用户对特定OAuth客户端授予的权限范围 (scopes) 的同意情况
 model ConsentGrant {
-  id        String    @id @default(cuid()) // 唯一标识符
-  userId    String // 关联的用户ID
-  clientId  String // 关联的OAuth客户端ID (这里是OAuthClient表的cuid)
-  scopes    String // JSON数组字符串，存储用户同意授予的scope名称列表 (e.g., ["openid", "profile", "order:read"])
+  id        String    @id @default(cuid()) // 同意记录的唯一标识符
+  userId    String    // 关联的用户ID
+  clientId  String    // 关联的OAuth客户端ID (这里是OAuthClient表的ID, 通常是cuid)
+  scopes    String    // JSON字符串数组，存储用户同意授予的scope名称列表 (例如: ["openid", "profile", "order:read"])
   issuedAt  DateTime  @default(now()) // 同意授权的颁发时间
-  expiresAt DateTime? // 同意授权的过期时间 (可选，如果同意有有效期)
-  revokedAt DateTime? // 同意授权被撤销的时间 (如果用户撤销了同意)
+  expiresAt DateTime? // 同意授权的过期时间 (可选，如果同意有有效期限制)
+  revokedAt DateTime? // 同意授权被用户撤销的时间 (如果用户后续撤销了此授权)
 
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // 关联关系
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade) // 关联客户端
 
-  @@unique([userId, clientId]) // 一个用户对一个客户端通常只有一个有效的同意记录 (可根据业务调整)
-  @@map("consent_grants")
+  @@unique([userId, clientId]) // 通常一个用户对一个客户端只有一个当前有效的同意记录集合 (可根据业务需求调整，例如允许针对不同scope组合有多个记录)
+  @@map("consent_grants") // 数据库表映射名称
 }
 
 // =======================================
-// 内网环境下不需要邮箱和手机验证功能
-// 用户由管理员直接创建和管理
+// 内网环境下通常不需要邮箱和手机验证相关功能模型
+// 用户账户由管理员在系统内直接创建和管理
 // =======================================
 
 // =======================================
-// Revoked V2 Auth JWTIs (已撤销的V2认证JTI)
+// Revoked V2 Auth JWTIs (已撤销的V2认证体系JWT ID)
 // =======================================
-// 用于将V2认证体系中的刷新令牌JTI加入黑名单 (实现刷新令牌的精确撤销)
+// 用于将V2认证体系中特定类型的JWT（通常是刷新令牌）的JTI (JWT ID) 加入黑名单，
+// 以实现对这些JWT的精确撤销，即使它们在有效期内。
 model RevokedAuthJti {
-  jti       String   @id // V2认证刷新令牌的JWT ID (JTI - JWT ID claim)
-  userId    String // 此JTI所属的用户ID
-  expiresAt DateTime // 此黑名单记录的过期时间 (应与原始刷新令牌的过期时间一致)
-  createdAt DateTime @default(now()) // 黑名单记录创建时间
+  jti       String   @id // V2认证JWT的ID (JTI - JWT ID claim)，作为主键，全局唯一
+  userId    String   // 此JTI所属的用户ID，用于辅助查询和管理
+  type      String   // 被撤销的JWT类型 (例如: "refresh_token", "access_token") - 可选，但推荐用于区分
+  expiresAt DateTime // 此黑名单记录的过期时间 (应与原始JWT的过期时间一致或稍晚，用于定期清理过期的黑名单条目)
+  createdAt DateTime @default(now()) // 黑名单记录的创建时间 (即JWT被撤销的时间)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
 
-  @@index([userId]) // 为用户ID创建索引
-  @@index([expiresAt]) // For cleaning up expired JTIs
-  @@map("revoked_auth_jtis")
+  @@index([userId]) // 为用户ID创建索引，方便查询用户所有已撤销的JTI
+  @@index([expiresAt]) // 为过期时间创建索引，方便定期清理任务
+  @@map("revoked_auth_jtis") // 数据库表映射名称
 }
 
 // 登录尝试记录
 model LoginAttempt {
-  id            String   @id @default(cuid()) // 唯一标识符
-  userId        String? // 关联的用户ID (如果尝试与已知用户账户关联)
-  username      String // 尝试登录时使用的用户名
-  ipAddress     String? // 尝试登录的IP地址
-  userAgent     String? // 尝试登录的用户代理 (浏览器或客户端信息)
-  timestamp     DateTime @default(now()) // 登录尝试的时间戳
-  successful    Boolean // 本次尝试是否成功
-  failureReason String? // 登录失败的原因 (e.g., "WRONG_PASSWORD", "USER_NOT_FOUND", "ACCOUNT_LOCKED", "MFA_REQUIRED", "MFA_FAILED")
+  id            String   @id @default(cuid()) // 登录尝试记录的唯一标识符
+  userId        String?  // 关联的用户ID (如果尝试与一个已知的用户账户相关联)
+  username      String   // 尝试登录时使用的用户名或身份标识
+  ipAddress     String?  // 发起登录尝试的IP地址
+  userAgent     String?  // 发起登录尝试的用户代理 (例如浏览器或客户端应用信息)
+  timestamp     DateTime @default(now()) // 登录尝试发生的时间戳
+  successful    Boolean  // 本次登录尝试是否成功
+  failureReason String?  // 如果登录失败，记录失败的原因 (例如: "INVALID_CREDENTIALS", "USER_NOT_FOUND", "ACCOUNT_LOCKED", "MFA_REQUIRED", "MFA_FAILED")
+                         // 可以使用预定义的错误码或描述性文本
+  mfaAttempted  Boolean  @default(false) // 本次尝试是否涉及MFA (多因素认证)
+  mfaSuccessful Boolean? // 如果涉及MFA，MFA是否成功
 
-  // 关联用户 (可选，如果需要从用户模型导航到其登录尝试记录)
+  // 关联用户 (可选，如果需要从用户模型双向导航到其登录尝试记录)
   // user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId]) // 为用户ID创建索引
-  @@index([username])
-  @@index([ipAddress])
-  @@index([timestamp])
-  @@map("login_attempts") // 数据库表名
+  @@index([username]) // 为用户名创建索引
+  @@index([ipAddress]) // 为IP地址创建索引
+  @@index([timestamp]) // 为时间戳创建索引
+  @@map("login_attempts") // 数据库表映射名称
 }
 
-// 系统配置
+// 系统配置表
 model SystemConfiguration {
-  id          String   @id @default(cuid()) // 唯一标识符
-  key         String   @unique // 配置项的键 (e.g., "siteName", "defaultLanguage", "maintenanceMode")
-  value       String // 配置项的值 (建议存储为JSON字符串以支持复杂数据类型如对象或数组)
-  description String? // 配置项的描述
-  type        String   @default("string") // 配置值的预期类型 (e.g., "string", "number", "boolean", "json")
-  isEditable  Boolean  @default(true) // 此配置项是否允许通过管理API进行编辑
-  createdAt   DateTime @default(now()) // 创建时间
-  updatedAt   DateTime @updatedAt // 更新时间
+  id          String   @id @default(cuid()) // 配置项的唯一标识符
+  key         String   @unique // 配置项的键名 (例如: "site.name", "security.mfa.enabled", "theme.default")
+  value       Json     // 配置项的值 (使用Json类型以支持存储字符串、数字、布尔、数组或对象等复杂结构)
+  description String?  // 配置项的描述，解释其用途和可能的值
+  type        String   @default("string") // 配置值的预期数据类型 (例如: "string", "number", "boolean", "json", "array") - 用于UI展示或验证
+  isEditable  Boolean  @default(true) // 此配置项是否允许通过管理界面或API进行编辑
+  isSensitive Boolean  @default(false) // 标记此配置项是否包含敏感信息 (例如密码、API密钥)，敏感信息在获取时不应直接暴露
+  category    String?  // 配置项分类 (例如: "General", "Security", "Appearance", "Integration") - 用于在UI上分组展示
+  createdAt   DateTime @default(now()) // 配置项创建时间
+  updatedAt   DateTime @updatedAt // 配置项最后更新时间
 
-  @@map("system_configurations") // 数据库表名
+  @@map("system_configurations") // 数据库表映射名称
 }
 
-// 安全策略
+// 安全策略表
 model SecurityPolicy {
-  id        String     @id @default(cuid()) // 唯一标识符
-  name      String     @unique // 策略名称 (e.g., "DefaultPasswordPolicy", "HighSecurityLoginPolicy")
-  type      PolicyType // 策略类型 (关联到PolicyType枚举)
-  policy    Json // 具体的策略配置 (JSON对象，其结构取决于策略类型)
-  isActive  Boolean    @default(true) // 此策略是否当前激活生效
-  createdAt DateTime   @default(now()) // 创建时间
-  updatedAt DateTime   @updatedAt // 更新时间
+  id        String     @id @default(cuid()) // 安全策略的唯一标识符
+  name      String     @unique // 策略的唯一名称 (例如: "DefaultPasswordPolicy", "HighSecurityLoginPolicy", "ApiClientRateLimit")
+  type      PolicyType // 策略的类型 (关联到PolicyType枚举，例如 PASSWORD_STRENGTH, LOGIN_SECURITY)
+  policy    Json       // 具体的策略配置内容 (JSON对象，其结构取决于策略类型，例如密码策略可能包含最小长度、字符要求等)
+  description String?  // 策略的描述
+  isActive  Boolean    @default(true) // 此策略是否当前激活并生效
+  isDefault Boolean    @default(false) // 标记此策略是否为某种类型的默认策略 (例如，默认密码策略)
+  createdAt DateTime   @default(now()) // 策略创建时间
+  updatedAt DateTime   @updatedAt // 策略最后更新时间
 
-  @@index([name, type]) // 为策略名称和类型创建复合索引
-  @@map("security_policies") // 数据库表名
+  @@index([name, type]) // 为策略名称和类型创建复合索引，确保同类型下名称唯一
+  @@index([type, isActive, isDefault]) // 方便查询特定类型激活的默认策略
+  @@map("security_policies") // 数据库表映射名称
 }
 
 // ================================
-// JTI Blacklist for Token Revocation (通用令牌黑名单)
+// JTI Blacklist for General Token Revocation (通用令牌撤销黑名单)
 // ================================
-// 用于存储已撤销的JWT的JTI (JWT ID)，适用于访问令牌和刷新令牌的通用撤销机制
+// 用于存储已撤销的JWT的JTI (JWT ID)，适用于需要精确撤销的各种类型的JWT (如访问令牌、自定义令牌等)
+// 注意：对于刷新令牌的撤销，如果 RevokedAuthJti 已被专门使用，则此表可能用于其他类型的JWT。
 model TokenBlacklist {
-  id        String   @id @default(cuid()) // 唯一标识符
-  jti       String   @unique // JWT的ID (JTI claim)
-  tokenType String // 令牌类型 (e.g., "access_token", "refresh_token", "id_token")
-  expiresAt DateTime // 黑名单条目的过期时间 (应与原始令牌的过期时间一致，用于定期清理)
-  createdAt DateTime @default(now()) // 黑名单条目创建时间
+  id        String   @id @default(cuid()) // 黑名单条目的唯一标识符
+  jti       String   @unique // 被撤销的JWT的ID (JTI claim)，作为主要查找依据
+  tokenType String   // 被撤销的令牌类型 (例如: "access_token", "id_token", "custom_app_token") - 用于区分不同类型的已撤销令牌
+  userId    String?  // 可选，与此JTI关联的用户ID，便于审计或按用户清理
+  clientId  String?  // 可选，与此JTI关联的客户端ID，便于审计或按客户端清理
+  expiresAt DateTime // 黑名单条目的过期时间 (应与原始令牌的过期时间一致或稍晚，用于定期清理过期的黑名单条目)
+  reason    String?  // 撤销原因 (可选，用于审计)
+  createdAt DateTime @default(now()) // 黑名单条目创建时间 (即令牌被撤销的时间)
 
-  @@index([jti]) // 为JTI创建索引以快速查找
-  @@index([expiresAt]) // For cleaning up expired blacklist entries
-  @@map("token_blacklist")
+  @@index([jti])       // 为JTI创建唯一索引以实现快速查找
+  @@index([expiresAt]) // 为过期时间创建索引，方便定期清理任务
+  @@index([userId])    // 为用户ID创建索引
+  @@index([clientId])  // 为客户端ID创建索引
+  @@map("token_blacklist") // 数据库表映射名称
 }
 
-// 策略类型枚举
+// 安全策略类型枚举
 enum PolicyType {
-  PASSWORD_STRENGTH // 密码强度策略
-  PASSWORD_HISTORY // 密码历史策略
-  PASSWORD_EXPIRATION // 密码过期策略
-  LOGIN_SECURITY // 登录安全策略
-  ACCESS_CONTROL // 访问控制策略
-  CLIENT_SECURITY // OAuth客户端安全策略
-  SCOPE_SECURITY // OAuth作用域安全策略
+  PASSWORD_STRENGTH   // 密码强度要求策略
+  PASSWORD_HISTORY    // 密码历史记录策略 (例如，不允许使用最近N个密码)
+  PASSWORD_EXPIRATION // 密码过期策略 (例如，密码必须每N天更换一次)
+  ACCOUNT_LOCKOUT     // 账户锁定策略 (例如，登录失败N次后锁定账户M分钟)
+  LOGIN_SECURITY      // 登录安全相关策略 (可能包含MFA要求、会话超时等)
+  ACCESS_CONTROL      // 通用访问控制策略 (例如IP白名单/黑名单，地理位置限制)
+  CLIENT_SECURITY     // OAuth客户端相关的安全策略 (例如对特定客户端类型的令牌生命周期，PKCE要求)
+  SCOPE_SECURITY      // OAuth作用域相关的安全策略 (例如哪些作用域需要额外审批)
+  TOKEN_LIFETIME      // 令牌生命周期策略 (可以更细致地定义不同场景下的令牌有效期)
+  RATE_LIMITING       // API速率限制策略
+  DATA_RETENTION      // 数据保留策略 (例如审计日志保留多久)
 }

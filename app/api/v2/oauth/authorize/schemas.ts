@@ -43,11 +43,9 @@ export const authorizeQuerySchema = z.object({
    * The route handler seems to check for its presence later.
    */
   scope: z.string({
-    // Making it required as per general OAuth spec, empty scope is different from no scope param.
-    // The route handler also checks for its presence.
     required_error: 'scope is required.',
-    invalid_type_error: 'scope must be a string.'
-  }).min(1, "scope cannot be empty if present, but can be an empty string for default scopes handled by server.").optional(), // Allowing it to be optional at parse, then checked in handler. Or make it z.string().min(1, "scope is required")
+    invalid_type_error: 'scope must be a string.',
+  }).min(1, 'scope cannot be empty.'),
 
   /**
    * 状态参数 (State).

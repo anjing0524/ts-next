@@ -135,3 +135,31 @@ export const clientSecretRegenerationResponseSchema = z.object({
     message: z.string(),
 });
 export type ClientSecretRegenerationResponse = z.infer<typeof clientSecretRegenerationResponseSchema>;
+
+/**
+ * Zod schema for updating an OAuth Client (PUT /api/v2/clients/[clientId]).
+ * All fields that can be updated. For PUT, typically all settable fields are expected.
+ * This schema reflects a "flexible PUT" where only provided fields are updated.
+ * `clientId` and `clientSecret` are not updatable via this schema.
+ */
+export const clientUpdateSchema = clientCreateSchema.omit({
+  clientId: true, // clientId is part of the path param, not body
+  clientSecret: true, // clientSecret is handled via a dedicated endpoint or not at all here
+}).partial().extend({
+  // Fields that might have different validation or be required in PUT vs create
+  // For example, if clientName was optional in create but required to exist for update:
+  // clientName: z.string().min(1, "客户端名称不能为空").max(100).optional(), // Keep optional if flexible PUT
+}).strict("请求体包含不允许更新的字段 (Request body includes fields not allowed for update via PUT/PATCH)");
+export type ClientUpdatePayload = z.infer<typeof clientUpdateSchema>;
+
+
+/**
+ * Zod schema for partially updating an OAuth Client (PATCH /api/v2/clients/[clientId]).
+ * All fields are optional.
+ * `clientId` and `clientSecret` are not updatable via this schema.
+ */
+export const clientPatchSchema = clientCreateSchema.omit({
+  clientId: true,
+  clientSecret: true,
+}).partial().strict("请求体包含不允许更新的字段 (Request body includes fields not allowed for update via PUT/PATCH)");
+export type ClientPatchPayload = z.infer<typeof clientPatchSchema>;

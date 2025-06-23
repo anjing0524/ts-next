@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { cleanupTestData, createTestUser, createTestOAuthClient } from '../setup/test-helpers';
+import { cleanupTestData, createTestUser, createTestClient } from '../setup/test-helpers';
 
 /**
  * OAuth2.1集成测试 - 完整授权码流程
@@ -26,8 +26,9 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
     });
     
     // 创建测试OAuth客户端
-    testClient = await createTestOAuthClient({
+    testClient = await createTestClient({
       id: 'integration_client_001',
+      clientId: 'integration-client-id-string', // Added clientId as it's required by createTestClient
       name: 'Integration Test Client',
       clientSecret: 'test_client_secret_123',
       redirectUris: ['https://example.com/callback'],
@@ -206,12 +207,16 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
       expect(tokenRequest.code_verifier).toBeDefined();
     });
     
+import crypto from 'crypto'; // Added import
+
+// ... (other imports) ...
+
     it('应该验证PKCE', () => {
       const codeVerifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
       const codeChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
       
       // 模拟PKCE验证
-      const crypto = require('crypto');
+      // const crypto = require('crypto'); // Removed require
       const hash = crypto.createHash('sha256').update(codeVerifier).digest();
       const computedChallenge = hash.toString('base64url');
       
@@ -255,7 +260,7 @@ describe('OAuth2.1 完整授权码流程集成测试', () => {
       const codeChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
       
       // 模拟PKCE验证
-      const crypto = require('crypto');
+      // const crypto = require('crypto'); // Already imported at the top
       const hash = crypto.createHash('sha256').update(codeVerifier).digest();
       const computedChallenge = hash.toString('base64url');
       

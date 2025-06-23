@@ -174,10 +174,10 @@ export default function Home() {
             <div>
               <h4 className="font-semibold text-white mb-3">Core OAuth 2.0</h4>
               <div className="space-y-2 text-gray-300 font-mono">
-                <div>GET /api/oauth/authorize</div>
-                <div>POST /api/oauth/token</div>
-                <div>POST /api/oauth/revoke</div>
-                <div>GET /api/oauth/userinfo</div>
+                <div>GET /api/v2/oauth/authorize</div>
+                <div>POST /api/v2/oauth/token</div>
+                <div>POST /api/v2/oauth/revoke</div>
+                <div>GET /api/v2/oauth/userinfo</div>
               </div>
             </div>
             <div>

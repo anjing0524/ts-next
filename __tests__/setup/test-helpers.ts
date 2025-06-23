@@ -102,9 +102,9 @@ export async function createTestClient(clientData: TestClient): Promise<any> {
       clientSecret: hashedSecret,
       name: clientData.name,
       redirectUris: JSON.stringify(clientData.redirectUris),
-      grantTypes: JSON.stringify(clientData.grantTypes),
-      responseTypes: JSON.stringify(clientData.responseTypes),
-      allowedScopes: JSON.stringify(clientData.allowedScopes),
+      grantTypes: JSON.stringify(clientData.grantTypes || ['authorization_code']), // Provide default if undefined
+      responseTypes: JSON.stringify(clientData.responseTypes || ['code']), // Provide default
+      allowedScopes: JSON.stringify(clientData.allowedScopes || ['openid']), // Provide default
       clientType: 'CONFIDENTIAL',
       requirePkce: true,
       requireConsent: false,
@@ -170,7 +170,8 @@ async function createTestPermissions(): Promise<void> {
         displayName: 'Client Management',
         description: 'Client management',
         resource: 'clients',
-        action: 'manage'
+        action: 'manage',
+        isSystemPerm: true, // Added
       },
     ],
   });
@@ -215,12 +216,12 @@ async function createTestRolePermissions(): Promise<void> {
  * 创建测试JWT令牌（用于认证中心会话）
  */
 export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
-  const privateKey = process.env.JWT_PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error('JWT_PRIVATE_KEY environment variable is required');
+  const privateKeyPem = process.env.JWT_PRIVATE_KEY_PEM;
+  if (!privateKeyPem) {
+    throw new Error('JWT_PRIVATE_KEY_PEM environment variable is required for createTestAuthCenterSessionToken');
   }
   
-  const key = await jose.importPKCS8(privateKey, 'RS256');
+  const key = await jose.importPKCS8(privateKeyPem, 'RS256');
   
   const jwt = await new jose.SignJWT({
     sub: userId,

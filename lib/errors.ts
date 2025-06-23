@@ -176,6 +176,16 @@ export abstract class BaseError extends Error {
 }
 
 /**
+ * 资源未找到错误 (Resource Not Found Error)
+ * 表示请求的资源不存在。
+ * (Indicates that the requested resource does not exist.)
+ */
+export class ResourceNotFoundError extends BaseError {
+  constructor(message: string = 'Resource not found.', code: string = 'RESOURCE_NOT_FOUND', context?: Record<string, any>) {
+    super(message, 404, code, context); // HTTP 404 Not Found
+  }
+}
+/**
  * 验证错误 (Validation Error)
  * 表示输入数据验证失败。
  * (Indicates that input data validation failed.)

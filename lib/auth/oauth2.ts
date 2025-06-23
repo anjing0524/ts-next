@@ -847,15 +847,18 @@ export class AuthorizationUtils {
 
       await prisma.auditLog.create({
         data: {
-          userId: validUserId,
-          clientId: validClientIdForDb,
+          user: validUserId ? { connect: { id: validUserId } } : undefined,
+          client: validClientIdForDb ? { connect: { id: validClientIdForDb } } : undefined,
           action: event.action,
-          resource: event.resource || null,
+          resourceType: event.resourceType || null, // Assuming resource is resourceType
+          resourceId: event.resourceId || null,   // Added resourceId
+          // resource: event.resource || null, // 'resource' might be a combination or specific field
           ipAddress: event.ipAddress || null,
           userAgent: event.userAgent || null,
           success: event.success,
           errorMessage: event.errorMessage || null,
           metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+          status: event.success ? 'SUCCESS' : 'FAILURE', // Added status field
           actorType: actorType,
           actorId: actorId,
         },

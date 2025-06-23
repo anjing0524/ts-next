@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
 
     // Redirect back to the /api/oauth/authorize endpoint with original parameters
     // The authorize endpoint will re-check consent, find it, and issue the code.
-    const authorizeUrl = new URL('/api/oauth/authorize', request.nextUrl.origin);
+    const authorizeUrl = new URL('/api/v2/oauth/authorize', request.nextUrl.origin);
     authorizeUrl.searchParams.set('client_id', client_id);
     authorizeUrl.searchParams.set('redirect_uri', redirect_uri);
     authorizeUrl.searchParams.set('response_type', 'code'); // Assuming 'code' for now, should come from original req

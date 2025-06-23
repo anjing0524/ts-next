@@ -22,137 +22,205 @@ interface AuthState {
   error: string | null;
 }
 
-// This is a simplified hook. In a real app, consider:
-// - Secure token storage (HttpOnly cookies are best, otherwise localStorage with CSRF protection)
-// - Token refresh logic
-// - More robust error handling
-// - Using React Context for providing auth state globally if preferred
+// hooks/useAuth.ts
+// - Secure token storage: Access token in memory (via state), Refresh token in sessionStorage.
+// - Token refresh logic implemented.
+// - Real API calls for user profile and permissions.
 
-/**
- * 模拟的客户端认证 Hook (Simulated Client-Side Authentication Hook)
- *
- * 功能 (Features):
- * - 从 localStorage 加载和保存认证令牌 (Loads and saves auth token from localStorage).
- * - (模拟) 根据令牌获取用户信息和权限 (Simulates fetching user info and permissions based on token).
- * - 提供登出功能 (Provides logout functionality).
- *
- * 注意 (Note):
- * - 这是一个简化的实现，用于UI原型设计。 (This is a simplified implementation for UI prototyping.)
- * - 生产环境中应使用更安全的令牌存储机制 (如 HttpOnly cookies)。
- *   (In a production environment, use more secure token storage like HttpOnly cookies.)
- * - 权限列表是模拟的，实际应从后端API获取或从JWT声明中解码。
- *   (Permissions list is simulated; in reality, it should be fetched from a backend API or decoded from JWT claims.)
- */
+// Helper to get cookie by name
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
+// Helper to set cookie
+function setCookie(name: string, value: string, days: number = 7, path: string = '/') {
+  if (typeof document === 'undefined') return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  // Add Secure in production; SameSite=Lax is a good default
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=${path}; SameSite=Lax`;
+}
+
+function deleteCookie(name: string, path: string = '/') {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}; SameSite=Lax`;
+}
+
+
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    token: null,
+    token: null, // This will be the access_token
     isLoading: true,
     error: null,
   });
   const router = useRouter();
 
-  const fetchUserAndPermissions = useCallback(async (authToken: string) => {
-    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-    try {
-      // 模拟API调用或JWT解码 (Simulate API call or JWT decoding)
-      // const decodedToken = jwt.decode(authToken); // Example if using a JWT library client-side
-      // const userProfile = await apiClient.get('/api/v2/account/profile', { token: authToken });
-      // const permissionsResponse = await apiClient.get('/api/v2/account/permissions', { token: authToken });
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || ''; // Ensure this is configured
 
-      // --- Placeholder/Mocked Data ---
-      // In a real app, this would come from an API call or decoding the JWT
-      let permissions: string[] = [];
-      let username = 'mockUser';
-      let id = 'mock-user-id';
+  const performLogout = useCallback(async (shouldRevokeToken: boolean = true) => {
+    const currentToken = authState.token || getCookie('auth_token');
+    const refreshToken = typeof window !== 'undefined' ? sessionStorage.getItem('refresh_token') : null;
 
-      // Simulate different users/permissions based on a mock token or username
-      if (authToken === 'admin-token-full-permissions') { // Example token for admin
-        username = 'adminUser';
-        id = 'admin-user-id-123';
-        permissions = [
-          'menu:dashboard:view', 'menu:system:view',
-          'menu:system:user:view', 'users:list', 'users:create', 'users:read', 'users:update', 'users:delete', 'users:manage_roles',
-          'menu:system:role:view', 'roles:list', 'roles:create', 'roles:read', 'roles:update', 'roles:delete', 'roles:manage_permissions',
-          'menu:system:permission:view', 'permissions:list', 'permissions:create', 'permissions:read', 'permissions:update', 'permissions:delete',
-          'menu:system:client:view', 'clients:list', 'clients:create', 'clients:read', 'clients:update', 'clients:delete',
-          'menu:system:scope:view', 'scopes:list', 'scopes:create', 'scopes:read', 'scopes:update', 'scopes:delete',
-          'menu:system:audit:view', 'audit:list',
-        ];
-      } else if (authToken === 'user-token-limited-permissions') { // Example token for a limited user
-        username = 'limitedUser';
-        id = 'limited-user-id-456';
-        permissions = ['menu:dashboard:view', 'menu:profile:view', 'profile:me:read', 'profile:me:update'];
-      } else {
-        // Default mock for any other token
-        permissions = ['menu:dashboard:view', 'menu:profile:view'];
-      }
-      // --- End Placeholder/Mocked Data ---
+    setAuthState({ user: null, token: null, isLoading: false, error: null });
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('refresh_token');
+      deleteCookie('auth_token'); // Clear access token cookie
+    }
 
-      const mockUser: AuthenticatedUser = {
-        id,
-        username,
-        displayName: username.charAt(0).toUpperCase() + username.slice(1),
-        permissions,
-      };
-      // --- End Placeholder Data ---
+    if (shouldRevokeToken && currentToken) {
+      try {
+        // Attempt to revoke the refresh token if available, then access token
+        // The backend /api/v2/oauth/revoke should handle revoking both if possible based on the token provided
+        const tokenToRevoke = refreshToken || currentToken;
+        const clientId = process.env.NEXT_PUBLIC_AUTH_CENTER_CLIENT_ID || 'auth-center-self'; // Client ID for the admin UI
 
-      setAuthState({ user: mockUser, token: authToken, isLoading: false, error: null });
-    } catch (err) {
-      console.error("Failed to fetch user/permissions:", err);
-      setAuthState({ user: null, token: null, isLoading: false, error: 'Failed to load user data.' });
-      // Consider removing token from localStorage if it's invalid
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('authToken');
+        await fetch(`${API_BASE_URL}/api/v2/oauth/revoke`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Bearer ${currentToken}`, // Use access token to authorize revoke if possible
+          },
+          body: new URLSearchParams({ token: tokenToRevoke, client_id: clientId }),
+        });
+        console.log('Tokens revoked on server (attempted).');
+      } catch (revokeError) {
+        console.error('Failed to revoke tokens on server:', revokeError);
       }
     }
-  }, []);
+    router.push('/login');
+  }, [router, authState.token, API_BASE_URL]);
+
+
+  const fetchUserAndPermissions = useCallback(async (accessToken: string) => {
+    setAuthState(prev => ({ ...prev, isLoading: true, error: null, token: accessToken }));
+    try {
+      const profileResponse = await fetch(`${API_BASE_URL}/api/v2/auth/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!profileResponse.ok) {
+        if (profileResponse.status === 401) { // Token likely expired or invalid
+          throw new Error('Unauthorized: Profile fetch failed'); // Trigger refresh or logout
+        }
+        const errorData = await profileResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error_description || `Failed to fetch profile: ${profileResponse.statusText}`);
+      }
+      const profileData = await profileResponse.json();
+
+      // Assuming /api/v2/auth/me returns permissions directly or we make another call
+      // For simplicity, let's assume permissions are part of profileData.data.permissions
+      const userPermissions = profileData.data?.permissions || [];
+
+      const fetchedUser: AuthenticatedUser = {
+        id: profileData.data.id,
+        username: profileData.data.username,
+        displayName: profileData.data.displayName || profileData.data.username,
+        avatar: profileData.data.avatar,
+        permissions: userPermissions,
+      };
+      setAuthState({ user: fetchedUser, token: accessToken, isLoading: false, error: null });
+      setCookie('auth_token', accessToken, 1/24 * 0.95); // Store access token in cookie for ~57 mins (if 1hr expiry)
+
+    } catch (err: any) {
+      console.error("Failed to fetch user/permissions:", err.message);
+      // If fetching user fails (e.g. 401), attempt to refresh the token
+      if (err.message.includes('Unauthorized')) {
+        const success = await refreshToken();
+        if (!success) {
+          performLogout(false); // If refresh fails, logout without trying to revoke (token might be invalid)
+        }
+      } else {
+        setAuthState(prev => ({ ...prev, user: null, token: null, isLoading: false, error: 'Failed to load user data.' }));
+        performLogout(false);
+      }
+    }
+  }, [API_BASE_URL, performLogout]); // Added performLogout to dependencies
+
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    const storedRefreshToken = typeof window !== 'undefined' ? sessionStorage.getItem('refresh_token') : null;
+    if (!storedRefreshToken) {
+      console.log('No refresh token available.');
+      return false;
+    }
+
+    try {
+      const clientId = process.env.NEXT_PUBLIC_AUTH_CENTER_CLIENT_ID || 'auth-center-self';
+      const response = await fetch(`${API_BASE_URL}/api/v2/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: storedRefreshToken,
+          client_id: clientId, // Client ID for the admin UI
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Refresh token request failed:', response.status, await response.text());
+        return false;
+      }
+
+      const data = await response.json();
+      if (data.access_token) {
+        setCookie('auth_token', data.access_token, 1/24 * 0.95); // Store new access token
+        if (data.refresh_token && typeof window !== 'undefined') {
+          sessionStorage.setItem('refresh_token', data.refresh_token); // Store new refresh token
+        }
+        await fetchUserAndPermissions(data.access_token); // Fetch user info with new token
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return false;
+    }
+  }, [API_BASE_URL, fetchUserAndPermissions]);
+
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('authToken');
-      if (storedToken) {
-        fetchUserAndPermissions(storedToken);
-      } else {
-        setAuthState(prev => ({ ...prev, isLoading: false })); // No token, not loading
-      }
+    const initialAccessToken = getCookie('auth_token');
+    if (initialAccessToken) {
+      fetchUserAndPermissions(initialAccessToken);
+    } else {
+      // Try to refresh if no access token but refresh token might exist (e.g. page reload after access token expired)
+      const attemptRefresh = async () => {
+        const success = await refreshToken();
+        if (!success) {
+          setAuthState(prev => ({ ...prev, isLoading: false })); // No tokens, not loading
+          // If not on login page, redirect to login
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+             // Avoid immediate logout if already on login page due to refresh failure
+            if(sessionStorage.getItem('refresh_token')) { // only logout if there was a token to fail
+                performLogout(false);
+            }
+          }
+        }
+      };
+      attemptRefresh();
     }
+  }, [fetchUserAndPermissions, refreshToken, performLogout]); // Initial load & token check
+
+  // Login function is now mostly a placeholder as actual login (OAuth flow)
+  // happens on /login and /auth/callback pages.
+  // This hook primarily manages the session after tokens are obtained.
+  const login = async () => {
+    console.warn("useAuth: login function called. OAuth flow should handle actual login. This function is a placeholder.");
+    // Typically, after OAuth login, the callback page would store tokens
+    // and then redirect, causing this hook's useEffect to pick them up.
+  };
+
+  // setToken is called by OAuth callback page after successful token exchange
+  const setTokensAndFetchUser = useCallback(async (newAccessToken: string, newRefreshToken?: string) => {
+    setCookie('auth_token', newAccessToken, 1/24 * 0.95); // Store access token in cookie
+    if (newRefreshToken && typeof window !== 'undefined') {
+      sessionStorage.setItem('refresh_token', newRefreshToken);
+    }
+    await fetchUserAndPermissions(newAccessToken);
   }, [fetchUserAndPermissions]);
 
-  const login = async (/* username, password */) => {
-    // Placeholder for actual login logic which would call the backend
-    // For this hook, we assume login happens elsewhere (e.g. login page)
-    // and this hook is primarily for loading the session from a stored token.
-    // After successful login, the token would be stored:
-    // const MOCK_TOKEN_AFTER_LOGIN = "admin-token-full-permissions"; // or "user-token-limited-permissions"
-    // localStorage.setItem('authToken', MOCK_TOKEN_AFTER_LOGIN);
-    // await fetchUserAndPermissions(MOCK_TOKEN_AFTER_LOGIN);
-    // router.push('/admin'); // Or desired redirect path
-    console.warn("useAuth: login function is a placeholder. Actual login should set 'authToken' in localStorage and call fetchUserAndPermissions or reload.");
-  };
-
-  const logout = useCallback(async () => {
-    // In a real app, also call the backend logout endpoint:
-    // await apiClient.post('/api/v2/auth/logout', {}, { token: authState.token });
-    console.log("Logging out, clearing token.");
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-    }
-    setAuthState({ user: null, token: null, isLoading: false, error: null });
-    router.push('/login'); // Redirect to login page
-  }, [router, authState.token]);
-
-  // Function to manually set token for testing or after login page sets it
-  const setToken = (token: string | null) => {
-    if (token) {
-        localStorage.setItem('authToken', token);
-        fetchUserAndPermissions(token);
-    } else {
-        localStorage.removeItem('authToken');
-        setAuthState({ user: null, token: null, isLoading: false, error: null });
-    }
-  };
-
-
-  return { ...authState, login, logout, setToken, fetchUserAndPermissions };
+  return { ...authState, login, logout: performLogout, setToken: setTokensAndFetchUser, refreshToken };
 }
