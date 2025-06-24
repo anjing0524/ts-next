@@ -5,11 +5,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from 'lib/prisma';
+import { JWTUtils, ClientAuthUtils, AuthorizationUtils } from 'lib/auth/oauth2';
 import { withErrorHandling } from 'lib/utils/error-handler';
-import { JWTUtils, ClientAuthUtils, OAuth2ErrorTypes as OldOAuth2ErrorTypes } from 'lib/auth/oauth2'; // OldOAuth2ErrorTypes will be replaced by OAuth2ErrorCode
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
-import { ApiResponse } from '@/lib/types/api';
+import { ApiResponse } from '@repo/lib/types/api';
 import { OAuth2Error, OAuth2ErrorCode, BaseError, ValidationError } from 'lib/errors';
 
 /**
@@ -90,10 +90,14 @@ async function revocationHandlerInternal(request: NextRequest): Promise<NextResp
   const rawBodyData: Record<string, any> = {};
   bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
 
+  // 转换为FormData以符合ClientAuthUtils.authenticateClient的参数类型
+  const formData = new FormData();
+  bodyParams.forEach((value, key) => { formData.append(key, value); });
+
   // --- 客户端认证 ---
   // ClientAuthUtils.authenticateClient 现在会抛出错误
   // ClientAuthUtils.authenticateClient will now throw errors
-  let authenticatedClient = await ClientAuthUtils.authenticateClient(request, bodyParams);
+  let authenticatedClient = await ClientAuthUtils.authenticateClient(request, formData);
 
   // 公共客户端可能在请求体中提供 client_id，再次检查 (ClientAuthUtils 内部已处理，此逻辑可简化或移除)
   // Public clients might provide client_id in body, re-check (ClientAuthUtils handles this internally, this logic can be simplified or removed)
@@ -217,7 +221,7 @@ async function revocationHandlerInternal(request: NextRequest): Promise<NextResp
       clientId: authenticatedClient.id,
       action: 'token_revocation_attempt',
       resource: `token_type_hint:${tokenTypeHint || 'any'}`,
-      ipAddress: request.headers.get('x-forwarded-for') || request.ip || undefined,
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
       success: true, // RFC 7009: 总是返回 200 (Always return 200 per RFC 7009)
       metadata: {

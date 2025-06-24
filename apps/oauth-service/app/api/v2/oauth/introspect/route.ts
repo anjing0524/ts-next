@@ -9,8 +9,8 @@ import { withErrorHandling } from 'lib/utils/error-handler';
 import { JWTUtils, ClientAuthUtils, ScopeUtils } from 'lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
 import * as jose from 'jose';
 import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, introspectResponseActiveSchema } from './schemas';
-import { ApiResponse } from '@/lib/types/api';
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from 'lib/errors';
+import { ApiResponse } from '@repo/lib/types/api';
+import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from 'lib/errors';
 
 /**
  * @swagger
@@ -117,8 +117,12 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
   const rawBodyData: Record<string, any> = {};
   bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
 
+  // 转换为FormData以符合ClientAuthUtils.authenticateClient的参数类型
+  const formData = new FormData();
+  bodyParams.forEach((value, key) => { formData.append(key, value); });
+
   // --- 客户端认证 --- (Client Authentication)
-  const authenticatedClient = await ClientAuthUtils.authenticateClient(request, bodyParams);
+  const authenticatedClient = await ClientAuthUtils.authenticateClient(request, formData);
   console.log(`Introspection request authenticated for client: ${authenticatedClient.clientId}`);
 
   // --- 请求体验证 --- (Request body validation)
@@ -232,7 +236,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
         return NextResponse.json<ApiResponse<IntrospectResponseActive>>({ success: true, data: parsedActiveResponse.data, message: "Token is active." }, { status: 200 });
     } else {
         console.error("Introspection active response schema validation failed:", parsedActiveResponse.error.flatten());
-        throw new BaseError('Internal server error processing token details for active token.', 500, 'INTROSPECTION_SCHEMA_ERROR_ACTIVE', { zodIssues: parsedActiveResponse.error.flatten().fieldErrors });
+        throw new ConfigurationError('Internal server error processing token details for active token.', { zodIssues: parsedActiveResponse.error.flatten().fieldErrors });
     }
   }
 

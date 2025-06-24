@@ -3,10 +3,10 @@ import * as crypto from 'crypto';
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { Client } from '@prisma/client';
+import { OAuthClient as Client } from '@prisma/client';
 import { addHours, addDays, isPast } from 'date-fns';
 
-import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
+import { BaseError } from 'lib/errors'; // For catching errors
 import { withOAuthTokenValidation, OAuthValidationResult } from 'lib/auth/middleware';
 import {
   JWTUtils,
@@ -37,6 +37,16 @@ async function handleTokenRequest(
 ): Promise<NextResponse> {
   const { body, client, ipAddress, userAgent, params } = context!;
   const grant_type = params!.grant_type;
+
+  if (!client) {
+    return NextResponse.json(
+      {
+        error: OAuth2ErrorTypes.INVALID_CLIENT,
+        error_description: '客户端身份验证失败',
+      },
+      { status: 401 }
+    );
+  }
 
   try {
     // Handle different grant types
@@ -233,7 +243,7 @@ async function handleAuthorizationCodeGrant(
   // Mark authorization code as used to prevent replay
   await prisma.authorizationCode.update({
     where: { id: authCode.id },
-    data: { used: true },
+    data: { isUsed: true },
   });
 
   try {
@@ -270,9 +280,8 @@ async function handleAuthorizationCodeGrant(
         tokenHash: accessTokenHash,
         clientId: client.id as string,
         userId: authCode.userId ?? undefined,
-        scope: authCode.scope ?? undefined,
+        scope: authCode.scope || '',
         expiresAt: addHours(new Date(), 1),
-        revoked: false,
       },
     });
 
@@ -282,9 +291,9 @@ async function handleAuthorizationCodeGrant(
         tokenHash: refreshTokenHash,
         clientId: client.id as string,
         userId: authCode.userId ?? undefined,
-        scope: authCode.scope ?? undefined,
+        scope: authCode.scope || '',
         expiresAt: addDays(new Date(), 30),
-        revoked: false,
+        isRevoked: false,
       },
     });
 
@@ -398,17 +407,17 @@ async function handleRefreshTokenGrant(
     // Catch as 'unknown' to inspect its type
     console.error('Refresh token processing error in handleRefreshTokenGrant:', error);
 
-    // If the error is an ApiError from processRefreshTokenGrantLogic, use its properties
-    if (error instanceof ApiError) {
-      // Audit logging for ApiError is already done within processRefreshTokenGrantLogic usually
+    // If the error is a BaseError from processRefreshTokenGrantLogic, use its properties
+    if (error instanceof BaseError) {
+      // Audit logging for BaseError is already done within processRefreshTokenGrantLogic usually
       // Or can be added here if specific context from handleRefreshTokenGrant is needed
       // For now, assume processRefreshTokenGrantLogic handles its own audit failures.
       return NextResponse.json(
         {
-          error: error.errorCode || OAuth2ErrorTypes.INVALID_GRANT, // Use errorCode from ApiError if available
+          error: error.code || OAuth2ErrorTypes.INVALID_GRANT, // Use code from BaseError if available
           error_description: error.message,
         },
-        { status: error.statusCode }
+        { status: error.status }
       );
     }
 
@@ -492,9 +501,8 @@ async function handleClientCredentialsGrant(
         tokenHash: accessTokenHash,
         clientId: client.id as string,
         userId: undefined,
-        scope: finalScope ?? undefined,
+        scope: finalScope || '',
         expiresAt: addHours(new Date(), 1),
-        revoked: false,
       },
     });
 

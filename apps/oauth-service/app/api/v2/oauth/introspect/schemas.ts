@@ -20,6 +20,12 @@ export const introspectTokenRequestSchema = z.object({
    */
   token_type_hint: z.enum(['access_token', 'refresh_token']).optional(),
 
+  /**
+   * Client identifier (OPTIONAL in request body)
+   * Usually provided via Basic Auth header, but can be in body
+   */
+  client_id: z.string().optional(),
+
   // Client authentication (client_id, client_secret) for the resource server
   // making the introspection request is typically handled via HTTP Basic Authentication header.
   // If sent in body, they could be added here, but header is preferred.
@@ -48,7 +54,7 @@ export const introspectResponseActiveSchema = z.object({
   /**
    * Client identifier for the OAuth 2.0 client that requested this token.
    */
-  client_id: z.string().optional(),
+  client_id: z.string(),
 
   /**
    * Human-readable identifier for the resource owner who authorized this token.
@@ -105,6 +111,11 @@ export const introspectResponseActiveSchema = z.object({
   // You can add other custom claims that might be in your tokens
   // e.g., 'permissions', 'organization_id', etc.
   permissions: z.array(z.string()).optional(), // Example custom claim
+  
+  /**
+   * User ID associated with this token.
+   */
+  user_id: z.string().optional(), // Custom claim for user identification
 });
 
 /**

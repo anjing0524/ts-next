@@ -4,7 +4,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, Shield, Key, Briefcase, Settings, BarChart, FileText } from 'lucide-react'; // Example icons
+import {
+  BarChart,
+  Briefcase,
+  FileText,
+  Home,
+  Key,
+  Settings,
+  Shield,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth'; // Placeholder auth hook
 import { cn } from '@/lib/utils'; // For conditional class names
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,22 +38,21 @@ interface NavItem {
 // 基于文档定义的菜单结构 (Menu structure based on documentation)
 // 权限名称需要与后端权限定义一致 (Permission names must match backend definitions)
 const allNavItems: NavItem[] = [
-  { href: '/admin', label: '仪表盘 (Dashboard)', icon: Home, requiredPermissions: ['menu:dashboard:view'] },
+  { href: '/admin', label: 'Overview', icon: Home, requiredPermissions: ['menu:dashboard:view'] },
   {
-    href: '#', label: '系统管理 (System)', icon: Settings, requiredPermissions: ['menu:system:view'],
+    href: '#',
+    label: 'System',
+    icon: Settings,
+    requiredPermissions: ['menu:system:view'],
     children: [
-      { href: '/admin/system/users', label: '用户管理 (Users)', icon: Users, requiredPermissions: ['menu:system:user:view', 'users:list'] },
-      { href: '/admin/system/roles', label: '角色管理 (Roles)', icon: Shield, requiredPermissions: ['menu:system:role:view', 'roles:list'] },
-      { href: '/admin/system/permissions', label: '权限管理 (Permissions)', icon: Key, requiredPermissions: ['menu:system:permission:view', 'permissions:list'] },
-      // { href: '/admin/system/menus', label: '菜单管理 (Menus)', icon: MenuIcon, requiredPermissions: ['menu:system:menu:view'] }, // Assuming MenuIcon exists
-      { href: '/admin/system/clients', label: '客户端管理 (Clients)', icon: Briefcase, requiredPermissions: ['menu:system:client:view', 'clients:list'] },
-      { href: '/admin/system/scopes', label: '授权范围管理 (Scopes)', icon: BarChart, requiredPermissions: ['menu:system:scope:view', 'scopes:list'] }, // Added Scopes
-      { href: '/admin/system/audits', label: '审计日志 (Audit Logs)', icon: FileText, requiredPermissions: ['menu:system:audit:view', 'audit:list'] },
-      // { href: '/admin/system/configs', label: '系统配置 (System Config)', icon: SettingsIcon, requiredPermissions: ['menu:system:config:view'] },
-      // { href: '/admin/system/policies', label: '安全策略 (Security Policies)', icon: ShieldAlertIcon, requiredPermissions: ['menu:system:policy:view'] },
+      { href: '/admin/users', label: 'Users', icon: Users, requiredPermissions: ['menu:system:user:view', 'users:list'] },
+      { href: '/admin/system/roles', label: 'Roles', icon: Shield, requiredPermissions: ['menu:system:role:view', 'roles:list'] },
+      { href: '/admin/system/permissions', label: 'Permissions', icon: Key, requiredPermissions: ['menu:system:permission:view', 'permissions:list'] },
+      { href: '/admin/system/clients', label: 'Clients', icon: Briefcase, requiredPermissions: ['menu:system:client:view', 'clients:list'] },
+      { href: '/admin/system/scopes', label: 'Scopes', icon: BarChart, requiredPermissions: ['menu:system:scope:view', 'scopes:list'] },
+      { href: '/admin/audit', label: 'Audit Logs', icon: FileText, requiredPermissions: ['menu:system:audit:view', 'audit:list'] },
     ]
   },
-  // Add other top-level menu items here if needed
 ];
 
 /**
@@ -63,7 +71,7 @@ export default function AdminSidebar() {
   };
 
   // 根据用户权限过滤菜单项 (Filter menu items based on user permissions)
-  const filterNavItemsByPermissions = (items: NavItem[], userPermissions: string[]): NavItem[] => {
+  const filterNavItemsByPermissions = (items: NavItem[], userPermissions: string[] | undefined): NavItem[] => {
     if (!userPermissions) return [];
     return items.filter(item =>
       item.requiredPermissions.every(perm => userPermissions.includes(perm))

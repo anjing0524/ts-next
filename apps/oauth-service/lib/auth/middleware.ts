@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, NextFetchEvent } from 'next/server';
 import type { NextApiRequest, NextApiResponse } from 'next'; // For type hints if used with older Next.js API routes
 
-import { Client, User as PrismaUser } from '@prisma/client'; // PrismaUser for request augmentation
+import { OAuthClient as Client, User as PrismaUser } from '@prisma/client'; // PrismaUser for request augmentation
 import * as jose from 'jose'; // 引入 'jose' (Import 'jose')
 
 import { prisma } from '@repo/database/client';

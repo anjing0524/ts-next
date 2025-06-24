@@ -139,8 +139,7 @@ async function getConsentPageDataHandlerInternal(
   const authUser = (request as any).user; // 临时处理，实际应该通过中间件设置
   if (!authUser || !authUser.id) {
     throw new ConfigurationError(
-      'User context not found after permission check.',
-      { authUser }
+      'User context not found after permission check.'
     );
   }
   const userId = authUser.id;
@@ -169,9 +168,11 @@ async function getConsentPageDataHandlerInternal(
   if (!clientId || !redirectUri || !scopeString || !responseType) {
     // 缺少必需的查询参数
     // Missing required query parameters
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Missing required parameters from authorization server.',
       OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       {
         missing: [
           !clientId && 'client_id',
@@ -185,9 +186,11 @@ async function getConsentPageDataHandlerInternal(
   if (responseType !== 'code') {
     // 无效的 response_type
     // Invalid response_type
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Invalid response_type from authorization server: must be "code".',
-      OAuth2ErrorCode.UnsupportedResponseType,
+      OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       { responseType }
     );
   }
@@ -198,7 +201,7 @@ async function getConsentPageDataHandlerInternal(
     // Invalid client ID or client is inactive
     throw new OAuth2Error(
       'Third-party client not found or is not active.',
-      OAuth2ErrorCode.InvalidClient,
+      OAuth2ErrorCode.InvalidRequest,
       403,
       undefined,
       { clientId }
@@ -215,16 +218,17 @@ async function getConsentPageDataHandlerInternal(
     // Client redirectUris configuration error
     throw new ConfigurationError(
       'Server error: Invalid client configuration for redirectUris.',
-      'CLIENT_CONFIG_REDIRECT_URI_INVALID_CONSENT_GET',
       { clientId }
     );
   }
   if (!AuthorizationUtils.validateRedirectUri(redirectUri, registeredRedirectUris)) {
     // 提供的 redirect_uri 未注册
     // Provided redirect_uri is not registered
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Provided redirect_uri is not registered for this client.',
       OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       { redirectUri, registered: registeredRedirectUris }
     );
   }
@@ -242,9 +246,11 @@ async function getConsentPageDataHandlerInternal(
     const missing = requestedScopeNames.filter((s) => !foundNames.includes(s));
     // 请求的某些 scope 无效或非活动
     // Some requested scopes are invalid or inactive
-    throw new ValidationError(
+    throw new OAuth2Error(
       `The following requested permissions are invalid or inactive: ${missing.join(', ')}. Please contact the application developer.`,
-      OAuth2ErrorCode.InvalidScope,
+      OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       { missingScopes: missing }
     );
   }
@@ -252,7 +258,7 @@ async function getConsentPageDataHandlerInternal(
   const responseData: ConsentPageData = {
     client: {
       id: client.clientId,
-      name: client.clientName || client.clientId,
+      name: client.name || client.clientId,
       logoUri: client.logoUri,
     },
     requested_scopes: requestedScopesDetails,
@@ -288,10 +294,8 @@ async function submitConsentDecisionHandlerInternal(
   // Manually get user authentication information here
   const authUser = (request as any).user; // 临时处理，实际应该通过中间件设置
   if (!authUser || !authUser.id) {
-    throw new BaseError(
-      'User context not found after permission check.',
-      500,
-      'SERVER_SETUP_ERROR_CONSENT_POST'
+    throw new ConfigurationError(
+      'User context not found after permission check.'
     );
   }
   const userId = authUser.id;
@@ -315,10 +319,12 @@ async function submitConsentDecisionHandlerInternal(
   } else {
     // 不支持的 Content-Type
     // Unsupported Content-Type
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Unsupported Content-Type. Please use application/x-www-form-urlencoded or application/json.',
-      'UNSUPPORTED_MEDIA_TYPE_CONSENT_POST',
-      415
+      OAuth2ErrorCode.InvalidRequest,
+      415,
+      undefined,
+      {}
     );
   }
 
@@ -348,9 +354,11 @@ async function submitConsentDecisionHandlerInternal(
   if (!decision || !clientId || !grantedScopeString || !redirectUri || !responseType) {
     // 提交的表单缺少必要字段
     // Submitted form is missing required fields
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Missing required form fields from consent submission.',
       OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       {
         missing: [
           !decision && 'decision',
@@ -363,9 +371,11 @@ async function submitConsentDecisionHandlerInternal(
     );
   }
   if (responseType !== 'code') {
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Invalid response_type submitted from consent form: must be "code".',
-      OAuth2ErrorCode.UnsupportedResponseType,
+      OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       { responseType }
     );
   }
@@ -376,7 +386,7 @@ async function submitConsentDecisionHandlerInternal(
     // Client specified in form is invalid
     throw new OAuth2Error(
       'Client specified in consent form not found or is not active.',
-      OAuth2ErrorCode.InvalidClient,
+      OAuth2ErrorCode.InvalidRequest,
       403,
       undefined,
       { clientId }
@@ -391,9 +401,11 @@ async function submitConsentDecisionHandlerInternal(
   if (!AuthorizationUtils.validateRedirectUri(redirectUri, registeredRedirectUris)) {
     // 表单中指定的 redirect_uri 无效
     // redirect_uri specified in form is invalid
-    throw new ValidationError(
+    throw new OAuth2Error(
       'Invalid redirect_uri submitted from consent form for this client.',
       OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
       { redirectUri }
     );
   }
@@ -451,9 +463,11 @@ async function submitConsentDecisionHandlerInternal(
 
   // 无效的 decision 值
   // Invalid decision value
-  throw new ValidationError(
+  throw new OAuth2Error(
     'Invalid decision value submitted. Must be "allow" or "deny".',
     OAuth2ErrorCode.InvalidRequest,
+    400,
+    undefined,
     { decision }
   );
 }

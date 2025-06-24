@@ -28,26 +28,12 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/oauth/revoke_token_by_jti/route-6273df075593ce6f.js"
     ],
-    "/api/v2/oauth/introspect/route": [
-      "static/chunks/webpack-b8929893121c31bf.js",
-      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
-      "static/chunks/236-a63548936d771472.js",
-      "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/oauth/introspect/route-c03db4262fc5c43b.js"
-    ],
     "/api/v2/.well-known/openid-configuration/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
       "static/chunks/236-a63548936d771472.js",
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/.well-known/openid-configuration/route-4d0d86591ce41e08.js"
-    ],
-    "/api/v2/oauth/authorize/route": [
-      "static/chunks/webpack-b8929893121c31bf.js",
-      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
-      "static/chunks/236-a63548936d771472.js",
-      "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/oauth/authorize/route-c8c47e2576e1ffa1.js"
     ],
     "/api/v2/oauth/consent/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
@@ -56,13 +42,6 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/oauth/consent/route-fc5fda1c3a1d99a0.js"
     ],
-    "/api/v2/oauth/userinfo/route": [
-      "static/chunks/webpack-b8929893121c31bf.js",
-      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
-      "static/chunks/236-a63548936d771472.js",
-      "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/oauth/userinfo/route-b2be09bc7fde2667.js"
-    ],
     "/api/v2/oauth/revoke/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
@@ -70,19 +49,26 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/oauth/revoke/route-0bfbd9cdadb28b48.js"
     ],
-    "/api/v2/roles/[roleId]/permissions/[permissionId]/route": [
+    "/api/v2/oauth/introspect/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
       "static/chunks/236-a63548936d771472.js",
       "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/roles/[roleId]/permissions/[permissionId]/route-c4ab0519a664a347.js"
+      "static/chunks/app/api/v2/oauth/introspect/route-c03db4262fc5c43b.js"
     ],
-    "/api/v2/permissions/route": [
+    "/api/v2/oauth/userinfo/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
       "static/chunks/236-a63548936d771472.js",
       "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/permissions/route-08451b5cf464218c.js"
+      "static/chunks/app/api/v2/oauth/userinfo/route-b2be09bc7fde2667.js"
+    ],
+    "/api/v2/oauth/authorize/route": [
+      "static/chunks/webpack-b8929893121c31bf.js",
+      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
+      "static/chunks/236-a63548936d771472.js",
+      "static/chunks/main-app-2a67977f5d4238b3.js",
+      "static/chunks/app/api/v2/oauth/authorize/route-c8c47e2576e1ffa1.js"
     ],
     "/api/v2/permissions/[permissionId]/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
@@ -91,6 +77,13 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/permissions/[permissionId]/route-7cc21c940a19c32e.js"
     ],
+    "/api/v2/roles/[roleId]/permissions/[permissionId]/route": [
+      "static/chunks/webpack-b8929893121c31bf.js",
+      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
+      "static/chunks/236-a63548936d771472.js",
+      "static/chunks/main-app-2a67977f5d4238b3.js",
+      "static/chunks/app/api/v2/roles/[roleId]/permissions/[permissionId]/route-c4ab0519a664a347.js"
+    ],
     "/api/v2/roles/[roleId]/permissions/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
@@ -98,19 +91,12 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/roles/[roleId]/permissions/route-bea4c27b5fb1291e.js"
     ],
-    "/api/v2/oauth/token/route": [
+    "/api/v2/permissions/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
       "static/chunks/236-a63548936d771472.js",
       "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/oauth/token/route-635bd62fa3b57d89.js"
-    ],
-    "/api/v2/roles/route": [
-      "static/chunks/webpack-b8929893121c31bf.js",
-      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
-      "static/chunks/236-a63548936d771472.js",
-      "static/chunks/main-app-2a67977f5d4238b3.js",
-      "static/chunks/app/api/v2/roles/route-4dde51ce64a4cd9d.js"
+      "static/chunks/app/api/v2/permissions/route-08451b5cf464218c.js"
     ],
     "/api/v2/scopes/[scopeId]/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
@@ -119,12 +105,26 @@
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/scopes/[scopeId]/route-b8041bf6ba0e6c64.js"
     ],
+    "/api/v2/oauth/token/route": [
+      "static/chunks/webpack-b8929893121c31bf.js",
+      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
+      "static/chunks/236-a63548936d771472.js",
+      "static/chunks/main-app-2a67977f5d4238b3.js",
+      "static/chunks/app/api/v2/oauth/token/route-635bd62fa3b57d89.js"
+    ],
     "/api/v2/scopes/route": [
       "static/chunks/webpack-b8929893121c31bf.js",
       "static/chunks/b8f30182-57e8efeaf5f155f2.js",
       "static/chunks/236-a63548936d771472.js",
       "static/chunks/main-app-2a67977f5d4238b3.js",
       "static/chunks/app/api/v2/scopes/route-65e8b3fe51e878c9.js"
+    ],
+    "/api/v2/roles/route": [
+      "static/chunks/webpack-b8929893121c31bf.js",
+      "static/chunks/b8f30182-57e8efeaf5f155f2.js",
+      "static/chunks/236-a63548936d771472.js",
+      "static/chunks/main-app-2a67977f5d4238b3.js",
+      "static/chunks/app/api/v2/roles/route-4dde51ce64a4cd9d.js"
     ],
     "/api/v2/roles/[roleId]/route": [
       "static/chunks/webpack-b8929893121c31bf.js",

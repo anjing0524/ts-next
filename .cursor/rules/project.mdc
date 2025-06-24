@@ -35,4 +35,8 @@ alwaysApply: true
 22. use sequential-thinking 分布思考
 23. use shrimp-task-manager 拆解任务
 24. 始终联网获取最新内容补充
+25. 文件命名风格：使用小写字母，单词之间用连字符 - 分隔（Kebab Case）
+26. 组件文件：使用描述性名称 + 类型后缀
+27. https://google.github.io/styleguide/jsguide.html
+28. 错误提示请保持中文或者提取到I18N
 

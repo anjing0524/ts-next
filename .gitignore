@@ -89,3 +89,4 @@ tasks.json
 tasks/ 
 
 .turbo
+**/.next/**

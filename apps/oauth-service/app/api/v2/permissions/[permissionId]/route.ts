@@ -66,8 +66,8 @@ const UpdatePermissionSchema = z.object({
  */
 async function getPermissionByIdHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 从上下文中获取 permissionId。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
   const userAgent = req.headers?.get('user-agent');
 
   try {
@@ -143,8 +143,8 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
  */
 async function updatePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
   const userAgent = req.headers?.get('user-agent');
 
   let body;
@@ -354,8 +354,8 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
  */
 async function deletePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
   const userAgent = req.headers?.get('user-agent');
 
   try {

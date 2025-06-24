@@ -131,16 +131,11 @@ async function handleAuthorizationCodeGrant(
     }
 
     // 检查授权码是否已被使用（防止重放攻击）
-    if (authCode.used) {
-      // 撤销所有相关的令牌
-      await prisma.accessToken.updateMany({
-        where: { authorizationCodeId: authCode.id },
-        data: { revokedAt: new Date() }
-      });
-      await prisma.refreshToken.updateMany({
-        where: { authorizationCodeId: authCode.id },
-        data: { revokedAt: new Date() }
-      });
+    if (authCode.isUsed) {
+      // 注意：在当前schema中，AccessToken和RefreshToken没有authorizationCodeId字段
+      // 如果需要撤销关联令牌，应该通过userId和clientId来查询
+      // Note: In current schema, AccessToken and RefreshToken don't have authorizationCodeId field
+      // If need to revoke related tokens, should query by userId and clientId
       throw new OAuth2Error('Authorization code has already been used', OAuth2ErrorCode.InvalidGrant, 400);
     }
 
@@ -157,21 +152,19 @@ async function handleAuthorizationCodeGrant(
         error instanceof ValidationError ||        // ClientID/RedirectURI 不匹配 (ClientID/RedirectURI mismatch)
         error instanceof AuthenticationError) {  // PKCE 失败 (PKCE failed)
       await AuthorizationUtils.logAuditEvent({
-        actorType: 'CLIENT',
-        actorId: client.clientId,
-        clientId: client.clientId,
+        clientId: client.id,
         action: 'TOKEN_AUTH_CODE_VALIDATION_FAILURE',
-        status: 'FAILURE',
         ipAddress,
         userAgent,
+        success: false,
         errorMessage: error.message,
-        details: JSON.stringify({
+        metadata: {
           grantType: 'authorization_code',
           errorName: error.name,
-          errorCode: error.code || (error as any).errorCode || OAuth2ErrorCode.InvalidGrant, // Extract error code if available
+          errorCode: error.code || (error as any).errorCode || OAuth2ErrorCode.InvalidGrant,
           context: error.context,
-          codeUsed: code, // Log the code that failed
-        }),
+          codeUsed: code,
+        },
       });
       throw new OAuth2Error(error.message, OAuth2ErrorCode.InvalidGrant, error.status, undefined, error.context);
     }
@@ -224,13 +217,13 @@ async function handleAuthorizationCodeGrant(
     user_id: validatedAuthCode.userId,
     scope: validatedAuthCode.scope,
     permissions: userPermissions,
-    // exp 由 JWTUtils.createAccessToken 内部处理默认值或基于 client.accessTokenLifetime (exp is handled internally by JWTUtils.createAccessToken with default or client.accessTokenLifetime)
+    // exp 由 JWTUtils.createAccessToken 内部处理默认值或基于 client.accessTokenTtl (exp is handled internally by JWTUtils.createAccessToken with default or client.accessTokenTtl)
   });
   const refreshTokenString = await JWTUtils.createRefreshToken({
     client_id: client.clientId,
     user_id: validatedAuthCode.userId,
     scope: validatedAuthCode.scope,
-    // exp 由 JWTUtils.createRefreshToken 内部处理默认值或基于 client.refreshTokenLifetime (exp is handled internally by JWTUtils.createRefreshToken with default or client.refreshTokenLifetime)
+    // exp 由 JWTUtils.createRefreshToken 内部处理默认值或基于 client.refreshTokenTtl (exp is handled internally by JWTUtils.createRefreshToken with default or client.refreshTokenTtl)
   });
 
   let idTokenString: string | undefined = undefined;
@@ -240,9 +233,9 @@ async function handleAuthorizationCodeGrant(
      idTokenString = await JWTUtils.createIdToken(user, client, validatedAuthCode.nonce || undefined);
   }
 
-  const accessTokenExpiresIn = client.accessTokenLifetime || 3600; // 默认1小时 (Default 1 hour)
+  const accessTokenExpiresIn = client.accessTokenTtl || 3600; // 默认1小时 (Default 1 hour)
   // 注意：刷新令牌的DB过期时间应与JWT内部的'exp'声明一致 (Note: Refresh token DB expiry should align with JWT's internal 'exp' claim)
-  const refreshTokenDefaultLifetimeDays = client.refreshTokenLifetime ? Math.ceil(client.refreshTokenLifetime / (24*60*60)) : 30; // 默认30天 (Default 30 days)
+  const refreshTokenDefaultLifetimeDays = client.refreshTokenTtl ? Math.ceil(client.refreshTokenTtl / (24*60*60)) : 30; // 默认30天 (Default 30 days)
 
 
   // 原子化地存储令牌 (Store tokens atomically)
@@ -250,6 +243,7 @@ async function handleAuthorizationCodeGrant(
     await prisma.$transaction([
       prisma.accessToken.create({
         data: {
+          token: accessTokenString,
           tokenHash: JWTUtils.getTokenHash(accessTokenString),
           userId: validatedAuthCode.userId,
           clientId: client.id,
@@ -259,6 +253,7 @@ async function handleAuthorizationCodeGrant(
       }),
       prisma.refreshToken.create({
         data: {
+          token: refreshTokenString,
           tokenHash: JWTUtils.getTokenHash(refreshTokenString),
           userId: validatedAuthCode.userId,
           clientId: client.id,
@@ -334,7 +329,7 @@ async function handleRefreshTokenGrant(
 
   // --- BEGIN: Refresh Token JTI Blacklist Check ---
   // First, decode the refresh token to get its JTI.
-  let refreshTokenPayload: JWTUtils.RefreshTokenPayload; // Assuming this type is defined in JWTUtils
+  let refreshTokenPayload: import('lib/auth/oauth2').RefreshTokenPayload; // 添加类型声明 (Add type declaration)
   try {
     // This utility function should verify the JWT's signature, expiry,
     // and essential claims like client_id against the provided client.
@@ -514,8 +509,8 @@ async function handleRefreshTokenGrant(
     newIdTokenString = await JWTUtils.createIdToken(storedRefreshToken.user, client, undefined);
   }
 
-  const accessTokenExpiresIn = client.accessTokenLifetime || 3600;
-  const refreshTokenDefaultLifetimeDays = client.refreshTokenLifetime ? Math.ceil(client.refreshTokenLifetime / (24*60*60)) : 30;
+  const accessTokenExpiresIn = client.accessTokenTtl || 3600;
+  const refreshTokenDefaultLifetimeDays = client.refreshTokenTtl ? Math.ceil(client.refreshTokenTtl / (24*60*60)) : 30;
 
   // 实现刷新令牌轮换 (Implement Refresh Token Rotation)
   const newRefreshTokenString = await JWTUtils.createRefreshToken({
@@ -529,10 +524,11 @@ async function handleRefreshTokenGrant(
       // 1. 创建新的访问令牌 (Create new access token)
       prisma.accessToken.create({
         data: {
+          token: newAccessTokenString,
           tokenHash: JWTUtils.getTokenHash(newAccessTokenString),
           userId: storedRefreshToken.userId,
           clientId: client.id,
-          scope: finalGrantedScopeString,
+          scope: finalGrantedScopeString || "", // 修复类型问题 (Fix type issue)
           expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
         },
       }),
@@ -544,10 +540,11 @@ async function handleRefreshTokenGrant(
       // 3. 创建新的刷新令牌 (Create new refresh token)
       prisma.refreshToken.create({
         data: {
+          token: newRefreshTokenString,
           tokenHash: JWTUtils.getTokenHash(newRefreshTokenString),
           userId: storedRefreshToken.userId,
           clientId: client.id,
-          scope: finalGrantedScopeString,
+          scope: finalGrantedScopeString || "", // 修复类型问题 (Fix type issue)
           expiresAt: addDays(new Date(), refreshTokenDefaultLifetimeDays),
           previousTokenId: storedRefreshToken.id,
         },
@@ -561,7 +558,6 @@ async function handleRefreshTokenGrant(
         action: 'refresh_token_rotated_successfully',
         resource: '/api/v2/oauth/token',
         success: true,
-        errorMessage: null, // No error
         metadata: {
             old_refresh_token_id: storedRefreshToken.id,
             new_refresh_token_jti: (await JWTUtils.decodeTokenPayload(newRefreshTokenString, process.env.JWT_REFRESH_TOKEN_SECRET || '')).jti, // Assuming decode for JTI
@@ -570,7 +566,7 @@ async function handleRefreshTokenGrant(
         },
     });
 
-  } catch (dbError) {
+  } catch (dbError: any) {
     console.error("Failed to rotate refresh token and store new tokens:", dbError);
     // Attempt to log audit event for failed rotation if possible
      await AuthorizationUtils.logAuditEvent({
@@ -581,7 +577,7 @@ async function handleRefreshTokenGrant(
         success: false,
         errorMessage: "Database transaction failed during refresh token rotation.",
         metadata: {
-            error: dbError.message,
+            error: dbError?.message || String(dbError), // 安全访问
             old_refresh_token_id: storedRefreshToken?.id,
             jti_of_token_presented: refreshTokenPayload?.jti,
         },
@@ -595,7 +591,7 @@ async function handleRefreshTokenGrant(
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
     refresh_token: newRefreshTokenString,
-    scope: finalGrantedScopeString,
+    scope: finalGrantedScopeString || "", // 修复类型问题 (Fix type issue)
     ...(newIdTokenString && { id_token: newIdTokenString }),
   };
 
@@ -703,19 +699,20 @@ async function handleClientCredentialsGrant(
 
   const accessTokenString = await JWTUtils.createAccessToken({
     client_id: client.clientId,
-    scope: finalGrantedScopeString,
+    scope: finalGrantedScopeString, // 保持原样，JWTUtils应该处理undefined
     permissions: [], // 客户端凭证令牌通常不包含用户权限 (Client credentials tokens usually don't contain user permissions)
   });
 
-  const accessTokenExpiresIn = client.accessTokenLifetime || 3600;
+  const accessTokenExpiresIn = client.accessTokenTtl || 3600;
 
   try {
     await prisma.accessToken.create({
       data: {
+        token: accessTokenString,
         tokenHash: JWTUtils.getTokenHash(accessTokenString),
         clientId: client.id,
-        userId: null, // 客户端凭证授予没有用户 (No user for client_credentials grant)
-        scope: finalGrantedScopeString,
+        userId: undefined, // 客户端凭证授予没有用户 (No user for client_credentials grant)
+        scope: finalGrantedScopeString || "", // 修复类型问题 (Fix type issue)
         expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
       },
     });
@@ -761,7 +758,7 @@ async function handleClientCredentialsGrant(
     access_token: accessTokenString,
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
-    scope: finalGrantedScopeString,
+    scope: finalGrantedScopeString ?? '', // 确保不为undefined (Ensure not undefined)
   };
   return NextResponse.json(responsePayload);
 }
