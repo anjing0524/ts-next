@@ -1,0 +1,30 @@
+{
+  "name": "@repo/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./base": "./base.js",
+    "./next": "./next.js",
+    "./react": "./react.js",
+    "./flat": "./flat.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.21.0",
+    "eslint-config-next": "^15.3.2",
+    "eslint-config-prettier": "^10.0.2",
+    "eslint-config-turbo": "^2.5.4",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@eslint/eslintrc": "^3.0.0",
+    "eslint-plugin-import": "^2.29.0"
+  },
+  "dependencies": {
+    "next": "^15.3.2"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+} 

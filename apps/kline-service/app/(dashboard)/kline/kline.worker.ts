@@ -1,6 +1,6 @@
 'use client';
 // kline.worker.ts - Web Worker 用于处理 WASM 和 Canvas 操作
-import init, { KlineProcess } from '@/public/wasm-cal/kline_processor';
+import init, { KlineProcess } from '../../../public/wasm-cal/kline_processor';
 
 // 定义消息类型
 interface InitMessage {

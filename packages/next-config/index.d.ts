@@ -1,3 +1,8 @@
 import { NextConfig } from 'next';
-declare const nextConfig: NextConfig;
-export = nextConfig;
+
+/**
+ * 基础 Next.js 配置函数
+ */
+declare function withNextConfig(config?: NextConfig): NextConfig;
+
+export = withNextConfig; 

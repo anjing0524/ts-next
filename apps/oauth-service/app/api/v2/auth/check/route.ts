@@ -2,8 +2,8 @@
 // 描述: 统一权限检查端点 (Unified permission check endpoint)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { JWTUtils } from '@/lib/auth/oauth2';
+import { prisma } from 'lib/prisma';
+import { JWTUtils } from 'lib/auth/oauth2';
 // import { PermissionService } from '@/lib/services/permissionService'; // 理想情况下，权限检查逻辑应位于服务层
 
 // --- 辅助函数 ---

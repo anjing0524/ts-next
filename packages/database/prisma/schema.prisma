@@ -37,14 +37,15 @@ model User {
   createdBy           String?   // 创建此用户的管理员ID或标识
 
   // 关联关系
-  userRoles          UserRole[] // 用户拥有的角色
-  authorizationCodes AuthorizationCode[] // 用户发起的授权码请求
-  accessTokens       AccessToken[] // 颁发给用户的访问令牌
-  refreshTokens      RefreshToken[] // 颁发给用户的刷新令牌
-  auditLogs          AuditLog[] // 与用户相关的审计日志
-  passwordHistories  PasswordHistory[] // 用户的密码历史记录
-  consentGrants      ConsentGrant[] // 用户对客户端的授权同意记录
-  revokedAuthJtis    RevokedAuthJti[] // 用户已撤销的V2认证刷新令牌JTI
+  userRoles             UserRole[] // 用户拥有的角色
+  authorizationCodes    AuthorizationCode[] // 用户发起的授权码请求
+  accessTokens          AccessToken[] // 颁发给用户的访问令牌
+  refreshTokens         RefreshToken[] // 颁发给用户的刷新令牌
+  auditLogs             AuditLog[] // 与用户相关的审计日志
+  passwordHistories     PasswordHistory[] // 用户的密码历史记录
+  passwordResetRequests PasswordResetRequest[] // 用户的密码重置请求
+  consentGrants         ConsentGrant[] // 用户对客户端的授权同意记录
+  revokedAuthJtis       RevokedAuthJti[] // 用户已撤销的V2认证刷新令牌JTI
 
   @@index([username]) // 为用户名创建索引以加速查找
   @@index([isActive]) // 为账户激活状态创建索引
@@ -420,6 +421,29 @@ model PasswordHistory {
 
   @@index([userId, createdAt]) // 为用户ID和创建时间创建复合索引，方便查询用户的密码历史
   @@map("password_histories") // 数据库表映射名称
+}
+
+// ================================
+// 密码重置请求 (Password Reset Requests)
+// ================================
+// 记录用户的密码重置请求和相关的重置令牌
+model PasswordResetRequest {
+  id        String   @id @default(cuid()) // 密码重置请求的唯一标识符
+  userId    String   // 关联的用户ID
+  token     String   @unique // 重置令牌（一次性使用）
+  expiresAt DateTime // 令牌的过期时间
+  isUsed    Boolean  @default(false) // 标记此令牌是否已被使用
+  createdAt DateTime @default(now()) // 重置请求创建时间
+  usedAt    DateTime? // 令牌被使用的时间
+
+  // 关联关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 关联用户
+
+  @@index([userId]) // 为用户ID创建索引
+  @@index([token]) // 为令牌创建索引
+  @@index([expiresAt]) // 为过期时间创建索引，方便清理过期令牌
+  @@index([isUsed]) // 为使用状态创建索引
+  @@map("password_reset_requests") // 数据库表映射名称
 }
 
 // ================================

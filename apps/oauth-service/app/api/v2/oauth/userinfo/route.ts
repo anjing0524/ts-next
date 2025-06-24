@@ -4,10 +4,10 @@
 // Description: OAuth 2.0 / OpenID Connect UserInfo Endpoint (OIDC Core 1.0)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { withErrorHandling } from '@/lib/utils/error-handler';
-import { authenticateBearer } from '@/lib/auth/middleware';
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@/lib/errors';
+import { prisma } from 'lib/prisma';
+import { withErrorHandling } from 'lib/utils/error-handler';
+import { authenticateBearer } from 'lib/auth/middleware';
+import { OAuth2Error, OAuth2ErrorCode, BaseError } from 'lib/errors';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
 import { ApiResponse } from '@/lib/types/api';
 

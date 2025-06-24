@@ -3,9 +3,10 @@ description:
 globs: 
 alwaysApply: true
 ---
-1. 本项目使用nextjs@15，结合shadcn/ui tailwindcss
+1. 本项目使用turborepo管理的monorepo项目
+2. 本项目使用nextjs@15，结合shadcn/ui tailwindcss@4 
 2. 本项目可能需要rust 以及 wasm-pack 编译webassemble
-3. 本项目的测试框架是jest
+3. 本项目的测试框架是jest@30
 4. 本项目的API代码都需要对应的单元测试
 5. 本项目使用prisma连接sqlite数据库
 6. docs目录是集中的文档，需要依据文档来设计实现代码，如果文档不合适需要修改文档
@@ -32,4 +33,6 @@ alwaysApply: true
 20. 文档日期选择今天最新日期
 21. 多个task需要合并调用模型
 22. use sequential-thinking 分布思考
+23. use shrimp-task-manager 拆解任务
+24. 始终联网获取最新内容补充
 

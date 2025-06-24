@@ -1,1 +1,1 @@
-module.exports = require('@repo/next-config');
+export default { output: "standalone" };

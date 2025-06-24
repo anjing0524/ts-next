@@ -7,15 +7,15 @@ import { Client } from '@prisma/client';
 import { addHours, addDays, isPast } from 'date-fns';
 
 import { ApiError } from '@/lib/api/errorHandler'; // For catching ApiError
-import { withOAuthTokenValidation, OAuthValidationResult } from '@/lib/auth/middleware';
+import { withOAuthTokenValidation, OAuthValidationResult } from 'lib/auth/middleware';
 import {
   JWTUtils,
   AuthorizationUtils,
   OAuth2ErrorTypes,
   ScopeUtils,
   processRefreshTokenGrantLogic, // Import the new function
-} from '@/lib/auth/oauth2';
-import { prisma } from '@/lib/prisma';
+} from 'lib/auth/oauth2';
+import { prisma } from 'lib/prisma';
 
 // PKCE S256 Verification Helper
 function verifyPkceChallenge(verifier: string, challenge: string): boolean {

@@ -122,8 +122,8 @@ export function generateSecurePassword(length: number = 12): string {
       SPECIAL_CHARACTERS,
     ];
     // 确保至少一个小写字母和一个数字
-    fallbackPassword += charSets[0][crypto.randomInt(charSets[0].length)];
-    fallbackPassword += charSets[2][crypto.randomInt(charSets[2].length)];
+    fallbackPassword += charSets[0]![crypto.randomInt(charSets[0]!.length)];
+    fallbackPassword += charSets[2]![crypto.randomInt(charSets[2]!.length)];
     // 填充剩余长度
     for (let i = 2; i < length; i++) {
       fallbackPassword += allChars[crypto.randomInt(allChars.length)];

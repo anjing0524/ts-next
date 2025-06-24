@@ -63,11 +63,11 @@ export function useAuth() {
 
   const performLogout = useCallback(async (shouldRevokeToken: boolean = true) => {
     const currentToken = authState.token || getCookie('auth_token');
-    const refreshToken = typeof window !== 'undefined' ? sessionStorage.getItem('refresh_token') : null;
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
 
     setAuthState({ user: null, token: null, isLoading: false, error: null });
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('refresh_token');
+      localStorage.removeItem('refresh_token');
       deleteCookie('auth_token'); // Clear access token cookie
     }
 
@@ -141,7 +141,7 @@ export function useAuth() {
   }, [API_BASE_URL, performLogout]); // Added performLogout to dependencies
 
   const refreshToken = useCallback(async (): Promise<boolean> => {
-    const storedRefreshToken = typeof window !== 'undefined' ? sessionStorage.getItem('refresh_token') : null;
+    const storedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
     if (!storedRefreshToken) {
       console.log('No refresh token available.');
       return false;
@@ -168,7 +168,7 @@ export function useAuth() {
       if (data.access_token) {
         setCookie('auth_token', data.access_token, 1/24 * 0.95); // Store new access token
         if (data.refresh_token && typeof window !== 'undefined') {
-          sessionStorage.setItem('refresh_token', data.refresh_token); // Store new refresh token
+          localStorage.setItem('refresh_token', data.refresh_token); // Store new refresh token
         }
         await fetchUserAndPermissions(data.access_token); // Fetch user info with new token
         return true;
@@ -194,7 +194,7 @@ export function useAuth() {
           // If not on login page, redirect to login
           if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
              // Avoid immediate logout if already on login page due to refresh failure
-            if(sessionStorage.getItem('refresh_token')) { // only logout if there was a token to fail
+            if(localStorage.getItem('refresh_token')) { // only logout if there was a token to fail
                 performLogout(false);
             }
           }
@@ -217,7 +217,7 @@ export function useAuth() {
   const setTokensAndFetchUser = useCallback(async (newAccessToken: string, newRefreshToken?: string) => {
     setCookie('auth_token', newAccessToken, 1/24 * 0.95); // Store access token in cookie
     if (newRefreshToken && typeof window !== 'undefined') {
-      sessionStorage.setItem('refresh_token', newRefreshToken);
+      localStorage.setItem('refresh_token', newRefreshToken);
     }
     await fetchUserAndPermissions(newAccessToken);
   }, [fetchUserAndPermissions]);

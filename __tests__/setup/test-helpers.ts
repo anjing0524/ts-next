@@ -439,10 +439,10 @@ async function createTestUsers(): Promise<void> {
  * 创建测试客户端
  */
 
-export async function createTestAuthCenterSessionToken(userId: string): Promise<string> {
+export async function createTestAuthCenterToken(userId: string): Promise<string> {
   const privateKeyPem = process.env.JWT_PRIVATE_KEY_PEM;
   if (!privateKeyPem) {
-    throw new Error('JWT_PRIVATE_KEY_PEM environment variable is required for createTestAuthCenterSessionToken');
+    throw new Error('JWT_PRIVATE_KEY_PEM environment variable is required for createTestAuthCenterToken');
   }
   
   const key = await jose.importPKCS8(privateKeyPem, 'RS256');
@@ -459,6 +459,7 @@ export async function createTestAuthCenterSessionToken(userId: string): Promise<
     .sign(key);
   
   return jwt;
+}
 
 async function createTestClients(): Promise<void> {
   for (const [key, clientData] of Object.entries(TEST_CLIENTS)) {

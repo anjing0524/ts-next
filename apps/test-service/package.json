@@ -15,7 +15,8 @@
     "react-dom": "^19.1.0",
     "@repo/ui": "workspace:*",
     "@repo/lib": "workspace:*",
-    "@repo/database": "workspace:*"
+    "@repo/database": "workspace:*",
+    "@prisma/client": "^6.10.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

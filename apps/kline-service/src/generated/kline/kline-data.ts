@@ -4,101 +4,105 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { KlineItem } from '../kline/kline-item';
-
 export class KlineData {
-  bb: flatbuffers.ByteBuffer | null = null;
+  bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-  __init(i: number, bb: flatbuffers.ByteBuffer): KlineData {
-    this.bb_pos = i;
-    this.bb = bb;
-    return this;
-  }
+  __init(i:number, bb:flatbuffers.ByteBuffer):KlineData {
+  this.bb_pos = i;
+  this.bb = bb;
+  return this;
+}
 
-  static getRootAsKlineData(bb: flatbuffers.ByteBuffer, obj?: KlineData): KlineData {
-    return (obj || new KlineData()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-  }
+static getRootAsKlineData(bb:flatbuffers.ByteBuffer, obj?:KlineData):KlineData {
+  return (obj || new KlineData()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
 
-  static getSizePrefixedRootAsKlineData(bb: flatbuffers.ByteBuffer, obj?: KlineData): KlineData {
-    bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
-    return (obj || new KlineData()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-  }
+static getSizePrefixedRootAsKlineData(bb:flatbuffers.ByteBuffer, obj?:KlineData):KlineData {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new KlineData()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
 
-  static bufferHasIdentifier(bb: flatbuffers.ByteBuffer): boolean {
-    return bb.__has_identifier('KLI1');
-  }
+timestamp():bigint {
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint64(this.bb_pos + offset) : BigInt('0');
+}
 
-  items(index: number, obj?: KlineItem): KlineItem | null {
-    const offset = this.bb!.__offset(this.bb_pos, 4);
-    return offset
-      ? (obj || new KlineItem()).__init(
-          this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4),
-          this.bb!
-        )
-      : null;
-  }
+open():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  itemsLength(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 4);
-    return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
-  }
+high():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  tick(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 6);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+low():number {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  static startKlineData(builder: flatbuffers.Builder) {
-    builder.startObject(2);
-  }
+close():number {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  static addItems(builder: flatbuffers.Builder, itemsOffset: flatbuffers.Offset) {
-    builder.addFieldOffset(0, itemsOffset, 0);
-  }
+volume():number {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  static createItemsVector(
-    builder: flatbuffers.Builder,
-    data: flatbuffers.Offset[]
-  ): flatbuffers.Offset {
-    builder.startVector(4, data.length, 4);
-    for (let i = data.length - 1; i >= 0; i--) {
-      builder.addOffset(data[i]!);
-    }
-    return builder.endVector();
-  }
+turnover():number {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  static startItemsVector(builder: flatbuffers.Builder, numElems: number) {
-    builder.startVector(4, numElems, 4);
-  }
+static startKlineData(builder:flatbuffers.Builder) {
+  builder.startObject(7);
+}
 
-  static addTick(builder: flatbuffers.Builder, tick: number) {
-    builder.addFieldFloat64(1, tick, 0.0);
-  }
+static addTimestamp(builder:flatbuffers.Builder, timestamp:bigint) {
+  builder.addFieldInt64(0, timestamp, BigInt('0'));
+}
 
-  static endKlineData(builder: flatbuffers.Builder): flatbuffers.Offset {
-    const offset = builder.endObject();
-    return offset;
-  }
+static addOpen(builder:flatbuffers.Builder, open:number) {
+  builder.addFieldFloat64(1, open, 0.0);
+}
 
-  static finishKlineDataBuffer(builder: flatbuffers.Builder, offset: flatbuffers.Offset) {
-    builder.finish(offset, 'KLI1');
-  }
+static addHigh(builder:flatbuffers.Builder, high:number) {
+  builder.addFieldFloat64(2, high, 0.0);
+}
 
-  static finishSizePrefixedKlineDataBuffer(
-    builder: flatbuffers.Builder,
-    offset: flatbuffers.Offset
-  ) {
-    builder.finish(offset, 'KLI1', true);
-  }
+static addLow(builder:flatbuffers.Builder, low:number) {
+  builder.addFieldFloat64(3, low, 0.0);
+}
 
-  static createKlineData(
-    builder: flatbuffers.Builder,
-    itemsOffset: flatbuffers.Offset,
-    tick: number
-  ): flatbuffers.Offset {
-    KlineData.startKlineData(builder);
-    KlineData.addItems(builder, itemsOffset);
-    KlineData.addTick(builder, tick);
-    return KlineData.endKlineData(builder);
-  }
+static addClose(builder:flatbuffers.Builder, close:number) {
+  builder.addFieldFloat64(4, close, 0.0);
+}
+
+static addVolume(builder:flatbuffers.Builder, volume:number) {
+  builder.addFieldFloat64(5, volume, 0.0);
+}
+
+static addTurnover(builder:flatbuffers.Builder, turnover:number) {
+  builder.addFieldFloat64(6, turnover, 0.0);
+}
+
+static endKlineData(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createKlineData(builder:flatbuffers.Builder, timestamp:bigint, open:number, high:number, low:number, close:number, volume:number, turnover:number):flatbuffers.Offset {
+  KlineData.startKlineData(builder);
+  KlineData.addTimestamp(builder, timestamp);
+  KlineData.addOpen(builder, open);
+  KlineData.addHigh(builder, high);
+  KlineData.addLow(builder, low);
+  KlineData.addClose(builder, close);
+  KlineData.addVolume(builder, volume);
+  KlineData.addTurnover(builder, turnover);
+  return KlineData.endKlineData(builder);
+}
 }

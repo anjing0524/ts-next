@@ -1,2 +1,6 @@
 export * from '@prisma/client';
-export { default as prisma } from './client';
+export { prisma as default, prisma } from './client';
+
+// MySQL 客户端工具
+export { default as mysqlPool, checkPoolHealth, closePool, getPool, dbConfig } from './mysql-client';
+export * from './mysql-client';

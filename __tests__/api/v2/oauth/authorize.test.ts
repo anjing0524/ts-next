@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/glo
 import { NextRequest } from 'next/server';
 import { GET as authorizeHandler } from 'oauth-service/app/api/v2/oauth/authorize/route'; // Adjust path as necessary
 import { prisma } from '@repo/database/client';
-import { createTestClient, createTestUser, cleanupTestData, initializeTestData, createTestRequest, createTestAuthCenterSessionToken } from '../../../setup/test-helpers'; // Adjust path
+import { createTestClient, createTestUser, cleanupTestData, initializeTestData, createTestRequest, createTestAuthCenterToken } from '../../../setup/test-helpers'; // Adjust path
 import { OAuthClient, User } from '@prisma/client';
 
 describe('/api/v2/oauth/authorize', () => {
@@ -77,7 +77,7 @@ describe('/api/v2/oauth/authorize', () => {
     });
 
     it('should redirect to consent page if user is authenticated but no prior consent', async () => {
-      const sessionToken = await createTestAuthCenterSessionToken(testUser.id);
+      const sessionToken = await createTestAuthCenterToken(testUser.id);
       const queryParams = {
         client_id: testClient.clientId,
         redirect_uri: testClient.redirectUris[0],
@@ -115,7 +115,7 @@ describe('/api/v2/oauth/authorize', () => {
     });
 
     it('should redirect to client with code if user is authenticated and consent exists', async () => {
-      const sessionToken = await createTestAuthCenterSessionToken(testUser.id);
+      const sessionToken = await createTestAuthCenterToken(testUser.id);
       const requestedScopes = 'openid profile api:read';
       const queryParams = {
         client_id: testClient.clientId,

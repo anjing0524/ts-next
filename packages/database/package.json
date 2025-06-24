@@ -1,28 +1,25 @@
 {
   "name": "@repo/database",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./client": "./client.ts"
+  },
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
-    "type-check": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "prisma:migrate": "prisma migrate dev"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.10.1"
+    "@prisma/client": "^6.0.1",
+    "prisma": "^6.0.1",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.5"
   },
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*",
-    "typescript": "^5",
-    "eslint": "^9",
-    "prisma": "^6.10.1",
-    "tsx": "^4.19.3",
-    "ts-node": "^10.9.2"
+    "tsx": "^4.0.0"
   }
-}
+} 

@@ -6,7 +6,7 @@
 
 import Redis from 'ioredis';
 import { LRUCache } from 'lru-cache';
-import { logger } from './utils';
+import logger from './utils/logger';
 
 // 缓存接口定义
 export interface CacheInterface {
@@ -114,7 +114,7 @@ class LRUCacheAdapter implements CacheInterface {
 // 缓存管理器
 export class CacheManager {
   private static instance: CacheManager;
-  private cache: CacheInterface;
+  private cache!: CacheInterface; // 使用 definite assignment assertion
   private redisClient?: Redis;
 
   private constructor() {
@@ -134,7 +134,6 @@ export class CacheManager {
     if (redisUrl) {
       try {
         this.redisClient = new Redis(redisUrl, {
-          retryDelayOnFailover: 100,
           maxRetriesPerRequest: 3,
           lazyConnect: true,
         });

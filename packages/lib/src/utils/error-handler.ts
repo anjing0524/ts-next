@@ -32,7 +32,7 @@ export function logError(error: Error | BaseError | any, req?: NextRequest, requ
   if (req) {
     logEntry.url = req.url;
     logEntry.method = req.method;
-    logEntry.ip = req.headers.get('x-forwarded-for') || req.ip; // 获取真实IP (Get real IP)
+    logEntry.ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'; // 获取真实IP (Get real IP)
     logEntry.userAgent = req.headers.get('user-agent');
   }
 
@@ -175,7 +175,7 @@ export function withErrorHandling<T extends NextRequest, P = any>(
 export async function safeExecute<T>(
   fn: () => Promise<T> | T,
   failureMessage: string = 'Operation failed',
-  ErrorType: typeof BaseError = BaseError // 默认使用 BaseError，允许传入具体的错误类型 (Default to BaseError, allows passing specific error types)
+  ErrorType: new (...args: any[]) => BaseError = ValidationError // 默认使用具体的错误类型
 ): Promise<{ data?: T; error?: BaseError }> {
   try {
     const result = await fn(); // 执行函数 (Execute the function)
@@ -202,4 +202,63 @@ export async function safeExecute<T>(
       )
     };
   }
+}
+
+/**
+ * 错误处理中间件
+ * Error handling middleware
+ */
+
+export type RouteHandler = (req: NextRequest, ...args: any[]) => Promise<NextResponse>;
+
+/**
+ * 错误处理包装器，用于 API 路由
+ * Error handling wrapper for API routes
+ */
+export function withErrorHandler(handler: RouteHandler): RouteHandler {
+  return async (req: NextRequest, ...args: any[]): Promise<NextResponse> => {
+    try {
+      return await handler(req, ...args);
+    } catch (error) {
+      console.error('API route error:', error);
+      
+      if (error instanceof BaseError) {
+        return NextResponse.json({
+          success: false,
+          error: error.code,
+          message: error.message
+        }, { status: error.status });
+      }
+      
+      return NextResponse.json({
+        success: false,
+        error: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected error occurred'
+      }, { status: 500 });
+    }
+  };
+}
+
+/**
+ * 错误响应处理
+ * Error response handling
+ */
+export function errorResponse(message: string, status: number, errorCode?: string) {
+  return NextResponse.json({
+    success: false,
+    error: errorCode || 'ERROR',
+    message
+  }, { status });
+}
+
+/**
+ * 成功响应处理
+ * Success response handling
+ */
+export function successResponse(data: any, message?: string, status: number = 200) {
+  return NextResponse.json({
+    success: true,
+    data,
+    message: message || 'Success'
+  }, { status });
 }

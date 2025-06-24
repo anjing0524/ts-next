@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 // 节流函数工具
-function throttle<T extends (...args: unknown[]) => unknown>(
+function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -102,26 +102,26 @@ export default function Main() {
         drawComplete: () => {
           setIsLoading(false);
         },
-        error: (data) => {
+        error: (data: any) => {
           setError(data.error);
           setIsLoading(false);
         },
-        cursorStyle: (data) => {
+        cursorStyle: (data: any) => {
           // 直接使用从WASM返回的cursor style字符串
           // 这些字符串现在来自CursorStyle枚举的to_string()方法
           setCursorStyle(data.style);
         },
-        mousedownHandled: (data) => {
+        mousedownHandled: (data: any) => {
           if (data.handled) {
             setIsDragging(true);
           }
         },
-        mouseupHandled: (data) => {
+        mouseupHandled: (data: any) => {
           if (data.isDragEnd) {
             setIsDragging(false);
           }
         },
-        mouseleaveHandled: (data) => {
+        mouseleaveHandled: (data: any) => {
           // 处理鼠标离开事件的结果
           if (data.needsRedraw) {
             // 如果需要重绘，可以在这里执行任何必要的UI更新
@@ -129,13 +129,13 @@ export default function Main() {
             setIsDragging(false);
           }
         },
-        clickHandled: (data) => {
+        clickHandled: (data: any) => {
           // 点击事件导致了模式切换，可以在这里执行任何额外操作
           if (data.modeChanged) {
             console.log('图表模式已切换');
           }
         },
-        performanceMetrics: (data) => {
+        performanceMetrics: (data: any) => {
           // 可以添加从Worker接收性能指标的处理
           if (data.renderTime) {
             console.log(`渲染时间: ${data.renderTime}ms`);

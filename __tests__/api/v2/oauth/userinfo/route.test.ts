@@ -4,10 +4,16 @@
 
 import { jest } from '@jest/globals'; // 新增导入
 import { NextRequest } from 'next/server';
-import { GET } from 'oauth-service/app/api/v2/oauth/userinfo/route';
+import { GET } from '@/app/api/v2/oauth/userinfo/route';
 import { prisma } from '@repo/database/client';
 import { authenticateBearer } from '@repo/lib/auth';
-import { createTestAuthCenterSessionToken, createTestUser, cleanupTestData } from '../../../../setup/test-helpers';
+import {
+  initializeTestData,
+  cleanupTestData,
+  createTestUser,
+  TEST_USERS,
+  createTestAuthCenterToken,
+} from '../../../../setup/test-helpers';
 
 // 模拟依赖
 const mockPrismaUserFindUnique = jest.fn();
@@ -31,7 +37,7 @@ describe('OAuth2.1 UserInfo端点 (/api/v2/oauth/userinfo)', () => {
 
   beforeAll(async () => {
     // 生成有效的访问令牌
-    validAccessToken = await createTestAuthCenterSessionToken('test_user_001');
+    validAccessToken = await createTestAuthCenterToken('test_user_001');
   });
 
   beforeEach(async () => {

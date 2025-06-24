@@ -4,13 +4,13 @@
 // Description: OAuth 2.0 Token Introspection Endpoint (RFC 7662)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { withErrorHandling } from '@/lib/utils/error-handler';
-import { JWTUtils, ClientAuthUtils, ScopeUtils } from '@/lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
+import { prisma } from 'lib/prisma';
+import { withErrorHandling } from 'lib/utils/error-handler';
+import { JWTUtils, ClientAuthUtils, ScopeUtils } from 'lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
 import * as jose from 'jose';
-import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, IntrospectResponseActive as IntrospectResponseActiveZodSchema } from './schemas';
+import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, introspectResponseActiveSchema } from './schemas';
 import { ApiResponse } from '@/lib/types/api';
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@/lib/errors';
+import { OAuth2Error, OAuth2ErrorCode, BaseError } from 'lib/errors';
 
 /**
  * @swagger
@@ -227,7 +227,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
     }
 
     // 使用 Zod 验证构建的活动响应 (Validate constructed active response with Zod)
-    const parsedActiveResponse = IntrospectResponseActiveZodSchema.safeParse(activeResponsePayload);
+    const parsedActiveResponse = introspectResponseActiveSchema.safeParse(activeResponsePayload);
     if (parsedActiveResponse.success) {
         return NextResponse.json<ApiResponse<IntrospectResponseActive>>({ success: true, data: parsedActiveResponse.data, message: "Token is active." }, { status: 200 });
     } else {

@@ -13,6 +13,11 @@ interface Task {
 
 type TaskOptions = Omit<Task, 'id' | 'executionCount'>;
 
+/**
+ * 时间轮工具
+ * Time wheel utilities
+ */
+
 class TimeWheel {
   private slots: Map<string, Task>[];
   private currentSlot: number;
@@ -44,7 +49,7 @@ class TimeWheel {
     const task: Task = { ...options, id, executionCount };
 
     const slotIndex = this.calculateSlotIndex(options.delay);
-    this.slots[slotIndex].set(id, task);
+    this.slots[slotIndex]!.set(id, task);
     const maxExecutionsInfo = options.maxExecutions
       ? `, 最大执行次数: ${options.maxExecutions}, 当前执行次数: ${executionCount}`
       : '';
@@ -115,7 +120,7 @@ class TimeWheel {
    */
   private tick(): void {
     logger.debug(`时间轮转动: 当前槽位 ${this.currentSlot}`);
-    const currentTasks = this.slots[this.currentSlot];
+    const currentTasks = this.slots[this.currentSlot]!;
     const taskCount = currentTasks.size;
     if (taskCount > 0) {
       logger.debug(`执行槽位 ${this.currentSlot} 的 ${taskCount} 个任务`);
@@ -209,6 +214,19 @@ class TimeWheel {
     }
     return removed;
   }
+}
+
+let timeWheelInstance: TimeWheel | null = null;
+
+/**
+ * 获取时间轮实例
+ * Get time wheel instance
+ */
+export function getTimeWheelInstance(): TimeWheel {
+  if (!timeWheelInstance) {
+    timeWheelInstance = new TimeWheel(10, 1000);
+  }
+  return timeWheelInstance;
 }
 
 export default TimeWheel;

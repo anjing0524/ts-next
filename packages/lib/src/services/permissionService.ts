@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from '../utils';
+import logger from '../utils/logger';
 import { cacheManager, CacheInterface } from '../cache';
 
 // 定义批量权限检查请求的结构类型
@@ -72,7 +72,6 @@ export class PermissionService {
       include: {
         userRoles: { // 包含用户的角色关联 (Include user's role assignments)
           where: {
-            isActive: true, // 确保用户角色关联本身是活动的 (Ensure the UserRole assignment itself is active)
             role: { isActive: true }, // 确保关联的角色是活动的 (Ensure role is active)
             // 确保用户角色关联未过期
             // Ensure user-role assignment is not expired
@@ -113,7 +112,7 @@ export class PermissionService {
     userWithRoles.userRoles.forEach((userRole) => {
       // 确保 userRole 和 role 对象存在且有效
       // Ensure userRole and role objects exist and are valid
-      if (userRole.isActive && userRole.role && userRole.role.isActive) {
+      if (userRole.role && userRole.role.isActive) {
         // 检查用户角色分配是否已过期
         // Check if the user-role assignment is expired
         const isExpired = userRole.expiresAt && userRole.expiresAt.getTime() <= Date.now();

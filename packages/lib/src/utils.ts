@@ -4,13 +4,16 @@
  */
 
 // === 日志工具 (Logger Utils) ===
-export { default as logger } from './logger';
+export * from './utils/logger';
 
 // === 错误处理 (Error Handling) ===
-export * from './error-handler';
+export * from './utils/error-handler';
 
 // === 时间轮工具 (Time Wheel Utils) ===
-export * from './time-wheel';
+export * from './utils/time-wheel';
+
+// === MySQL 客户端工具 (MySQL Client Utils) ===
+// mysql-client已迁移到@repo/database包
 
 /**
  * Validates if the given string is a valid email address.

@@ -1,0 +1,10 @@
+/Users/liushuo/code/ts-next-template/apps/kline-service/wasm-cal/target/release/deps/liblog-7f484ad8e5d8d296.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/macros.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/serde.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/__private_api.rs
+
+/Users/liushuo/code/ts-next-template/apps/kline-service/wasm-cal/target/release/deps/liblog-7f484ad8e5d8d296.rlib: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/macros.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/serde.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/__private_api.rs
+
+/Users/liushuo/code/ts-next-template/apps/kline-service/wasm-cal/target/release/deps/log-7f484ad8e5d8d296.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/macros.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/serde.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/__private_api.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/macros.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/serde.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/log-0.4.27/src/__private_api.rs:

@@ -2,13 +2,14 @@
   "name": "kline-service",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3003 --turbopack",
     "build": "next build",
     "start": "next start -p 3003",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "flatc:generate": "flatc -o ./src/generated --ts ../../schemas/kline.fbs && flatc -o ./src/wasm-cal/src --rust ../../schemas/kline.fbs"
+    "flatc:generate": "flatc -o ./src/generated --ts ./schemas/kline.fbs && flatc -o ./src/wasm-cal/src --rust ./schemas/kline.fbs"
   },
   "dependencies": {
     "next": "^15.3.2",
@@ -21,11 +22,16 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "@repo/next-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
+    "@repo/tailwind-config": "workspace:*",
     "typescript": "^5",
     "@types/react": "^19.1.6",
     "@types/node": "^20.19.1",
     "eslint": "^9",
-    "eslint-config-next": "15.2.0"
-  }
+    "eslint-config-next": "15.2.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  },
+  "prettier": "@repo/prettier-config"
 }

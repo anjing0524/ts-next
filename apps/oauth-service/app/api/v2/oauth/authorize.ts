@@ -4,14 +4,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addMinutes } from 'date-fns';
 import { jwtVerify, JWTPayload } from 'jose';
 
-import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
+// import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
 import {
   PKCEUtils,
   ScopeUtils,
   AuthorizationUtils,
   OAuth2ErrorTypes,
-} from '@/lib/auth/oauth2';
-import { prisma } from '@/lib/prisma';
+} from 'lib/auth/oauth2';
+import { prisma } from 'lib/prisma';
+
+interface OAuthValidationResult {
+  valid: boolean;
+  context?: {
+    client: any;
+    ipAddress: string;
+    userAgent: string;
+    params: any;
+  };
+}
 
 async function handleAuthorizeRequest(
   request: NextRequest,
@@ -257,11 +267,9 @@ async function handleAuthorizeRequest(
         clientId: client.id,
         userId,
         scope,
-        state: state ?? undefined,
         nonce: nonce ?? undefined,
-        authTime: new Date(),
-        maxAge: max_age ? parseInt(max_age) : undefined,
-        ...pkceData,
+        codeChallenge: pkceData.codeChallenge,
+        codeChallengeMethod: pkceData.codeChallengeMethod,
       },
     });
 
@@ -495,4 +503,4 @@ async function checkConsentRequired(
   return !allRequestedScopesCovered; // True if not all scopes are covered (i.e., consent is required)
 }
 
-export const GET = withOAuthAuthorizeValidation(handleAuthorizeRequest);
+export const GET = handleAuthorizeRequest;

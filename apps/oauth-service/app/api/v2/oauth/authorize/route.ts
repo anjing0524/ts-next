@@ -13,14 +13,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
-import { prisma } from '@/lib/prisma';
+import { prisma } from 'lib/prisma';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@/lib/auth/oauth2'; // Added AuthorizationUtils
+import { PKCEUtils, ScopeUtils, AuthorizationUtils } from 'lib/auth/oauth2'; // Added AuthorizationUtils
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
-import { storeAuthorizationCode } from '@/lib/auth/authorizationCodeFlow';
-import { withErrorHandling } from '@/lib/utils/error-handler'; // 错误处理 HOF (Error handling HOF)
-import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from '@/lib/errors'; // 自定义错误类 (Custom error classes)
+import { storeAuthorizationCode } from 'lib/auth/authorizationCodeFlow';
+import { withErrorHandling } from 'lib/utils/error-handler'; // 错误处理 HOF (Error handling HOF)
+import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from 'lib/errors'; // 自定义错误类 (Custom error classes)
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';
@@ -59,7 +59,7 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
       console.error("CRITICAL: buildErrorRedirect called with invalid baseRedirectUri", baseRedirectUri, e);
       // 抛出一个通用错误，让 withErrorHandling 处理
       // Throw a generic error for withErrorHandling to process
-      throw new ConfigurationError(`Server error: Could not construct redirect URL due to invalid base redirect URI. Original error: ${error}`, 'REDIRECT_URI_CONSTRUCTION_FAILED');
+      throw new ConfigurationError(`Server error: Could not construct redirect URL due to invalid base redirect URI. Original error: ${error}`, { code: 'REDIRECT_URI_CONSTRUCTION_FAILED' });
     }
   };
 
@@ -76,8 +76,11 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     // However, if redirect_uri itself is problematic or not provided, redirection isn't feasible.
     // 此处抛出 ValidationError，withErrorHandling 将其转换为 JSON 响应。
     // Throw ValidationError here, withErrorHandling will convert it to a JSON response.
+    const errorMessage = firstError 
+      ? `Invalid authorization request: ${firstError.path.join('.')} - ${firstError.message}`
+      : 'Invalid authorization request: Validation failed';
     throw new ValidationError(
-      `Invalid authorization request: ${firstError.path.join('.')} - ${firstError.message}`,
+      errorMessage,
       { issues: validationResult.error.flatten().fieldErrors, state: paramsToValidate.state },
       OAuth2ErrorCode.InvalidRequest // 使用 OAuth2 标准错误码 (Use OAuth2 standard error code)
     );
@@ -122,7 +125,7 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     console.error("Failed to parse third-party client's redirectUris:", thirdPartyClient.redirectUris, e);
     // 客户端配置错误是服务器端的问题
     // Client configuration error is a server-side issue
-    throw new ConfigurationError('Invalid client configuration for redirectUris.', 'CLIENT_CONFIG_REDIRECT_URI_INVALID', { clientId: client_id });
+    throw new ConfigurationError('Invalid client configuration for redirectUris.', { clientId: client_id, code: 'CLIENT_CONFIG_REDIRECT_URI_INVALID' });
   }
   if (!registeredRedirectUrisList.includes(redirect_uri)) {
     // redirect_uri 不匹配，不应重定向。直接返回 JSON 错误。
@@ -140,21 +143,19 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   if (thirdPartyClient.clientType === 'PUBLIC' || thirdPartyClient.requirePkce) {
     if (!code_challenge || !code_challenge_method) {
       await AuthorizationUtils.logAuditEvent({
-        actorType: 'CLIENT_APP',
-        actorId: thirdPartyClient.clientId,
         clientId: thirdPartyClient.clientId,
         action: 'AUTH_CODE_PKCE_REQUIRED_MISSING_PARAMS',
-        status: 'FAILURE',
+        success: false,
         ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-        userAgent: req.headers.get('user-agent'),
+        userAgent: req.headers.get('user-agent') || undefined,
         errorMessage: 'PKCE (code_challenge and code_challenge_method) is required for this client but one or both were missing.',
-        details: JSON.stringify({
+        metadata: {
             client_id: thirdPartyClient.clientId,
             clientType: thirdPartyClient.clientType,
             requirePkceField: thirdPartyClient.requirePkce,
             hasCodeChallenge: !!code_challenge,
             hasCodeChallengeMethod: !!code_challenge_method,
-        }),
+        },
       });
       return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'PKCE (code_challenge and code_challenge_method) is required for this client.', state);
     }
@@ -164,18 +165,16 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   // PKCE code_challenge format validation (if code_challenge is provided)
   if (code_challenge && !PKCEUtils.validateCodeChallenge(code_challenge)) {
      await AuthorizationUtils.logAuditEvent({
-        actorType: 'CLIENT_APP',
-        actorId: thirdPartyClient.clientId,
         clientId: thirdPartyClient.clientId,
         action: 'AUTH_CODE_PKCE_INVALID_CHALLENGE_FORMAT',
-        status: 'FAILURE',
+        success: false,
         ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-        userAgent: req.headers.get('user-agent'),
+        userAgent: req.headers.get('user-agent') || undefined,
         errorMessage: 'Invalid PKCE code_challenge format.',
-        details: JSON.stringify({
+        metadata: {
             client_id: thirdPartyClient.clientId,
             code_challenge_provided: code_challenge, // Be cautious logging the challenge itself if it's sensitive or too long
-        }),
+        },
       });
      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'Invalid code_challenge format.', state);
   }
@@ -202,11 +201,11 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   if (internalAuthToken) {
     try {
       const jwksUriString = process.env.JWKS_URI;
-      if (!jwksUriString) throw new ConfigurationError('JWKS_URI not configured for internal auth.', 'CONFIG_JWKS_URI_MISSING');
+      if (!jwksUriString) throw new ConfigurationError('JWKS_URI not configured for internal auth.', { code: 'CONFIG_JWKS_URI_MISSING' });
       const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
 
       const expectedIssuer = process.env.JWT_ISSUER;
-      if (!expectedIssuer) throw new ConfigurationError('JWT_ISSUER not configured for internal auth.', 'CONFIG_JWT_ISSUER_MISSING');
+      if (!expectedIssuer) throw new ConfigurationError('JWT_ISSUER not configured for internal auth.', { code: 'CONFIG_JWT_ISSUER_MISSING' });
 
       const { payload: internalAuthTokenPayload } = await jose.jwtVerify(internalAuthToken, JWKS, {
         issuer: expectedIssuer, audience: AUTH_CENTER_UI_AUDIENCE, algorithms: ['RS256'],

@@ -1,23 +1,79 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": ["NODE_ENV", "NEXT_PUBLIC_*"]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "outputs": []
     },
     "test": {
       "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "__tests__/**/*.ts", "__tests__/**/*.tsx"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
-    "lint": {
-      "dependsOn": ["^build"]
+    "db:generate": {
+      "cache": false,
+      "dependsOn": []
     },
-    "type-check": {
-      "dependsOn": ["^build"]
+    "db:push": {
+      "cache": false,
+      "dependsOn": ["db:generate"]
+    },
+    "db:seed": {
+      "cache": false,
+      "dependsOn": ["db:push"]
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "prisma:migrate": {
+      "cache": false,
+      "dependsOn": ["db:generate"]
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
+    "e2e:ui": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["build"]
+    },
+    "e2e:report": {
+      "cache": false,
+      "dependsOn": ["e2e"]
+    },
+    "flatc:generate": {
+      "outputs": ["src/generated/**", "src/wasm-cal/src/kline_generated.rs"],
+      "inputs": ["schemas/**/*.fbs"]
     }
-  }
-}
+  },
+  "globalDependencies": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.json",
+    "components.json",
+    ".env*"
+  ],
+  "globalEnv": [
+    "NODE_ENV"
+  ]
+} 

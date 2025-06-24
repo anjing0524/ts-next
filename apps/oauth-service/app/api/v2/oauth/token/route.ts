@@ -22,14 +22,14 @@
 // Security: Emphasizes client authentication, PKCE, and one-time use or rotation mechanisms for authorization codes and refresh tokens.
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
+import prisma from 'lib/prisma'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
 import { OAuthClient, User, Prisma, ClientType as PrismaClientType } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
-import { ClientAuthUtils, AuthorizationUtils, ScopeUtils, JWTUtils } from '@/lib/auth/oauth2'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
+import { ClientAuthUtils, AuthorizationUtils, ScopeUtils, JWTUtils } from 'lib/auth/oauth2'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
 import { addHours, addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
-import { OAuth2Error, OAuth2ErrorCode, BaseError, TokenError, ResourceNotFoundError, ValidationError, AuthenticationError } from '@/lib/errors'; // 导入自定义错误类 (Import custom error classes)
-import { withErrorHandling } from '@/lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
+import { OAuth2Error, OAuth2ErrorCode, BaseError, TokenError, ResourceNotFoundError, ValidationError, AuthenticationError } from 'lib/errors'; // 导入自定义错误类 (Import custom error classes)
+import { withErrorHandling } from 'lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
 
 
 // 从专用的模式文件导入 Zod 模式
@@ -146,7 +146,7 @@ async function handleAuthorizationCodeGrant(
 
     // validateAuthorizationCode 现在会抛出错误，而不是返回 null
     // validateAuthorizationCode will now throw errors instead of returning null
-    validatedAuthCode = await import('@/lib/auth/authorizationCodeFlow').then(mod =>
+    validatedAuthCode = await import('lib/auth/authorizationCodeFlow').then(mod =>
       mod.validateAuthorizationCode(code, client.id, redirectUri, codeVerifier)
     );
   } catch (error: any) {

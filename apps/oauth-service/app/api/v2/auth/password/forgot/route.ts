@@ -2,10 +2,10 @@
 // 描述: 请求密码重置端点 (Request password reset endpoint)
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from 'lib/prisma';
 import crypto from 'crypto'; // For generating a secure random token
 import { addHours } from 'date-fns'; // For setting token expiry
-import { isValidEmail } from '@/lib/utils'; // Assuming this utility exists
+import { isValidEmail } from 'lib/utils'; // Assuming this utility exists
 
 const RESET_TOKEN_LENGTH = 32; // 重置令牌的长度（字节数）(Length of the reset token in bytes)
 const RESET_TOKEN_EXPIRY_HOURS = 1; // 重置令牌的有效期（小时）(Expiry duration of the reset token in hours)
@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. 根据邮箱查找用户 (Find user by email)
+    // 1. 根据用户名查找用户 (Find user by username)
     const user = await prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+      where: { username: email.trim().toLowerCase() },
     });
 
     // 2. 如果用户存在且激活 (If user exists and is active)
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       // (In a real application, an email service would be called here to send an email with the reset link)
       const resetLink = `https://yourfrontend.com/reset-password?token=${resetToken}`; // 示例重置链接 (Example reset link)
       console.log(`---- SIMULATED EMAIL ----`);
-      console.log(`To: ${user.email}`);
+      console.log(`To: ${user.username}`);
       console.log(`From: noreply@example.com`);
       console.log(`Subject: Password Reset Request`);
       console.log(`Body: Please reset your password using the following link: ${resetLink}`);

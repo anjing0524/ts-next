@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // For error types
+import { prisma } from 'lib/prisma';
+import { OAuth2ErrorTypes } from 'lib/auth/oauth2'; // For error types
 
 const ADMIN_API_KEY = process.env.TOKEN_REVOCATION_ADMIN_KEY;
 
