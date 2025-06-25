@@ -8,10 +8,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { OAuthClient as Client, User as PrismaUser } from '@prisma/client';
 import * as jose from 'jose';
 import { prisma } from '@repo/database/client';
-import { RBACService as PermissionService } from '@repo/lib/services/rbacService';
+import { PermissionService } from '@repo/lib';
 
 // 实例化真实权限服务 (Instantiate actual PermissionService)
-const permissionServiceInstance = new PermissionService();
+const permissionServiceInstance = new PermissionService(prisma);
 
 /**
  * 为 requirePermission 定义请求类型扩展

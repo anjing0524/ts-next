@@ -15,6 +15,10 @@ export * from './utils/time-wheel';
 // === MySQL 客户端工具 (MySQL Client Utils) ===
 // mysql-client已迁移到@repo/database包
 
+// 导出速率限制工具 (Export rate limiting utilities)
+export * from './utils/rate-limit-utils';
+export type { RateLimitResult, RateLimitConfig } from './utils/rate-limit-utils';
+
 /**
  * Validates if the given string is a valid email address.
  * @param email The string to validate.

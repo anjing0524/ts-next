@@ -5,13 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { OAuthClient as Client } from '@prisma/client';
-import { 
-  ScopeUtils,
-  AuthorizationUtils,
-  RateLimitUtils,
-  ClientAuthUtils,
-  PKCEUtils,
-} from '../utils';
+import { AuthorizationUtils } from '@/lib/auth/utils';
+import { ClientAuthUtils } from '../utils';
+import { ScopeUtils, RateLimitUtils } from '@repo/lib';
+import { PKCEUtils } from '@repo/lib';
 import { OAuth2ErrorTypes, createOAuth2ErrorResponse } from '../oauth2-errors';
 
 /**
@@ -84,10 +81,11 @@ export async function validateOAuthRequest(
   // 速率限制检查 (Rate limit check)
   if (options.rateLimit) {
     const { maxRequests, windowMs, keyType } = options.rateLimit;
-    const rateLimitKey = RateLimitUtils.getRateLimitKey(request, keyType);
-
-    const rateLimitResult = await RateLimitUtils.checkRateLimit(rateLimitKey, maxRequests, windowMs);
-    if (!rateLimitResult.allowed) {
+    const config = { maxRequests, windowMs, keyType };
+    
+    const rateLimitResult = RateLimitUtils.applyRateLimit(request, config);
+    const isLimited = !rateLimitResult.allowed;
+    if (isLimited) {
       await AuthorizationUtils.logAuditEvent({
         action: options.auditAction || 'rate_limit_exceeded',
         resource: request.url,
@@ -251,25 +249,26 @@ export async function validateOAuthRequest(
       };
     }
     
-    const clientAuth = await ClientAuthUtils.authenticateClient(request, body);
-
-    if (!clientAuth.client) {
+    try {
+      client = await ClientAuthUtils.authenticateClient(request, body);
+    } catch (error: any) {
       await AuthorizationUtils.logAuditEvent({
         action: `${options.auditAction || 'oauth_request'}_client_auth_failed`,
         resource: request.url,
         ipAddress,
         userAgent,
         success: false,
-        errorMessage: clientAuth.error?.error_description,
+        errorMessage: error.message || 'Client authentication failed',
       });
 
       return {
         success: false,
-        response: NextResponse.json(clientAuth.error, { status: 401 }),
+        response: NextResponse.json({
+          error: 'invalid_client',
+          error_description: error.message || 'Client authentication failed'
+        }, { status: 401 }),
       };
     }
-
-    client = clientAuth.client;
   }
 
   return {
@@ -302,7 +301,7 @@ export async function validateOAuthScopes(
     userAgent?: string;
   } = {}
 ): Promise<{ valid: boolean; response?: NextResponse; validScopes?: string[] }> {
-  const scopeValidation = await ScopeUtils.validateScopes(requestedScopes, client);
+      const scopeValidation = await ScopeUtils.validateScopes(requestedScopes, client);
 
   if (!scopeValidation.valid) {
     await AuthorizationUtils.logAuditEvent({
@@ -333,7 +332,7 @@ export async function validateOAuthScopes(
 
   return {
     valid: true,
-    validScopes: scopeValidation.validScopes,
+    validScopes: requestedScopes.filter(scope => !scopeValidation.invalidScopes.includes(scope)),
   };
 }
 
@@ -406,7 +405,7 @@ export function validateOAuthPKCE(
 
   // 验证代码挑战格式
   // Validate code challenge format
-  if (codeChallenge && !PKCEUtils.isValidCodeChallenge(codeChallenge)) {
+  if (codeChallenge && !PKCEUtils.validateCodeChallenge(codeChallenge)) {
     return {
       valid: false,
       response: NextResponse.json(
@@ -559,10 +558,11 @@ export function withOAuthMiddleware(
     if (!options.skipRateLimit) {
       const maxRequests = options.maxRequests || 100;
       const windowMs = options.windowMs || 15 * 60 * 1000; // 15分钟 (15 minutes)
-      const rateLimitKey = options.rateLimitKey || `rate_limit:${request.ip || 'unknown'}`;
+      const rateLimitKey = options.rateLimitKey || `rate_limit:unknown`;
 
-      const rateLimitResult = await RateLimitUtils.checkRateLimit(rateLimitKey, maxRequests, windowMs);
-      if (!rateLimitResult.allowed) {
+      const rateLimitResult = RateLimitUtils.applyRateLimit(request, { maxRequests, windowMs });
+      const isLimited = !rateLimitResult.allowed;
+      if (isLimited) {
         return NextResponse.json(
           {
             error: 'temporarily_unavailable',

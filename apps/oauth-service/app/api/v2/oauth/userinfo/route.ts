@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { withErrorHandling } from '@repo/lib/utils/error-handler';
-import { authenticateBearer } from 'lib/auth/middleware';
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from 'lib/errors';
+import { authenticateBearer } from '@/lib/auth';
+import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@/lib/errors';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
 

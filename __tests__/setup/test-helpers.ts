@@ -150,19 +150,42 @@ export function generatePKCE(): PKCEParams {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
   
+  return {
+    codeVerifier,
+    codeChallenge,
+    codeChallengeMethod: 'S256',
+  };
+}
+
+// ===== 测试数据创建函数 =====
+
+/**
+ * 创建测试客户端
+ */
+export async function createTestClient(
+  clientData: Partial<TestClientType> | keyof typeof TEST_CLIENTS = 'WEB_APP'
+) {
+  // 如果传入的是字符串键，使用预设数据
+  const data = typeof clientData === 'string' ? TEST_CLIENTS[clientData] : {
+    ...TEST_CLIENTS.WEB_APP,
+    ...clientData
+  };
+  
+  const hashedSecret = data.clientSecret ? 
+    await hashPassword(data.clientSecret) : null;
 
   const createdClient = await prisma.oAuthClient.create({
     data: {
-      id: clientData.id,
-      clientId: clientData.clientId,
+      id: data.id,
+      clientId: data.clientId,
       clientSecret: hashedSecret,
-      name: clientData.name,
-      redirectUris: JSON.stringify(clientData.redirectUris),
-      grantTypes: JSON.stringify(clientData.grantTypes || ['authorization_code']), // Provide default if undefined
-      responseTypes: JSON.stringify(clientData.responseTypes || ['code']), // Provide default
-      allowedScopes: JSON.stringify(clientData.allowedScopes || ['openid']), // Provide default
-      clientType: 'CONFIDENTIAL',
-      requirePkce: true,
+      name: data.name,
+      redirectUris: JSON.stringify(data.redirectUris),
+      grantTypes: JSON.stringify(data.grantTypes || ['authorization_code']),
+      responseTypes: JSON.stringify(data.responseTypes || ['code']),
+      allowedScopes: JSON.stringify(data.allowedScopes || ['openid']),
+      clientType: data.clientType,
+      requirePkce: data.requirePkce,
       requireConsent: false,
       isActive: true,
       createdAt: new Date(),
@@ -171,13 +194,36 @@ export function generatePKCE(): PKCEParams {
   });
   
   return createdClient;
+}
 
-  return {
-    codeVerifier,
-    codeChallenge,
-    codeChallengeMethod: 'S256',
+/**
+ * 创建测试用户
+ */
+export async function createTestUser(
+  userData: Partial<TestUserType> | keyof typeof TEST_USERS = 'REGULAR_USER'
+) {
+  // 如果传入的是字符串键，使用预设数据
+  const data = typeof userData === 'string' ? TEST_USERS[userData] : {
+    ...TEST_USERS.REGULAR_USER,
+    ...userData
   };
+  
+  const hashedPassword = await hashPassword('testpassword123');
 
+  const createdUser = await prisma.user.create({
+    data: {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      displayName: data.displayName,
+      passwordHash: hashedPassword,
+      isActive: data.isActive,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+  
+  return createdUser;
 }
 
 // ===== 数据库管理 =====
@@ -552,7 +598,7 @@ export function generateRandomToken(): string {
 /**
  * 哈希密码
  */
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);

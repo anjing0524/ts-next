@@ -4,9 +4,9 @@
 
 import { jest } from '@jest/globals'; // 新增导入
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/v2/oauth/userinfo/route';
+import { GET } from '../../../../../apps/oauth-service/app/api/v2/oauth/userinfo/route';
 import { prisma } from '@repo/database/client';
-import { authenticateBearer } from '@repo/lib/auth';
+import { authenticateBearer } from '../../../../../apps/oauth-service/lib/auth';
 import {
   initializeTestData,
   cleanupTestData,

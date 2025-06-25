@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { jwtVerify, JWTPayload } from 'jose'; // 引入JWT验证相关的模块
 
-import { AuthorizationUtils, OAuth2ErrorTypes, ScopeUtils } from 'lib/auth/oauth2';
+import { AuthorizationUtils } from '@/lib/auth/utils';
+import { OAuth2ErrorTypes } from '@/lib/auth/oauth2';
+import { ScopeUtils } from '@repo/lib/auth';
 // import { validateSession } from '../../../lib/auth/session'; // To validate user's current session // 移除 session 验证
-import { prisma } from 'lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 // 定义JWT相关的常量，与 authorize/route.ts 中保持一致
 // Define JWT related constants, consistent with authorize/route.ts

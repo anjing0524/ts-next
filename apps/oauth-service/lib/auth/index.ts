@@ -5,16 +5,17 @@
  * @since 1.0.0
  */
 
-// PKCE 相关功能
-export {
-  generateCodeVerifier,
-  generateCodeChallenge,
-  verifyCodeChallenge,
-  isValidCodeVerifier,
-  isSupportedChallengeMethod,
-  validatePKCEParams,
-  type PKCEValidationResult
-} from './pkce-utils';
+// PKCE 相关功能 - 重新导出PKCEUtils的静态方法
+// PKCE functionality - re-export PKCEUtils static methods
+import { PKCEUtils } from '@repo/lib';
+export type { PKCEValidationResult } from '@repo/lib';
+
+export const generateCodeVerifier = PKCEUtils.generateCodeVerifier;
+export const generateCodeChallenge = PKCEUtils.generateCodeChallenge;
+export const verifyCodeChallenge = PKCEUtils.verifyCodeChallenge;
+export const isValidCodeVerifier = PKCEUtils.validateCodeVerifier;
+export const isSupportedChallengeMethod = PKCEUtils.isSupportedChallengeMethod;
+export const validatePKCEParams = PKCEUtils.validatePKCEParams;
 
 // OAuth2 错误处理
 export {
@@ -58,4 +59,4 @@ export {
   type OAuthMiddlewareOptions,
   type OAuthValidationOptions,
   type OAuthValidationResult
-} from './middleware'; 
+} from './middleware/index'; 

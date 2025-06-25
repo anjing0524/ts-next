@@ -12,10 +12,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ClientType } from '@prisma/client';
-import { ClientService } from '../../../lib/services/client-service';
-import { withErrorHandling } from '@repo/lib';
-import { requirePermission } from '../../../lib/auth/middleware';
-import { ApiResponse } from '@repo/lib';
+import { ClientService } from '@/lib/services/client-service';
+import { withErrorHandling, ApiResponse } from '@repo/lib';
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
 
 /**
  * 客户端创建请求Schema
@@ -61,7 +60,7 @@ const queryClientsSchema = z.object({
  * 需要 'oauth:clients:read' 权限
  * Requires 'oauth:clients:read' permission
  */
-async function getClientsHandler(request: NextRequest): Promise<NextResponse> {
+async function getClientsHandler(request: NextRequest, context: AuthContext): Promise<NextResponse> {
   // 验证查询参数
   // Validate query parameters
   const url = new URL(request.url);
@@ -109,7 +108,7 @@ async function getClientsHandler(request: NextRequest): Promise<NextResponse> {
  * 需要 'oauth:clients:create' 权限
  * Requires 'oauth:clients:create' permission
  */
-async function createClientHandler(request: NextRequest): Promise<NextResponse> {
+async function createClientHandler(request: NextRequest, context: AuthContext): Promise<NextResponse> {
   try {
     // 解析请求体
     // Parse request body
@@ -156,9 +155,9 @@ async function createClientHandler(request: NextRequest): Promise<NextResponse> 
 // 导出处理函数，使用权限中间件和错误处理包装器
 // Export handler functions with permission middleware and error handling wrapper
 export const GET = withErrorHandling(
-  requirePermission('oauth:clients:read')(getClientsHandler)
+  withAuth(getClientsHandler, { requiredPermissions: ['oauth:clients:read'] })
 );
 
 export const POST = withErrorHandling(
-  requirePermission('oauth:clients:create')(createClientHandler)
+  withAuth(createClientHandler, { requiredPermissions: ['oauth:clients:create'] })
 ); 

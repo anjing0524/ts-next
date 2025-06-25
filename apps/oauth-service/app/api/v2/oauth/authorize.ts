@@ -4,14 +4,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addMinutes } from 'date-fns';
 import { jwtVerify, JWTPayload } from 'jose';
 
-// import { withOAuthAuthorizeValidation, OAuthValidationResult } from '../../../lib/auth/middleware';
+// import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth';
 import {
   PKCEUtils,
   ScopeUtils,
   AuthorizationUtils,
   OAuth2ErrorTypes,
-} from 'lib/auth/oauth2';
-import { prisma } from 'lib/prisma';
+} from '@/lib/auth/oauth2';
+import { prisma } from '@/lib/prisma';
 
 interface OAuthValidationResult {
   valid: boolean;

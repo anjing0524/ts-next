@@ -4,10 +4,11 @@
 // 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from 'lib/prisma'; // Prisma ORM 客户端。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端。
 import { Prisma, PermissionType, HttpMethod } from '@prisma/client'; // Prisma 生成的类型。
-import { requirePermission } from 'lib/auth/middleware'; // 引入权限控制中间件。
-import { AuthorizationUtils } from 'lib/auth/oauth2'; // For Audit Logging
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件。
+import { withErrorHandling } from '@repo/lib';
+import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义路由上下文接口，用于从动态路由参数中获取 permissionId。
@@ -66,9 +67,9 @@ const UpdatePermissionSchema = z.object({
  */
 async function getPermissionByIdHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 从上下文中获取 permissionId。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
-  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   try {
     // 从数据库中查找具有指定 ID 的权限。
@@ -84,47 +85,43 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
 
     if (!permission) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'PERMISSION_READ_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Permission',
-          resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
           ipAddress,
           userAgent,
+          success: false,
           errorMessage: 'Permission definition not found.',
+          metadata: { permissionId }
       });
       return NextResponse.json({ message: '权限定义未找到 (Permission definition not found)' }, { status: 404 });
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_READ_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+        resource: `Permission:${permissionId}`,
         ipAddress,
         userAgent,
-        details: JSON.stringify({ permissionName: permission.name, permissionType: permission.type }),
+        success: true,
+        metadata: { 
+          permissionId,
+          permissionName: permission.name, 
+          permissionType: permission.type 
+        }
     });
     return NextResponse.json(permission);
   } catch (error: any) {
     console.error(`获取权限 ${permissionId} 详情失败 (Failed to fetch permission details for ID ${permissionId}):`, error);
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_READ_FAILURE_DB_ERROR',
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+        resource: `Permission:${permissionId}`,
         ipAddress,
         userAgent,
+        success: false,
         errorMessage: `Failed to fetch permission details for ID ${permissionId}.`,
-        details: JSON.stringify({ error: error.message }),
+        metadata: { permissionId, error: error.message }
     });
     return NextResponse.json({ message: '获取权限定义详情时发生错误 (An error occurred while retrieving permission definition details)' }, { status: 500 });
   }
@@ -143,26 +140,23 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
  */
 async function updatePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
-  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   let body;
   try {
     body = await req.json(); // 解析请求体。
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_UPDATE_FAILURE_INVALID_JSON',
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Invalid JSON request body for permission update.',
-        details: JSON.stringify({ error: e.message }),
+        metadata: { error: e.message }
     });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
@@ -170,21 +164,18 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
   const validationResult = UpdatePermissionSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_UPDATE_FAILURE_VALIDATION',
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Permission update payload validation failed.',
-        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+        metadata: { issues: validationResult.error.format(), receivedBody: body }
     });
     return NextResponse.json({
       message: '更新权限的输入数据验证失败 (Permission update input validation failed)',
-      errors: validationResult.error.format(),
+      errors: validationResult.error.format()
     }, { status: 400 });
   }
 
@@ -192,16 +183,13 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
 
   if (Object.keys(updateData).length === 0) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_UPDATE_FAILURE_EMPTY_BODY',
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
         ipAddress,
         userAgent,
-        errorMessage: 'Request body empty for permission update.',
+        errorMessage: 'Request body empty for permission update.'
     });
     return NextResponse.json({ message: '请求体中至少需要一个待更新的字段 (At least one field to update is required in the request body)' }, { status: 400 });
   }
@@ -210,38 +198,32 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     const existingPermission = await prisma.permission.findUnique({ where: { id: permissionId } });
     if (!existingPermission) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'PERMISSION_UPDATE_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Permission',
-          resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Permission definition not found to update.',
+          errorMessage: 'Permission definition not found to update.'
       });
       return NextResponse.json({ message: '权限定义未找到，无法更新 (Permission definition not found, cannot update)' }, { status: 404 });
     }
 
     if ((updateData as any).name || (updateData as any).type) {
         await AuthorizationUtils.logAuditEvent({
-            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-            actorId: performingAdmin?.id || 'anonymous',
             userId: performingAdmin?.id,
             action: 'PERMISSION_UPDATE_FAILURE_IMMUTABLE_FIELDS',
-            status: 'FAILURE',
-            resourceType: 'Permission',
-            resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
             ipAddress,
             userAgent,
             errorMessage: 'Attempted to modify immutable fields (name or type) of a permission.',
-            details: JSON.stringify({
+            metadata: {
                 attemptedName: (updateData as any).name,
                 attemptedType: (updateData as any).type,
                 currentName: existingPermission.name,
-                currentType: existingPermission.type,
-            }),
+                currentType: existingPermission.type
+            }
         });
         return NextResponse.json({ message: '权限的 "name" (名称) 和 "type" (类型) 字段不可修改 (The "name" and "type" fields of a permission cannot be changed)' }, { status: 400 });
     }
@@ -292,20 +274,17 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     });
     // 返回更新后的完整权限信息。
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_UPDATE_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({
+        metadata: {
             permissionId: permissionId,
             updatedFields: Object.keys(updateData),
             originalName: existingPermission.name, // Log original name for context
-        }),
+        }
     });
     return NextResponse.json(fullUpdatedPermission);
 
@@ -322,21 +301,17 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({
+        metadata: {
             error: error.message,
             errorCode: (error as any).code,
-            attemptedUpdateData: updateData,
-        }),
+            attemptedUpdateData: updateData
+        }
     });
     return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
@@ -354,25 +329,22 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
  */
 async function deletePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
-  const ipAddress = req.headers.get("x-forwarded-for") || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   try {
     // 步骤 1: 检查权限定义是否存在。
     const permission = await prisma.permission.findUnique({ where: { id: permissionId } });
     if (!permission) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'PERMISSION_DELETE_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Permission',
-          resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Permission definition not found to delete.',
+          errorMessage: 'Permission definition not found to delete.'
       });
       return NextResponse.json({ message: '权限定义未找到，无法删除 (Permission definition not found, cannot delete)' }, { status: 404 });
     }
@@ -381,17 +353,14 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
     const rolesWithPermissionCount = await prisma.rolePermission.count({ where: { permissionId: permissionId } });
     if (rolesWithPermissionCount > 0) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'PERMISSION_DELETE_FAILURE_IN_USE',
-          status: 'FAILURE',
-          resourceType: 'Permission',
-          resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: `Permission "${permission.name}" is still in use by ${rolesWithPermissionCount} roles.`,
-          details: JSON.stringify({ permissionName: permission.name, rolesCount: rolesWithPermissionCount }),
+          metadata: { permissionName: permission.name, rolesCount: rolesWithPermissionCount }
       });
       return NextResponse.json({ message: `权限 "${permission.name}" 仍被 ${rolesWithPermissionCount} 个角色使用，无法删除 (Permission "${permission.name}" is still in use by ${rolesWithPermissionCount} roles and cannot be deleted)` }, { status: 409 }); // 409 Conflict
     }
@@ -411,16 +380,13 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
     });
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_DELETE_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          resource: `Permission:${permissionId}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({ deletedPermissionId: permissionId, permissionName: permission.name }),
+        metadata: { deletedPermissionId: permissionId, permissionName: permission.name }
     });
     // 返回 HTTP 204 No Content 表示成功删除且无内容返回。
     return new NextResponse(null, { status: 204 });
@@ -437,23 +403,40 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
-        resourceType: 'Permission',
-        resourceId: permissionId,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({ error: error.message, permissionNameAttemptedDelete: permission?.name || 'N/A' }),
+        metadata: { error: error.message, permissionId }
     });
     return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
 }
 
-// 使用 `requirePermission` 中间件包装处理函数，并导出为相应的 HTTP 方法。
-export const GET = requirePermission('permissions:read')(getPermissionByIdHandler);
-export const PUT = requirePermission('permissions:update')(updatePermissionHandler);
-export const DELETE = requirePermission('permissions:delete')(deletePermissionHandler);
+// 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
+export const GET = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const permissionId = pathSegments[pathSegments.length - 1] || '';
+    return getPermissionByIdHandler(request, { params: { permissionId } });
+  }, { requiredPermissions: ['permissions:read'] })
+);
+export const PUT = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const permissionId = pathSegments[pathSegments.length - 1] || '';
+    return updatePermissionHandler(request, { params: { permissionId } });
+  }, { requiredPermissions: ['permissions:update'] })
+);
+export const DELETE = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const permissionId = pathSegments[pathSegments.length - 1] || '';
+    return deletePermissionHandler(request, { params: { permissionId } });
+  }, { requiredPermissions: ['permissions:delete'] })
+);

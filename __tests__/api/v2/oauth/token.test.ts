@@ -4,7 +4,7 @@ import { POST as tokenHandler } from 'oauth-service/app/api/v2/oauth/token/route
 import { prisma } from '@repo/database/client';
 import { createTestClient, createTestUser, cleanupTestData, initializeTestData, createTestRequest } from '../../../setup/test-helpers'; // Adjust path
 import { OAuthClient, User, AuthorizationCode } from '@prisma/client';
-import { JWTUtils, ScopeUtils } from 'oauth-service/src/lib/auth/oauth2';
+import { JWTUtils, ScopeUtils } from '@repo/lib/auth';
 import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/auth';
 
 

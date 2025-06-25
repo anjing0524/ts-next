@@ -1,5 +1,5 @@
 // Jest globals are available without explicit import in our setup
-import { JWTUtils } from '../../../../lib/auth/utils/jwt-utils';
+import { JWTUtils } from '@repo/lib';
 import { prisma } from '@repo/database';
 import type { User, OAuthClient } from '@prisma/client';
 

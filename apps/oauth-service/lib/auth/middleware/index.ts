@@ -136,4 +136,10 @@ export function withAdminAPIEndpoint(
 }
 
 // 重新导出必要的类型 (Re-export necessary types)
-import type { NextRequest, NextResponse } from 'next/server'; 
+import type { NextRequest, NextResponse } from 'next/server';
+
+// 导入必要的函数 (Import necessary functions)
+import { withCORS } from './cors';
+import { withOAuthRateLimit, withIPRateLimit } from './rate-limit';
+import { withOAuthTokenValidation, withOAuthAuthorizeValidation } from './validation';
+import { withAuth, type AuthContext, type AuthOptions } from './bearer-auth'; 

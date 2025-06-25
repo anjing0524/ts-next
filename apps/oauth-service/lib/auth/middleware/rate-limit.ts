@@ -4,7 +4,7 @@
 // Description: Rate Limiting Middleware
 
 import { NextRequest, NextResponse } from 'next/server';
-import { RateLimitUtils } from '../utils/rate-limit-utils';
+import { RateLimitUtils } from '@repo/lib/utils';
 
 /**
  * 速率限制选项接口
@@ -91,7 +91,7 @@ function getClientIP(request: NextRequest): string {
   if (xForwardedFor) {
     // X-Forwarded-For可能包含多个IP，取第一个
     // X-Forwarded-For may contain multiple IPs, take the first one
-    return xForwardedFor.split(',')[0].trim();
+    return xForwardedFor.split(',')[0]?.trim() || '127.0.0.1';
   }
   
   if (xRealIP) return xRealIP;
@@ -99,7 +99,7 @@ function getClientIP(request: NextRequest): string {
   
   // 从URL中提取IP（可能不准确）
   // Extract IP from URL (may not be accurate)
-  return request.ip || '127.0.0.1';
+  return '127.0.0.1';
 }
 
 /**
@@ -118,8 +118,11 @@ function extractClientId(request: NextRequest): string | null {
       const token = authorization.substring(7);
       // 这里应该解析JWT令牌获取client_id，简化处理
       // Should parse JWT token to get client_id, simplified handling
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.client_id || null;
+      const tokenParts = token.split('.');
+      if (tokenParts.length >= 2 && tokenParts[1]) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        return payload.client_id || null;
+      }
     } catch {
       // 忽略解析错误 (Ignore parsing errors)
     }
@@ -147,8 +150,11 @@ function extractUserId(request: NextRequest): string | null {
       const token = authorization.substring(7);
       // 这里应该解析JWT令牌获取sub (user_id)，简化处理
       // Should parse JWT token to get sub (user_id), simplified handling
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.sub || payload.user_id || null;
+      const tokenParts = token.split('.');
+      if (tokenParts.length >= 2 && tokenParts[1]) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        return payload.sub || payload.user_id || null;
+      }
     } catch {
       // 忽略解析错误 (Ignore parsing errors)
     }
@@ -214,11 +220,10 @@ export function withRateLimit(
 
     try {
       // 检查速率限制 (Check rate limit)
-      const rateLimitResult = await RateLimitUtils.checkRateLimit(
-        rateLimitKey,
-        rateLimitOptions.maxRequests,
-        rateLimitOptions.windowMs
-      );
+      const rateLimitResult = RateLimitUtils.checkRateLimit(rateLimitKey, {
+        maxRequests: rateLimitOptions.maxRequests,
+        windowMs: rateLimitOptions.windowMs
+      });
 
       if (!rateLimitResult.allowed) {
         // 超出速率限制 (Rate limit exceeded)

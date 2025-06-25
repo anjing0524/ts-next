@@ -4,8 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from 'lib/prisma';
-import { requirePermission } from 'lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { withErrorHandling } from '@repo/lib';
 import { Prisma } from '@prisma/client';
 
 interface RouteContext {
@@ -42,7 +43,7 @@ const scopeUpdateSchema = z.object({
  *       403: { description: "禁止访问。" }
  *       404: { description: "未找到指定的权限范围。" }
  */
-async function getScopeHandler(request: NextRequest, context: RouteContext) {
+async function getScopeHandler(request: NextRequest, context: RouteContext & { authContext: AuthContext }) {
   const { scopeId } = context.params;
 
   // Validate scopeId format (CUID)
@@ -64,7 +65,14 @@ async function getScopeHandler(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: '获取Scope详情失败 (Error fetching scope details)' }, { status: 500 });
   }
 }
-export const GET = requirePermission('scopes:read')(getScopeHandler);
+export const GET = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const scopeId = pathSegments[pathSegments.length - 1] || '';
+    return getScopeHandler(request, { params: { scopeId }, authContext });
+  }, { requiredPermissions: ['scopes:read'] })
+);
 
 
 /**
@@ -146,7 +154,14 @@ async function patchScopeHandler(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: '更新Scope失败 (Error updating scope)' }, { status: 500 });
   }
 }
-export const PATCH = requirePermission('scopes:update')(patchScopeHandler); // Changed from PUT to PATCH
+export const PATCH = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const scopeId = pathSegments[pathSegments.length - 1] || '';
+    return patchScopeHandler(request, { params: { scopeId } });
+  }, { requiredPermissions: ['scopes:update'] })
+);
 
 
 /**
@@ -215,4 +230,11 @@ async function deleteScopeHandler(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: '删除Scope失败 (Error deleting scope)' }, { status: 500 });
   }
 }
-export const DELETE = requirePermission('scopes:delete')(deleteScopeHandler);
+export const DELETE = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const scopeId = pathSegments[pathSegments.length - 1] || '';
+    return deleteScopeHandler(request, { params: { scopeId } });
+  }, { requiredPermissions: ['scopes:delete'] })
+);

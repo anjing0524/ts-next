@@ -4,10 +4,11 @@
 // 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from 'lib/prisma'; // Prisma ORM 客户端。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端。
 import { Prisma, PermissionType, HttpMethod } from '@prisma/client'; // Prisma 生成的类型，包括枚举。
-import { requirePermission } from 'lib/auth/middleware'; // 引入权限控制中间件。
-import { AuthorizationUtils } from 'lib/auth/oauth2'; // For Audit Logging
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件。
+import { withErrorHandling } from '@repo/lib';
+import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // --- 常量定义 ---
@@ -87,7 +88,7 @@ const CreatePermissionSchema = z.object({
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含权限列表和分页信息的 JSON 响应。
  */
-async function listPermissionsHandler(req: NextRequest): Promise<NextResponse> {
+async function listPermissionsHandler(req: NextRequest, context: AuthContext): Promise<NextResponse> {
   const { searchParams } = new URL(req.url); // 解析查询参数。
 
   // 分页参数处理。
@@ -103,11 +104,11 @@ async function listPermissionsHandler(req: NextRequest): Promise<NextResponse> {
 
   // 构建 Prisma 查询的 `where` 条件。
   const where: Prisma.PermissionWhereInput = {};
-  if (nameQuery) where.name = { contains: nameQuery, mode: 'insensitive' }; // 名称模糊查询 (不区分大小写)。
+  if (nameQuery) where.name = { contains: nameQuery }; // 名称模糊查询
   // 确保 typeQuery 是有效的 PermissionType 枚举值。
   if (typeQuery && Object.values(PermissionType).includes(typeQuery)) where.type = typeQuery;
-  if (resourceQuery) where.resource = { contains: resourceQuery, mode: 'insensitive' };
-  if (actionQuery) where.action = { contains: actionQuery, mode: 'insensitive' };
+  if (resourceQuery) where.resource = { contains: resourceQuery };
+  if (actionQuery) where.action = { contains: actionQuery };
 
   try {
     // 从数据库查询权限列表。
@@ -132,7 +133,7 @@ async function listPermissionsHandler(req: NextRequest): Promise<NextResponse> {
         page,
         pageSize,
         totalItems: totalPermissions,
-        totalPages: Math.ceil(totalPermissions / pageSize),
+        totalPages: Math.ceil(totalPermissions / pageSize)
       },
     });
   } catch (error) {
@@ -151,25 +152,23 @@ async function listPermissionsHandler(req: NextRequest): Promise<NextResponse> {
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含新创建的完整权限信息或错误信息的 JSON 响应。
  */
-async function createPermissionHandler(req: NextRequest): Promise<NextResponse> {
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+async function createPermissionHandler(req: NextRequest, context: AuthContext): Promise<NextResponse> {
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   let body;
   try {
     body = await req.json(); // 解析请求体。
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_CREATE_FAILURE_INVALID_JSON',
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Invalid JSON request body for permission creation.',
-        details: JSON.stringify({ error: e.message }),
+        metadata: { error: e.message }
     });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
@@ -178,19 +177,17 @@ async function createPermissionHandler(req: NextRequest): Promise<NextResponse> 
   const validationResult = CreatePermissionSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_CREATE_FAILURE_VALIDATION',
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Permission creation payload validation failed.',
-        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+        metadata: { issues: validationResult.error.format(), receivedBody: body }
     });
     return NextResponse.json({
       message: '创建权限的输入数据验证失败 (Permission creation input validation failed)',
-      errors: validationResult.error.format(),
+      errors: validationResult.error.format()
     }, { status: 400 });
   }
 
@@ -202,17 +199,14 @@ async function createPermissionHandler(req: NextRequest): Promise<NextResponse> 
     const existingPermission = await prisma.permission.findUnique({ where: { name } });
     if (existingPermission) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'PERMISSION_CREATE_FAILURE_CONFLICT',
-          status: 'FAILURE',
+          resource: `Permission:${existingPermission.id}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: `Permission name "${name}" already exists.`,
-          resourceType: 'Permission',
-          resourceId: existingPermission.id,
-          details: JSON.stringify({ name }),
+          metadata: { name }
       });
       return NextResponse.json({ message: `权限名称 "${name}" 已存在 (Permission name "${name}" already exists)` }, { status: 409 });
     }
@@ -253,23 +247,20 @@ async function createPermissionHandler(req: NextRequest): Promise<NextResponse> 
     });
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'PERMISSION_CREATE_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Permission',
-        resourceId: createdPermission.id,
+          resource: `Permission:${createdPermission.id}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({
+        metadata: {
             permissionId: createdPermission.id,
             name: createdPermission.name,
             type: createdPermission.type,
             resource: createdPermission.resource,
             action: createdPermission.action,
             apiDetails, menuDetails, dataDetails // Log the input details
-        }),
+        }
     });
     // 返回新创建的完整权限信息，HTTP状态码为 201 Created。
     return NextResponse.json(fullNewPermission, { status: 201 });
@@ -291,27 +282,29 @@ async function createPermissionHandler(req: NextRequest): Promise<NextResponse> 
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({
+        metadata: {
             name, displayName, type, resource, action, // Log main fields
             apiDetailsAttempted: apiDetails,
             menuDetailsAttempted: menuDetails,
             dataDetailsAttempted: dataDetails,
             error: error.message,
-            errorCode: (error as any).code,
-        }),
+            errorCode: (error as any).code
+        }
     });
     return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
 }
 
-// 使用 `requirePermission` 中间件包装处理函数，并导出为相应的 HTTP 方法。
-export const GET = requirePermission('permissions:list')(listPermissionsHandler);
-export const POST = requirePermission('permissions:create')(createPermissionHandler);
+// 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
+export const GET = withErrorHandling(
+  withAuth(listPermissionsHandler, { requiredPermissions: ['permissions:list'] })
+);
+export const POST = withErrorHandling(
+  withAuth(createPermissionHandler, { requiredPermissions: ['permissions:create'] })
+);

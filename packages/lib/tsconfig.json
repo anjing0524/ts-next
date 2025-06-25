@@ -1,5 +1,14 @@
 {
   "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "module": "commonjs",
+    "target": "ES2017",
+    "moduleResolution": "node"
+  },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

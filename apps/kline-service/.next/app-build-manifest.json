@@ -1,29 +1,29 @@
 {
   "pages": {
     "/_not-found/page": [
-      "static/chunks/webpack-6afc942fc795fad6.js",
+      "static/chunks/webpack-f353b123e2f8f4ca.js",
       "static/chunks/b8f30182-b53fac622173035a.js",
       "static/chunks/180-ce7fdad8fc500df7.js",
       "static/chunks/main-app-05cf5e1be2fe9461.js",
       "static/chunks/app/_not-found/page-d8fdefa70981fb5c.js"
     ],
+    "/layout": [
+      "static/chunks/webpack-f353b123e2f8f4ca.js",
+      "static/chunks/b8f30182-b53fac622173035a.js",
+      "static/chunks/180-ce7fdad8fc500df7.js",
+      "static/chunks/main-app-05cf5e1be2fe9461.js",
+      "static/css/1c83ce4168cc5bff.css",
+      "static/chunks/app/layout-ecb7e57f44cb1655.js"
+    ],
     "/api/kline/route": [
-      "static/chunks/webpack-6afc942fc795fad6.js",
+      "static/chunks/webpack-f353b123e2f8f4ca.js",
       "static/chunks/b8f30182-b53fac622173035a.js",
       "static/chunks/180-ce7fdad8fc500df7.js",
       "static/chunks/main-app-05cf5e1be2fe9461.js",
       "static/chunks/app/api/kline/route-808e518ca7b0b1af.js"
     ],
-    "/layout": [
-      "static/chunks/webpack-6afc942fc795fad6.js",
-      "static/chunks/b8f30182-b53fac622173035a.js",
-      "static/chunks/180-ce7fdad8fc500df7.js",
-      "static/chunks/main-app-05cf5e1be2fe9461.js",
-      "static/css/d3b12eaa95cd3283.css",
-      "static/chunks/app/layout-06d67f178340a522.js"
-    ],
     "/(dashboard)/kline/page": [
-      "static/chunks/webpack-6afc942fc795fad6.js",
+      "static/chunks/webpack-f353b123e2f8f4ca.js",
       "static/chunks/b8f30182-b53fac622173035a.js",
       "static/chunks/180-ce7fdad8fc500df7.js",
       "static/chunks/main-app-05cf5e1be2fe9461.js",

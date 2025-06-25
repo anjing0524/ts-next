@@ -4,10 +4,11 @@
 // 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from 'lib/prisma'; // Prisma ORM 客户端。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端。
 import { Prisma } from '@prisma/client'; // Prisma 生成的类型。
-import { requirePermission } from 'lib/auth/middleware'; // 引入权限控制中间件。
-import { AuthorizationUtils } from 'lib/auth/oauth2'; // For Audit Logging
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件。
+import { withErrorHandling } from '@repo/lib';
+import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义路由上下文接口，用于从动态路由参数中获取 roleId。
@@ -48,9 +49,9 @@ const CORE_SYSTEM_ROLES = ['SYSTEM_ADMIN', 'USER', 'USER_ADMIN', 'PERMISSION_ADM
  * @param context RouteContext - 包含从URL路径中提取的 roleId。
  * @returns NextResponse - 包含角色信息或错误信息的 JSON 响应。
  */
-async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
+async function getRoleByIdHandler(req: NextRequest, context: RouteContext & { authContext: AuthContext }): Promise<NextResponse> {
   const { roleId } = context.params; // 从上下文中获取 roleId。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -62,23 +63,20 @@ async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Prom
         rolePermissions: {
           include: {
             permission: true, // 包含每个关联的完整权限对象
-          },
-        },
+          }
+        }
       },
     });
 
     if (!role) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_READ_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Role not found.',
+          errorMessage: 'Role not found.'
       });
       return NextResponse.json({ message: '角色未找到 (Role not found)' }, { status: 404 });
     }
@@ -91,16 +89,13 @@ async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Prom
     };
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_READ_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({ roleName: role.name, returnedFields: Object.keys(formattedRole) }),
+        metadata: { roleName: role.name, returnedFields: Object.keys(formattedRole) }
     });
     // 返回找到的角色信息，HTTP状态码为 200 OK。
     return NextResponse.json(formattedRole);
@@ -108,17 +103,14 @@ async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Prom
     // 错误处理：记录错误并返回500服务器错误。
     console.error(`获取角色 ${roleId} 详情失败 (Failed to fetch role details for ID ${roleId}):`, error);
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_READ_FAILURE_DB_ERROR',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: `Failed to fetch role details for ID ${roleId}.`,
-        details: JSON.stringify({ error: error.message }),
+        metadata: { error: error.message }
     });
     return NextResponse.json({ message: `获取角色详情时发生错误 (An error occurred while retrieving role details for ID ${roleId})` }, { status: 500 });
   }
@@ -134,9 +126,9 @@ async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Prom
  * @param context RouteContext - 包含 roleId。
  * @returns NextResponse - 包含更新后的角色信息或错误信息的 JSON 响应。
  */
-async function updateRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
+async function updateRoleHandler(req: NextRequest, context: RouteContext & { authContext: AuthContext }): Promise<NextResponse> {
   const { roleId } = context.params; // 目标角色ID。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -146,17 +138,14 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
     body = await req.json();
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_UPDATE_FAILURE_INVALID_JSON',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Invalid JSON request body for role update (PUT).',
-        details: JSON.stringify({ error: e.message }),
+        metadata: { error: e.message }
     });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
@@ -165,21 +154,18 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
   const validationResult = UpdateRoleSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_UPDATE_FAILURE_VALIDATION',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Role update payload validation failed (PUT).',
-        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+        metadata: { issues: validationResult.error.format(), receivedBody: body }
     });
     return NextResponse.json({
       message: '更新角色信息验证失败 (Role update input validation failed)',
-      errors: validationResult.error.format(),
+      errors: validationResult.error.format()
     }, { status: 400 });
   }
 
@@ -191,16 +177,13 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
     // Not strictly an error, but good to log if it's unexpected.
     // However, current code returns 400, so we log it as a client-induced failure.
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_UPDATE_FAILURE_EMPTY_BODY',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
-        errorMessage: 'At least one field to update is required (PUT).',
+        errorMessage: 'At least one field to update is required (PUT).'
     });
     return NextResponse.json({ message: '请求体中至少需要一个待更新的字段 (At least one field to update is required in the request body)' }, { status: 400 });
   }
@@ -210,16 +193,13 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
     const existingRole = await prisma.role.findUnique({ where: { id: roleId } });
     if (!existingRole) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_UPDATE_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Role not found to update (PUT).',
+          errorMessage: 'Role not found to update (PUT).'
       });
       return NextResponse.json({ message: '角色未找到，无法更新 (Role not found, cannot update)' }, { status: 404 });
     }
@@ -227,33 +207,27 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
     // 步骤 2: 安全性检查 - 防止修改核心系统角色的关键属性。
     if (CORE_SYSTEM_ROLES.includes(existingRole.name) && isActive === false && existingRole.name === 'SYSTEM_ADMIN') {
         await AuthorizationUtils.logAuditEvent({
-            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-            actorId: performingAdmin?.id || 'anonymous',
             userId: performingAdmin?.id,
             action: 'ROLE_UPDATE_FAILURE_SYSTEM_ROLE_DEACTIVATION',
-            status: 'FAILURE',
-            resourceType: 'Role',
-            resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
             ipAddress,
             userAgent,
             errorMessage: 'Attempted to deactivate SYSTEM_ADMIN role.',
-            details: JSON.stringify({ roleName: existingRole.name }),
+            metadata: { roleName: existingRole.name }
         });
         return NextResponse.json({ message: '禁止操作：不能停用 SYSTEM_ADMIN 角色 (Forbidden: Cannot deactivate the SYSTEM_ADMIN role)' }, { status: 403 });
     }
   if ((body as any).name && (body as any).name !== existingRole.name) { // Check if name is in body and different
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_UPDATE_FAILURE_NAME_MODIFICATION',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Modifying the role name is not allowed.',
-        details: JSON.stringify({ attemptedName: (body as any).name, currentName: existingRole.name }),
+        metadata: { attemptedName: (body as any).name, currentName: existingRole.name }
     });
     return NextResponse.json({ message: '禁止操作：不允许修改角色名称 (Forbidden: Modifying the role name is not allowed)' }, { status: 400 });
   }
@@ -291,33 +265,27 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
   };
 
   await AuthorizationUtils.logAuditEvent({
-      actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-      actorId: performingAdmin?.id || 'anonymous',
       userId: performingAdmin?.id,
-      action: 'ROLE_UPDATE_SUCCESS', // Using general update for PUT as well
-      status: 'SUCCESS',
-      resourceType: 'Role',
-      resourceId: roleId,
+      action: 'ROLE_UPDATE_SUCCESS',
+          resource: `Role:${roleId}`, // Using general update for PUT as well
+          success: true,
       ipAddress,
       userAgent,
-      details: JSON.stringify({ updatedFields: Object.keys(validationResult.data), roleId: roleId }),
+      metadata: { updatedFields: Object.keys(validationResult.data), roleId: roleId }
   });
   return NextResponse.json(formattedRole);
   } catch (error: any) {
     // 错误处理。
     console.error(`更新角色 ${roleId} 失败 (Failed to update role ${roleId}):`, error);
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_UPDATE_FAILURE_DB_ERROR',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: `Failed to update role (PUT) for ID ${roleId}.`,
-        details: JSON.stringify({ error: error.message }),
+        metadata: { error: error.message }
     });
     return NextResponse.json({ message: `更新角色时发生错误 (An error occurred while updating role for ID ${roleId})` }, { status: 500 });
   }
@@ -334,7 +302,7 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
  */
 async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 目标角色ID。
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -343,16 +311,13 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
     const roleToDelete = await prisma.role.findUnique({ where: { id: roleId } });
     if (!roleToDelete) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_DELETE_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Role not found to delete.',
+          errorMessage: 'Role not found to delete.'
       });
       return NextResponse.json({ message: '角色未找到，无法删除 (Role not found, cannot delete)' }, { status: 404 });
     }
@@ -360,17 +325,14 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
     // 步骤 2: 防止删除核心系统角色。
     if (CORE_SYSTEM_ROLES.includes(roleToDelete.name)) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_DELETE_FAILURE_CORE_SYSTEM_ROLE',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: `Attempted to delete core system role: ${roleToDelete.name}.`,
-          details: JSON.stringify({ roleName: roleToDelete.name }),
+          metadata: { roleName: roleToDelete.name }
       });
       return NextResponse.json({ message: `核心系统角色 "${roleToDelete.name}" 不能被删除 (Core system role "${roleToDelete.name}" cannot be deleted)` }, { status: 403 });
     }
@@ -379,17 +341,14 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
     const usersWithRoleCount = await prisma.userRole.count({ where: { roleId: roleId } });
     if (usersWithRoleCount > 0) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_DELETE_FAILURE_IN_USE',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: `Role "${roleToDelete.name}" is still in use by ${usersWithRoleCount} users.`,
-          details: JSON.stringify({ roleName: roleToDelete.name, userCount: usersWithRoleCount }),
+          metadata: { roleName: roleToDelete.name, userCount: usersWithRoleCount }
       });
       return NextResponse.json({ message: `角色 "${roleToDelete.name}" 仍被 ${usersWithRoleCount} 个用户使用，无法删除 (Role "${roleToDelete.name}" is still in use by ${usersWithRoleCount} users and cannot be deleted)` }, { status: 409 }); // 409 Conflict
     }
@@ -404,16 +363,13 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
     await prisma.role.delete({ where: { id: roleId } });
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_DELETE_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({ deletedRoleId: roleId, roleName: roleToDelete.name }),
+        metadata: { deletedRoleId: roleId, roleName: roleToDelete.name }
     });
     // 返回 HTTP 204 No Content 表示成功删除且无内容返回。
     return new NextResponse(null, { status: 204 });
@@ -430,17 +386,13 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
         }
     }
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({ error: error.message, roleNameAttemptedDelete: roleToDelete?.name || 'N/A' }),
+        metadata: { error: error.message, roleId }
     });
     // Return specific error for foreign key, otherwise general error
     if (actionCode === 'ROLE_DELETE_FAILURE_FOREIGN_KEY') {
@@ -450,10 +402,19 @@ async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promi
   }
 }
 
-// 使用 `requirePermission` 中间件包装处理函数，并导出为相应的 HTTP 方法。
-export const GET = requirePermission('roles:read')(getRoleByIdHandler);
+// 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
+export const GET = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const roleId = pathSegments[pathSegments.length - 1] || '';
+    return getRoleByIdHandler(request, { params: { roleId }, authContext });
+  }, { requiredPermissions: ['roles:read'] })
+);
 // PUT is refactored to PATCH below as per subtask requirements.
-// export const PUT = requirePermission('roles:update')(updateRoleHandler);
+// export const PUT = withErrorHandling(
+//   withAuth(updateRoleHandler, { requiredPermissions: ['roles:update'] })
+// );
 
 
 // --- PATCH /api/v2/roles/{roleId} (部分更新角色信息，包括权限) ---
@@ -466,7 +427,7 @@ const RolePatchSchema = z.object({
 
 async function patchRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params;
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -475,17 +436,14 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
     body = await req.json();
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_PATCH_FAILURE_INVALID_JSON',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Invalid JSON request body for role patch.',
-        details: JSON.stringify({ error: e.message }),
+        metadata: { error: e.message }
     });
     return NextResponse.json({ message: '无效的JSON请求体' }, { status: 400 });
   }
@@ -493,17 +451,14 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
   const validationResult = RolePatchSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_PATCH_FAILURE_VALIDATION',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Role patch payload validation failed.',
-        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+        metadata: { issues: validationResult.error.format(), receivedBody: body }
     });
     return NextResponse.json({ message: '更新角色信息验证失败', errors: validationResult.error.format() }, { status: 400 });
   }
@@ -512,16 +467,13 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
 
   if (Object.keys(validationResult.data).length === 0) {
      await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_PATCH_FAILURE_EMPTY_BODY',
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
         ipAddress,
         userAgent,
-        errorMessage: 'At least one field to update is required for PATCH.',
+        errorMessage: 'At least one field to update is required for PATCH.'
     });
     return NextResponse.json({ message: '请求体中至少需要一个待更新的字段' }, { status: 400 });
   }
@@ -530,49 +482,40 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
     const existingRole = await prisma.role.findUnique({ where: { id: roleId } });
     if (!existingRole) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_PATCH_FAILURE_NOT_FOUND',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
-          errorMessage: 'Role not found to patch.',
+          errorMessage: 'Role not found to patch.'
       });
       return NextResponse.json({ message: '角色未找到，无法更新' }, { status: 404 });
     }
 
     if (CORE_SYSTEM_ROLES.includes(existingRole.name) && isActive === false && existingRole.name === 'SYSTEM_ADMIN') {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_PATCH_FAILURE_SYSTEM_ROLE_DEACTIVATION',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: 'Attempted to deactivate SYSTEM_ADMIN role via PATCH.',
-          details: JSON.stringify({ roleName: existingRole.name }),
+          metadata: { roleName: existingRole.name }
       });
       return NextResponse.json({ message: '禁止操作：不能停用 SYSTEM_ADMIN 角色' }, { status: 403 });
     }
     if ((body as any).name && (body as any).name !== existingRole.name) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_PATCH_FAILURE_NAME_MODIFICATION',
-          status: 'FAILURE',
-          resourceType: 'Role',
-          resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: 'Modifying the role name is not allowed (PATCH).',
-          details: JSON.stringify({ attemptedName: (body as any).name, currentName: existingRole.name }),
+          metadata: { attemptedName: (body as any).name, currentName: existingRole.name }
       });
       return NextResponse.json({ message: '禁止操作：不允许修改角色名称' }, { status: 400 });
     }
@@ -627,24 +570,21 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
     const { rolePermissions, ...roleData } = updatedRole;
     const formattedRole = {
       ...roleData,
-      permissions: rolePermissions.map(rp => rp.permission),
+      permissions: rolePermissions.map(rp => rp.permission)
     };
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_PATCH_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Role',
-        resourceId: roleId,
+          resource: `Role:${roleId}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({
+        metadata: {
             roleId: roleId,
             updatedFields: Object.keys(validationResult.data), // Log which fields were in the payload
             assignedPermissionIds: permissionIds, // Log full list of permissions if provided
-        }),
+        }
     });
     return NextResponse.json(formattedRole);
 
@@ -661,27 +601,36 @@ async function patchRoleHandler(req: NextRequest, context: RouteContext): Promis
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
-        resourceType: 'Role',
-        resourceId: roleId,
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({
+        metadata: {
             error: error.message,
             errorCode: (error as any).code,
             attemptedData: validationResult.data, // Log validated data that was attempted
-        }),
+        }
     });
 
     return NextResponse.json({ message: errorMessage }, { status: httpStatus });
   }
 }
-export const PATCH = requirePermission('roles:update')(patchRoleHandler);
+export const PATCH = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const roleId = pathSegments[pathSegments.length - 1] || '';
+    return patchRoleHandler(request, { params: { roleId } });
+  }, { requiredPermissions: ['roles:update'] })
+);
 
-
-export const DELETE = requirePermission('roles:delete')(deleteRoleHandler);
+export const DELETE = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const roleId = pathSegments[pathSegments.length - 1] || '';
+    return deleteRoleHandler(request, { params: { roleId } });
+  }, { requiredPermissions: ['roles:delete'] })
+);

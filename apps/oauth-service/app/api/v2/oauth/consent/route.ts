@@ -5,13 +5,14 @@
 // (For detailed responsibilities, see original comments - preserved below)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from 'lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { User, OAuthClient as Client } from '@prisma/client';
-import { ScopeUtils, AuthorizationUtils } from 'lib/auth/oauth2';
-import { requirePermission } from 'lib/auth/middleware';
+import { AuthorizationUtils } from '@/lib/auth/utils';
+import { ScopeUtils } from '@repo/lib/auth';
+import { requirePermission } from '@/lib/auth';
 
-import { storeAuthorizationCode } from 'lib/auth/authorizationCodeFlow';
-import { withErrorHandling } from 'lib/utils/error-handler';
+import { storeAuthorizationCode } from '@/lib/auth/authorization-code-flow';
+import { withErrorHandling } from '@/lib/utils/error-handler';
 import { ApiResponse } from '@repo/lib/types/api';
 import {
   OAuth2Error,
@@ -20,7 +21,7 @@ import {
   ResourceNotFoundError,
   ConfigurationError,
   BaseError,
-} from 'lib/errors';
+} from '@/lib/errors';
 
 // 同意表单提交的目标 URL 路径
 // Target URL path for consent form submission

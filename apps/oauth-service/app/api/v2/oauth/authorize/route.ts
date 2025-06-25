@@ -13,14 +13,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
-import { prisma } from 'lib/prisma';
+import { prisma } from '@repo/database';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils, AuthorizationUtils } from 'lib/auth/oauth2'; // Added AuthorizationUtils
+import { PKCEUtils, ScopeUtils } from '@repo/lib/auth';
+import { AuthorizationUtils } from '@/lib/auth/utils';
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
-import { storeAuthorizationCode } from 'lib/auth/authorizationCodeFlow';
-import { withErrorHandling } from 'lib/utils/error-handler'; // 错误处理 HOF (Error handling HOF)
-import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from 'lib/errors'; // 自定义错误类 (Custom error classes)
+import { storeAuthorizationCode } from '@/lib/auth/authorization-code-flow';
+import { withErrorHandling } from '@repo/lib/utils';
+import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from '@repo/lib/errors';
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';

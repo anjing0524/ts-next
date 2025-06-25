@@ -10,9 +10,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ClientService } from '../../../../../lib/services/client-service';
+import { ClientService } from '@/lib/services/client-service';
 import { withErrorHandling } from '@repo/lib';
-import { requirePermission } from '../../../../../lib/auth/middleware';
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
 import { ApiResponse } from '@repo/lib';
 
 /**
@@ -54,5 +54,10 @@ async function rotateSecretHandler(
 // 导出处理函数，使用权限中间件和错误处理包装器
 // Export handler function with permission middleware and error handling wrapper
 export const POST = withErrorHandling(
-  requirePermission('oauth:clients:manage')(rotateSecretHandler)
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const clientId = pathSegments[pathSegments.length - 2] || ''; // secret is the last segment
+    return rotateSecretHandler(request, { params: { clientId } });
+  }, { requiredPermissions: ['oauth:clients:manage'] })
 ); 

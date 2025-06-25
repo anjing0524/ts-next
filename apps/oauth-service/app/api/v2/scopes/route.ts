@@ -4,8 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from 'lib/prisma';
-import { requirePermission } from 'lib/auth/middleware';
+import { prisma } from '@/lib/prisma';
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { withErrorHandling } from '@repo/lib';
 import { Prisma } from '@prisma/client';
 
 // Zod Schema for creating a new scope
@@ -67,7 +68,7 @@ const MAX_PAGE_SIZE = 100;
  *       401: { description: "未经授权。" }
  *       403: { description: "禁止访问。" }
  */
-async function listScopesHandler(request: NextRequest) {
+async function listScopesHandler(request: NextRequest, context: AuthContext) {
   const { searchParams } = new URL(request.url);
   const queryParams: Record<string, string | undefined> = {};
   searchParams.forEach((value, key) => { queryParams[key] = value; });
@@ -106,7 +107,9 @@ async function listScopesHandler(request: NextRequest) {
     return NextResponse.json({ message: "Error listing scopes." }, { status: 500 });
   }
 }
-export const GET = requirePermission('scopes:list')(listScopesHandler);
+export const GET = withErrorHandling(
+  withAuth(listScopesHandler, { requiredPermissions: ['scopes:list'] })
+);
 
 
 /**
@@ -141,7 +144,7 @@ export const GET = requirePermission('scopes:list')(listScopesHandler);
  *         isPublic: { type: boolean, description: "是否公开范围", default: false }
  *         isActive: { type: boolean, description: "是否激活", default: true }
  */
-async function createScopeHandler(request: NextRequest) {
+async function createScopeHandler(request: NextRequest, context: AuthContext) {
   let payload;
   try {
     payload = await request.json();
@@ -179,4 +182,6 @@ async function createScopeHandler(request: NextRequest) {
     return NextResponse.json({ message: "Error creating scope." }, { status: 500 });
   }
 }
-export const POST = requirePermission('scopes:create')(createScopeHandler);
+export const POST = withErrorHandling(
+  withAuth(createScopeHandler, { requiredPermissions: ['scopes:create'] })
+);

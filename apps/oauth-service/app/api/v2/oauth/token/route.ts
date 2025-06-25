@@ -22,14 +22,16 @@
 // Security: Emphasizes client authentication, PKCE, and one-time use or rotation mechanisms for authorization codes and refresh tokens.
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from 'lib/prisma'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
+import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
 import { OAuthClient, User, Prisma, ClientType as PrismaClientType } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
-import { ClientAuthUtils, AuthorizationUtils, ScopeUtils, JWTUtils } from 'lib/auth/oauth2'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
+import { JWTUtils, ScopeUtils } from '@repo/lib/auth';
+import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
+import { AuthorizationUtils } from '@/lib/auth/utils';
 import { addHours, addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
-import { OAuth2Error, OAuth2ErrorCode, BaseError, TokenError, ResourceNotFoundError, ValidationError, AuthenticationError } from 'lib/errors'; // 导入自定义错误类 (Import custom error classes)
-import { withErrorHandling } from 'lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
+import { OAuth2Error, OAuth2ErrorCode, BaseError, TokenError, ResourceNotFoundError, ValidationError, AuthenticationError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
+import { withErrorHandling } from '@repo/lib/utils'; // 导入错误处理高阶函数 (Import error handling HOF)
 
 
 // 从专用的模式文件导入 Zod 模式
@@ -141,7 +143,7 @@ async function handleAuthorizationCodeGrant(
 
     // validateAuthorizationCode 现在会抛出错误，而不是返回 null
     // validateAuthorizationCode will now throw errors instead of returning null
-    validatedAuthCode = await import('lib/auth/authorizationCodeFlow').then(mod =>
+    validatedAuthCode = await import('../../../../../lib/auth/authorization-code-flow').then(mod =>
       mod.validateAuthorizationCode(code, client.id, redirectUri, codeVerifier)
     );
   } catch (error: any) {
@@ -223,6 +225,7 @@ async function handleAuthorizationCodeGrant(
     client_id: client.clientId,
     user_id: validatedAuthCode.userId,
     scope: validatedAuthCode.scope,
+    token_type: 'refresh_token',
     // exp 由 JWTUtils.createRefreshToken 内部处理默认值或基于 client.refreshTokenTtl (exp is handled internally by JWTUtils.createRefreshToken with default or client.refreshTokenTtl)
   });
 
@@ -230,7 +233,12 @@ async function handleAuthorizationCodeGrant(
   if (grantedScopesArray.includes('openid') && user) {
      // TODO: 传递 nonce (如果已在 authorizationCodeFlow 中存储和返回)
      // TODO: Pass nonce (if stored and returned in authorizationCodeFlow)
-     idTokenString = await JWTUtils.createIdToken(user, client, validatedAuthCode.nonce || undefined);
+     idTokenString = await JWTUtils.createIdToken({
+       sub: user.id,
+       aud: client.clientId,
+       name: user.displayName || user.username || undefined,
+       nonce: validatedAuthCode.nonce || undefined,
+     });
   }
 
   const accessTokenExpiresIn = client.accessTokenTtl || 3600; // 默认1小时 (Default 1 hour)
@@ -329,7 +337,7 @@ async function handleRefreshTokenGrant(
 
   // --- BEGIN: Refresh Token JTI Blacklist Check ---
   // First, decode the refresh token to get its JTI.
-  let refreshTokenPayload: import('lib/auth/oauth2').RefreshTokenPayload; // 添加类型声明 (Add type declaration)
+  let refreshTokenPayload: import('@repo/lib/auth').RefreshTokenPayload; // 添加类型声明 (Add type declaration)
   try {
     // This utility function should verify the JWT's signature, expiry,
     // and essential claims like client_id against the provided client.
@@ -506,7 +514,11 @@ async function handleRefreshTokenGrant(
 
   let newIdTokenString: string | undefined = undefined;
   if (finalGrantedScopesArray.includes('openid') && storedRefreshToken.user) {
-    newIdTokenString = await JWTUtils.createIdToken(storedRefreshToken.user, client, undefined);
+    newIdTokenString = await JWTUtils.createIdToken({
+      sub: storedRefreshToken.user.id,
+      aud: client.clientId,
+      name: storedRefreshToken.user.displayName || storedRefreshToken.user.username || undefined,
+    });
   }
 
   const accessTokenExpiresIn = client.accessTokenTtl || 3600;
@@ -517,6 +529,7 @@ async function handleRefreshTokenGrant(
     client_id: client.clientId,
     user_id: storedRefreshToken.userId,
     scope: finalGrantedScopeString,
+    token_type: 'refresh_token',
   });
 
   try {
@@ -648,7 +661,7 @@ async function handleClientCredentialsGrant(
 
   if (requestedScopeString) {
     const requestedScopesArray = ScopeUtils.parseScopes(requestedScopeString);
-    const globalScopeValidation = await ScopeUtils.validateScopes(requestedScopesArray, client);
+          const globalScopeValidation = await ScopeUtils.validateScopes(requestedScopesArray, client);
     if (!globalScopeValidation.valid) {
         await AuthorizationUtils.logAuditEvent({
             actorType: 'CLIENT',

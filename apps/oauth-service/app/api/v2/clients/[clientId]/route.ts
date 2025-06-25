@@ -12,11 +12,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ClientType } from '@prisma/client';
-import { ClientService } from '../../../../lib/services/client-service';
-import { withErrorHandling } from '@repo/lib';
-import { requirePermission } from '../../../../lib/auth/middleware';
-import { ApiResponse } from '@repo/lib';
-import { OAuth2Error, OAuth2ErrorCode } from '../../../../lib/errors';
+import { ClientService } from '@/lib/services/client-service';
+import { withErrorHandling, ApiResponse } from '@repo/lib';
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/errors';
 
 /**
  * 客户端更新请求Schema
@@ -182,13 +181,28 @@ async function deleteClientHandler(
 // 导出处理函数，使用权限中间件和错误处理包装器
 // Export handler functions with permission middleware and error handling wrapper
 export const GET = withErrorHandling(
-  requirePermission('oauth:clients:read')(getClientHandler)
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const clientId = pathSegments[pathSegments.length - 1] || '';
+    return getClientHandler(request, { params: { clientId } });
+  }, { requiredPermissions: ['oauth:clients:read'] })
 );
 
 export const PUT = withErrorHandling(
-  requirePermission('oauth:clients:update')(updateClientHandler)
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const clientId = pathSegments[pathSegments.length - 1] || '';
+    return updateClientHandler(request, { params: { clientId } });
+  }, { requiredPermissions: ['oauth:clients:update'] })
 );
 
 export const DELETE = withErrorHandling(
-  requirePermission('oauth:clients:delete')(deleteClientHandler)
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/');
+    const clientId = pathSegments[pathSegments.length - 1] || '';
+    return deleteClientHandler(request, { params: { clientId } });
+  }, { requiredPermissions: ['oauth:clients:delete'] })
 ); 

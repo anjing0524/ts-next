@@ -3,10 +3,11 @@
 // 使用 `requirePermission` 中间件来保护这些端点，确保只有授权用户才能访问。
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from 'lib/prisma'; // Prisma ORM 客户端，用于数据库交互。
+import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。
 import { Prisma, Role } from '@prisma/client'; // Prisma 生成的类型，用于高级查询和类型定义。
-import { requirePermission } from 'lib/auth/middleware'; // 引入权限控制中间件和认证请求类型。
-import { AuthorizationUtils } from 'lib/auth/oauth2'; // For Audit Logging
+import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件和认证请求类型。
+import { withErrorHandling } from '@repo/lib';
+import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义获取角色列表时分页的默认页面大小。
@@ -40,7 +41,7 @@ const CreateRoleSchema = z.object({
  * @param req AuthenticatedRequest - 经过认证的请求对象，包含用户信息。
  * @returns NextResponse - 包含角色列表和分页信息的 JSON 响应。
  */
-async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
+async function listRolesHandler(req: NextRequest, context: { authContext: AuthContext }): Promise<NextResponse> {
   const { searchParams } = new URL(req.url);
 
   const page = parseInt(searchParams.get('page') || '1', 10);
@@ -65,8 +66,8 @@ async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
         rolePermissions: {
           include: {
             permission: true, // 包含每个关联的完整权限对象
-          },
-        },
+          }
+        }
       },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -90,7 +91,7 @@ async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
         page,
         pageSize,
         totalItems: totalRoles,
-        totalPages: Math.ceil(totalRoles / pageSize),
+        totalPages: Math.ceil(totalRoles / pageSize)
       },
     });
   } catch (error) {
@@ -108,8 +109,8 @@ async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含新创建的角色信息或错误信息的 JSON 响应。
  */
-async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
-  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+async function createRoleHandler(req: NextRequest, context: { authContext: AuthContext }): Promise<NextResponse> {
+  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -118,15 +119,13 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
     body = await req.json();
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_CREATE_FAILURE_INVALID_JSON',
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Invalid JSON request body for role creation.',
-        details: JSON.stringify({ error: e.message }),
+        metadata: { error: e.message }
     });
     return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
   }
@@ -134,19 +133,17 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
   const validationResult = CreateRoleSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_CREATE_FAILURE_VALIDATION',
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: 'Role creation payload validation failed.',
-        details: JSON.stringify({ issues: validationResult.error.format(), receivedBody: body }),
+        metadata: { issues: validationResult.error.format(), receivedBody: body }
     });
     return NextResponse.json({
       message: '创建角色验证失败 (Role creation input validation failed)',
-      errors: validationResult.error.format(),
+      errors: validationResult.error.format()
     }, { status: 400 });
   }
 
@@ -157,17 +154,14 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole) {
       await AuthorizationUtils.logAuditEvent({
-          actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-          actorId: performingAdmin?.id || 'anonymous',
           userId: performingAdmin?.id,
           action: 'ROLE_CREATE_FAILURE_CONFLICT',
-          status: 'FAILURE',
+          resource: `Role:${existingRole.id}`,
+          success: false,
           ipAddress,
           userAgent,
           errorMessage: `Role name "${name}" already exists.`,
-          resourceType: 'Role',
-          resourceId: existingRole.id,
-          details: JSON.stringify({ name }),
+          metadata: { name }
       });
       return NextResponse.json({ message: `角色名称 "${name}" 已存在 (Role name "${name}" already exists)` }, { status: 409 });
     }
@@ -181,18 +175,16 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
       if (foundPermissions.length !== permissionIds.length) {
         const notFoundIds = permissionIds.filter(id => !foundPermissions.some(p => p.id === id));
         await AuthorizationUtils.logAuditEvent({
-            actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-            actorId: performingAdmin?.id || 'anonymous',
             userId: performingAdmin?.id,
             action: 'ROLE_CREATE_FAILURE_INVALID_PERMISSIONS',
-            status: 'FAILURE',
+          success: false,
             ipAddress,
             userAgent,
             errorMessage: 'Invalid or non-existent permissionIds provided.',
-            details: JSON.stringify({ providedIds: permissionIds, notFoundIds }),
+            metadata: { providedIds: permissionIds, notFoundIds }
         });
         return NextResponse.json({
-          message: `提供了无效或不存在的权限ID (Invalid or non-existent permissionIds provided): ${notFoundIds.join(', ')}`,
+          message: `提供了无效或不存在的权限ID (Invalid or non-existent permissionIds provided): ${notFoundIds.join(', ')}`
         }, { status: 400 });
       }
     }
@@ -204,7 +196,7 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
           name,
           displayName,
           description: description || null,
-          isActive,
+          isActive
         },
       });
 
@@ -238,21 +230,18 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
     };
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: 'ROLE_CREATE_SUCCESS',
-        status: 'SUCCESS',
-        resourceType: 'Role',
-        resourceId: newRoleWithPermissions.id,
+          resource: `Role:${newRoleWithPermissions.id}`,
+          success: true,
         ipAddress,
         userAgent,
-        details: JSON.stringify({
+        metadata: {
             roleId: newRoleWithPermissions.id,
             name: newRoleWithPermissions.name,
             displayName: newRoleWithPermissions.displayName,
-            permissionIds: permissionIds,
-        }),
+            permissionIds: permissionIds
+        }
     });
 
     return NextResponse.json(formattedRole, { status: 201 });
@@ -267,15 +256,13 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
     }
 
     await AuthorizationUtils.logAuditEvent({
-        actorType: performingAdmin?.id ? 'USER' : 'UNKNOWN_ACTOR',
-        actorId: performingAdmin?.id || 'anonymous',
         userId: performingAdmin?.id,
         action: actionCode,
-        status: 'FAILURE',
+          success: false,
         ipAddress,
         userAgent,
         errorMessage: errorMessage,
-        details: JSON.stringify({ name, displayName, permissionIds, error: error.message, errorCode: (error as any).code }),
+        metadata: { name, displayName, permissionIds, error: error.message, errorCode: (error as any).code }
     });
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -285,5 +272,13 @@ async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-export const GET = requirePermission('roles:list')(listRolesHandler);
-export const POST = requirePermission('roles:create')(createRoleHandler);
+export const GET = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    return listRolesHandler(request, { authContext });
+  }, { requiredPermissions: ['roles:list'] })
+);
+export const POST = withErrorHandling(
+  withAuth(async (request: NextRequest, authContext: AuthContext) => {
+    return createRoleHandler(request, { authContext });
+  }, { requiredPermissions: ['roles:create'] })
+);

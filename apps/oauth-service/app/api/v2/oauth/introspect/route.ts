@@ -4,13 +4,14 @@
 // Description: OAuth 2.0 Token Introspection Endpoint (RFC 7662)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from 'lib/prisma';
-import { withErrorHandling } from 'lib/utils/error-handler';
-import { JWTUtils, ClientAuthUtils, ScopeUtils } from 'lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
+import { prisma } from '@/lib/prisma';
+import { withErrorHandling } from '@/lib/utils/error-handler';
+import { ClientAuthUtils } from '@/lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
+import { ScopeUtils, JWTUtils } from '@repo/lib/auth';
 import * as jose from 'jose';
 import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, introspectResponseActiveSchema } from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
-import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from 'lib/errors';
+import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from '@/lib/errors';
 
 /**
  * @swagger

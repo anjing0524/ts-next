@@ -14,7 +14,7 @@
  * - date-fns (日期操作)
  * - 自定义错误类 (Custom error classes)
  */
-import { prisma } from 'lib/prisma';
+import { prisma } from '@repo/database';
 import { addSeconds } from 'date-fns';
 import crypto from 'crypto';
 import {
@@ -26,7 +26,7 @@ import {
   TokenValidationError,
   TokenExpiredError
 } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
-import { AuthorizationCode as PrismaAuthorizationCode } from '@prisma/client'; // Prisma 类型 (Prisma type)
+import { AuthorizationCode as PrismaAuthorizationCode, Prisma } from '@prisma/client'; // Prisma 类型 (Prisma type)
 
 // 授权码数据接口，定义了授权码对象的基本结构
 // AuthorizationCodeData interface, defines the basic structure of an authorization code object
@@ -115,7 +115,8 @@ export async function storeAuthorizationCode(
     // 数据库操作失败，记录错误并抛出 BaseError
     // Database operation failed, log error and throw BaseError
     console.error('Failed to store authorization code:', error);
-          throw new CryptoError('Database error while storing authorization code.', { originalError: error.message });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+          throw new CryptoError('Database error while storing authorization code.', { originalError: errorMessage });
   }
 }
 
@@ -241,9 +242,10 @@ export async function validateAuthorizationCode(
     console.error('Error during authorization code validation:', error);
     // 检查是否是 Prisma 已知请求错误，并提供更具体的错误码（如果可能）
     // Check if it's a Prisma known request error and provide a more specific error code if possible
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BaseError(`Database error during authorization code validation: ${error.message}`, 500, `DB_VALIDATE_AUTH_CODE_PRISMA_${error.code}`);
+        throw new CryptoError(`Database error during authorization code validation: ${errorMessage}`, { originalError: errorMessage, code: error.code });
     }
-    throw new BaseError('Database error during authorization code validation.', 500, 'DB_VALIDATE_AUTH_CODE_FAILED');
+    throw new CryptoError('Database error during authorization code validation.', { originalError: errorMessage });
   }
 }
