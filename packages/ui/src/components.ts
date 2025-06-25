@@ -26,6 +26,8 @@ export * from "./components/table";
 export * from "./components/tabs";
 export * from "./components/tooltip";
 export * from "./components/use-toast";
+export * from "./components/avatar"; // Added Avatar
+export * from "./components/drawer"; // Added Drawer
 
 // 新迁移的组件 (Newly migrated components)
 export * from "./components/data-table/data-table";
@@ -36,3 +38,9 @@ export * from "./components/data-table/types";
 // 工具函数和提供者 (Utility functions and providers)
 export * from "./components/get-query-client";
 export * from "./components/providers";
+
+// Dashboard block components
+export * from "./components/blocks/dashboard-01/app-sidebar"; // This exports AppSidebar and also MenuItem if exported from app-sidebar.tsx
+export * from "./components/blocks/dashboard-01/site-header";
+export * from "./components/blocks/dashboard-01/nav-main";
+export * from "./components/blocks/dashboard-01/user-nav";
