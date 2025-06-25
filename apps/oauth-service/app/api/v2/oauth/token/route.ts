@@ -26,9 +26,8 @@ import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Pr
 import { OAuthClient, User, Prisma, ClientType as PrismaClientType } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
-import { JWTUtils, ScopeUtils } from '@repo/lib/auth';
+import { JWTUtils, ScopeUtils, AuthorizationUtils, type RefreshTokenPayload } from '@repo/lib/auth';
 import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
-import { AuthorizationUtils } from '@/lib/auth/utils';
 import { addHours, addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 import { OAuth2Error, OAuth2ErrorCode, BaseError, TokenError, ResourceNotFoundError, ValidationError, AuthenticationError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 import { withErrorHandling } from '@repo/lib/utils'; // 导入错误处理高阶函数 (Import error handling HOF)
@@ -78,7 +77,7 @@ async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
       if (!validationResult.success) {
         throw new OAuth2Error(validationResult.error.errors[0]?.message || "Invalid parameters for authorization_code grant.", OAuth2ErrorCode.InvalidRequest, 400, undefined, validationResult.error.flatten().fieldErrors);
       }
-      return await handleAuthorizationCodeGrant(validationResult.data, client);
+      return await handleAuthorizationCodeGrant(validationResult.data, client, req);
     }
     case 'refresh_token': {
       const validationResult = tokenRefreshTokenGrantSchema.safeParse(formDataObj);
@@ -105,8 +104,12 @@ export const POST = withErrorHandling(tokenEndpointHandler);
 // --- 'authorization_code' Grant Type Handler ---
 async function handleAuthorizationCodeGrant(
   data: z.infer<typeof tokenAuthorizationCodeGrantSchema>,
-  client: OAuthClient
+  client: OAuthClient,
+  req: NextRequest
 ): Promise<NextResponse> {
+  // 获取客户端IP和用户代理
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const userAgent = req.headers.get('user-agent') || undefined;
   // 验证请求体中的 client_id (如果提供) 是否与已认证的客户端匹配
   // Validate client_id from body (if provided) matches authenticated client
   if (data.client_id && data.client_id !== client.clientId) {
@@ -115,104 +118,26 @@ async function handleAuthorizationCodeGrant(
     throw new OAuth2Error('client_id in body does not match authenticated client.', OAuth2ErrorCode.InvalidRequest);
   }
 
-  const { code, redirect_uri: redirectUri, code_verifier: codeVerifier } = data;
-  let validatedAuthCode;
-  // Attempt to get ipAddress and userAgent if possible (assuming req might be accessible or passed)
-  // This is a placeholder; actual implementation might need to pass req or extract headers differently.
-  const ipAddress = undefined; // Placeholder: e.g., req.ip
-  const userAgent = undefined; // Placeholder: e.g., req.headers.get('user-agent')
-  try {
-    // 验证授权码
-    const authCode = await prisma.authorizationCode.findUnique({
-      where: { code: code },
-      include: { client: true, user: true },
-    });
+  // 使用恢复的 authorization-code-flow 业务逻辑
+  const { validateAuthorizationCode } = await import('../../../../../lib/auth/authorization-code-flow');
+  
+  // 验证授权码和PKCE
+  const validatedAuthCode = await validateAuthorizationCode(
+    data.code,
+    client.id, // 使用客户端的数据库ID
+    data.redirect_uri,
+    data.code_verifier
+  );
 
-    if (!authCode || authCode.expiresAt < new Date()) {
-      throw new OAuth2Error('Invalid or expired authorization code', OAuth2ErrorCode.InvalidGrant, 400);
-    }
-
-    // 检查授权码是否已被使用（防止重放攻击）
-    if (authCode.isUsed) {
-      // 注意：在当前schema中，AccessToken和RefreshToken没有authorizationCodeId字段
-      // 如果需要撤销关联令牌，应该通过userId和clientId来查询
-      // Note: In current schema, AccessToken and RefreshToken don't have authorizationCodeId field
-      // If need to revoke related tokens, should query by userId and clientId
-      throw new OAuth2Error('Authorization code has already been used', OAuth2ErrorCode.InvalidGrant, 400);
-    }
-
-    // validateAuthorizationCode 现在会抛出错误，而不是返回 null
-    // validateAuthorizationCode will now throw errors instead of returning null
-    validatedAuthCode = await import('../../../../../lib/auth/authorization-code-flow').then(mod =>
-      mod.validateAuthorizationCode(code, client.id, redirectUri, codeVerifier)
-    );
-  } catch (error: any) {
-    // 捕获来自 validateAuthorizationCode 的特定错误并转换为 OAuth2Error
-    // Catch specific errors from validateAuthorizationCode and convert to OAuth2Error
-    if (error instanceof ResourceNotFoundError || // 代码未找到 (Code not found)
-        error instanceof TokenError ||           // 代码已使用/过期 (Code used/expired)
-        error instanceof ValidationError ||        // ClientID/RedirectURI 不匹配 (ClientID/RedirectURI mismatch)
-        error instanceof AuthenticationError) {  // PKCE 失败 (PKCE failed)
-      await AuthorizationUtils.logAuditEvent({
-        clientId: client.id,
-        action: 'TOKEN_AUTH_CODE_VALIDATION_FAILURE',
-        ipAddress,
-        userAgent,
-        success: false,
-        errorMessage: error.message,
-        metadata: {
-          grantType: 'authorization_code',
-          errorName: error.name,
-          errorCode: error.code || (error as any).errorCode || OAuth2ErrorCode.InvalidGrant,
-          context: error.context,
-          codeUsed: code,
-        },
-      });
-      throw new OAuth2Error(error.message, OAuth2ErrorCode.InvalidGrant, error.status, undefined, error.context);
-    }
-    // 对于其他未知错误 (例如数据库错误)
-    // For other unknown errors (e.g., database errors)
-    console.error("Unexpected error during authorization code validation:", error); // 记录原始错误 (Log original error)
-    await AuthorizationUtils.logAuditEvent({
-        actorType: 'SYSTEM',
-        actorId: 'tokenEndpoint',
-        clientId: client.clientId,
-        action: 'TOKEN_AUTH_CODE_UNEXPECTED_ERROR',
-        status: 'FAILURE',
-        ipAddress,
-        userAgent,
-        errorMessage: 'Authorization code validation failed due to an unexpected server error.',
-        details: JSON.stringify({
-            grantType: 'authorization_code',
-            originalErrorName: error.name,
-            originalMessage: error.message,
-            codeUsed: code,
-        }),
-    });
-    throw new OAuth2Error('Authorization code validation failed due to an unexpected server error.', OAuth2ErrorCode.ServerError, 500, undefined, { originalErrorName: error.name, originalMessage: error.message });
-  }
-
-  // 确保用户存在且活动
-  // Ensure user exists and is active
-  const user = await prisma.user.findUnique({ where: { id: validatedAuthCode.userId }});
-  if (!user || !user.isActive) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: validatedAuthCode.userId, // User ID from the validated code
-        actorType: 'USER', // Action is implicitly by this user trying to get a token
-        actorId: validatedAuthCode.userId,
-        clientId: client.clientId,
-        action: 'TOKEN_AUTH_CODE_USER_INVALID',
-        status: 'FAILURE',
-        ipAddress,
-        userAgent,
-        errorMessage: 'User associated with authorization code not found or inactive.',
-        details: JSON.stringify({ grantType: 'authorization_code', userId: validatedAuthCode.userId, codeUsed: validatedAuthCode.id }),
-      });
-      throw new OAuth2Error('User associated with authorization code not found or inactive.', OAuth2ErrorCode.InvalidGrant);
-  }
-
+  // 获取用户权限
   const userPermissions = await AuthorizationUtils.getUserPermissions(validatedAuthCode.userId);
-  const grantedScopesArray = ScopeUtils.parseScopes(validatedAuthCode.scope);
+  
+  // 获取用户信息（用于可能的ID令牌）
+  const user = await prisma.user.findUnique({
+    where: { id: validatedAuthCode.userId }
+  });
+
+  const grantedScopesArray = ScopeUtils.parseScopes(validatedAuthCode.scope ?? '');
 
   const accessTokenString = await JWTUtils.createAccessToken({
     client_id: client.clientId,
@@ -337,7 +262,7 @@ async function handleRefreshTokenGrant(
 
   // --- BEGIN: Refresh Token JTI Blacklist Check ---
   // First, decode the refresh token to get its JTI.
-  let refreshTokenPayload: import('@repo/lib/auth').RefreshTokenPayload; // 添加类型声明 (Add type declaration)
+  let refreshTokenPayload: RefreshTokenPayload; // 添加类型声明 (Add type declaration)
   try {
     // This utility function should verify the JWT's signature, expiry,
     // and essential claims like client_id against the provided client.

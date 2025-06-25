@@ -15,6 +15,9 @@ export * from './services';
 // 工具模块 (Utils module)
 export * from './utils';
 
+// 通用中间件 (Common middleware)
+export * from './middleware';
+
 // 中间件模块 (Middleware module)
 // export * from './middleware';
 

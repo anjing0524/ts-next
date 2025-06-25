@@ -1,21 +1,9 @@
 /**
- * OAuth2 错误代码常量
- * OAuth 2.0 standard error code constants
- * 这些常量用于在发生错误时，向客户端返回标准化的错误信息
- * These constants are used to return standardized error information to clients when errors occur
+ * OAuth2 错误定义已统一到 @repo/lib/errors 中
+ * OAuth2 error definitions have been unified in @repo/lib/errors
+ * 请使用 import { OAuth2ErrorCode } from '@repo/lib/errors'
+ * Please use import { OAuth2ErrorCode } from '@repo/lib/errors'
  */
-export const OAuth2ErrorTypes = {
-  INVALID_REQUEST: 'invalid_request',
-  INVALID_CLIENT: 'invalid_client',
-  INVALID_GRANT: 'invalid_grant',
-  UNAUTHORIZED_CLIENT: 'unauthorized_client',
-  UNSUPPORTED_GRANT_TYPE: 'unsupported_grant_type',
-  INVALID_SCOPE: 'invalid_scope',
-  ACCESS_DENIED: 'access_denied',
-  UNSUPPORTED_RESPONSE_TYPE: 'unsupported_response_type',
-  SERVER_ERROR: 'server_error',
-  TEMPORARILY_UNAVAILABLE: 'temporarily_unavailable',
-} as const; // 'as const' 将对象的属性变为只读，并将其类型推断为字面量类型
 
 /**
  * 默认配置常量

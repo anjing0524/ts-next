@@ -1,2 +1,2 @@
-export * from "./services/permissionService";
-export * from "./services/rbacService";
+export * from "./services/permission-service";
+export * from "./services/rbac-service";

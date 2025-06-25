@@ -15,7 +15,7 @@
  */
 import { prisma } from '@repo/database';
 import bcrypt from 'bcrypt';
-import { JWTUtils } from './oauth2'; // 导入 JWTUtils 用于令牌生成 (Import JWTUtils for token generation)
+import { JWTUtils } from '@repo/lib/auth'; // 导入 JWTUtils 用于令牌生成 (Import JWTUtils for token generation)
 import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
 import { AuthenticationError, ValidationError, CryptoError, TokenGenerationError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 
@@ -185,4 +185,4 @@ export async function grantClientCredentialsToken(
     // Should throw TokenGenerationError here
     throw new TokenGenerationError('Token generation failed for client credentials grant.', { originalError: error.message });
   }
-}
+} 

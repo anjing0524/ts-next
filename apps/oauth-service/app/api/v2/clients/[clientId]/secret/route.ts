@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ClientService } from '@/lib/services/client-service';
 import { withErrorHandling } from '@repo/lib';
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { withAuth, type AuthContext } from '@repo/lib/middleware';
 import { ApiResponse } from '@repo/lib';
 
 /**

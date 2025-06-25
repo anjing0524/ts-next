@@ -4,8 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { prisma } from '@repo/database';
+import { withAuth, type AuthContext } from '@repo/lib/middleware';
 import { withErrorHandling } from '@repo/lib';
 import { Prisma } from '@prisma/client';
 

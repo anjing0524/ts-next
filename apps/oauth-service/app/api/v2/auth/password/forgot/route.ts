@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import crypto from 'crypto'; // For generating a secure random token
 import { addHours } from 'date-fns'; // For setting token expiry
-import { isValidEmail } from '@repo/lib/utils'; // Assuming this utility exists
+import { isValidEmail } from '@repo/lib';
 
 const RESET_TOKEN_LENGTH = 32; // 重置令牌的长度（字节数）(Length of the reset token in bytes)
 const RESET_TOKEN_EXPIRY_HOURS = 1; // 重置令牌的有效期（小时）(Expiry duration of the reset token in hours)

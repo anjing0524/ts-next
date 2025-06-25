@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { withErrorHandling } from '@repo/lib/utils/error-handler';
-import { authenticateBearer } from '@/lib/auth';
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@/lib/errors';
+// authenticateBearer 已移至 @repo/lib/middleware
+import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@repo/lib/errors';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
 
@@ -92,32 +92,25 @@ import { ApiResponse } from '@repo/lib/types/api';
 async function userInfoHandlerInternal(request: NextRequest): Promise<NextResponse> {
   // --- 步骤1: JWT令牌认证 (使用Jose库) ---
   // --- Step 1: JWT Token Authentication (using Jose library) ---
-  const authResult = await authenticateBearer(request, {
-    allowPublicAccess: false, // 此端点要求认证
-    requiredScopes: ['openid'], // OIDC UserInfo端点需要openid scope
-  });
-
+  // 使用恢复的认证中间件逻辑
+  const { authenticateBearer } = await import('@repo/lib/middleware');
+  
+  // 执行Bearer令牌认证
+  const authResult = await authenticateBearer(request);
   if (!authResult.success) {
-    if (authResult.response) {
-      return authResult.response; // 返回中间件生成的错误响应
-    }
-    throw new OAuth2Error(
-      'Authentication failed for UserInfo endpoint.',
-      OAuth2ErrorCode.InvalidToken,
-      401
-    );
+    // 认证失败，中间件已经准备好了响应
+    return authResult.response!;
   }
 
+  // 认证成功，但需要确保上下文存在
   if (!authResult.context) {
     throw new OAuth2Error(
-      'Authentication context missing after successful authentication.',
+      'Authentication context is missing after successful authentication.',
       OAuth2ErrorCode.ServerError,
       500
     );
   }
 
-  // --- 步骤2: 检查用户ID和权限 ---
-  // --- Step 2: Check User ID and Permissions ---
   const { user, scopes } = authResult.context;
   const userId = user?.id;
   

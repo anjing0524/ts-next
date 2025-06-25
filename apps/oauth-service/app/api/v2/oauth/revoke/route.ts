@@ -4,9 +4,9 @@
 // Description: OAuth 2.0 Token Revocation Endpoint (RFC 7009)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { JWTUtils, ClientAuthUtils } from '@/lib/auth/oauth2';
-import { AuthorizationUtils } from '@/lib/auth/utils';
+import { prisma } from '@repo/database';
+import { JWTUtils, AuthorizationUtils } from '@repo/lib/auth';
+import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
 import { withErrorHandling } from '@/lib/utils/error-handler';
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';

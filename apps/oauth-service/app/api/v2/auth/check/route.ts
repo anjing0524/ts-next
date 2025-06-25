@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 // 确保 JWTUtils.verifyAccessToken 在 lib/auth/oauth2.ts 中声明或实现
 // (Ensure JWTUtils.verifyAccessToken is declared or implemented in lib/auth/oauth2.ts)
 /*
-declare module '@/lib/auth/oauth2' {
+declare module '@repo/lib' {
   export class JWTUtils {
     static async verifyAccessToken(token: string): Promise<{
       valid: boolean;

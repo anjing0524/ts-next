@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { jwtVerify, JWTPayload } from 'jose'; // 引入JWT验证相关的模块
 
-import { AuthorizationUtils } from '@/lib/auth/utils';
-import { OAuth2ErrorTypes } from '@/lib/auth/oauth2';
-import { ScopeUtils } from '@repo/lib/auth';
+import { AuthorizationUtils, ScopeUtils } from '@repo/lib/auth';
+import { OAuth2ErrorCode } from '@repo/lib/errors';
 // import { validateSession } from '../../../lib/auth/session'; // To validate user's current session // 移除 session 验证
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@repo/database';
 
 // 定义JWT相关的常量，与 authorize/route.ts 中保持一致
 // Define JWT related constants, consistent with authorize/route.ts
@@ -217,7 +216,7 @@ export async function POST(request: NextRequest) {
 
     // Redirect to client's redirect_uri with error
     const errorRedirectUrl = new URL(redirect_uri);
-    errorRedirectUrl.searchParams.set('error', OAuth2ErrorTypes.ACCESS_DENIED);
+    errorRedirectUrl.searchParams.set('error', OAuth2ErrorCode.AccessDenied);
     if (state) errorRedirectUrl.searchParams.set('state', state);
 
     return NextResponse.redirect(errorRedirectUrl.toString());

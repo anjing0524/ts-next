@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { OAuth2ErrorTypes } from '@/lib/auth/oauth2'; // For error types
+import { prisma } from '@repo/database';
+import { OAuth2ErrorCode } from '@repo/lib/errors'; // For error types
 
 const ADMIN_API_KEY = process.env.TOKEN_REVOCATION_ADMIN_KEY;
 
@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   // 1. Placeholder Protection
   if (!ADMIN_API_KEY || req.headers.get('X-Admin-API-Key') !== ADMIN_API_KEY) {
     return NextResponse.json(
-      { error: OAuth2ErrorTypes.UNAUTHORIZED_CLIENT, error_description: 'Unauthorized: Missing or invalid admin API key.' },
+      { error: OAuth2ErrorCode.UnauthorizedClient, error_description: 'Unauthorized: Missing or invalid admin API key.' },
       { status: 401 }
     );
   }
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch (error) {
     return NextResponse.json(
-      { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: 'Invalid JSON request body.' },
+      { error: OAuth2ErrorCode.InvalidRequest, error_description: 'Invalid JSON request body.' },
       { status: 400 }
     );
   }
@@ -29,13 +29,13 @@ export async function POST(req: NextRequest) {
   // 3. Validate Input
   if (!jti || typeof jti !== 'string') {
     return NextResponse.json(
-      { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: 'Missing or invalid "jti" (JWT ID) in request body.' },
+      { error: OAuth2ErrorCode.InvalidRequest, error_description: 'Missing or invalid "jti" (JWT ID) in request body.' },
       { status: 400 }
     );
   }
   if (!exp || typeof exp !== 'number') {
     return NextResponse.json(
-      { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: 'Missing or invalid "exp" (expiry timestamp) in request body.' },
+      { error: OAuth2ErrorCode.InvalidRequest, error_description: 'Missing or invalid "exp" (expiry timestamp) in request body.' },
       { status: 400 }
     );
   }
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   const expiresAt = new Date(exp * 1000);
   if (isNaN(expiresAt.getTime())) {
     return NextResponse.json(
-        { error: OAuth2ErrorTypes.INVALID_REQUEST, error_description: 'Invalid "exp" (expiry timestamp) format.' },
+        { error: OAuth2ErrorCode.InvalidRequest, error_description: 'Invalid "exp" (expiry timestamp) format.' },
         { status: 400 }
       );
   }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
         );
     }
     return NextResponse.json(
-      { error: OAuth2ErrorTypes.SERVER_ERROR, error_description: errorMessage },
+      { error: OAuth2ErrorCode.ServerError, error_description: errorMessage },
       { status: 500 }
     );
   }

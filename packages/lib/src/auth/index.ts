@@ -12,8 +12,9 @@ export { PKCEUtils } from './pkce-utils';
 export { ScopeUtils } from './scope-utils';
 export { AuthorizationUtils } from './authorization-utils';
 
+
 // 密码工具函数 (Password utility functions)
-export * from './passwordUtils';
+export * from './password-utils';
 
 // 类型定义 (Type definitions)
 export type {
@@ -23,4 +24,11 @@ export type {
   PKCEChallenge,
   ScopeValidationResult,
   PasswordHashResult,
-} from './types'; 
+} from './types';
+
+// JWT 相关类型 (JWT related types)
+export type {
+  RefreshTokenPayload,
+  AccessTokenPayload,
+  IdTokenPayload,
+} from './jwt-utils'; 

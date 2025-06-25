@@ -4,9 +4,9 @@
 // Description: OAuth 2.0 Token Introspection Endpoint (RFC 7662)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@repo/database';
 import { withErrorHandling } from '@/lib/utils/error-handler';
-import { ClientAuthUtils } from '@/lib/auth/oauth2'; // Removed OldOAuth2ErrorTypes
+import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
 import { ScopeUtils, JWTUtils } from '@repo/lib/auth';
 import * as jose from 'jose';
 import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, introspectResponseActiveSchema } from './schemas';

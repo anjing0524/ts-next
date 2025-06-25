@@ -23,21 +23,11 @@ export interface AuthContext {
 }
 
 /**
- * OAuth2 错误代码枚举
- * OAuth2 error code enumeration
+ * OAuth2 错误代码枚举已统一到 @repo/lib/errors 中
+ * OAuth2 error code enumeration has been unified in @repo/lib/errors
+ * 请使用 import { OAuth2ErrorCode } from '@repo/lib/errors'
+ * Please use import { OAuth2ErrorCode } from '@repo/lib/errors'
  */
-export enum OAuth2ErrorCode {
-  InvalidRequest = 'invalid_request',
-  InvalidClient = 'invalid_client',
-  InvalidGrant = 'invalid_grant',
-  UnauthorizedClient = 'unauthorized_client',
-  UnsupportedGrantType = 'unsupported_grant_type',
-  InvalidScope = 'invalid_scope',
-  UnsupportedResponseType = 'unsupported_response_type',
-  AccessDenied = 'access_denied',
-  ServerError = 'server_error',
-  TemporarilyUnavailable = 'temporarily_unavailable',
-}
 
 /**
  * 客户端类型枚举

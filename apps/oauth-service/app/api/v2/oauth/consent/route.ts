@@ -5,14 +5,13 @@
 // (For detailed responsibilities, see original comments - preserved below)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@repo/database';
 import { User, OAuthClient as Client } from '@prisma/client';
-import { AuthorizationUtils } from '@/lib/auth/utils';
-import { ScopeUtils } from '@repo/lib/auth';
-import { requirePermission } from '@/lib/auth';
+import { AuthorizationUtils, ScopeUtils } from '@repo/lib/auth';
+import { requirePermission } from '@repo/lib/middleware';
 
-import { storeAuthorizationCode } from '@/lib/auth/authorization-code-flow';
-import { withErrorHandling } from '@/lib/utils/error-handler';
+// storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
+import { withErrorHandling } from '@repo/lib/utils/error-handler';
 import { ApiResponse } from '@repo/lib/types/api';
 import {
   OAuth2Error,
@@ -21,7 +20,7 @@ import {
   ResourceNotFoundError,
   ConfigurationError,
   BaseError,
-} from '@/lib/errors';
+} from '@repo/lib/errors';
 
 // 同意表单提交的目标 URL 路径
 // Target URL path for consent form submission
@@ -447,18 +446,39 @@ async function submitConsentDecisionHandlerInternal(
       },
     });
 
-    const authCode = await storeAuthorizationCode(
+    // 使用恢复的 authorization-code-flow 业务逻辑
+    const { storeAuthorizationCode } = await import('../../../../../lib/auth/authorization-code-flow');
+    
+    const authCodeResult = await storeAuthorizationCode(
       user.id,
       client.id,
       redirectUri,
-      codeChallenge || undefined, // 确保传递 undefined 而不是 null (Ensure undefined is passed instead of null)
-      (codeChallengeMethod as 'S256') || undefined, // 同上，并断言类型 (Same as above, and assert type)
+      codeChallenge || '',
+      codeChallengeMethod || 'S256',
       ScopeUtils.formatScopes(grantedScopes),
-      client.authorizationCodeLifetime || undefined,
-      nonce || undefined
+      600, // 10分钟过期
+      nonce
     );
 
-    finalRedirectUrl.searchParams.set('code', authCode.code);
+    // 将授权码添加到重定向URL
+    finalRedirectUrl.searchParams.set('code', authCodeResult.code);
+
+    // 记录成功的审计事件
+    await AuthorizationUtils.logAuditEvent({
+      userId: user.id,
+      clientId: client.clientId,
+      action: 'CONSENT_GRANTED_AUTH_CODE_ISSUED',
+      success: true,
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      userAgent: request.headers.get('user-agent') || undefined,
+      metadata: {
+        client_id: client.clientId,
+        grantedScopes: ScopeUtils.formatScopes(grantedScopes),
+        hasPKCE: !!codeChallenge,
+        hasNonce: !!nonce,
+      },
+    });
+
     return NextResponse.redirect(finalRedirectUrl.toString(), 302);
   }
 

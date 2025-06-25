@@ -8,10 +8,10 @@ import { jwtVerify, JWTPayload } from 'jose';
 import {
   PKCEUtils,
   ScopeUtils,
-  AuthorizationUtils,
-  OAuth2ErrorTypes,
-} from '@/lib/auth/oauth2';
-import { prisma } from '@/lib/prisma';
+} from '@repo/lib';
+import { AuthorizationUtils } from '@repo/lib';
+import { OAuth2ErrorCode } from '@repo/lib/errors';
+import { prisma } from '@repo/database';
 
 interface OAuthValidationResult {
   valid: boolean;
@@ -48,7 +48,7 @@ async function handleAuthorizeRequest(
 
     if (!scopeValidation.valid) {
       const error = {
-        error: OAuth2ErrorTypes.INVALID_SCOPE,
+        error: OAuth2ErrorCode.InvalidScope,
         error_description: `Invalid scopes: ${scopeValidation.invalidScopes.join(', ')}`,
       };
 
@@ -78,7 +78,7 @@ async function handleAuthorizeRequest(
     if (client.clientType === 'PUBLIC') {
       if (!code_challenge || !code_challenge_method || code_challenge_method !== 'S256') {
         const error = {
-          error: OAuth2ErrorTypes.INVALID_REQUEST,
+          error: OAuth2ErrorCode.InvalidRequest,
           error_description: 'PKCE (code_challenge and code_challenge_method=S256) is required for public clients.',
         };
 
@@ -106,7 +106,7 @@ async function handleAuthorizeRequest(
     if (code_challenge) {
       if (!code_challenge_method || code_challenge_method !== 'S256') {
         const error = {
-          error: OAuth2ErrorTypes.INVALID_REQUEST,
+          error: OAuth2ErrorCode.InvalidRequest,
           error_description: 'code_challenge_method must be S256',
         };
 
@@ -130,7 +130,7 @@ async function handleAuthorizeRequest(
 
       if (!PKCEUtils.validateCodeChallenge(code_challenge)) {
         const error = {
-          error: OAuth2ErrorTypes.INVALID_REQUEST,
+          error: OAuth2ErrorCode.InvalidRequest,
           error_description: 'Invalid code_challenge format',
         };
 
@@ -158,7 +158,7 @@ async function handleAuthorizeRequest(
       };
     } else if (client.requirePkce) {
       const error = {
-        error: OAuth2ErrorTypes.INVALID_REQUEST,
+        error: OAuth2ErrorCode.InvalidRequest,
         error_description: 'PKCE is required for this client',
       };
 
@@ -242,7 +242,7 @@ async function handleAuthorizeRequest(
     if (needsConsent && prompt === 'none') {
       // Consent required but prompt=none, return error
       const error = {
-        error: OAuth2ErrorTypes.ACCESS_DENIED,
+        error: OAuth2ErrorCode.AccessDenied,
         error_description: 'User consent required',
       };
 
@@ -315,7 +315,7 @@ async function handleAuthorizeRequest(
     if (redirect_uri) {
       try {
         const errorRedirectUrl = new URL(redirect_uri);
-        errorRedirectUrl.searchParams.set('error', OAuth2ErrorTypes.SERVER_ERROR);
+        errorRedirectUrl.searchParams.set('error', OAuth2ErrorCode.ServerError);
         errorRedirectUrl.searchParams.set('error_description', 'An unexpected error occurred');
         if (state) errorRedirectUrl.searchParams.set('state', state);
 
@@ -327,7 +327,7 @@ async function handleAuthorizeRequest(
 
     return NextResponse.json(
       {
-        error: OAuth2ErrorTypes.SERVER_ERROR,
+        error: OAuth2ErrorCode.ServerError,
         error_description: 'An unexpected error occurred',
       },
       { status: 500 }

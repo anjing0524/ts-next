@@ -15,11 +15,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
 import { prisma } from '@repo/database';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils } from '@repo/lib/auth';
-import { AuthorizationUtils } from '@/lib/auth/utils';
+import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@repo/lib/auth';
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
-import { storeAuthorizationCode } from '@/lib/auth/authorization-code-flow';
+// storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
 import { withErrorHandling } from '@repo/lib/utils';
 import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from '@repo/lib/errors';
 
@@ -267,20 +266,44 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   console.log(`User ${currentUser.id} already consented for client ${thirdPartyClient.clientId}. Issuing code.`);
 
   // --- 步骤 6: 生成并存储授权码 --- (Step 6: Generate and store authorization code)
-  const authCode = await storeAuthorizationCode(
-    currentUser.id, thirdPartyClient.id, redirect_uri, code_challenge,
-    code_challenge_method as 'S256', // Zod schema ensures this is 'S256'
+  // 使用恢复的 authorization-code-flow 业务逻辑
+  const { storeAuthorizationCode } = await import('../../../../../lib/auth/authorization-code-flow');
+  
+  const authCodeResult = await storeAuthorizationCode(
+    currentUser.id,
+    thirdPartyClient.id,
+    redirect_uri,
+    code_challenge || '',
+    code_challenge_method || 'S256',
     ScopeUtils.formatScopes(finalGrantedScopesArray),
-    thirdPartyClient.authorizationCodeLifetime || undefined,
-    nonce || undefined // 传递 nonce 给 storeAuthorizationCode (Pass nonce to storeAuthorizationCode)
+    600, // 10分钟过期
+    nonce
   );
 
-  // --- 步骤 7: 重定向到第三方客户端的回调URL --- (Step 7: Redirect to third-party client's callback URL)
+  // 构建成功的重定向URL
   const successRedirectUrl = new URL(redirect_uri);
-  successRedirectUrl.searchParams.set('code', authCode.code);
+  successRedirectUrl.searchParams.set('code', authCodeResult.code);
   if (state) {
     successRedirectUrl.searchParams.set('state', state);
   }
+
+  // 记录成功的审计事件
+  await AuthorizationUtils.logAuditEvent({
+    userId: currentUser.id,
+    clientId: thirdPartyClient.clientId,
+    action: 'AUTHORIZATION_CODE_ISSUED',
+    success: true,
+    ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+    userAgent: req.headers.get('user-agent') || undefined,
+    metadata: {
+      client_id: thirdPartyClient.clientId,
+      scope: ScopeUtils.formatScopes(finalGrantedScopesArray),
+      hasPKCE: !!code_challenge,
+      hasNonce: !!nonce,
+    },
+  });
+
+  console.log(`Authorization code issued for user ${currentUser.id} and client ${thirdPartyClient.clientId}`);
   return NextResponse.redirect(successRedirectUrl.toString(), 302);
 }
 

@@ -11,7 +11,7 @@
 
 import { OAuthClient, ClientType } from '@prisma/client';
 import { prisma } from '@repo/database';
-import { AuthorizationUtils } from '@/lib/auth/utils';
+import { AuthorizationUtils } from '@repo/lib/auth';
 import { OAuth2Error, OAuth2ErrorCode } from '../errors';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';

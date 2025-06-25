@@ -1,10 +1,9 @@
 // app/api/v2/roles/[roleId]/permissions/[permissionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { prisma } from '@repo/database';
+import { withAuth, type AuthContext } from '@repo/lib/middleware';
 import { withErrorHandling } from '@repo/lib';
-import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
+import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
 
 interface RouteContext {
   params: {

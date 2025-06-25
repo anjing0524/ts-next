@@ -1,7 +1,7 @@
 // Jest globals are available without explicit import in our setup
 import { prisma } from '@repo/database';
 import { ClientService } from '../../lib/services/client-service';
-import { OAuth2Error, OAuth2ErrorCode } from '../../lib/oauth2-errors';
+import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/errors';
 import type { OAuthClient } from '@prisma/client';
 
 describe('ClientService', () => {

@@ -4,11 +4,11 @@
 // 使用 `requirePermission` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端。
+import { prisma } from '@repo/database'; // Prisma ORM 客户端。
 import { Prisma, PermissionType, HttpMethod } from '@prisma/client'; // Prisma 生成的类型。
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件。
+import { withAuth, type AuthContext } from '@repo/lib/middleware'; // 引入权限控制中间件。
 import { withErrorHandling } from '@repo/lib';
-import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
+import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义路由上下文接口，用于从动态路由参数中获取 permissionId。

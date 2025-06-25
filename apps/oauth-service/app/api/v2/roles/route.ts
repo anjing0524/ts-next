@@ -3,11 +3,11 @@
 // 使用 `requirePermission` 中间件来保护这些端点，确保只有授权用户才能访问。
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // Prisma ORM 客户端，用于数据库交互。
+import { prisma } from '@repo/database'; // Prisma ORM 客户端，用于数据库交互。
 import { Prisma, Role } from '@prisma/client'; // Prisma 生成的类型，用于高级查询和类型定义。
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth'; // 引入权限控制中间件和认证请求类型。
+import { withAuth, type AuthContext } from '@repo/lib/middleware'; // 引入权限控制中间件和认证请求类型。
 import { withErrorHandling } from '@repo/lib';
-import { AuthorizationUtils } from '@/lib/auth/utils'; // For Audit Logging
+import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义获取角色列表时分页的默认页面大小。

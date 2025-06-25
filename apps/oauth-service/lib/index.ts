@@ -1,34 +1,22 @@
 /**
- * OAuth Service 应用级统一导出
- * OAuth Service application-level exports
+ * @fileoverview
+ * 这个文件作为 oauth-service 内部 lib 目录的入口点。
+ * (This file serves as the entry point for the internal lib directory of oauth-service.)
  * 
- * 提供应用特定的服务和重新导出共享模块
- * Provides application-specific services and re-exports shared modules
+ * 它重新导出共享的或特定于此应用的服务和工具类，以简化导入路径。
+ * (It re-exports shared or app-specific services and utilities to simplify import paths.)
+ * 
+ * @deprecated 请直接从 `@repo/lib/*` 或具体模块导入，以获得更好的模块解析和类型推断。
+ * (Please import directly from `@repo/lib/*` or specific modules for better module resolution and type inference.)
  */
 
-// 重新导出共享模块 (Re-export shared modules)
-export * from '@repo/lib';
+// 应用特定的服务 (Application-specific services)
+export { ClientService } from './services/client-service';
 
-// 应用特定的 OAuth2 相关模块 (Application-specific OAuth2 modules)
-export * from './auth/oauth2';
+// 应用特定的类型定义 (Application-specific type definitions)
+export * from './auth/types';
 
-// 应用特定的流程处理 (Application-specific flows)
-export { storeAuthorizationCode, validateAuthorizationCode } from './auth/authorization-code-flow';
-export { authenticateClient, grantClientCredentialsToken } from './auth/client-credentials-flow';
-
-// 应用特定的工具类 (Application-specific utilities)
-export { AuthorizationUtils } from './auth/utils';
-export { ClientAuthUtils } from './auth/utils/client-auth-utils';
-
-// OAuth2 错误类型 (OAuth2 error types)
-export { OAuth2ErrorTypes } from './auth/oauth2-errors';
-
-// 验证中间件 (Validation middleware)
-export { withOAuthTokenValidation } from './auth/middleware/validation';
-
-// 如果需要类型定义，请创建 types.ts 文件
-// If type definitions are needed, please create types.ts file
-
-// 类型定义 (Type definitions)
-// 如果需要类型定义，请创建 types.ts 文件
-// If type definitions are needed, please create types.ts file 
+// 注意：共享功能请直接从 @repo/lib 导入
+// Note: For shared functionality, import directly from @repo/lib
+// 例如：import { JWTUtils, ScopeUtils, PKCEUtils } from '@repo/lib';
+// 中间件：import { withOAuthTokenValidation } from '@repo/lib/middleware'; 

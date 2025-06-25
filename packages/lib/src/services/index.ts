@@ -7,7 +7,10 @@
  */
 
 // RBAC 权限服务 (RBAC permission service)
-export { RBACService } from './rbacService';
+export { RBACService } from './rbac-service';
+
+// 权限服务 (Permission service)
+export { PermissionService } from './permission-service';
 
 // 类型定义 (Type definitions)
 export type {

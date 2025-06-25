@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { ClientType } from '@prisma/client';
 import { ClientService } from '@/lib/services/client-service';
 import { withErrorHandling, ApiResponse } from '@repo/lib';
-import { withAuth, type AuthContext } from '@/lib/auth/middleware/bearer-auth';
+import { withAuth, type AuthContext } from '@repo/lib/middleware';
 
 /**
  * 客户端创建请求Schema
