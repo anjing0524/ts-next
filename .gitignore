@@ -89,4 +89,5 @@ tasks.json
 tasks/ 
 
 .turbo
-**/.next/**
+./**/.next/**
+./**/dist/**

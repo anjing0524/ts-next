@@ -1,6 +1,0 @@
-{
-  "/api/health/route": "app/api/health/route.js",
-  "/api/sse/route": "app/api/sse/route.js",
-  "/api/test/route": "app/api/test/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js"
-}

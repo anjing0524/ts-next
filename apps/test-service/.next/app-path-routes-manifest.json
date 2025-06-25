@@ -1,6 +1,0 @@
-{
-  "/api/health/route": "/api/health",
-  "/api/sse/route": "/api/sse",
-  "/api/test/route": "/api/test",
-  "/favicon.ico/route": "/favicon.ico"
-}
