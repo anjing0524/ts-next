@@ -57,15 +57,47 @@ export const userInfoResponseSchema = z.object({
   // Custom claims based on Prisma User model
   /**
    * User's organization.
+   * Mapped from User.organization.
    * (Custom claim, potentially available if 'profile' or a custom scope was granted)
    */
   organization: z.string().optional(),
 
   /**
    * User's department.
+   * Mapped from User.department.
    * (Custom claim, potentially available if 'profile' or a custom scope was granted)
    */
   department: z.string().optional(),
+
+  // Email-related claims (Available if 'email' scope was granted)
+  /**
+   * End-User's preferred e-mail address.
+   * Mapped from User.email (if available in User model).
+   * (Available if 'email' scope was granted)
+   */
+  email: z.string().email().optional(),
+
+  /**
+   * True if the End-User's e-mail address has been verified; otherwise false.
+   * Mapped from User.emailVerified (if available in User model).
+   * (Available if 'email' scope was granted)
+   */
+  email_verified: z.boolean().optional(),
+
+  // Phone-related claims (Available if 'phone' scope was granted)
+  /**
+   * End-User's preferred telephone number.
+   * Mapped from User.phone (if available in User model).
+   * (Available if 'phone' scope was granted)
+   */
+  phone_number: z.string().optional(),
+
+  /**
+   * True if the End-User's phone number has been verified; otherwise false.
+   * Mapped from User.phoneVerified (if available in User model).
+   * (Available if 'phone' scope was granted)
+   */
+  phone_number_verified: z.boolean().optional(),
 
   // NOTE: Standard OIDC claims like email, email_verified, phone_number, address, etc.,
   // are omitted here because corresponding fields are not present in the current Prisma User model.

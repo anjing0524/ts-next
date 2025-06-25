@@ -17,7 +17,7 @@ import { prisma } from 'lib/prisma';
 import bcrypt from 'bcrypt';
 import { JWTUtils } from './oauth2'; // 导入 JWTUtils 用于令牌生成 (Import JWTUtils for token generation)
 import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
-import { AuthenticationError, ConfigurationError, BaseError } from '../errors'; // 导入自定义错误类 (Import custom error classes)
+import { AuthenticationError, ValidationError, CryptoError, TokenGenerationError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 
 // AuthenticatedClient 接口定义了客户端认证成功后需要暴露的基本信息。
 // The AuthenticatedClient interface defines the basic information to be exposed after successful client authentication.
@@ -53,7 +53,7 @@ export async function authenticateClient(
     });
   } catch (error: any) {
     console.error('Database error during client lookup:', error);
-    throw new BaseError('Database error during client authentication.', 500, 'DB_CLIENT_LOOKUP_FAILED', { originalError: error.message });
+          throw new AuthenticationError('Database error during client authentication.', { originalError: error.message }, 'DB_CLIENT_LOOKUP_FAILED');
   }
 
   // 客户端未找到
@@ -80,7 +80,7 @@ export async function authenticateClient(
       // 配置错误：机密客户端在数据库中没有存储密钥
       // Configuration error: Confidential client has no stored secret in the database
       console.error(`Configuration error: Confidential client "${clientId}" has no stored secret.`);
-      throw new ConfigurationError(`Client "${clientId}" is misconfigured: secret not stored.`, 'CLIENT_CONFIG_NO_SECRET');
+      throw new AuthenticationError(`Client "${clientId}" is misconfigured: secret not stored.`, { clientId }, 'CLIENT_CONFIG_NO_SECRET');
     }
     // 验证提供的密钥是否与存储的哈希匹配
     // Verify if the provided secret matches the stored hash
@@ -89,7 +89,7 @@ export async function authenticateClient(
         isSecretValid = await bcrypt.compare(clientSecret, clientRecord.clientSecret);
     } catch (bcryptError: any) {
         console.error(`Error during bcrypt comparison for client ${clientId}:`, bcryptError);
-        throw new BaseError('Error during secret verification.', 500, 'BCRYPT_ERROR', { originalError: bcryptError.message });
+        throw new CryptoError('Error during secret verification.', { originalError: bcryptError.message });
     }
 
     if (!isSecretValid) {
@@ -107,7 +107,7 @@ export async function authenticateClient(
     console.error(unsupportedTypeMessage);
     // 这更像是一个配置或数据完整性问题
     // This is more of a configuration or data integrity issue
-    throw new ConfigurationError(unsupportedTypeMessage, 'UNSUPPORTED_CLIENT_TYPE');
+          throw new ValidationError(unsupportedTypeMessage, { clientType: clientRecord.clientType }, 'UNSUPPORTED_CLIENT_TYPE');
   }
 
   // 认证成功，返回客户端信息

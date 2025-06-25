@@ -2,7 +2,7 @@
 // 描述: 管理OAuth权限范围 (Scopes) - 创建和列表。
 // (Manages OAuth Scopes - Create and List.)
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from 'lib/prisma';
 import { requirePermission } from 'lib/auth/middleware';
@@ -80,7 +80,7 @@ async function listScopesHandler(request: NextRequest) {
   const { page, limit, name, isActive } = validationResult.data;
 
   const whereClause: Prisma.ScopeWhereInput = {};
-  if (name) whereClause.name = { contains: name, mode: 'insensitive' };
+  if (name) whereClause.name = { contains: name };
   if (isActive !== undefined) whereClause.isActive = isActive;
 
   try {

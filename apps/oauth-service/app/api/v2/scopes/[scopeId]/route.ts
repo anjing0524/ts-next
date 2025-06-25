@@ -2,7 +2,7 @@
 // 描述: 管理特定OAuth权限范围 (Scope) - 获取详情、更新、删除。
 // (Manages specific OAuth Scope - Get details, Update, Delete.)
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from 'lib/prisma';
 import { requirePermission } from 'lib/auth/middleware';

@@ -52,7 +52,7 @@ async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
 
   const where: Prisma.RoleWhereInput = {};
   if (nameQuery) {
-    where.name = { contains: nameQuery, mode: 'insensitive' };
+    where.name = { contains: nameQuery };
   }
   if (isActiveQuery !== null) {
     where.isActive = isActiveQuery === 'true';
@@ -109,9 +109,9 @@ async function listRolesHandler(req: NextRequest): Promise<NextResponse> {
  * @returns NextResponse - 包含新创建的角色信息或错误信息的 JSON 响应。
  */
 async function createRoleHandler(req: NextRequest): Promise<NextResponse> {
-  const performingAdmin = req.user; // Available from AuthenticatedRequest
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   let body;
   try {

@@ -41,6 +41,12 @@ export interface AuthContext {
   scopes: string[];
   permissions: string[];
   tokenPayload: Record<string, unknown>; // Renamed from payload
+  user?: {
+    id: string;
+    username?: string;
+    email?: string;
+    [key: string]: any;
+  };
 }
 
 export interface AuthOptions {
@@ -778,7 +784,8 @@ export function requirePermission(requiredPermission: string) {
         // (2. If the token does not have a 'permissions' claim, fall back to checking user permissions via PermissionService (typically by querying the database).)
         // (   This provides greater flexibility, allowing changes to user permissions without reissuing JWTs.)
         console.log(`requirePermission: 用户 '${userId}' 的令牌中无 'permissions' 声明。通过 PermissionService 检查权限 '${requiredPermission}'。(No 'permissions' claim in token for user '${userId}'. Checking permission '${requiredPermission}' via PermissionService.)`);
-        hasPermission = await permissionServiceInstance.checkPermission(userId, requiredPermission);
+        const userPermissions = await PermissionService.getUserPermissions(userId);
+        hasPermission = userPermissions?.permissions.includes(requiredPermission) || false;
       }
 
       if (!hasPermission) {
@@ -1282,7 +1289,7 @@ export function withOAuthAuthorizeValidation(
     }
 
     // Additional validation for client based on validated client_id from params
-    const client = await prisma.client.findUnique({
+    const client = await prisma.oAuthClient.findUnique({
       where: { clientId: validation.context.params?.client_id },
     });
 

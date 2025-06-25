@@ -129,7 +129,7 @@ declare module '@/lib/auth/oauth2' {
 // (Ideally, the definition of PermissionService and checkUserPermission method)
 /*
 // In lib/services/permissionService.ts
-import prisma from '@/lib/prisma';
+import { prisma } from '@repo/lib';
 
 export class PermissionService {
   static async checkUserPermission(userId: string, permissionName: string): Promise<boolean> {

@@ -20,11 +20,12 @@ import crypto from 'crypto';
 import {
   BaseError,
   ResourceNotFoundError,
-  TokenError,
   ValidationError,
   AuthenticationError,
-  ConfigurationError
-} from '../errors'; // 导入自定义错误类 (Import custom error classes)
+  CryptoError,
+  TokenValidationError,
+  TokenExpiredError
+} from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 import { AuthorizationCode as PrismaAuthorizationCode } from '@prisma/client'; // Prisma 类型 (Prisma type)
 
 // 授权码数据接口，定义了授权码对象的基本结构
@@ -82,7 +83,7 @@ export async function storeAuthorizationCode(
   // 验证 codeChallengeMethod 是否为 "S256"
   // Validate if codeChallengeMethod is "S256"
   if (codeChallengeMethod !== 'S256') {
-    throw new ConfigurationError(`Unsupported code challenge method: ${codeChallengeMethod}. Only 'S256' is supported.`);
+          throw new ValidationError(`Unsupported code challenge method: ${codeChallengeMethod}. Only 'S256' is supported.`, { codeChallengeMethod }, 'UNSUPPORTED_CHALLENGE_METHOD');
   }
 
   // 生成一个安全的随机授权码
@@ -114,7 +115,7 @@ export async function storeAuthorizationCode(
     // 数据库操作失败，记录错误并抛出 BaseError
     // Database operation failed, log error and throw BaseError
     console.error('Failed to store authorization code:', error);
-    throw new BaseError('Database error while storing authorization code.', 500, 'DB_STORE_AUTH_CODE_FAILED');
+          throw new CryptoError('Database error while storing authorization code.', { originalError: error.message });
   }
 }
 
@@ -166,7 +167,7 @@ export async function validateAuthorizationCode(
       // 为简化，此处删除已使用的授权码以防止进一步尝试，并抛出错误。
       // For simplicity, delete the used code to prevent further attempts and throw an error.
       await prisma.authorizationCode.delete({ where: { id: storedCode.id } });
-      throw new TokenError('Invalid authorization code: Code has already been used.', 400, 'AUTH_CODE_USED');
+              throw new TokenValidationError('Invalid authorization code: Code has already been used.', { code: code }, 'AUTH_CODE_USED');
     }
 
     // 如果授权码已过期
@@ -175,7 +176,7 @@ export async function validateAuthorizationCode(
       // 删除已过期的授权码
       // Delete the expired authorization code
       await prisma.authorizationCode.delete({ where: { id: storedCode.id } });
-      throw new TokenError('Invalid authorization code: Code has expired.', 400, 'AUTH_CODE_EXPIRED');
+              throw new TokenExpiredError('Invalid authorization code: Code has expired.', { code: code, expiresAt: storedCode.expiresAt });
     }
 
     // 验证客户端ID是否匹配
@@ -213,7 +214,7 @@ export async function validateAuthorizationCode(
     } else {
       // 如果 storeAuthorizationCode 强制使用 S256，则不应发生此情况
       // Should not happen if storeAuthorizationCode enforces S256
-      throw new ConfigurationError(`Unsupported code challenge method in stored code: ${storedCode.codeChallengeMethod}. Only 'S256' is supported.`, undefined, 'UNSUPPORTED_STORED_CHALLENGE_METHOD');
+              throw new ValidationError(`Unsupported code challenge method in stored code: ${storedCode.codeChallengeMethod}. Only 'S256' is supported.`, { storedMethod: storedCode.codeChallengeMethod }, 'UNSUPPORTED_STORED_CHALLENGE_METHOD');
     }
 
     // 验证成功，将授权码标记为已使用

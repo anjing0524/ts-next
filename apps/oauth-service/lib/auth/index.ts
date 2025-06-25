@@ -14,7 +14,7 @@ export {
   isSupportedChallengeMethod,
   validatePKCEParams,
   type PKCEValidationResult
-} from './pkce';
+} from './pkce-utils';
 
 // OAuth2 错误处理
 export {

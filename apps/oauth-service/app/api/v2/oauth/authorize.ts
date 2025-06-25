@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addMinutes } from 'date-fns';
 import { jwtVerify, JWTPayload } from 'jose';
 
-// import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth/middleware';
+// import { withOAuthAuthorizeValidation, OAuthValidationResult } from '../../../lib/auth/middleware';
 import {
   PKCEUtils,
   ScopeUtils,

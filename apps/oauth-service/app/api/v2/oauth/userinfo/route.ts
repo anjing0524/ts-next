@@ -4,12 +4,12 @@
 // Description: OAuth 2.0 / OpenID Connect UserInfo Endpoint (OIDC Core 1.0)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from 'lib/prisma';
-import { withErrorHandling } from 'lib/utils/error-handler';
+import { prisma } from '@repo/database';
+import { withErrorHandling } from '@repo/lib/utils/error-handler';
 import { authenticateBearer } from 'lib/auth/middleware';
 import { OAuth2Error, OAuth2ErrorCode, BaseError } from 'lib/errors';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
-import { ApiResponse } from '@/lib/types/api';
+import { ApiResponse } from '@repo/lib/types/api';
 
 /**
  * @swagger
@@ -118,7 +118,8 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   // --- 步骤2: 检查用户ID和权限 ---
   // --- Step 2: Check User ID and Permissions ---
-  const { userId, scopes } = authResult.context;
+  const { user, scopes } = authResult.context;
+  const userId = user?.id;
   
   if (!userId) {
     throw new OAuth2Error(
@@ -142,14 +143,14 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   // --- 步骤3: 获取用户信息 ---
   // --- Step 3: Retrieve User Information ---
-  const user = await prisma.user.findUnique({
+  const userData = await prisma.user.findUnique({
     where: { 
       id: userId,
       isActive: true // 只返回活跃用户的信息
     },
   });
 
-  if (!user) {
+  if (!userData) {
     throw new OAuth2Error(
       'User not found or inactive.',
       OAuth2ErrorCode.InvalidToken, // 用户不存在通常表示令牌无效
@@ -162,43 +163,43 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
   // --- 步骤4: 构建响应数据 (基于scope) ---
   // --- Step 4: Build Response Data (based on scope) ---
   const userInfo: UserInfoResponse = {
-    sub: user.id, // subject - 必需字段
+    sub: userData.id, // subject - 必需字段
   };
 
   // 基于访问令牌的scope添加相应的用户信息
   // Add corresponding user information based on access token scope
   if (scopes.includes('profile')) {
-    userInfo.name = user.firstName && user.lastName 
-      ? `${user.firstName} ${user.lastName}`.trim() 
+    userInfo.name = userData.firstName && userData.lastName 
+      ? `${userData.firstName} ${userData.lastName}`.trim() 
       : undefined;
-    userInfo.given_name = user.firstName || undefined;
-    userInfo.family_name = user.lastName || undefined;
-    userInfo.preferred_username = user.username || undefined;
-    userInfo.picture = user.picture || undefined;
-    userInfo.updated_at = user.updatedAt ? Math.floor(user.updatedAt.getTime() / 1000) : undefined;
+    userInfo.given_name = userData.firstName || undefined;
+    userInfo.family_name = userData.lastName || undefined;
+    userInfo.preferred_username = userData.username || undefined;
+    userInfo.picture = userData.avatar || undefined;
+    userInfo.updated_at = userData.updatedAt ? Math.floor(userData.updatedAt.getTime() / 1000) : undefined;
     
     // 扩展字段 (如果用户模型支持)
     // Extended fields (if User model supports)
-    if ('organization' in user) {
-      userInfo.organization = (user as any).organization || undefined;
-    }
-    if ('department' in user) {
-      userInfo.department = (user as any).department || undefined;
-    }
+    userInfo.organization = userData.organization || undefined;
+    userInfo.department = userData.department || undefined;
   }
 
+  // email scope - 当前User模型不包含email字段，这些字段在schema中定义为可选
+  // email scope - current User model doesn't include email fields, these are optional in schema
   if (scopes.includes('email')) {
-    userInfo.email = user.email || undefined;
-    userInfo.email_verified = user.emailVerified || false;
+    // 当前User模型没有email字段，保持为undefined
+    // Current User model has no email fields, keep as undefined
+    userInfo.email = undefined;
+    userInfo.email_verified = undefined;
   }
 
-  // 如果有phone scope (如果用户模型支持)
-  // If phone scope exists (if User model supports)
+  // 如果有phone scope (当前用户模型不支持phone字段)
+  // If phone scope exists (current User model doesn't support phone fields)
   if (scopes.includes('phone')) {
-    if ('phone' in user) {
-      userInfo.phone_number = (user as any).phone || undefined;
-      userInfo.phone_number_verified = (user as any).phoneVerified || false;
-    }
+    // 当前User模型没有phone字段，保持为undefined
+    // Current User model has no phone fields, keep as undefined
+    userInfo.phone_number = undefined;
+    userInfo.phone_number_verified = undefined;
   }
 
   // 移除undefined值

@@ -50,9 +50,9 @@ const CORE_SYSTEM_ROLES = ['SYSTEM_ADMIN', 'USER', 'USER_ADMIN', 'PERMISSION_ADM
  */
 async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 从上下文中获取 roleId。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   try {
     // 从数据库中查找具有指定 ID 的角色。
@@ -136,9 +136,9 @@ async function getRoleByIdHandler(req: NextRequest, context: RouteContext): Prom
  */
 async function updateRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 目标角色ID。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   let body;
   try {
@@ -334,9 +334,9 @@ async function updateRoleHandler(req: NextRequest, context: RouteContext): Promi
  */
 async function deleteRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params; // 目标角色ID。
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   try {
     // 步骤 1: 检查角色是否存在。
@@ -466,9 +466,9 @@ const RolePatchSchema = z.object({
 
 async function patchRoleHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { roleId } = context.params;
-  const performingAdmin = req.user;
-  const ipAddress = req.ip || req.headers?.get('x-forwarded-for');
-  const userAgent = req.headers?.get('user-agent');
+  const performingAdmin = undefined // TODO: 从认证中间件获取用户信息;
+  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+  const userAgent = req.headers.get('user-agent') || undefined;
 
   let body;
   try {
