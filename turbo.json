@@ -1,5 +1,5 @@
 {
-  "$schema": "https://turborepo.com/schema.json",
+  "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -22,7 +22,7 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", "__tests__/**/*.ts", "__tests__/**/*.tsx"]
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],
@@ -76,4 +76,4 @@
   "globalEnv": [
     "NODE_ENV"
   ]
-} 
+}

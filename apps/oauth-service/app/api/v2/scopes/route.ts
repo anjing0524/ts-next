@@ -132,8 +132,8 @@ async function createScopeHandler(
 
 export const GET = withErrorHandling(
   withAuth(listScopesHandler, { requiredPermissions: ['scope:list'] })
-);
+) as any;
 
 export const POST = withErrorHandling(
   withAuth(createScopeHandler, { requiredPermissions: ['scope:create'] })
-);
+) as any;

@@ -425,10 +425,10 @@ async function deletePermissionHandler(
 // 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
 export const GET = withErrorHandling(
   withAuth(getPermissionByIdHandler, { requiredPermissions: ['permission:read'] })
-);
+) as any;
 export const PUT = withErrorHandling(
   withAuth(updatePermissionHandler, { requiredPermissions: ['permission:update'] })
-);
+) as any;
 export const DELETE = withErrorHandling(
   withAuth(deletePermissionHandler, { requiredPermissions: ['permission:delete'] })
-);
+) as any;

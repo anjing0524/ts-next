@@ -304,7 +304,7 @@ async function decodeTokenPayload(token, secret) {
             return decoded;
         }
         catch (e) {
-            throw new Error('Invalid token format');
+            throw new Error('Invalid token format' + e);
         }
     }
     // 使用密钥验证和解码

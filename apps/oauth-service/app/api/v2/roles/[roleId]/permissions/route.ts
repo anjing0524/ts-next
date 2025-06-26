@@ -296,18 +296,12 @@ async function assignPermissionsToRoleHandler(req: NextRequest, context: RouteCo
 // GET 请求需要 'roles:permissions:read' 权限。
 // POST 请求需要 'roles:permissions:assign' 权限。
 export const GET = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const roleId = pathSegments[pathSegments.length - 2] || '';
-    return listRolePermissionsHandler(request, { params: { roleId }, authContext });
+  withAuth(async (request: NextRequest, context: { authContext: AuthContext; params: { roleId: string } }) => {
+    return listRolePermissionsHandler(request, { params: context.params, authContext: context.authContext });
   }, { requiredPermissions: ['roles:permissions:read'] })
-);
+) as any;
 export const POST = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const roleId = pathSegments[pathSegments.length - 2] || '';
-    return assignPermissionsToRoleHandler(request, { params: { roleId }, authContext });
+  withAuth(async (request: NextRequest, context: { authContext: AuthContext; params: { roleId: string } }) => {
+    return assignPermissionsToRoleHandler(request, { params: context.params, authContext: context.authContext });
   }, { requiredPermissions: ['roles:permissions:assign'] })
-);
+) as any;

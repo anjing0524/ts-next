@@ -48,7 +48,7 @@ const updateClientSchema = z.object({
  */
 async function getClientHandler(
   request: NextRequest,
-  { params }: { authContext: AuthContext; params: RouteParams }
+  { params, authContext }: { authContext: AuthContext; params: RouteParams }
 ): Promise<NextResponse> {
   const { clientId } = params;
 
@@ -156,12 +156,12 @@ async function deleteClientHandler(
 // 导出处理函数，使用权限中间件和错误处理包装器
 export const GET = withErrorHandling(
   withAuth(getClientHandler, { requiredPermissions: ['client:read'] })
-);
+) as any;
 
 export const PUT = withErrorHandling(
   withAuth(updateClientHandler, { requiredPermissions: ['client:update'] })
-);
+) as any;
 
 export const DELETE = withErrorHandling(
   withAuth(deleteClientHandler, { requiredPermissions: ['client:delete'] })
-); 
+) as any;

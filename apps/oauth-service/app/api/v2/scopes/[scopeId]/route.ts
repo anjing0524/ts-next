@@ -25,7 +25,7 @@ const scopeUpdateSchema = z.object({
  */
 async function getScopeHandler(
   request: NextRequest,
-  { params }: { authContext: AuthContext; params: RouteParams }
+  { params, authContext }: { authContext: AuthContext; params: RouteParams }
 ) {
   const { scopeId } = params;
 
@@ -54,7 +54,7 @@ async function getScopeHandler(
  */
 async function updateScopeHandler(
   request: NextRequest,
-  { params }: { authContext: AuthContext; params: RouteParams }
+  { params, authContext }: { authContext: AuthContext; params: RouteParams }
 ) {
   const { scopeId } = params;
 
@@ -106,7 +106,7 @@ async function updateScopeHandler(
  */
 async function deleteScopeHandler(
   request: NextRequest,
-  { params }: { authContext: AuthContext; params: RouteParams }
+  { params, authContext }: { authContext: AuthContext; params: RouteParams }
 ) {
   const { scopeId } = params;
 
@@ -147,12 +147,12 @@ async function deleteScopeHandler(
 
 export const GET = withErrorHandling(
   withAuth(getScopeHandler, { requiredPermissions: ['scope:read'] })
-);
+) as any;
 
 export const PUT = withErrorHandling(
   withAuth(updateScopeHandler, { requiredPermissions: ['scope:update'] })
-);
+) as any;
 
 export const DELETE = withErrorHandling(
   withAuth(deleteScopeHandler, { requiredPermissions: ['scope:delete'] })
-);
+) as any;

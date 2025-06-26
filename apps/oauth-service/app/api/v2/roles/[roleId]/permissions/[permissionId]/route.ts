@@ -103,11 +103,7 @@ async function removePermissionFromRoleHandler(req: NextRequest, context: RouteC
 }
 
 export const DELETE = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const permissionId = pathSegments[pathSegments.length - 1] || '';
-    const roleId = pathSegments[pathSegments.length - 3] || '';
-    return removePermissionFromRoleHandler(request, { params: { roleId, permissionId }, authContext });
+  withAuth(async (request: NextRequest, context: { authContext: AuthContext; params: { roleId: string; permissionId: string } }) => {
+    return removePermissionFromRoleHandler(request, { params: context.params, authContext: context.authContext });
   }, { requiredPermissions: ['roles:permissions:remove'] })
-);
+) as any;

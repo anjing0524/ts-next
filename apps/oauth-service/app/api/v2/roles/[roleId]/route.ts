@@ -533,16 +533,16 @@ async function patchRoleHandler(
 // --- 导出 HTTP 方法处理器 ---
 export const GET = withErrorHandling(
   withAuth(getRoleByIdHandler, { requiredPermissions: ['role:read'] })
-);
+) as any;
 
 export const PUT = withErrorHandling(
   withAuth(updateRoleHandler, { requiredPermissions: ['role:update'] })
-);
+) as any;
 
 export const DELETE = withErrorHandling(
   withAuth(deleteRoleHandler, { requiredPermissions: ['role:delete'] })
-);
+) as any;
 
 export const PATCH = withErrorHandling(
   withAuth(patchRoleHandler, { requiredPermissions: ['role:update'] })
-);
+) as any;

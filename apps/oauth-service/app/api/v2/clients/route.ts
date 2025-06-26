@@ -162,8 +162,8 @@ async function createClientHandler(
 // Export handler functions with permission middleware and error handling wrapper
 export const GET = withErrorHandling(
   withAuth(getClientsHandler, { requiredPermissions: ['client:list'] })
-);
+) as any;
 
 export const POST = withErrorHandling(
   withAuth(createClientHandler, { requiredPermissions: ['client:create'] })
-); 
+) as any;

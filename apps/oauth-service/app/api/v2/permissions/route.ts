@@ -288,7 +288,7 @@ async function createPermissionHandler(
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: actionCode,
           success: false,
         ipAddress,
@@ -310,7 +310,7 @@ async function createPermissionHandler(
 // 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
 export const GET = withErrorHandling(
   withAuth(listPermissionsHandler, { requiredPermissions: ['permission:list'] })
-);
+) as any;
 export const POST = withErrorHandling(
   withAuth(createPermissionHandler, { requiredPermissions: ['permission:create'] })
-);
+) as any;

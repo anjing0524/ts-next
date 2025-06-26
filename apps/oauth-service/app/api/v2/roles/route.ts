@@ -114,9 +114,9 @@ async function listRolesHandler(
  */
 async function createRoleHandler(
   req: NextRequest,
-  { authContext }: { authContext: AuthContext; params: any }
+  context: { authContext: AuthContext; params: any }
 ): Promise<NextResponse> {
-  const performingAdminId = authContext.user_id;
+  const performingAdminId = context.authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -281,8 +281,8 @@ async function createRoleHandler(
 // 使用 withAuth 和 withErrorHandling 包装处理器
 export const GET = withErrorHandling(
   withAuth(listRolesHandler, { requiredPermissions: ['role:list'] })
-);
+) as any;
 
 export const POST = withErrorHandling(
   withAuth(createRoleHandler, { requiredPermissions: ['role:create'] })
-);
+) as any;
