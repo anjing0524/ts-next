@@ -5,16 +5,19 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\""
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "eslint": "^9",
     "typescript": "^5.4.5"
   },
+  "prettier": "@repo/prettier-config",
   "dependencies": {
     "ioredis": "^5.4.1",
     "lru-cache": "^10.2.2"
   }
-} 
+}

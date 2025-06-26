@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@repo/ui';
 import type { PaginatedResponse } from '@/types/admin-entities';
 
 // 定义API函数的类型签名
 // P now extends an object that expects offset and limit
-type ApiListFunction<T, P extends { offset: number; limit: number; [key: string]: any }> =
-  (params: P) => Promise<PaginatedResponse<T>>;
+type ApiListFunction<T, P extends { offset: number; limit: number; [key: string]: any }> = (
+  params: P
+) => Promise<PaginatedResponse<T>>;
 
 interface UsePaginatedResourceOptions<P> {
   initialOffset?: number;
@@ -16,7 +17,10 @@ interface UsePaginatedResourceOptions<P> {
   loadInitialData?: boolean; // Whether to load data on mount, default true
 }
 
-interface UsePaginatedResourceReturn<T, P extends { offset: number; limit: number; [key: string]: any }> {
+interface UsePaginatedResourceReturn<
+  T,
+  P extends { offset: number; limit: number; [key: string]: any },
+> {
   data: T[];
   isLoading: boolean;
   error: string | null;
@@ -27,7 +31,7 @@ interface UsePaginatedResourceReturn<T, P extends { offset: number; limit: numbe
   searchTerm: string;
   searchParams: Omit<P, 'offset' | 'limit'>;
   setOffset: (offset: number) => void; // Direct offset control if needed, e.g. for virtual scrolling
-  setLimit: (limit: number) => void;   // Resets offset to 0
+  setLimit: (limit: number) => void; // Resets offset to 0
   setSearchTerm: (term: string) => void;
   setSearchParams: (params: Omit<P, 'offset' | 'limit'>) => void;
   applyFiltersAndReset: () => void; // Applies current searchTerm & searchParams, resets offset to 0
@@ -42,7 +46,10 @@ const DEFAULT_LIMIT = 10;
  * @param apiListFunction - 调用API以获取列表数据的函数。它应接受一个包含 offset, limit 和其他过滤参数的对象。
  * @param options - 可选的初始配置。
  */
-export function usePaginatedResource<T, P extends { offset: number; limit: number; search?: string; [key: string]: any }>(
+export function usePaginatedResource<
+  T,
+  P extends { offset: number; limit: number; search?: string; [key: string]: any },
+>(
   apiListFunction: ApiListFunction<T, P>,
   options?: UsePaginatedResourceOptions<P>
 ): UsePaginatedResourceReturn<T, P> {
@@ -62,45 +69,51 @@ export function usePaginatedResource<T, P extends { offset: number; limit: numbe
   const [totalItems, setTotalItems] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState(initialSearchParams?.search || '');
-  const [searchParams, setSearchParamsState] = useState<Omit<P, 'offset' | 'limit'>>(initialSearchParams);
-  const [appliedFilters, setAppliedFilters] = useState<Omit<P, 'offset' | 'limit'>>(initialSearchParams);
+  const [searchParams, setSearchParamsState] =
+    useState<Omit<P, 'offset' | 'limit'>>(initialSearchParams);
+  const [appliedFilters, setAppliedFilters] =
+    useState<Omit<P, 'offset' | 'limit'>>(initialSearchParams);
 
   const canLoadMore = offset + data.length < totalItems;
 
-  const fetchData = useCallback(async (fetchOffset: number, isLoadMore: boolean = false) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const paramsForApi = {
-        ...appliedFilters,
-        offset: fetchOffset,
-        limit: limit, // Use current limit state
-        search: appliedFilters.search
-      } as P;
+  const fetchData = useCallback(
+    async (fetchOffset: number, isLoadMore: boolean = false) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const paramsForApi = {
+          ...appliedFilters,
+          offset: fetchOffset,
+          limit: limit, // Use current limit state
+          search: appliedFilters.search,
+        } as P;
 
-      const response = await apiListFunction(paramsForApi);
+        const response = await apiListFunction(paramsForApi);
 
-      if (isLoadMore) {
-        setData(prevData => [...prevData, ...response.data]);
-      } else {
-        setData(response.data);
+        if (isLoadMore) {
+          setData((prevData) => [...prevData, ...response.data]);
+        } else {
+          setData(response.data);
+        }
+        setTotalItems(response.meta.totalItems);
+        // No totalPages or currentPage needed with offset/limit directly
+      } catch (err: any) {
+        const errorMessage = err.message || '获取数据失败。';
+        setError(errorMessage);
+        toast({ variant: 'destructive', title: '错误', description: errorMessage });
+      } finally {
+        setIsLoading(false);
       }
-      setTotalItems(response.meta.totalItems);
-      // No totalPages or currentPage needed with offset/limit directly
-    } catch (err: any) {
-      const errorMessage = err.message || '获取数据失败。';
-      setError(errorMessage);
-      toast({ variant: "destructive", title: "错误", description: errorMessage });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiListFunction, limit, appliedFilters]);
+    },
+    [apiListFunction, limit, appliedFilters]
+  );
 
   useEffect(() => {
-    if (loadInitialData || offset !== initialOffset) { // Fetch if loadInitialData or if offset changed by loadMore/setOffset
-        fetchData(offset);
+    if (loadInitialData || offset !== initialOffset) {
+      // Fetch if loadInitialData or if offset changed by loadMore/setOffset
+      fetchData(offset);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset, appliedFilters, loadInitialData]); // fetchData is memoized. Limit changes trigger reset via setLimitState.
 
   const handleSetOffset = (newOffset: number) => {
@@ -122,12 +135,16 @@ export function usePaginatedResource<T, P extends { offset: number; limit: numbe
   };
 
   const applyFiltersAndReset = () => {
-    const newAppliedFilters = { ...searchParams, search: searchTerm } as Omit<P, 'offset' | 'limit'>;
+    const newAppliedFilters = { ...searchParams, search: searchTerm } as Omit<
+      P,
+      'offset' | 'limit'
+    >;
     setAppliedFilters(newAppliedFilters);
-    if (offset === 0) { // If offset is already 0, useEffect won't fire by offset change alone
-        fetchData(0); // Manually trigger fetch for current offset if filters changed but offset didn't
+    if (offset === 0) {
+      // If offset is already 0, useEffect won't fire by offset change alone
+      fetchData(0); // Manually trigger fetch for current offset if filters changed but offset didn't
     } else {
-        setOffset(0); // This will trigger useEffect
+      setOffset(0); // This will trigger useEffect
     }
   };
 
@@ -172,7 +189,7 @@ export function usePaginatedResource<T, P extends { offset: number; limit: numbe
       // so replacing data for the current `offset` is usually correct.
       // The `canLoadMore` flag is useful for "load more" buttons.
       if (canLoadMore && !isLoading) {
-         setOffset(prevOffset => prevOffset + limit);
+        setOffset((prevOffset) => prevOffset + limit);
       }
     }
   };
@@ -200,4 +217,3 @@ export function usePaginatedResource<T, P extends { offset: number; limit: numbe
     refreshData,
   };
 }
-```

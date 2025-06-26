@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -40,11 +41,14 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "typescript": "^5"
-  }
+  },
+  "prettier": "@repo/prettier-config"
 }

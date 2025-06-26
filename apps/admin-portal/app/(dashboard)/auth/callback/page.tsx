@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { Terminal } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@repo/ui';
 import { getOAuthRedirectUri } from '@/lib/api'; // Assuming getOAuthRedirectUri gives the correct callback URL
 
 export default function AuthCallbackPage() {

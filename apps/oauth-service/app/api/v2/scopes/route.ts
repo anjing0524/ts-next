@@ -12,10 +12,19 @@ import { Prisma } from '@prisma/client';
 // Zod Schema for creating a new scope
 // 创建新权限范围的Zod Schema
 const scopeCreateSchema = z.object({
-  name: z.string().min(3, "Scope name must be at least 3 characters long / 范围名称至少需要3个字符")
-    .max(100, "Scope name must be at most 100 characters long / 范围名称长度不超过100字符")
-    .regex(/^[a-zA-Z0-9_:-]+$/, "Scope name can only contain alphanumeric characters, underscores, colons, and hyphens / 范围名称只能包含字母数字、下划线、冒号和连字符"),
-  description: z.string().max(500, "Description must be at most 500 characters long / 描述长度不超过500字符").optional().nullable(),
+  name: z
+    .string()
+    .min(3, 'Scope name must be at least 3 characters long / 范围名称至少需要3个字符')
+    .max(100, 'Scope name must be at most 100 characters long / 范围名称长度不超过100字符')
+    .regex(
+      /^[a-zA-Z0-9_:-]+$/,
+      'Scope name can only contain alphanumeric characters, underscores, colons, and hyphens / 范围名称只能包含字母数字、下划线、冒号和连字符'
+    ),
+  description: z
+    .string()
+    .max(500, 'Description must be at most 500 characters long / 描述长度不超过500字符')
+    .optional()
+    .nullable(),
   isPublic: z.boolean().default(false).optional(), // 公开客户端通常只能请求公开范围 (Public clients can usually only request public scopes)
   isActive: z.boolean().default(true).optional(),
 });
@@ -26,7 +35,7 @@ const scopeListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   name: z.string().optional(), // Filter by name (contains)
-  isActive: z.preprocess(val => {
+  isActive: z.preprocess((val) => {
     if (val === 'true') return true;
     if (val === 'false') return false;
     return undefined;
@@ -35,7 +44,6 @@ const scopeListQuerySchema = z.object({
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
-
 
 /**
  * GET /api/v2/scopes - 列出所有可用权限范围 (OAuth Scope管理)
@@ -47,11 +55,16 @@ async function listScopesHandler(
 ) {
   const { searchParams } = new URL(request.url);
   const queryParams: Record<string, string | undefined> = {};
-  searchParams.forEach((value, key) => { queryParams[key] = value; });
+  searchParams.forEach((value, key) => {
+    queryParams[key] = value;
+  });
 
   const validationResult = scopeListQuerySchema.safeParse(queryParams);
   if (!validationResult.success) {
-    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Validation failed', issues: validationResult.error.issues },
+      { status: 400 }
+    );
   }
 
   const { page, limit, name, isActive } = validationResult.data;
@@ -79,8 +92,8 @@ async function listScopesHandler(
       },
     });
   } catch (error) {
-    console.error("Failed to list scopes:", error);
-    return NextResponse.json({ message: "Error listing scopes." }, { status: 500 });
+    console.error('Failed to list scopes:', error);
+    return NextResponse.json({ message: 'Error listing scopes.' }, { status: 500 });
   }
 }
 
@@ -96,12 +109,18 @@ async function createScopeHandler(
   try {
     payload = await request.json();
   } catch (error) {
-    return NextResponse.json({ error: 'Invalid request body', message: 'Failed to parse JSON body.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid request body', message: 'Failed to parse JSON body.' },
+      { status: 400 }
+    );
   }
 
   const validationResult = scopeCreateSchema.safeParse(payload);
   if (!validationResult.success) {
-    return NextResponse.json({ error: 'Validation failed', issues: validationResult.error.issues }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Validation failed', issues: validationResult.error.issues },
+      { status: 400 }
+    );
   }
 
   const { name, description, isPublic, isActive } = validationResult.data;
@@ -109,7 +128,10 @@ async function createScopeHandler(
   try {
     const existingScope = await prisma.scope.findUnique({ where: { name } });
     if (existingScope) {
-      return NextResponse.json({ message: `Scope name "${name}" already exists.` }, { status: 409 });
+      return NextResponse.json(
+        { message: `Scope name "${name}" already exists.` },
+        { status: 409 }
+      );
     }
 
     const newScope = await prisma.scope.create({
@@ -122,11 +144,14 @@ async function createScopeHandler(
     });
     return NextResponse.json(newScope, { status: 201 });
   } catch (error: any) {
-    console.error("Failed to create scope:", error);
+    console.error('Failed to create scope:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ message: `Scope name "${name}" already exists (race condition).` }, { status: 409 });
+      return NextResponse.json(
+        { message: `Scope name "${name}" already exists (race condition).` },
+        { status: 409 }
+      );
     }
-    return NextResponse.json({ message: "Error creating scope." }, { status: 500 });
+    return NextResponse.json({ message: 'Error creating scope.' }, { status: 500 });
   }
 }
 

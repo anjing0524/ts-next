@@ -25,9 +25,11 @@ async function checkUserPermission(userId: string, permissionName: string): Prom
   const userRoles = await prisma.userRole.findMany({
     where: { userId: userId },
     include: {
-      role: { // 包含角色信息 (Include role information)
+      role: {
+        // 包含角色信息 (Include role information)
         include: {
-          rolePermissions: { // 包含角色的权限关联 (Include role's permission associations)
+          rolePermissions: {
+            // 包含角色的权限关联 (Include role's permission associations)
             include: {
               permission: true, // 包含具体的权限对象 (Include the actual permission object)
             },
@@ -45,11 +47,15 @@ async function checkUserPermission(userId: string, permissionName: string): Prom
   for (const userRole of userRoles) {
     if (userRole.role && userRole.role.rolePermissions) {
       for (const rolePermission of userRole.role.rolePermissions) {
-        if (rolePermission.permission && rolePermission.permission.name === permissionName && rolePermission.permission.isActive) {
+        if (
+          rolePermission.permission &&
+          rolePermission.permission.name === permissionName &&
+          rolePermission.permission.isActive
+        ) {
           // 权限匹配且权限本身是激活的 (Permission matches and the permission itself is active)
           // 还需要检查角色是否激活 (Also need to check if the role is active)
           if (userRole.role.isActive) {
-             return true; // 找到匹配的、激活的权限和激活的角色 (Found a matching, active permission and active role)
+            return true; // 找到匹配的、激活的权限和激活的角色 (Found a matching, active permission and active role)
           }
         }
       }
@@ -59,27 +65,38 @@ async function checkUserPermission(userId: string, permissionName: string): Prom
   return false; // 未找到匹配的权限 (No matching permission found)
 }
 
-
 // --- 主处理函数 ---
 
 export async function POST(req: NextRequest) {
   // 1. 认证用户 (Authenticate user)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return NextResponse.json({ error: 'unauthorized', message: 'Missing or invalid Authorization header.' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'unauthorized', message: 'Missing or invalid Authorization header.' },
+      { status: 401 }
+    );
   }
   const token = authHeader.substring(7);
   if (!token) {
-    return NextResponse.json({ error: 'unauthorized', message: 'Access token is missing.' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'unauthorized', message: 'Access token is missing.' },
+      { status: 401 }
+    );
   }
 
   const { valid, payload, error: tokenError } = await JWTUtils.verifyAccessToken(token);
   if (!valid || !payload) {
-    return NextResponse.json({ error: 'invalid_token', message: `Invalid or expired token. ${tokenError || ''}`.trim() }, { status: 401 });
+    return NextResponse.json(
+      { error: 'invalid_token', message: `Invalid or expired token. ${tokenError || ''}`.trim() },
+      { status: 401 }
+    );
   }
   const userId = payload.user_id as string | undefined;
   if (!userId) {
-    return NextResponse.json({ error: 'invalid_token_payload', message: 'Invalid token: User ID missing.' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'invalid_token_payload', message: 'Invalid token: User ID missing.' },
+      { status: 401 }
+    );
   }
 
   // 2. 解析请求体 (Parse request body)
@@ -87,13 +104,19 @@ export async function POST(req: NextRequest) {
   try {
     requestBody = await req.json();
   } catch (e) {
-    return NextResponse.json({ error: 'invalid_request', message: 'Invalid JSON request body.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'invalid_request', message: 'Invalid JSON request body.' },
+      { status: 400 }
+    );
   }
 
   const { permission, context } = requestBody; // context 当前未使用，但为未来扩展保留 (context is currently unused but reserved for future extension)
 
   if (!permission || typeof permission !== 'string') {
-    return NextResponse.json({ error: 'invalid_request', message: 'Permission string is required.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'invalid_request', message: 'Permission string is required.' },
+      { status: 400 }
+    );
   }
 
   try {
@@ -103,10 +126,12 @@ export async function POST(req: NextRequest) {
 
     // 4. 返回响应 (Return response)
     return NextResponse.json({ allowed: hasPermission }, { status: 200 });
-
   } catch (error: any) {
     console.error(`Permission check error for user ${userId}, permission ${permission}:`, error);
-    return NextResponse.json({ error: 'server_error', message: 'An unexpected error occurred during permission check.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'server_error', message: 'An unexpected error occurred during permission check.' },
+      { status: 500 }
+    );
   }
 }
 

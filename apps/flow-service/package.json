@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start -p 3004",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "next": "^15.3.2",
@@ -23,11 +27,19 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
     "@repo/next-config": "workspace:*",
+    "@repo/tailwind-config": "workspace:*",
+    "@repo/jest-config": "workspace:*",
     "typescript": "^5",
     "@types/react": "^19.1.6",
     "@types/node": "^20.19.1",
     "eslint": "^9",
-    "eslint-config-next": "15.2.0"
-  }
+    "eslint-config-next": "15.2.0",
+    "tailwindcss": "^4.1.5",
+    "@tailwindcss/postcss": "^4.1.5",
+    "postcss": "^8.5.3"
+  },
+  "prettier": "@repo/prettier-config"
 }

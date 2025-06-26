@@ -237,6 +237,7 @@ exports.TokenValidationError = TokenValidationError;
  * (Indicates that a provided token has passed its expiration time.)
  */
 class TokenExpiredError extends TokenValidationError {
+    // 继承自 TokenValidationError (Inherits from TokenValidationError)
     constructor(message = 'Token has expired.', context) {
         super(message, context, 'TOKEN_EXPIRED'); // 状态码仍为401 (Status code remains 401)
     }

@@ -118,9 +118,7 @@ describe('JWTUtils', () => {
         scope: 'read write', // 没有openid
       };
 
-      await expect(
-        JWTUtils.createIdToken(payload)
-      ).rejects.toThrow();
+      await expect(JWTUtils.createIdToken(payload)).rejects.toThrow();
     });
   });
 
@@ -153,7 +151,8 @@ describe('JWTUtils', () => {
     it('应该拒绝过期的令牌', async () => {
       // 这个测试需要模拟过期令牌，或者使用较短的过期时间
       // 由于实际令牌有1小时过期时间，这里我们模拟验证过期令牌的行为
-      const expiredToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDAwMDAwMDB9.signature';
+      const expiredToken =
+        'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDAwMDAwMDB9.signature';
       const verification = await JWTUtils.verifyAccessToken(expiredToken);
 
       expect(verification.valid).toBe(false);
@@ -208,14 +207,9 @@ describe('JWTUtils', () => {
     });
 
     it('应该在无效格式时返回null', () => {
-      const invalidHeaders = [
-        'Basic dGVzdA==',
-        'Bearer',
-        'test-token-value',
-        '',
-      ];
+      const invalidHeaders = ['Basic dGVzdA==', 'Bearer', 'test-token-value', ''];
 
-      invalidHeaders.forEach(header => {
+      invalidHeaders.forEach((header) => {
         const token = JWTUtils.extractTokenFromHeader(header);
         expect(token).toBeNull();
       });
@@ -242,4 +236,4 @@ describe('JWTUtils', () => {
       }
     });
   });
-}); 
+});

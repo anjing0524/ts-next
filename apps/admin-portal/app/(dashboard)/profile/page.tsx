@@ -3,17 +3,34 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { adminApi, authApi } from '@/lib/api'; // Assuming authApi might have password change
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { toast } from '@/components/ui/use-toast'; // Assuming shadcn/ui toast is used
-import type { UserProfile, EditableProfileFormData, PasswordChangeFormData } from '@/types/admin-entities'; // 引入共享类型
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+  Button,
+  Input,
+  Label,
+  Badge,
+  toast,
+} from '@repo/ui';
+import type {
+  UserProfile,
+  EditableProfileFormData,
+  PasswordChangeFormData,
+} from '@/types/admin-entities'; // 引入共享类型
 
 export default function ProfilePage() {
   // EditableProfile and PasswordChange are now EditableProfileFormData and PasswordChangeFormData
-  const { user, isLoading: authLoading, error: authError, fetchUserProfile, accessToken } = useAuth();
+  const {
+    user,
+    isLoading: authLoading,
+    error: authError,
+    fetchUserProfile,
+    accessToken,
+  } = useAuth();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState<EditableProfile>({
@@ -45,7 +62,7 @@ export default function ProfilePage() {
   // 处理个人资料输入变化
   const handleProfileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setProfileData(prev => ({ ...prev, [name]: value }));
+    setProfileData((prev) => ({ ...prev, [name]: value }));
   };
 
   // 保存个人资料
@@ -56,19 +73,24 @@ export default function ProfilePage() {
     try {
       // TODO: Validate profileData (e.g., using Zod)
       if (!profileData.displayName || !profileData.email) {
-        throw new Error("显示名称和邮箱不能为空。");
+        throw new Error('显示名称和邮箱不能为空。');
       }
       // Assuming adminApi.updateUserProfile exists and works for the current user
       // Alternatively, a dedicated endpoint like /api/v2/users/me/profile might be better
       await adminApi.updateUserProfile(profileData);
-      toast({ title: "成功", description: "个人资料已更新。" });
+      toast({ title: '成功', description: '个人资料已更新。' });
       setIsEditingProfile(false);
-      if (accessToken) { // 重新获取用户信息以更新显示
+      if (accessToken) {
+        // 重新获取用户信息以更新显示
         await fetchUserProfile(accessToken);
       }
     } catch (error: any) {
       setProfileError(error.message || '更新个人资料失败。');
-      toast({ variant: "destructive", title: "错误", description: error.message || '更新个人资料失败。' });
+      toast({
+        variant: 'destructive',
+        title: '错误',
+        description: error.message || '更新个人资料失败。',
+      });
     } finally {
       setProfileLoading(false);
     }
@@ -77,7 +99,7 @@ export default function ProfilePage() {
   // 处理密码输入变化
   const handlePasswordInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setPasswordData(prev => ({ ...prev, [name]: value }));
+    setPasswordData((prev) => ({ ...prev, [name]: value }));
   };
 
   // 修改密码
@@ -89,26 +111,31 @@ export default function ProfilePage() {
       if (passwordData.newPassword !== passwordData.confirmNewPassword) {
         throw new Error('新密码和确认密码不匹配。');
       }
-      if (passwordData.newPassword.length < 8) { // Example validation
+      if (passwordData.newPassword.length < 8) {
+        // Example validation
         throw new Error('新密码长度至少为8位。');
       }
       // Assuming an API endpoint for password change exists, e.g., in authApi
       // await authApi.changePassword(user.id, passwordData.currentPassword, passwordData.newPassword);
       // Placeholder for API call:
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
       // For a real API, it might be:
       // await authApi.changePassword({
       //   currentPassword: passwordData.currentPassword,
       //   newPassword: passwordData.newPassword
       // });
 
-      toast({ title: "成功", description: "密码已修改。请重新登录。" }); // Usually requires re-login
+      toast({ title: '成功', description: '密码已修改。请重新登录。' }); // Usually requires re-login
       setIsChangingPassword(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
       // logout(); // Optionally force logout
     } catch (error: any) {
       setPasswordError(error.message || '修改密码失败。');
-      toast({ variant: "destructive", title: "错误", description: error.message || '修改密码失败。' });
+      toast({
+        variant: 'destructive',
+        title: '错误',
+        description: error.message || '修改密码失败。',
+      });
     } finally {
       setPasswordLoading(false);
     }
@@ -119,7 +146,11 @@ export default function ProfilePage() {
   }
 
   if (authError || !user) {
-    return <div className="p-6 text-red-600 text-center">{authError || '无法加载用户信息，请确保您已登录。'}</div>;
+    return (
+      <div className="p-6 text-red-600 text-center">
+        {authError || '无法加载用户信息，请确保您已登录。'}
+      </div>
+    );
   }
 
   return (
@@ -170,12 +201,19 @@ export default function ProfilePage() {
                 <Button type="submit" disabled={profileLoading}>
                   {profileLoading ? '保存中...' : '保存更改'}
                 </Button>
-                <Button variant="outline" onClick={() => {
-                  setIsEditingProfile(false);
-                  setProfileError(null);
-                  // Reset form to original user data
-                  if(user) setProfileData({ displayName: user.displayName || user.username || '', email: user.email || '' });
-                }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditingProfile(false);
+                    setProfileError(null);
+                    // Reset form to original user data
+                    if (user)
+                      setProfileData({
+                        displayName: user.displayName || user.username || '',
+                        email: user.email || '',
+                      });
+                  }}
+                >
                   取消
                 </Button>
               </div>
@@ -275,4 +313,3 @@ export default function ProfilePage() {
 //    `/api/v2/users/me/profile` type of endpoint. The current `adminApi.updateUserProfile` in `api.ts`
 //    is a general one and might need adjustment or a new method.
 // 6. Internationalization for messages and labels.
-```

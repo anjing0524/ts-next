@@ -17,7 +17,12 @@ import { prisma } from '@repo/database';
 import bcrypt from 'bcrypt';
 import { JWTUtils } from '@repo/lib/auth'; // 导入 JWTUtils 用于令牌生成 (Import JWTUtils for token generation)
 import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
-import { AuthenticationError, ValidationError, CryptoError, TokenGenerationError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
+import {
+  AuthenticationError,
+  ValidationError,
+  CryptoError,
+  TokenGenerationError,
+} from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 
 // AuthenticatedClient 接口定义了客户端认证成功后需要暴露的基本信息。
 // The AuthenticatedClient interface defines the basic information to be exposed after successful client authentication.
@@ -29,7 +34,6 @@ export interface AuthenticatedClient {
   name: string; // 客户端名称 (Client name)
   accessTokenTtl?: number | null; // 客户端特定的访问令牌生命周期（秒）(Client-specific access token TTL in seconds)
 }
-
 
 /**
  * 认证 OAuth 客户端。此函数特定于客户端凭证流程的内部认证需求。
@@ -44,7 +48,7 @@ export interface AuthenticatedClient {
  */
 export async function authenticateClient(
   clientId: string,
-  clientSecret?: string,
+  clientSecret?: string
 ): Promise<AuthenticatedClient> {
   let clientRecord: OAuthClient | null;
   try {
@@ -53,19 +57,31 @@ export async function authenticateClient(
     });
   } catch (error: any) {
     console.error('Database error during client lookup:', error);
-          throw new AuthenticationError('Database error during client authentication.', { originalError: error.message }, 'DB_CLIENT_LOOKUP_FAILED');
+    throw new AuthenticationError(
+      'Database error during client authentication.',
+      { originalError: error.message },
+      'DB_CLIENT_LOOKUP_FAILED'
+    );
   }
 
   // 客户端未找到
   // Client not found
   if (!clientRecord) {
-    throw new AuthenticationError(`Client ID "${clientId}" not found.`, undefined, 'CLIENT_NOT_FOUND');
+    throw new AuthenticationError(
+      `Client ID "${clientId}" not found.`,
+      undefined,
+      'CLIENT_NOT_FOUND'
+    );
   }
 
   // 客户端非活动状态
   // Client is inactive
   if (!clientRecord.isActive) {
-    throw new AuthenticationError(`Client ID "${clientId}" is inactive.`, undefined, 'CLIENT_INACTIVE');
+    throw new AuthenticationError(
+      `Client ID "${clientId}" is inactive.`,
+      undefined,
+      'CLIENT_INACTIVE'
+    );
   }
 
   // 处理机密客户端
@@ -74,26 +90,40 @@ export async function authenticateClient(
     if (!clientSecret) {
       // 机密客户端需要提供密钥
       // Confidential client requires a secret
-      throw new AuthenticationError(`Client secret is required for confidential client "${clientId}".`, undefined, 'CLIENT_SECRET_REQUIRED');
+      throw new AuthenticationError(
+        `Client secret is required for confidential client "${clientId}".`,
+        undefined,
+        'CLIENT_SECRET_REQUIRED'
+      );
     }
     if (!clientRecord.clientSecret) {
       // 配置错误：机密客户端在数据库中没有存储密钥
       // Configuration error: Confidential client has no stored secret in the database
       console.error(`Configuration error: Confidential client "${clientId}" has no stored secret.`);
-      throw new AuthenticationError(`Client "${clientId}" is misconfigured: secret not stored.`, { clientId }, 'CLIENT_CONFIG_NO_SECRET');
+      throw new AuthenticationError(
+        `Client "${clientId}" is misconfigured: secret not stored.`,
+        { clientId },
+        'CLIENT_CONFIG_NO_SECRET'
+      );
     }
     // 验证提供的密钥是否与存储的哈希匹配
     // Verify if the provided secret matches the stored hash
     let isSecretValid = false;
     try {
-        isSecretValid = await bcrypt.compare(clientSecret, clientRecord.clientSecret);
+      isSecretValid = await bcrypt.compare(clientSecret, clientRecord.clientSecret);
     } catch (bcryptError: any) {
-        console.error(`Error during bcrypt comparison for client ${clientId}:`, bcryptError);
-        throw new CryptoError('Error during secret verification.', { originalError: bcryptError.message });
+      console.error(`Error during bcrypt comparison for client ${clientId}:`, bcryptError);
+      throw new CryptoError('Error during secret verification.', {
+        originalError: bcryptError.message,
+      });
     }
 
     if (!isSecretValid) {
-      throw new AuthenticationError(`Invalid client secret for client ID "${clientId}".`, undefined, 'INVALID_CLIENT_SECRET');
+      throw new AuthenticationError(
+        `Invalid client secret for client ID "${clientId}".`,
+        undefined,
+        'INVALID_CLIENT_SECRET'
+      );
     }
   } else if (clientRecord.clientType === PrismaClientType.PUBLIC) {
     // 公共客户端仅通过 clientId 认证，不检查密钥
@@ -107,7 +137,11 @@ export async function authenticateClient(
     console.error(unsupportedTypeMessage);
     // 这更像是一个配置或数据完整性问题
     // This is more of a configuration or data integrity issue
-          throw new ValidationError(unsupportedTypeMessage, { clientType: clientRecord.clientType }, 'UNSUPPORTED_CLIENT_TYPE');
+    throw new ValidationError(
+      unsupportedTypeMessage,
+      { clientType: clientRecord.clientType },
+      'UNSUPPORTED_CLIENT_TYPE'
+    );
   }
 
   // 认证成功，返回客户端信息
@@ -126,7 +160,6 @@ export async function authenticateClient(
 // Default Access Token TTL (in seconds) for Client Credentials Flow
 export const DEFAULT_CLIENT_CREDENTIALS_TOKEN_TTL_SECONDS = 3600; // 例如1小时 (e.g., 1 hour)
 
-
 /**
  * 为客户端凭证授权流程颁发访问令牌.
  * Grants an access token for the client credentials flow.
@@ -140,18 +173,22 @@ export const DEFAULT_CLIENT_CREDENTIALS_TOKEN_TTL_SECONDS = 3600; // 例如1小�
  */
 export async function grantClientCredentialsToken(
   client: AuthenticatedClient,
-  requestedScope?: string,
+  requestedScope?: string
 ): Promise<string> {
   let finalScopes: string[]; // 最终授予的权限范围数组 (Array of finally granted scopes)
   // 解析客户端配置中允许的权限范围 (通常是JSON字符串)
   // Parse allowed scopes from client configuration (usually a JSON string)
-  const clientAllowedScopes: string[] = client.allowedScopes ? JSON.parse(client.allowedScopes) : [];
+  const clientAllowedScopes: string[] = client.allowedScopes
+    ? JSON.parse(client.allowedScopes)
+    : [];
 
   if (requestedScope) {
-    const requestedScopeArray = requestedScope.split(' ').filter(s => s);
-    const allRequestedScopesAllowed = requestedScopeArray.every(rs => clientAllowedScopes.includes(rs));
+    const requestedScopeArray = requestedScope.split(' ').filter((s) => s);
+    const allRequestedScopesAllowed = requestedScopeArray.every((rs) =>
+      clientAllowedScopes.includes(rs)
+    );
     if (!allRequestedScopesAllowed) {
-      const disallowed = requestedScopeArray.filter(rs => !clientAllowedScopes.includes(rs));
+      const disallowed = requestedScopeArray.filter((rs) => !clientAllowedScopes.includes(rs));
       // 使用 ValidationError 或 OAuth2Error(InvalidScope) 更合适
       // Using ValidationError or OAuth2Error(InvalidScope) would be more appropriate
       throw new Error(`Requested scope '${disallowed.join(', ')}' is not allowed for this client.`);
@@ -168,7 +205,6 @@ export async function grantClientCredentialsToken(
   const expiresInSeconds = client.accessTokenTtl ?? DEFAULT_CLIENT_CREDENTIALS_TOKEN_TTL_SECONDS;
   const expiresInString = `${expiresInSeconds}s`;
 
-
   try {
     const token = await JWTUtils.createAccessToken({
       client_id: client.clientId,
@@ -183,6 +219,8 @@ export async function grantClientCredentialsToken(
     // If JWTUtils.createAccessToken throws ConfigurationError, it will be caught by upper layer
     // 此处应抛出 TokenGenerationError
     // Should throw TokenGenerationError here
-    throw new TokenGenerationError('Token generation failed for client credentials grant.', { originalError: error.message });
+    throw new TokenGenerationError('Token generation failed for client credentials grant.', {
+      originalError: error.message,
+    });
   }
-} 
+}

@@ -105,7 +105,7 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; message: st
   if (!mysqlPool) {
     return {
       healthy: false,
-      message: 'MySQL connection pool is not initialized'
+      message: 'MySQL connection pool is not initialized',
     };
   }
 
@@ -116,7 +116,7 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; message: st
       console.log('Database health check successful');
       return {
         healthy: true,
-        message: 'Connection pool is healthy'
+        message: 'Connection pool is healthy',
       };
     } catch (error) {
       retryCount++;
@@ -135,7 +135,7 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; message: st
 
   return {
     healthy: false,
-    message: `Database health check failed after ${maxRetries} attempts`
+    message: `Database health check failed after ${maxRetries} attempts`,
   };
 }
 
@@ -173,4 +173,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export default mysqlPool; 
+export default mysqlPool;

@@ -44,7 +44,7 @@ const DEFAULT_RATE_LIMIT_OPTIONS: Partial<RateLimitOptions> = {
 /**
  * 生成速率限制键
  * Generate rate limit key
- * 
+ *
  * @param request - Next.js请求对象
  * @param options - 速率限制选项
  * @returns 速率限制键
@@ -57,18 +57,18 @@ function generateRateLimitKey(request: NextRequest, options: RateLimitOptions): 
   switch (options.keyType) {
     case 'ip':
       return `rate_limit:ip:${getClientIP(request)}`;
-    
+
     case 'client':
       const clientId = extractClientId(request);
       return clientId ? `rate_limit:client:${clientId}` : `rate_limit:ip:${getClientIP(request)}`;
-    
+
     case 'user':
       const userId = extractUserId(request);
       return userId ? `rate_limit:user:${userId}` : `rate_limit:ip:${getClientIP(request)}`;
-    
+
     case 'custom':
       return `rate_limit:custom:${getClientIP(request)}`;
-    
+
     default:
       return `rate_limit:ip:${getClientIP(request)}`;
   }
@@ -77,7 +77,7 @@ function generateRateLimitKey(request: NextRequest, options: RateLimitOptions): 
 /**
  * 获取客户端IP地址
  * Get client IP address
- * 
+ *
  * @param request - Next.js请求对象
  * @returns 客户端IP地址
  */
@@ -87,16 +87,16 @@ function getClientIP(request: NextRequest): string {
   const xForwardedFor = request.headers.get('x-forwarded-for');
   const xRealIP = request.headers.get('x-real-ip');
   const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  
+
   if (xForwardedFor) {
     // X-Forwarded-For可能包含多个IP，取第一个
     // X-Forwarded-For may contain multiple IPs, take the first one
     return xForwardedFor.split(',')[0]?.trim() || '127.0.0.1';
   }
-  
+
   if (xRealIP) return xRealIP;
   if (cfConnectingIP) return cfConnectingIP;
-  
+
   // 从URL中提取IP（可能不准确）
   // Extract IP from URL (may not be accurate)
   return '127.0.0.1';
@@ -105,7 +105,7 @@ function getClientIP(request: NextRequest): string {
 /**
  * 从请求中提取客户端ID
  * Extract client ID from request
- * 
+ *
  * @param request - Next.js请求对象
  * @returns 客户端ID或null
  */
@@ -127,7 +127,7 @@ function extractClientId(request: NextRequest): string | null {
       // 忽略解析错误 (Ignore parsing errors)
     }
   }
-  
+
   // 尝试从请求体中获取client_id
   // Try to get client_id from request body
   const url = new URL(request.url);
@@ -137,7 +137,7 @@ function extractClientId(request: NextRequest): string | null {
 /**
  * 从请求中提取用户ID
  * Extract user ID from request
- * 
+ *
  * @param request - Next.js请求对象
  * @returns 用户ID或null
  */
@@ -159,14 +159,14 @@ function extractUserId(request: NextRequest): string | null {
       // 忽略解析错误 (Ignore parsing errors)
     }
   }
-  
+
   return null;
 }
 
 /**
  * 添加速率限制响应头
  * Add rate limit response headers
- * 
+ *
  * @param response - 响应对象
  * @param limit - 请求限制
  * @param remaining - 剩余请求数
@@ -182,19 +182,19 @@ function addRateLimitHeaders(
   response.headers.set('X-RateLimit-Limit', limit.toString());
   response.headers.set('X-RateLimit-Remaining', Math.max(0, remaining).toString());
   response.headers.set('X-RateLimit-Reset', resetTime.toString());
-  
+
   if (remaining <= 0) {
     const retryAfter = Math.ceil((resetTime - Date.now()) / 1000);
     response.headers.set('Retry-After', retryAfter.toString());
   }
-  
+
   return response;
 }
 
 /**
  * 速率限制中间件
  * Rate limiting middleware
- * 
+ *
  * @param handler - 处理函数
  * @param options - 速率限制选项
  * @returns 包装后的中间件函数
@@ -222,13 +222,13 @@ export function withRateLimit(
       // 检查速率限制 (Check rate limit)
       const rateLimitResult = RateLimitUtils.checkRateLimit(rateLimitKey, {
         maxRequests: rateLimitOptions.maxRequests,
-        windowMs: rateLimitOptions.windowMs
+        windowMs: rateLimitOptions.windowMs,
       });
 
       if (!rateLimitResult.allowed) {
         // 超出速率限制 (Rate limit exceeded)
         const retryAfter = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000);
-        
+
         // 使用自定义错误响应或默认响应 (Use custom error response or default)
         if (rateLimitOptions.onLimitReached) {
           return rateLimitOptions.onLimitReached(request, retryAfter);
@@ -273,7 +273,7 @@ export function withRateLimit(
       return response;
     } catch (error) {
       console.error('速率限制中间件错误 (Rate limit middleware error):', error);
-      
+
       // 发生错误时继续处理请求 (Continue processing request on error)
       return handler(request);
     }
@@ -283,7 +283,7 @@ export function withRateLimit(
 /**
  * OAuth端点速率限制中间件
  * OAuth endpoint rate limiting middleware
- * 
+ *
  * @param handler - 处理函数
  * @param maxRequests - 最大请求数
  * @param windowMs - 时间窗口
@@ -305,7 +305,7 @@ export function withOAuthRateLimit(
 /**
  * 基于IP的速率限制中间件
  * IP-based rate limiting middleware
- * 
+ *
  * @param handler - 处理函数
  * @param maxRequests - 最大请求数
  * @param windowMs - 时间窗口
@@ -327,7 +327,7 @@ export function withIPRateLimit(
 /**
  * 基于用户的速率限制中间件
  * User-based rate limiting middleware
- * 
+ *
  * @param handler - 处理函数
  * @param maxRequests - 最大请求数
  * @param windowMs - 时间窗口
@@ -344,4 +344,4 @@ export function withUserRateLimit(
     keyType: 'user',
     message: '用户请求过于频繁，请稍后再试 (User requests too frequent, please try again later)',
   });
-} 
+}

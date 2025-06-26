@@ -1,10 +1,10 @@
 /**
  * OAuth客户端管理API路由
  * OAuth Client Management API Routes
- * 
+ *
  * 提供客户端的CRUD操作接口
  * Provides CRUD operation interfaces for clients
- * 
+ *
  * @author OAuth团队
  * @since 1.0.0
  */
@@ -23,8 +23,8 @@ import { withAuth, type AuthContext } from '@repo/lib/middleware';
 const createClientSchema = z.object({
   name: z.string().min(1, '客户端名称不能为空').max(100, '客户端名称不能超过100个字符'),
   description: z.string().optional(),
-  clientType: z.nativeEnum(ClientType, { 
-    errorMap: () => ({ message: '客户端类型必须是PUBLIC或CONFIDENTIAL' }) 
+  clientType: z.nativeEnum(ClientType, {
+    errorMap: () => ({ message: '客户端类型必须是PUBLIC或CONFIDENTIAL' }),
   }),
   redirectUris: z.array(z.string().url('重定向URI必须是有效的URL')).min(1, '至少需要一个重定向URI'),
   grantTypes: z.array(z.string()).min(1, '至少需要一个授权类型'),
@@ -47,16 +47,27 @@ const createClientSchema = z.object({
  */
 const queryClientsSchema = z.object({
   clientType: z.nativeEnum(ClientType).optional(),
-  isActive: z.string().transform(val => val === 'true').optional(),
+  isActive: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
   name: z.string().optional(),
-  limit: z.string().transform(val => parseInt(val)).pipe(z.number().int().positive().max(100)).optional(),
-  offset: z.string().transform(val => parseInt(val)).pipe(z.number().int().min(0)).optional(),
+  limit: z
+    .string()
+    .transform((val) => parseInt(val))
+    .pipe(z.number().int().positive().max(100))
+    .optional(),
+  offset: z
+    .string()
+    .transform((val) => parseInt(val))
+    .pipe(z.number().int().min(0))
+    .optional(),
 });
 
 /**
  * GET /api/v2/clients - 获取客户端列表
  * GET /api/v2/clients - Get client list
- * 
+ *
  * 需要 'client:list' 权限
  * Requires 'client:list' permission
  */
@@ -68,17 +79,20 @@ async function getClientsHandler(
   // Validate query parameters
   const url = new URL(request.url);
   const queryParams = Object.fromEntries(url.searchParams.entries());
-  
+
   const validationResult = queryClientsSchema.safeParse(queryParams);
   if (!validationResult.success) {
-    return NextResponse.json<ApiResponse<never>>({
-      success: false,
-      error: {
-        code: 'invalid_request',
-        message: '请求参数验证失败',
-        details: validationResult.error.flatten().fieldErrors,
+    return NextResponse.json<ApiResponse<never>>(
+      {
+        success: false,
+        error: {
+          code: 'invalid_request',
+          message: '请求参数验证失败',
+          details: validationResult.error.flatten().fieldErrors,
+        },
       },
-    }, { status: 400 });
+      { status: 400 }
+    );
   }
 
   const params = validationResult.data;
@@ -94,11 +108,14 @@ async function getClientsHandler(
       offset: params.offset,
     });
 
-    return NextResponse.json<ApiResponse<typeof result>>({
-      success: true,
-      data: result,
-      message: '客户端列表获取成功',
-    }, { status: 200 });
+    return NextResponse.json<ApiResponse<typeof result>>(
+      {
+        success: true,
+        data: result,
+        message: '客户端列表获取成功',
+      },
+      { status: 200 }
+    );
   } catch (error) {
     throw error; // 由错误处理包装器处理
   }
@@ -107,7 +124,7 @@ async function getClientsHandler(
 /**
  * POST /api/v2/clients - 创建新客户端
  * POST /api/v2/clients - Create new client
- * 
+ *
  * 需要 'client:create' 权限
  * Requires 'client:create' permission
  */
@@ -119,19 +136,22 @@ async function createClientHandler(
     // 解析请求体
     // Parse request body
     const body = await request.json();
-    
+
     // 验证请求数据
     // Validate request data
     const validationResult = createClientSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json<ApiResponse<never>>({
-        success: false,
-        error: {
-          code: 'invalid_request',
-          message: '请求数据验证失败',
-          details: validationResult.error.flatten().fieldErrors,
+      return NextResponse.json<ApiResponse<never>>(
+        {
+          success: false,
+          error: {
+            code: 'invalid_request',
+            message: '请求数据验证失败',
+            details: validationResult.error.flatten().fieldErrors,
+          },
         },
-      }, { status: 400 });
+        { status: 400 }
+      );
     }
 
     const params = validationResult.data;
@@ -140,7 +160,8 @@ async function createClientHandler(
     // Get audit information
     const auditInfo = {
       userId: authContext.user_id,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
 
@@ -148,11 +169,14 @@ async function createClientHandler(
     // Create client
     const client = await ClientService.createClient(params, auditInfo);
 
-    return NextResponse.json<ApiResponse<typeof client>>({
-      success: true,
-      data: client,
-      message: '客户端创建成功',
-    }, { status: 201 });
+    return NextResponse.json<ApiResponse<typeof client>>(
+      {
+        success: true,
+        data: client,
+        message: '客户端创建成功',
+      },
+      { status: 201 }
+    );
   } catch (error) {
     throw error; // 由错误处理包装器处理
   }

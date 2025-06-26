@@ -25,7 +25,7 @@ class RateLimitUtils {
                     expiredKeys.push(key);
                 }
             }
-            expiredKeys.forEach(key => this.store.delete(key));
+            expiredKeys.forEach((key) => this.store.delete(key));
         }, 5 * 60 * 1000); // 每5分钟清理一次 (Clean up every 5 minutes)
     }
     /**
@@ -242,7 +242,7 @@ exports.defaultRateLimiter = {
  * 创建一个简单的限流检查函数
  * Creates a simple rate limiting check function
  */
-function createRateLimit({ maxRequests, windowMs }) {
+function createRateLimit({ maxRequests, windowMs, }) {
     return (key) => {
         return RateLimitUtils.checkRateLimit(key, { maxRequests, windowMs });
     };

@@ -15,9 +15,9 @@ interface BatchPermissionCheckResult {
   id?: string; // 可选的请求标识符，与请求对应 (Optional request identifier, mirrored from request)
   allowed: boolean; // 是否允许 (Whether allowed)
   reasonCode?: // 原因代码 (Reason code)
-    | 'PERMISSION_GRANTED' // 权限已授予 (Permission granted)
-    | 'PERMISSION_DENIED'  // 权限被拒绝 (Permission denied)
-    | 'NO_PERMISSIONS'     // 用户无任何有效权限 (User has no effective permissions)
+  | 'PERMISSION_GRANTED' // 权限已授予 (Permission granted)
+    | 'PERMISSION_DENIED' // 权限被拒绝 (Permission denied)
+    | 'NO_PERMISSIONS' // 用户无任何有效权限 (User has no effective permissions)
     | 'INVALID_REQUEST_FORMAT'; // 请求格式无效 (Invalid request format)
   message?: string; // 附加信息 (Additional message)
 }
@@ -31,7 +31,7 @@ export class PermissionService {
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.cache = cacheManager.getCache();
-    
+
     logger.info('PermissionService initialized with cache manager');
   }
 
@@ -70,7 +70,8 @@ export class PermissionService {
     const userWithRoles = await this.prisma.user.findUnique({
       where: { id: userId, isActive: true }, // 确保用户是活动的 (Ensure user is active)
       include: {
-        userRoles: { // 包含用户的角色关联 (Include user's role assignments)
+        userRoles: {
+          // 包含用户的角色关联 (Include user's role assignments)
           where: {
             role: { isActive: true }, // 确保关联的角色是活动的 (Ensure role is active)
             // 确保用户角色关联未过期
@@ -78,9 +79,11 @@ export class PermissionService {
             OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
           },
           include: {
-            role: { // 包含角色详情 (Include role details)
+            role: {
+              // 包含角色详情 (Include role details)
               include: {
-                rolePermissions: { // 包含角色的权限关联 (Include role's permission assignments)
+                rolePermissions: {
+                  // 包含角色的权限关联 (Include role's permission assignments)
                   where: {
                     permission: { isActive: true }, // 确保关联的权限是活动的 (Ensure permission is active)
                   },
@@ -120,7 +123,11 @@ export class PermissionService {
           userRole.role.rolePermissions.forEach((rolePermission) => {
             // 确保权限对象存在、活动且有名称
             // Ensure permission object exists, is active, and has a name
-            if (rolePermission.permission && rolePermission.permission.isActive && rolePermission.permission.name) {
+            if (
+              rolePermission.permission &&
+              rolePermission.permission.isActive &&
+              rolePermission.permission.name
+            ) {
               effectivePermissions.add(rolePermission.permission.name);
             }
           });
@@ -147,7 +154,7 @@ export class PermissionService {
    */
   public async clearUserPermissionCache(userId: string): Promise<void> {
     const cacheKey = `user:${userId}:permissions`;
-    
+
     try {
       await this.cache.del(cacheKey);
       logger.info(`[Cache Cleared] Permissions for user ${userId}`);
@@ -170,8 +177,10 @@ export class PermissionService {
    * @param roleId 更改了权限的角色ID。 (The ID of the role whose permissions changed.)
    */
   public async clearCachesAffectedByRoleChange(roleId: string): Promise<void> {
-    logger.info(`[Cache Invalidation] Role ${roleId} changed. Clearing all user permission caches.`);
-    
+    logger.info(
+      `[Cache Invalidation] Role ${roleId} changed. Clearing all user permission caches.`
+    );
+
     try {
       // 注意：这会清除所有缓存，在生产环境中可能需要更精细的策略
       // Note: This clears all cache, may need more granular strategy in production
@@ -185,7 +194,6 @@ export class PermissionService {
     // 这将需要一种反向查找（角色 -> 用户）或在用户缓存键中包含角色信息。
     // This would require a reverse lookup (role -> users) or including role info in user cache keys.
   }
-
 
   /**
    * 检查用户是否拥有特定权限。
@@ -201,9 +209,9 @@ export class PermissionService {
     if (!requiredPermission) {
       // console.warn('checkPermission called with empty requiredPermission');
       return false; // 或者 true，取决于业务逻辑：空权限是否意味着总是允许或总是拒绝
-                    // Or true, depending on business logic: does empty permission mean always allow or always deny?
-                    // 当前行为：空权限字符串不授予任何权限。
-                    // Current behavior: empty permission string grants no permission.
+      // Or true, depending on business logic: does empty permission mean always allow or always deny?
+      // 当前行为：空权限字符串不授予任何权限。
+      // Current behavior: empty permission string grants no permission.
     }
     // 获取用户的有效权限集合
     // Get the user's effective permissions set

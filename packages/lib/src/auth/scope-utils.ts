@@ -8,7 +8,7 @@ import type { OAuthClient } from '@prisma/client';
  */
 export function parseScopes(scopeString?: string): string[] {
   if (!scopeString) return [];
-  return scopeString.split(' ').filter(s => s.length > 0);
+  return scopeString.split(' ').filter((s) => s.length > 0);
 }
 
 /**
@@ -32,7 +32,7 @@ export function hasScope(userScopes: string[], requiredScope: string): boolean {
  * (Checks if user scopes contain any of the specified scopes)
  */
 export function hasAnyScope(userScopes: string[], requiredScopes: string[]): boolean {
-  return requiredScopes.some(scope => userScopes.includes(scope));
+  return requiredScopes.some((scope) => userScopes.includes(scope));
 }
 
 /**
@@ -40,7 +40,7 @@ export function hasAnyScope(userScopes: string[], requiredScopes: string[]): boo
  * (Checks if user scopes contain all specified scopes)
  */
 export function hasAllScopes(userScopes: string[], requiredScopes: string[]): boolean {
-  return requiredScopes.every(scope => userScopes.includes(scope));
+  return requiredScopes.every((scope) => userScopes.includes(scope));
 }
 
 /**
@@ -56,8 +56,11 @@ export function isValidScopeFormat(scope: string): boolean {
  * 验证scope数组中的所有scope格式是否合法
  * (Validates if all scopes in array have valid format)
  */
-export function validateScopeFormats(scopes: string[]): { valid: boolean; invalidScopes: string[] } {
-  const invalidScopes = scopes.filter(scope => !isValidScopeFormat(scope));
+export function validateScopeFormats(scopes: string[]): {
+  valid: boolean;
+  invalidScopes: string[];
+} {
+  const invalidScopes = scopes.filter((scope) => !isValidScopeFormat(scope));
   return {
     valid: invalidScopes.length === 0,
     invalidScopes,
@@ -82,24 +85,30 @@ export function validateScopes(
  */
 export function validateScopes(
   requestedScopes: string[],
-  allowedScopesOrClient: string[] | OAuthClient | { allowedScopes?: string; clientScopes?: string; scopes?: string }
-): { valid: boolean; invalidScopes: string[]; error_description?: string } | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
+  allowedScopesOrClient:
+    | string[]
+    | OAuthClient
+    | { allowedScopes?: string; clientScopes?: string; scopes?: string }
+):
+  | { valid: boolean; invalidScopes: string[]; error_description?: string }
+  | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
   if (requestedScopes.length === 0) {
     return { valid: true, invalidScopes: [] };
   }
 
   // 1. 简单验证: allowedScopesOrClient 是一个字符串数组
   if (Array.isArray(allowedScopesOrClient)) {
-    const invalidScopes = requestedScopes.filter(scope => !allowedScopesOrClient.includes(scope));
+    const invalidScopes = requestedScopes.filter((scope) => !allowedScopesOrClient.includes(scope));
     return {
       valid: invalidScopes.length === 0,
       invalidScopes,
-      error_description: invalidScopes.length > 0
-        ? `Requested scope(s) not in allowed list: ${invalidScopes.join(', ')}`
-        : undefined,
+      error_description:
+        invalidScopes.length > 0
+          ? `Requested scope(s) not in allowed list: ${invalidScopes.join(', ')}`
+          : undefined,
     };
   }
-  
+
   const client = allowedScopesOrClient as OAuthClient;
   // 2. 高级验证: OAuthClient 对象，需要数据库检查
   if (client.id && client.allowedScopes !== undefined) {
@@ -117,7 +126,7 @@ export function validateScopes(
       }
 
       const invalidAgainstClientAllowed = requestedScopes.filter(
-        scope => !clientAllowedScopes.includes(scope)
+        (scope) => !clientAllowedScopes.includes(scope)
       );
       if (invalidAgainstClientAllowed.length > 0) {
         return {
@@ -135,64 +144,74 @@ export function validateScopes(
             isActive: true,
           },
         });
-        const validDbScopeNames = validDbScopes.map(scope => scope.name);
-        const invalidAgainstDb = requestedScopes.filter(scope => !validDbScopeNames.includes(scope));
+        const validDbScopeNames = validDbScopes.map((scope) => scope.name);
+        const invalidAgainstDb = requestedScopes.filter(
+          (scope) => !validDbScopeNames.includes(scope)
+        );
 
         return {
           valid: invalidAgainstDb.length === 0,
           invalidScopes: invalidAgainstDb,
-          error_description: invalidAgainstDb.length > 0
-            ? `Requested scope(s) not found in system: ${invalidAgainstDb.join(', ')}`
-            : undefined,
+          error_description:
+            invalidAgainstDb.length > 0
+              ? `Requested scope(s) not found in system: ${invalidAgainstDb.join(', ')}`
+              : undefined,
         };
       } catch (error) {
-        console.warn('Database validation not available, falling back to client-only validation'+error);
+        console.warn(
+          'Database validation not available, falling back to client-only validation' + error
+        );
         return { valid: true, invalidScopes: [] };
       }
     })();
   }
-  
+
   // 3. 通用对象验证
   return (async () => {
-    const clientObj = allowedScopesOrClient as { allowedScopes?: string; clientScopes?: string; scopes?: string };
+    const clientObj = allowedScopesOrClient as {
+      allowedScopes?: string;
+      clientScopes?: string;
+      scopes?: string;
+    };
     let allowedScopes: string[] = [];
     const scopeString = clientObj.allowedScopes || clientObj.clientScopes || clientObj.scopes || '';
 
     try {
       if (scopeString) {
-        allowedScopes = typeof scopeString === 'string'
-          ? parseScopes(scopeString)
-          : Array.isArray(scopeString)
-            ? scopeString
-            : [];
+        allowedScopes =
+          typeof scopeString === 'string'
+            ? parseScopes(scopeString)
+            : Array.isArray(scopeString)
+              ? scopeString
+              : [];
       }
     } catch (error) {
       console.error('Error parsing client scopes:', error);
       return {
         valid: false,
         invalidScopes: requestedScopes,
-        error_description: 'Failed to parse client allowed scopes'
+        error_description: 'Failed to parse client allowed scopes',
       };
     }
 
-    const invalidScopes = requestedScopes.filter(scope => !allowedScopes.includes(scope));
+    const invalidScopes = requestedScopes.filter((scope) => !allowedScopes.includes(scope));
     return {
       valid: invalidScopes.length === 0,
       invalidScopes,
-      error_description: invalidScopes.length > 0
-        ? `Requested scope(s) not in allowed list: ${invalidScopes.join(', ')}`
-        : undefined,
+      error_description:
+        invalidScopes.length > 0
+          ? `Requested scope(s) not in allowed list: ${invalidScopes.join(', ')}`
+          : undefined,
     };
   })();
 }
-
 
 /**
  * 过滤出有效的权限范围
  * (Filters out valid scopes)
  */
 export function filterValidScopes(requestedScopes: string[], allowedScopes: string[]): string[] {
-  return requestedScopes.filter(scope => allowedScopes.includes(scope));
+  return requestedScopes.filter((scope) => allowedScopes.includes(scope));
 }
 
 /**
@@ -217,7 +236,7 @@ export function extractOpenIdConnectScopes(scopes: string[]): string[] {
  * (Extracts all non-OIDC custom scopes from a scope array)
  */
 export function extractCustomScopes(scopes: string[]): string[] {
-  return scopes.filter(scope => !isOpenIdConnectScope(scope));
+  return scopes.filter((scope) => !isOpenIdConnectScope(scope));
 }
 
 /**
@@ -242,7 +261,7 @@ export function normalizeScopes(scopes: string[]): string[] {
  */
 export function intersectScopes(scopes1: string[], scopes2: string[]): string[] {
   const set1 = new Set(scopes1);
-  return scopes2.filter(scope => set1.has(scope));
+  return scopes2.filter((scope) => set1.has(scope));
 }
 
 /**
@@ -259,7 +278,7 @@ export function unionScopes(scopes1: string[], scopes2: string[]): string[] {
  */
 export function differenceScopes(scopes1: string[], scopes2: string[]): string[] {
   const set2 = new Set(scopes2);
-  return scopes1.filter(scope => !set2.has(scope));
+  return scopes1.filter((scope) => !set2.has(scope));
 }
 
 // ===== 兼容旧调用：导出同名对象 =====

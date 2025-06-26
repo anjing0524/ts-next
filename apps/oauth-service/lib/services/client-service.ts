@@ -1,10 +1,10 @@
 /**
  * OAuth客户端管理服务类
  * OAuth Client Management Service Class
- * 
+ *
  * 提供完整的OAuth客户端CRUD操作、密钥管理、权限控制
  * Provides complete OAuth client CRUD operations, key management, and access control
- * 
+ *
  * @author OAuth团队
  * @since 1.0.0
  */
@@ -77,7 +77,7 @@ export interface ClientQueryParams {
 /**
  * OAuth客户端管理服务
  * OAuth Client Management Service
- * 
+ *
  * 采用静态方法模式，提供完整的客户端管理功能
  * Uses static method pattern to provide complete client management functionality
  */
@@ -85,7 +85,7 @@ export class ClientService {
   /**
    * 创建新的OAuth客户端
    * Create a new OAuth client
-   * 
+   *
    * @param params - 客户端创建参数 (Client creation parameters)
    * @param auditInfo - 审计信息 (Audit information)
    * @returns 创建的客户端信息 (Created client information)
@@ -107,7 +107,7 @@ export class ClientService {
       // Generate client ID and secret (if needed)
       const clientId = ClientService.generateClientId();
       let clientSecret: string | null = null;
-      
+
       if (params.clientType === ClientType.CONFIDENTIAL) {
         clientSecret = ClientService.generateClientSecret();
       }
@@ -184,7 +184,7 @@ export class ClientService {
   /**
    * 根据ID获取客户端信息
    * Get client information by ID
-   * 
+   *
    * @param clientId - 客户端ID (Client ID)
    * @returns 客户端信息 (Client information)
    */
@@ -206,7 +206,7 @@ export class ClientService {
   /**
    * 根据客户端ID获取客户端信息
    * Get client information by client ID
-   * 
+   *
    * @param clientId - 客户端标识符 (Client identifier)
    * @returns 客户端信息 (Client information)
    */
@@ -228,7 +228,7 @@ export class ClientService {
   /**
    * 查询客户端列表
    * Query client list
-   * 
+   *
    * @param params - 查询参数 (Query parameters)
    * @returns 客户端列表和总数 (Client list and total count)
    */
@@ -238,15 +238,15 @@ export class ClientService {
   }> {
     try {
       const where: any = {};
-      
+
       if (params.clientType) {
         where.clientType = params.clientType;
       }
-      
+
       if (params.isActive !== undefined) {
         where.isActive = params.isActive;
       }
-      
+
       if (params.name) {
         where.name = {
           contains: params.name,
@@ -278,7 +278,7 @@ export class ClientService {
   /**
    * 更新客户端信息
    * Update client information
-   * 
+   *
    * @param clientId - 客户端ID (Client ID)
    * @param params - 更新参数 (Update parameters)
    * @param auditInfo - 审计信息 (Audit information)
@@ -298,11 +298,7 @@ export class ClientService {
       // Check if client exists
       const existingClient = await ClientService.getClientById(clientId);
       if (!existingClient) {
-        throw new OAuth2Error(
-          'Client not found',
-          OAuth2ErrorCode.InvalidClient,
-          404
-        );
+        throw new OAuth2Error('Client not found', OAuth2ErrorCode.InvalidClient, 404);
       }
 
       // 验证更新参数
@@ -312,22 +308,28 @@ export class ClientService {
       // 构建更新数据
       // Build update data
       const updateData: any = {};
-      
+
       if (params.name !== undefined) updateData.name = params.name;
       if (params.description !== undefined) updateData.description = params.description;
-      if (params.redirectUris !== undefined) updateData.redirectUris = JSON.stringify(params.redirectUris);
-      if (params.grantTypes !== undefined) updateData.grantTypes = JSON.stringify(params.grantTypes);
-      if (params.responseTypes !== undefined) updateData.responseTypes = JSON.stringify(params.responseTypes);
-      if (params.allowedScopes !== undefined) updateData.allowedScopes = JSON.stringify(params.allowedScopes);
+      if (params.redirectUris !== undefined)
+        updateData.redirectUris = JSON.stringify(params.redirectUris);
+      if (params.grantTypes !== undefined)
+        updateData.grantTypes = JSON.stringify(params.grantTypes);
+      if (params.responseTypes !== undefined)
+        updateData.responseTypes = JSON.stringify(params.responseTypes);
+      if (params.allowedScopes !== undefined)
+        updateData.allowedScopes = JSON.stringify(params.allowedScopes);
       if (params.logoUri !== undefined) updateData.logoUri = params.logoUri;
       if (params.policyUri !== undefined) updateData.policyUri = params.policyUri;
       if (params.tosUri !== undefined) updateData.tosUri = params.tosUri;
       if (params.requirePkce !== undefined) updateData.requirePkce = params.requirePkce;
       if (params.requireConsent !== undefined) updateData.requireConsent = params.requireConsent;
-      if (params.ipWhitelist !== undefined) updateData.ipWhitelist = params.ipWhitelist ? JSON.stringify(params.ipWhitelist) : null;
+      if (params.ipWhitelist !== undefined)
+        updateData.ipWhitelist = params.ipWhitelist ? JSON.stringify(params.ipWhitelist) : null;
       if (params.accessTokenTtl !== undefined) updateData.accessTokenTtl = params.accessTokenTtl;
       if (params.refreshTokenTtl !== undefined) updateData.refreshTokenTtl = params.refreshTokenTtl;
-      if (params.authorizationCodeLifetime !== undefined) updateData.authorizationCodeLifetime = params.authorizationCodeLifetime;
+      if (params.authorizationCodeLifetime !== undefined)
+        updateData.authorizationCodeLifetime = params.authorizationCodeLifetime;
       if (params.isActive !== undefined) updateData.isActive = params.isActive;
 
       // 执行更新
@@ -382,7 +384,7 @@ export class ClientService {
   /**
    * 删除客户端
    * Delete client
-   * 
+   *
    * @param clientId - 客户端ID (Client ID)
    * @param auditInfo - 审计信息 (Audit information)
    */
@@ -399,11 +401,7 @@ export class ClientService {
       // Check if client exists
       const existingClient = await ClientService.getClientById(clientId);
       if (!existingClient) {
-        throw new OAuth2Error(
-          'Client not found',
-          OAuth2ErrorCode.InvalidClient,
-          404
-        );
+        throw new OAuth2Error('Client not found', OAuth2ErrorCode.InvalidClient, 404);
       }
 
       // 删除客户端（级联删除相关记录）
@@ -455,7 +453,7 @@ export class ClientService {
   /**
    * 轮换客户端密钥
    * Rotate client secret
-   * 
+   *
    * @param clientId - 客户端ID (Client ID)
    * @param auditInfo - 审计信息 (Audit information)
    * @returns 新的客户端密钥 (New client secret)
@@ -473,11 +471,7 @@ export class ClientService {
       // Check if client exists
       const existingClient = await ClientService.getClientById(clientId);
       if (!existingClient) {
-        throw new OAuth2Error(
-          'Client not found',
-          OAuth2ErrorCode.InvalidClient,
-          404
-        );
+        throw new OAuth2Error('Client not found', OAuth2ErrorCode.InvalidClient, 404);
       }
 
       // 只有机密客户端才能轮换密钥
@@ -544,16 +538,12 @@ export class ClientService {
   /**
    * 验证创建参数
    * Validate creation parameters
-   * 
+   *
    * @param params - 创建参数 (Creation parameters)
    */
   private static validateCreateParams(params: CreateClientParams): void {
     if (!params.name || params.name.trim().length === 0) {
-      throw new OAuth2Error(
-        'Client name is required',
-        OAuth2ErrorCode.InvalidRequest,
-        400
-      );
+      throw new OAuth2Error('Client name is required', OAuth2ErrorCode.InvalidRequest, 400);
     }
 
     if (!params.redirectUris || params.redirectUris.length === 0) {
@@ -570,11 +560,7 @@ export class ClientService {
       try {
         new URL(uri);
       } catch {
-        throw new OAuth2Error(
-          `Invalid redirect URI: ${uri}`,
-          OAuth2ErrorCode.InvalidRequest,
-          400
-        );
+        throw new OAuth2Error(`Invalid redirect URI: ${uri}`, OAuth2ErrorCode.InvalidRequest, 400);
       }
     }
 
@@ -598,16 +584,12 @@ export class ClientService {
   /**
    * 验证更新参数
    * Validate update parameters
-   * 
+   *
    * @param params - 更新参数 (Update parameters)
    */
   private static validateUpdateParams(params: UpdateClientParams): void {
     if (params.name !== undefined && params.name.trim().length === 0) {
-      throw new OAuth2Error(
-        'Client name cannot be empty',
-        OAuth2ErrorCode.InvalidRequest,
-        400
-      );
+      throw new OAuth2Error('Client name cannot be empty', OAuth2ErrorCode.InvalidRequest, 400);
     }
 
     if (params.redirectUris !== undefined) {
@@ -638,7 +620,7 @@ export class ClientService {
   /**
    * 生成客户端ID
    * Generate client ID
-   * 
+   *
    * @returns 客户端ID (Client ID)
    */
   private static generateClientId(): string {
@@ -648,10 +630,10 @@ export class ClientService {
   /**
    * 生成客户端密钥
    * Generate client secret
-   * 
+   *
    * @returns 客户端密钥 (Client secret)
    */
   private static generateClientSecret(): string {
     return crypto.randomBytes(32).toString('base64url');
   }
-} 
+}

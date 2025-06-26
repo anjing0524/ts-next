@@ -36,7 +36,7 @@ export function PermissionGuard({
 
   const checkPermissions = () => {
     if (Array.isArray(requiredPermission)) {
-      return requiredPermission.every(permission => hasPermission(permission));
+      return requiredPermission.every((permission) => hasPermission(permission));
     }
     return hasPermission(requiredPermission);
   };
@@ -50,16 +50,20 @@ export function PermissionGuard({
       const permissionsQuery = Array.isArray(requiredPermission)
         ? requiredPermission.join(',')
         : requiredPermission;
-      router.push(`/unauthorized?required_permission=${encodeURIComponent(permissionsQuery)}&from=${encodeURIComponent(window.location.pathname)}`);
+      router.push(
+        `/unauthorized?required_permission=${encodeURIComponent(permissionsQuery)}&from=${encodeURIComponent(window.location.pathname)}`
+      );
     }
   }, [authIsLoading, user, hasRequiredPermissions, requiredPermission, router, fallback]);
 
   if (authIsLoading) {
-    return loadingFallback || (
-      <div className="flex justify-center items-center h-32">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">验证权限...</span>
-      </div>
+    return (
+      loadingFallback || (
+        <div className="flex justify-center items-center h-32">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">验证权限...</span>
+        </div>
+      )
     );
   }
 
@@ -120,4 +124,3 @@ export function withPermission<P extends object>(
 // <PermissionGuard requiredPermission="admin:access" fallback={<div>You are not an admin.</div>}>
 //   <AdminDashboard />
 // </PermissionGuard>
-```

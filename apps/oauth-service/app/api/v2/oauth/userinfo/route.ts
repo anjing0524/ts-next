@@ -19,12 +19,12 @@ import { ApiResponse } from '@repo/lib/types/api';
  *     description: |
  *       返回已认证用户的用户信息。此端点受OAuth 2.0访问令牌保护。
  *       Returns user information for the authenticated user. This endpoint is protected by OAuth 2.0 Access Token.
- *       
+ *
  *       **认证要求**:
  *       - 必须在Authorization头中提供有效的Bearer访问令牌
  *       - 访问令牌必须包含'openid'范围才能访问此端点
  *       - 令牌必须通过Jose库的JWT验证
- *       
+ *
  *       **返回的用户信息**:
  *       基于访问令牌中的scope声明返回相应的用户信息声明。
  *     tags:
@@ -94,7 +94,7 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
   // --- Step 1: JWT Token Authentication (using Jose library) ---
   // 使用恢复的认证中间件逻辑
   const { authenticateBearer } = await import('@repo/lib/middleware');
-  
+
   // 执行Bearer令牌认证
   const authResult = await authenticateBearer(request);
   if (!authResult.success) {
@@ -113,13 +113,9 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   const { user, scopes } = authResult.context;
   const userId = user?.id;
-  
+
   if (!userId) {
-    throw new OAuth2Error(
-      'User ID not found in access token.',
-      OAuth2ErrorCode.InvalidToken,
-      401
-    );
+    throw new OAuth2Error('User ID not found in access token.', OAuth2ErrorCode.InvalidToken, 401);
   }
 
   // 验证是否有openid scope (虽然中间件已检查，但为了安全再次确认)
@@ -137,9 +133,9 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
   // --- 步骤3: 获取用户信息 ---
   // --- Step 3: Retrieve User Information ---
   const userData = await prisma.user.findUnique({
-    where: { 
+    where: {
       id: userId,
-      isActive: true // 只返回活跃用户的信息
+      isActive: true, // 只返回活跃用户的信息
     },
   });
 
@@ -162,15 +158,18 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
   // 基于访问令牌的scope添加相应的用户信息
   // Add corresponding user information based on access token scope
   if (scopes.includes('profile')) {
-    userInfo.name = userData.firstName && userData.lastName 
-      ? `${userData.firstName} ${userData.lastName}`.trim() 
-      : undefined;
+    userInfo.name =
+      userData.firstName && userData.lastName
+        ? `${userData.firstName} ${userData.lastName}`.trim()
+        : undefined;
     userInfo.given_name = userData.firstName || undefined;
     userInfo.family_name = userData.lastName || undefined;
     userInfo.preferred_username = userData.username || undefined;
     userInfo.picture = userData.avatar || undefined;
-    userInfo.updated_at = userData.updatedAt ? Math.floor(userData.updatedAt.getTime() / 1000) : undefined;
-    
+    userInfo.updated_at = userData.updatedAt
+      ? Math.floor(userData.updatedAt.getTime() / 1000)
+      : undefined;
+
     // 扩展字段 (如果用户模型支持)
     // Extended fields (if User model supports)
     userInfo.organization = userData.organization || undefined;
@@ -197,7 +196,7 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   // 移除undefined值
   // Remove undefined values
-  Object.keys(userInfo).forEach(key => {
+  Object.keys(userInfo).forEach((key) => {
     if (userInfo[key as keyof UserInfoResponse] === undefined) {
       delete userInfo[key as keyof UserInfoResponse];
     }
@@ -219,20 +218,23 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   // --- 步骤6: 返回成功响应 ---
   // --- Step 6: Return Success Response ---
-  return NextResponse.json<ApiResponse<UserInfoResponse>>({
-    success: true,
-    data: validationResult.data,
-    message: 'User information retrieved successfully.',
-  }, {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate', // 用户信息不应缓存
-      'Pragma': 'no-cache',
+  return NextResponse.json<ApiResponse<UserInfoResponse>>(
+    {
+      success: true,
+      data: validationResult.data,
+      message: 'User information retrieved successfully.',
     },
-  });
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate', // 用户信息不应缓存
+        Pragma: 'no-cache',
+      },
+    }
+  );
 }
 
 // 导出处理函数，使用错误处理包装器
 // Export handler function with error handling wrapper
-export const GET = withErrorHandling(userInfoHandlerInternal); 
+export const GET = withErrorHandling(userInfoHandlerInternal);

@@ -5,4 +5,4 @@ import { NextConfig } from 'next';
  */
 declare function withNextConfig(config?: NextConfig): NextConfig;
 
-export = withNextConfig; 
+export = withNextConfig;

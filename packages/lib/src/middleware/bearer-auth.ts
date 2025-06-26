@@ -3,11 +3,9 @@
 // 描述: OAuth 2.0 Bearer Token 认证中间件
 // Description: OAuth 2.0 Bearer Token Authentication Middleware
 
-import { NextRequest, NextResponse } from 'next/server';
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { OAuthClient as Client, User as PrismaUser } from '@prisma/client';
-import * as jose from 'jose';
 import { prisma } from '@repo/database/client';
+import * as jose from 'jose';
+import { NextRequest, NextResponse } from 'next/server';
 import { PermissionService, RBACService } from '../services';
 
 // 实例化真实权限服务 (Instantiate actual PermissionService)
@@ -62,7 +60,7 @@ export interface AuthOptions {
 /**
  * OAuth 2.0 Bearer Token 认证中间件
  * OAuth 2.0 Bearer Token Authentication Middleware
- * 
+ *
  * @param request - Next.js请求对象
  * @param options - 认证选项
  * @returns 认证结果，包含成功状态、上下文和可能的响应
@@ -194,7 +192,7 @@ export async function authenticateBearer(
   // 步骤 7: 验证必需的作用域
   // Step 7: Validate required scopes
   if (options.requiredScopes && options.requiredScopes.length > 0) {
-    const hasRequiredScopes = options.requiredScopes.every(scope => scopes.includes(scope));
+    const hasRequiredScopes = options.requiredScopes.every((scope) => scopes.includes(scope));
     if (!hasRequiredScopes) {
       return {
         success: false,
@@ -231,7 +229,7 @@ export async function authenticateBearer(
       };
     }
 
-    const hasRequiredPermissions = options.requiredPermissions.every(permission =>
+    const hasRequiredPermissions = options.requiredPermissions.every((permission) =>
       userPermissions.permissions.includes(permission)
     );
 
@@ -325,11 +323,7 @@ export function withAuth<T extends { params?: any }>(
     request: NextRequest,
     routeContext?: T
   ): Promise<NextResponse> {
-    const {
-      success,
-      context: authContext,
-      response,
-    } = await authenticateBearer(request, options);
+    const { success, context: authContext, response } = await authenticateBearer(request, options);
 
     if (!success || !authContext) {
       return response || new NextResponse('Unauthorized', { status: 401 });
@@ -349,7 +343,7 @@ export function withAuth<T extends { params?: any }>(
 /**
  * 权限检查中间件
  * Permission check middleware
- * 
+ *
  * @param requiredPermission - 必需的权限
  * @returns 权限检查中间件函数
  */
@@ -431,4 +425,4 @@ export function requirePermission(requiredPermission: string) {
 
     return descriptor;
   };
-} 
+}

@@ -5,12 +5,18 @@ import Link from 'next/link';
 import { adminApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Key, Shield, FileText, Activity, ExternalLink } from 'lucide-react'; // Icons for cards and links
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from '@/components/ui/use-toast';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Button,
+  Badge,
+  ScrollArea,
+  toast,
+} from '@repo/ui';
+import { Users, Shield, Key, Activity, FileText, ExternalLink } from 'lucide-react'; // Icons for cards and links
 import type { AuditLog, PaginatedResponse, DashboardStats } from '@/types/admin-entities'; // 引入共享类型
 
 // --- 数据接口定义 ---
@@ -70,9 +76,11 @@ function DashboardContent() {
       setRoleCount(rolesRes.meta.totalItems);
       setClientCount(clientsRes.meta.totalItems);
     } catch (error: any) {
-      console.error("Failed to load statistics:", error);
-      toast({ variant: "destructive", title: "错误", description: "加载统计数据失败。" });
-      setUserCount('错误'); setRoleCount('错误'); setClientCount('错误');
+      console.error('Failed to load statistics:', error);
+      toast({ variant: 'destructive', title: '错误', description: '加载统计数据失败。' });
+      setUserCount('错误');
+      setRoleCount('错误');
+      setClientCount('错误');
     } finally {
       setIsLoadingStats(false);
     }
@@ -81,11 +89,15 @@ function DashboardContent() {
   const fetchRecentLogs = useCallback(async () => {
     setIsLoadingLogs(true);
     try {
-      const response: PaginatedResponse<AuditLog> = await adminApi.getAuditLogs({ limit: 7, page: 1, sort: 'timestamp:desc' });
+      const response: PaginatedResponse<AuditLog> = await adminApi.getAuditLogs({
+        limit: 7,
+        page: 1,
+        sort: 'timestamp:desc',
+      });
       setRecentAuditLogs(response.data);
     } catch (error: any) {
-      console.error("Failed to load recent audit logs:", error);
-      toast({ variant: "destructive", title: "错误", description: "加载最近审计日志失败。" });
+      console.error('Failed to load recent audit logs:', error);
+      toast({ variant: 'destructive', title: '错误', description: '加载最近审计日志失败。' });
     } finally {
       setIsLoadingLogs(false);
     }
@@ -110,16 +122,32 @@ function DashboardContent() {
         <h1 className="text-3xl font-bold tracking-tight">
           欢迎回来, {user?.displayName || user?.username || '管理员'}!
         </h1>
-        <p className="text-muted-foreground mt-1">
-          这是您的管理仪表盘，概览系统状态和常用操作。
-        </p>
+        <p className="text-muted-foreground mt-1">这是您的管理仪表盘，概览系统状态和常用操作。</p>
       </header>
 
       {/* 统计卡片区域 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard title="用户总数" value={userCount} description="已注册的用户数量" icon={Users} isLoading={isLoadingStats} />
-        <StatCard title="角色总数" value={roleCount} description="已定义的角色数量" icon={Shield} isLoading={isLoadingStats} />
-        <StatCard title="客户端总数" value={clientCount} description="已注册的OAuth客户端" icon={Key} isLoading={isLoadingStats} />
+        <StatCard
+          title="用户总数"
+          value={userCount}
+          description="已注册的用户数量"
+          icon={Users}
+          isLoading={isLoadingStats}
+        />
+        <StatCard
+          title="角色总数"
+          value={roleCount}
+          description="已定义的角色数量"
+          icon={Shield}
+          isLoading={isLoadingStats}
+        />
+        <StatCard
+          title="客户端总数"
+          value={clientCount}
+          description="已注册的OAuth客户端"
+          icon={Key}
+          isLoading={isLoadingStats}
+        />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -134,9 +162,12 @@ function DashboardContent() {
               <CardDescription>快速访问常用管理功能。</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              {quickLinks.map(link => (
+              {quickLinks.map((link) => (
                 <Button key={link.href} variant="outline" asChild className="h-auto py-3">
-                  <Link href={link.href} className="flex flex-col items-center justify-center space-y-1">
+                  <Link
+                    href={link.href}
+                    className="flex flex-col items-center justify-center space-y-1"
+                  >
                     <link.icon className="h-6 w-6 mb-1 text-muted-foreground" />
                     <span className="text-xs text-center">{link.label}</span>
                   </Link>
@@ -151,7 +182,7 @@ function DashboardContent() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                 <FileText className="h-5 w-5 mr-2 text-primary" />
+                <FileText className="h-5 w-5 mr-2 text-primary" />
                 最近审计日志
               </CardTitle>
               <CardDescription>最近的系统和用户活动记录。</CardDescription>
@@ -159,22 +190,31 @@ function DashboardContent() {
             <CardContent>
               {isLoadingLogs ? (
                 <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => ( <div key={i} className="h-10 animate-pulse bg-muted rounded-md" /> ))}
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-10 animate-pulse bg-muted rounded-md" />
+                  ))}
                 </div>
               ) : recentAuditLogs.length > 0 ? (
                 <ScrollArea className="h-72">
                   <ul className="space-y-3 pr-3">
-                    {recentAuditLogs.map(log => (
-                      <li key={log.id} className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors">
+                    {recentAuditLogs.map((log) => (
+                      <li
+                        key={log.id}
+                        className="flex items-center justify-between p-3 border rounded-md bg-background hover:bg-muted/50 transition-colors"
+                      >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate" title={log.action}>
-                            {log.action} <span className="text-xs text-muted-foreground">({log.resource})</span>
+                            {log.action}{' '}
+                            <span className="text-xs text-muted-foreground">({log.resource})</span>
                           </p>
                           <p className="text-xs text-muted-foreground">
                             用户: {log.userId} - {new Date(log.timestamp).toLocaleString()}
                           </p>
                         </div>
-                        <Badge variant={log.status === 'FAILURE' ? 'destructive' : 'outline'} className="ml-2 flex-shrink-0">
+                        <Badge
+                          variant={log.status === 'FAILURE' ? 'destructive' : 'outline'}
+                          className="ml-2 flex-shrink-0"
+                        >
                           {log.status}
                         </Badge>
                       </li>
@@ -186,7 +226,9 @@ function DashboardContent() {
               )}
               <div className="mt-4 text-right">
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/admin/audit">查看全部 <ExternalLink className="ml-1 h-3 w-3" /></Link>
+                  <Link href="/admin/audit">
+                    查看全部 <ExternalLink className="ml-1 h-3 w-3" />
+                  </Link>
                 </Button>
               </div>
             </CardContent>

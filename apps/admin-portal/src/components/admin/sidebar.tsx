@@ -4,20 +4,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  BarChart,
-  Briefcase,
-  FileText,
-  Home,
-  Key,
-  Settings,
-  Shield,
-  Users,
-} from 'lucide-react';
+import { BarChart, Briefcase, FileText, Home, Key, Settings, Shield, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth'; // Placeholder auth hook
 import { cn } from '@/lib/utils'; // For conditional class names
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { ScrollArea, Button, buttonVariants } from '@repo/ui';
 
 /**
  * @typedef NavItem
@@ -45,13 +35,43 @@ const allNavItems: NavItem[] = [
     icon: Settings,
     requiredPermissions: ['menu:system:view'],
     children: [
-      { href: '/admin/users', label: 'Users', icon: Users, requiredPermissions: ['menu:system:user:view', 'users:list'] },
-      { href: '/admin/system/roles', label: 'Roles', icon: Shield, requiredPermissions: ['menu:system:role:view', 'roles:list'] },
-      { href: '/admin/system/permissions', label: 'Permissions', icon: Key, requiredPermissions: ['menu:system:permission:view', 'permissions:list'] },
-      { href: '/admin/system/clients', label: 'Clients', icon: Briefcase, requiredPermissions: ['menu:system:client:view', 'clients:list'] },
-      { href: '/admin/system/scopes', label: 'Scopes', icon: BarChart, requiredPermissions: ['menu:system:scope:view', 'scopes:list'] },
-      { href: '/admin/audit', label: 'Audit Logs', icon: FileText, requiredPermissions: ['menu:system:audit:view', 'audit:list'] },
-    ]
+      {
+        href: '/admin/users',
+        label: 'Users',
+        icon: Users,
+        requiredPermissions: ['menu:system:user:view', 'users:list'],
+      },
+      {
+        href: '/admin/system/roles',
+        label: 'Roles',
+        icon: Shield,
+        requiredPermissions: ['menu:system:role:view', 'roles:list'],
+      },
+      {
+        href: '/admin/system/permissions',
+        label: 'Permissions',
+        icon: Key,
+        requiredPermissions: ['menu:system:permission:view', 'permissions:list'],
+      },
+      {
+        href: '/admin/system/clients',
+        label: 'Clients',
+        icon: Briefcase,
+        requiredPermissions: ['menu:system:client:view', 'clients:list'],
+      },
+      {
+        href: '/admin/system/scopes',
+        label: 'Scopes',
+        icon: BarChart,
+        requiredPermissions: ['menu:system:scope:view', 'scopes:list'],
+      },
+      {
+        href: '/admin/audit',
+        label: 'Audit Logs',
+        icon: FileText,
+        requiredPermissions: ['menu:system:audit:view', 'audit:list'],
+      },
+    ],
   },
 ];
 
@@ -67,24 +87,32 @@ export default function AdminSidebar() {
   const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>({});
 
   const toggleSubmenu = (label: string) => {
-    setOpenSubmenus(prev => ({ ...prev, [label]: !prev[label] }));
+    setOpenSubmenus((prev) => ({ ...prev, [label]: !prev[label] }));
   };
 
   // 根据用户权限过滤菜单项 (Filter menu items based on user permissions)
-  const filterNavItemsByPermissions = (items: NavItem[], userPermissions: string[] | undefined): NavItem[] => {
+  const filterNavItemsByPermissions = (
+    items: NavItem[],
+    userPermissions: string[] | undefined
+  ): NavItem[] => {
     if (!userPermissions) return [];
-    return items.filter(item =>
-      item.requiredPermissions.every(perm => userPermissions.includes(perm))
-    ).map(item => ({
-      ...item,
-      children: item.children ? filterNavItemsByPermissions(item.children, userPermissions) : undefined,
-    })).filter(item => item.children ? item.children.length > 0 : true); // Remove parent if no children visible
+    return items
+      .filter((item) => item.requiredPermissions.every((perm) => userPermissions.includes(perm)))
+      .map((item) => ({
+        ...item,
+        children: item.children
+          ? filterNavItemsByPermissions(item.children, userPermissions)
+          : undefined,
+      }))
+      .filter((item) => (item.children ? item.children.length > 0 : true)); // Remove parent if no children visible
   };
 
   if (authLoading) {
     return (
       <aside className="w-64 bg-white dark:bg-slate-800 p-4 space-y-2 shadow-lg">
-        <p className="text-sm text-gray-500 dark:text-gray-400">加载用户权限... (Loading user permissions...)</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          加载用户权限... (Loading user permissions...)
+        </p>
         {/* Skeleton loaders for menu items */}
         {[...Array(5)].map((_, i) => (
           <div key={i} className="h-8 bg-gray-200 dark:bg-slate-700 rounded animate-pulse" />
@@ -123,7 +151,8 @@ export default function AdminSidebar() {
                           className={cn(
                             buttonVariants({ variant: 'ghost' }),
                             'w-full justify-start text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700',
-                            pathname === child.href && 'bg-slate-100 dark:bg-slate-700 font-semibold'
+                            pathname === child.href &&
+                              'bg-slate-100 dark:bg-slate-700 font-semibold'
                           )}
                         >
                           <child.icon className="mr-2 h-4 w-4" />

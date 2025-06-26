@@ -48,6 +48,14 @@
       "cache": false,
       "dependsOn": ["db:generate"]
     },
+    "format": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "flatc:generate": {
+      "cache": false,
+      "dependsOn": []
+    },
     "e2e": {
       "dependsOn": ["build"],
       "outputs": ["playwright-report/**", "test-results/**"]

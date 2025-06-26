@@ -62,13 +62,13 @@ const menuItems: MenuItem[] = [
     title: '个人资料', // Profile
     href: '/profile', // Assuming /profile is a valid top-level dashboard page
     icon: 'UserCircle',
-  }
+  },
 ];
 
 export async function GET() {
   // In a real application, you would fetch this data based on user roles/permissions.
   // For now, we return mock data.
   // Simulate a delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
   return NextResponse.json(menuItems);
 }

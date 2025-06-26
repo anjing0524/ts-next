@@ -57,69 +57,82 @@ export function useAuth(): UseAuthReturn {
    * 当 Access Token 存在时调用此函数获取用户信息。
    * @param token - Access Token.
    */
-  const fetchUserProfile = useCallback(async (token: string) => {
-    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-    try {
-      // TODO: 替换为真实的 authApi.fetchUserProfile 实现
-      // const userData = await authApi.fetchUserProfile(token);
-      // 模拟 API 调用获取用户信息
-      const response = await fetch('/api/v2/users/me', { // 假设这是获取用户信息的端点
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  const fetchUserProfile = useCallback(
+    async (token: string) => {
+      setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+      try {
+        // TODO: 替换为真实的 authApi.fetchUserProfile 实现
+        // const userData = await authApi.fetchUserProfile(token);
+        // 模拟 API 调用获取用户信息
+        const response = await fetch('/api/v2/users/me', {
+          // 假设这是获取用户信息的端点
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) {
-        if (response.status === 401) { // Token 无效或过期
-          TokenStorage.clearTokens();
-          setAuthState({ user: null, accessToken: null, isLoading: false, error: '会话已过期，请重新登录。' });
-          router.push('/login'); // 重定向到登录页
-          return;
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Token 无效或过期
+            TokenStorage.clearTokens();
+            setAuthState({
+              user: null,
+              accessToken: null,
+              isLoading: false,
+              error: '会话已过期，请重新登录。',
+            });
+            router.push('/login'); // 重定向到登录页
+            return;
+          }
+          const errorData = await response.json().catch(() => ({ message: '获取用户信息失败' }));
+          throw new Error(errorData.message || '获取用户信息失败');
         }
-        const errorData = await response.json().catch(() => ({ message: '获取用户信息失败' }));
-        throw new Error(errorData.message || '获取用户信息失败');
-      }
 
-      const userData = await response.json();
-      setAuthState({
-        user: userData.data, // 假设用户信息在 data 字段
-        accessToken: token,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error: any) {
-      console.error('获取用户信息失败:', error);
-      TokenStorage.clearTokens(); // 获取用户信息失败时也清除 Token
-      setAuthState({
-        user: null,
-        accessToken: null,
-        isLoading: false,
-        error: error.message || '加载用户数据失败。',
-      });
-      router.push('/login'); // 可选：获取用户信息失败则重定向到登录页
-    }
-  }, [router]);
+        const userData = await response.json();
+        setAuthState({
+          user: userData.data, // 假设用户信息在 data 字段
+          accessToken: token,
+          isLoading: false,
+          error: null,
+        });
+      } catch (error: any) {
+        console.error('获取用户信息失败:', error);
+        TokenStorage.clearTokens(); // 获取用户信息失败时也清除 Token
+        setAuthState({
+          user: null,
+          accessToken: null,
+          isLoading: false,
+          error: error.message || '加载用户数据失败。',
+        });
+        router.push('/login'); // 可选：获取用户信息失败则重定向到登录页
+      }
+    },
+    [router]
+  );
 
   /**
    * 登录函数。
    * @param credentials - 登录所需的凭据 (例如，用户名和密码)。
    */
   const login = async (credentials: any) => {
-    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       // TODO: 替换为真实的 authApi.login 实现
       // const { accessToken, refreshToken: newRefreshToken, user } = await authApi.login(credentials);
 
       // 模拟登录 API 调用
-      const response = await fetch('/api/v2/oauth/token', { // 假设这是登录/获取token的端点
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials), // 根据实际API调整 body 结构
+      const response = await fetch('/api/v2/oauth/token', {
+        // 假设这是登录/获取token的端点
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials), // 根据实际API调整 body 结构
       });
 
       if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: '登录失败，请检查您的凭据。' }));
-          throw new Error(errorData.message || '登录失败，请检查您的凭据。');
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: '登录失败，请检查您的凭据。' }));
+        throw new Error(errorData.message || '登录失败，请检查您的凭据。');
       }
 
       const { access_token, refresh_token, user_info } = await response.json(); // 假设返回结构
@@ -135,7 +148,7 @@ export function useAuth(): UseAuthReturn {
       // router.push(router.query.redirect || '/admin');
     } catch (error: any) {
       console.error('登录失败:', error);
-      setAuthState(prev => ({
+      setAuthState((prev) => ({
         ...prev,
         isLoading: false,
         error: error.message || '登录时发生错误。',
@@ -149,7 +162,7 @@ export function useAuth(): UseAuthReturn {
    * 登出函数。
    */
   const logout = async () => {
-    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+    setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
     const token = TokenStorage.getAccessToken();
     try {
       if (token) {
@@ -157,8 +170,8 @@ export function useAuth(): UseAuthReturn {
         // await authApi.logout(token);
         // 模拟调用后端登出API
         await fetch('/api/v2/auth/logout', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
         });
       }
     } catch (error: any) {
@@ -184,11 +197,11 @@ export function useAuth(): UseAuthReturn {
   const refreshToken = useCallback(async (): Promise<boolean> => {
     const currentRefreshToken = TokenStorage.getRefreshToken();
     if (!currentRefreshToken) {
-      setAuthState(prev => ({ ...prev, error: '无有效刷新凭证，请重新登录。' }));
+      setAuthState((prev) => ({ ...prev, error: '无有效刷新凭证，请重新登录。' }));
       return false;
     }
 
-    setAuthState(prev => ({ ...prev, isLoading: true }));
+    setAuthState((prev) => ({ ...prev, isLoading: true }));
     try {
       // TODO: 替换为真实的 authApi.refreshToken 实现
       // const { accessToken, refreshToken: newRefreshToken } = await authApi.refreshToken(currentRefreshToken);
@@ -205,7 +218,9 @@ export function useAuth(): UseAuthReturn {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '会话刷新失败，请重新登录。' }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: '会话刷新失败，请重新登录。' }));
         throw new Error(errorData.message);
       }
 
@@ -220,7 +235,12 @@ export function useAuth(): UseAuthReturn {
     } catch (error: any) {
       console.error('Token 刷新失败:', error);
       TokenStorage.clearTokens(); // 刷新失败，清除所有 token
-      setAuthState({ user: null, accessToken: null, isLoading: false, error: '会话已过期，请重新登录。' });
+      setAuthState({
+        user: null,
+        accessToken: null,
+        isLoading: false,
+        error: '会话已过期，请重新登录。',
+      });
       router.push('/login');
       return false;
     }
@@ -231,15 +251,18 @@ export function useAuth(): UseAuthReturn {
    * @param permission - 要检查的权限字符串。
    * @returns boolean - 如果用户拥有该权限则返回 true，否则返回 false。
    */
-  const hasPermission = useCallback((permission: string): boolean => {
-    return authState.user?.permissions?.includes(permission) ?? false;
-  }, [authState.user?.permissions]);
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      return authState.user?.permissions?.includes(permission) ?? false;
+    },
+    [authState.user?.permissions]
+  );
 
   /**
    * 清除错误信息。
    */
   const clearError = () => {
-    setAuthState(prev => ({ ...prev, error: null }));
+    setAuthState((prev) => ({ ...prev, error: null }));
   };
 
   // Effect Hook：组件加载时检查初始认证状态
@@ -265,7 +288,6 @@ export function useAuth(): UseAuthReturn {
   //       return () => clearInterval(interval);
   //     }
   //   }, [authState.accessToken, authState.user, refreshToken]);
-
 
   return {
     ...authState,
@@ -398,18 +420,21 @@ export function useAuth(): UseAuthReturn {
 // login 函数应该在成功获取 token 后，调用 fetchUserProfile 来设置用户状态。
 // 这确保了 user 对象始终是通过 fetchUserProfile 获取的，保持一致性。
 const updatedLogin = async (credentials: any) => {
-  setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+  setAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
   try {
-    const response = await fetch('/api/v2/oauth/token', { // ROPC Grant
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // 或 application/x-www-form-urlencoded
-        // body: JSON.stringify({ grant_type: 'password', ...credentials }), // 调整 body
-        body: JSON.stringify(credentials), // 假设 credentials 已包含 grant_type 或后端能推断
+    const response = await fetch('/api/v2/oauth/token', {
+      // ROPC Grant
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, // 或 application/x-www-form-urlencoded
+      // body: JSON.stringify({ grant_type: 'password', ...credentials }), // 调整 body
+      body: JSON.stringify(credentials), // 假设 credentials 已包含 grant_type 或后端能推断
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '登录失败，请检查您的凭据。' }));
-        throw new Error(errorData.message || '登录失败，请检查您的凭据。');
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: '登录失败，请检查您的凭据。' }));
+      throw new Error(errorData.message || '登录失败，请检查您的凭据。');
     }
 
     const { access_token, refresh_token } = await response.json();
@@ -420,7 +445,7 @@ const updatedLogin = async (credentials: any) => {
     console.error('登录失败:', error);
     // 清除可能不完整的token设置
     TokenStorage.clearTokens();
-    setAuthState(prev => ({
+    setAuthState((prev) => ({
       ...prev,
       user: null,
       accessToken: null,
@@ -434,7 +459,6 @@ const updatedLogin = async (credentials: any) => {
 // (this is a bit of a hack for the prompt environment, in real code I'd just define it once)
 (this as any).login = updatedLogin;
 
-
 // 最终的 useAuth 函数签名
 const finalUseAuth = (): UseAuthReturn => {
   // ... (useState, useRouter, fetchUserProfile, logout, refreshToken, hasPermission, clearError, useEffects as defined before)
@@ -447,56 +471,67 @@ const finalUseAuth = (): UseAuthReturn => {
   });
   const internalRouter = useRouter();
 
-  const internalFetchUserProfile = useCallback(async (token: string) => {
-    setInternalAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-    try {
-      const response = await fetch('/api/v2/users/me', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          TokenStorage.clearTokens();
-          setInternalAuthState({ user: null, accessToken: null, isLoading: false, error: '会话已过期，请重新登录。' });
-          internalRouter.push('/login');
-          return;
+  const internalFetchUserProfile = useCallback(
+    async (token: string) => {
+      setInternalAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
+      try {
+        const response = await fetch('/api/v2/users/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          if (response.status === 401) {
+            TokenStorage.clearTokens();
+            setInternalAuthState({
+              user: null,
+              accessToken: null,
+              isLoading: false,
+              error: '会话已过期，请重新登录。',
+            });
+            internalRouter.push('/login');
+            return;
+          }
+          const errorData = await response.json().catch(() => ({ message: '获取用户信息失败' }));
+          throw new Error(errorData.message || '获取用户信息失败');
         }
-        const errorData = await response.json().catch(() => ({ message: '获取用户信息失败' }));
-        throw new Error(errorData.message || '获取用户信息失败');
+        const userData = await response.json();
+        setInternalAuthState({
+          user: userData.data,
+          accessToken: token,
+          isLoading: false,
+          error: null,
+        });
+      } catch (error: any) {
+        console.error('获取用户信息失败:', error);
+        TokenStorage.clearTokens();
+        setInternalAuthState({
+          user: null,
+          accessToken: null,
+          isLoading: false,
+          error: error.message || '加载用户数据失败。',
+        });
+        if (!window.location.pathname.startsWith('/login')) {
+          // 避免在登录页无限重定向
+          internalRouter.push('/login');
+        }
       }
-      const userData = await response.json();
-      setInternalAuthState({
-        user: userData.data,
-        accessToken: token,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error: any) {
-      console.error('获取用户信息失败:', error);
-      TokenStorage.clearTokens();
-      setInternalAuthState({
-        user: null,
-        accessToken: null,
-        isLoading: false,
-        error: error.message || '加载用户数据失败。',
-      });
-      if (!window.location.pathname.startsWith('/login')) { // 避免在登录页无限重定向
-        internalRouter.push('/login');
-      }
-    }
-  }, [internalRouter]);
+    },
+    [internalRouter]
+  );
 
   const internalLogin = async (credentials: any) => {
-    setInternalAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+    setInternalAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       // 假设 credentials 包含 grant_type: 'password', username, password
       const response = await fetch('/api/v2/oauth/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
       });
       if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: '登录失败，请检查您的凭据。' }));
-          throw new Error(errorData.message || '登录失败，请检查您的凭据。');
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: '登录失败，请检查您的凭据。' }));
+        throw new Error(errorData.message || '登录失败，请检查您的凭据。');
       }
       const { access_token, refresh_token } = await response.json();
       TokenStorage.setTokens(access_token, refresh_token);
@@ -504,7 +539,7 @@ const finalUseAuth = (): UseAuthReturn => {
     } catch (error: any) {
       console.error('登录失败:', error);
       TokenStorage.clearTokens();
-      setInternalAuthState(prev => ({
+      setInternalAuthState((prev) => ({
         ...prev,
         user: null,
         accessToken: null,
@@ -516,13 +551,13 @@ const finalUseAuth = (): UseAuthReturn => {
   };
 
   const internalLogout = async () => {
-    setInternalAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+    setInternalAuthState((prev) => ({ ...prev, isLoading: true, error: null }));
     const token = TokenStorage.getAccessToken();
     try {
       if (token) {
         await fetch('/api/v2/auth/logout', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
         });
       }
     } catch (error: any) {
@@ -537,10 +572,10 @@ const finalUseAuth = (): UseAuthReturn => {
   const internalRefreshToken = useCallback(async (): Promise<boolean> => {
     const currentRefreshToken = TokenStorage.getRefreshToken();
     if (!currentRefreshToken) {
-      setInternalAuthState(prev => ({ ...prev, error: '无有效刷新凭证，请重新登录。' }));
+      setInternalAuthState((prev) => ({ ...prev, error: '无有效刷新凭证，请重新登录。' }));
       return false;
     }
-    setInternalAuthState(prev => ({ ...prev, isLoading: true }));
+    setInternalAuthState((prev) => ({ ...prev, isLoading: true }));
     try {
       const response = await fetch('/api/v2/oauth/token', {
         method: 'POST',
@@ -551,7 +586,9 @@ const finalUseAuth = (): UseAuthReturn => {
         }),
       });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '会话刷新失败，请重新登录。' }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: '会话刷新失败，请重新登录。' }));
         throw new Error(errorData.message);
       }
       const { access_token, refresh_token: newRefreshToken } = await response.json();
@@ -561,7 +598,12 @@ const finalUseAuth = (): UseAuthReturn => {
     } catch (error: any) {
       console.error('Token 刷新失败:', error);
       TokenStorage.clearTokens();
-      setInternalAuthState({ user: null, accessToken: null, isLoading: false, error: '会话已过期，请重新登录。' });
+      setInternalAuthState({
+        user: null,
+        accessToken: null,
+        isLoading: false,
+        error: '会话已过期，请重新登录。',
+      });
       if (!window.location.pathname.startsWith('/login')) {
         internalRouter.push('/login');
       }
@@ -569,17 +611,21 @@ const finalUseAuth = (): UseAuthReturn => {
     }
   }, [internalRouter, internalFetchUserProfile]);
 
-  const internalHasPermission = useCallback((permission: string): boolean => {
-    return internalAuthState.user?.permissions?.includes(permission) ?? false;
-  }, [internalAuthState.user?.permissions]);
+  const internalHasPermission = useCallback(
+    (permission: string): boolean => {
+      return internalAuthState.user?.permissions?.includes(permission) ?? false;
+    },
+    [internalAuthState.user?.permissions]
+  );
 
   const internalClearError = () => {
-    setInternalAuthState(prev => ({ ...prev, error: null }));
+    setInternalAuthState((prev) => ({ ...prev, error: null }));
   };
 
   useEffect(() => {
     const currentToken = TokenStorage.getAccessToken();
-    if (currentToken && !internalAuthState.user) { // 只有在没有用户信息时才加载
+    if (currentToken && !internalAuthState.user) {
+      // 只有在没有用户信息时才加载
       internalFetchUserProfile(currentToken);
     } else if (!currentToken) {
       setInternalAuthState({ user: null, accessToken: null, isLoading: false, error: null });

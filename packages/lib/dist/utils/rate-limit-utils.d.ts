@@ -104,7 +104,7 @@ export declare const defaultRateLimiter: {
  * 创建一个简单的限流检查函数
  * Creates a simple rate limiting check function
  */
-export declare function createRateLimit({ maxRequests, windowMs }: {
+export declare function createRateLimit({ maxRequests, windowMs, }: {
     maxRequests: number;
     windowMs: number;
 }): (key: string) => RateLimitResult;

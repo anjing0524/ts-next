@@ -1,9 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { toast } from '@/components/ui/use-toast';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+  toast,
+} from '@repo/ui';
 import { Eye, EyeOff, Copy } from 'lucide-react';
 
 interface ClientSecretDialogProps {
@@ -23,12 +30,17 @@ export function ClientSecretDialog({
 
   const handleCopySecret = () => {
     if (clientSecret) {
-      navigator.clipboard.writeText(clientSecret)
+      navigator.clipboard
+        .writeText(clientSecret)
         .then(() => {
-          toast({ title: "已复制", description: "客户端密钥已复制到剪贴板。" });
+          toast({ title: '已复制', description: '客户端密钥已复制到剪贴板。' });
         })
-        .catch(err => {
-          toast({ variant: "destructive", title: "复制失败", description: "无法复制密钥: " + err.message });
+        .catch((err) => {
+          toast({
+            variant: 'destructive',
+            title: '复制失败',
+            description: '无法复制密钥: ' + err.message,
+          });
         });
     }
   };
@@ -50,10 +62,22 @@ export function ClientSecretDialog({
             {showSecret ? clientSecret : '••••••••••••••••••••••••••••••••••••••••••••••••••'}
           </span>
           <div className="absolute top-1 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSecret(s => !s)} title={showSecret ? "隐藏密钥" : "显示密钥"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setShowSecret((s) => !s)}
+              title={showSecret ? '隐藏密钥' : '显示密钥'}
+            >
               {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopySecret} title="复制密钥">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleCopySecret}
+              title="复制密钥"
+            >
               <Copy className="h-4 w-4" />
             </Button>
           </div>
@@ -67,4 +91,3 @@ export function ClientSecretDialog({
     </Dialog>
   );
 }
-```

@@ -12,15 +12,12 @@ export class ClientAuthUtils {
   /**
    * 客户端认证主入口函数
    * Main entry function for client authentication
-   * 
+   *
    * @param request - Next.js请求对象 (Next.js request object)
    * @param body - 表单数据 (Form data)
    * @returns 认证成功的客户端对象 (Authenticated client object)
    */
-  static async authenticateClient(
-    request: NextRequest,
-    body: FormData
-  ): Promise<Client> {
+  static async authenticateClient(request: NextRequest, body: FormData): Promise<Client> {
     let client_id = body.get('client_id') as string;
     let client_secret = body.get('client_secret') as string;
     const client_assertion_type = body.get('client_assertion_type') as string;
@@ -90,7 +87,7 @@ export class ClientAuthUtils {
   /**
    * 使用client_id和client_secret进行认证
    * Authenticate with client_id and client_secret
-   * 
+   *
    * @param clientId - 客户端ID (Client ID)
    * @param clientSecret - 客户端密钥 (Client secret)
    * @returns 认证成功的客户端对象 (Authenticated client object)
@@ -142,7 +139,7 @@ export class ClientAuthUtils {
   /**
    * 使用JWT客户端断言进行认证
    * Authenticate with JWT client assertion
-   * 
+   *
    * @param assertion - JWT断言字符串 (JWT assertion string)
    * @param request - Next.js请求对象 (Next.js request object)
    * @returns 认证成功的客户端对象 (Authenticated client object)
@@ -209,20 +206,16 @@ export class ClientAuthUtils {
         throw error;
       }
 
-      throw new OAuth2Error(
-        errorDescription,
-        oauthErrorCode,
-        400,
-        undefined,
-        { originalError: error.message }
-      );
+      throw new OAuth2Error(errorDescription, oauthErrorCode, 400, undefined, {
+        originalError: error.message,
+      });
     }
   }
 
   /**
    * 获取当前请求的令牌端点URL
    * Get the token endpoint URL for the current request
-   * 
+   *
    * @param request - Next.js请求对象 (Next.js request object)
    * @returns 令牌端点URL (Token endpoint URL)
    */
@@ -233,4 +226,4 @@ export class ClientAuthUtils {
     const path = process.env.OAUTH_TOKEN_ENDPOINT_PATH || '/api/v2/oauth/token';
     return `${protocol}://${host}${path}`;
   }
-} 
+}

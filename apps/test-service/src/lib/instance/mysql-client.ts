@@ -15,4 +15,4 @@ import { checkPoolHealth as baseCheckPoolHealth } from '@repo/database';
  * 导出检查连接池健康状态函数
  * Export check pool health function
  */
-export { baseCheckPoolHealth as checkPoolHealth }; 
+export { baseCheckPoolHealth as checkPoolHealth };

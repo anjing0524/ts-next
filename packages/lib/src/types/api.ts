@@ -84,9 +84,9 @@ export interface ApiResponse<T = any> {
  * where `T` can be `never` (if no data is returned on error), and `success` is set to `false`.)
  */
 export interface ApiErrorResponse {
-    /**
-     * 包含错误详细信息的对象。
-     * (Object containing detailed error information.)
-     */
-    error: ApiError;
+  /**
+   * 包含错误详细信息的对象。
+   * (Object containing detailed error information.)
+   */
+  error: ApiError;
 }

@@ -43,4 +43,4 @@ export const PKCEConstants = {
   CODE_CHALLENGE_METHOD_S256: 'S256',
   CODE_VERIFIER_MIN_LENGTH: 43,
   CODE_VERIFIER_MAX_LENGTH: 128,
-} as const; 
+} as const;

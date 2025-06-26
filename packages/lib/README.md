@@ -1,14 +1,17 @@
 # @repo/lib 包索引文档
 
 ## 概述
+
 本包提供项目中所有共享的工具类、服务和中间件。
 
 ## 模块结构
 
 ### 🔐 认证模块 (Auth Module)
+
 **导入路径**: `@repo/lib/auth` 或 `@repo/lib`
 
 #### AuthorizationUtils
+
 - **位置**: `src/auth/authorization-utils.ts`
 - **作用**: OAuth2 授权相关工具函数
 - **主要方法**:
@@ -19,6 +22,7 @@
   - `getUserPermissions()` - 获取用户权限
 
 #### JWTUtils
+
 - **位置**: `src/auth/jwt-utils.ts`
 - **作用**: JWT 令牌处理工具
 - **主要方法**:
@@ -27,6 +31,7 @@
   - `refreshToken()` - 刷新令牌
 
 #### PKCEUtils
+
 - **位置**: `src/auth/pkce-utils.ts`
 - **作用**: PKCE (Proof Key for Code Exchange) 工具
 - **主要方法**:
@@ -34,6 +39,7 @@
   - `validateCodeChallenge()` - 验证代码挑战
 
 #### ScopeUtils
+
 - **位置**: `src/auth/scope-utils.ts`
 - **作用**: OAuth2 范围管理工具
 - **主要方法**:
@@ -41,6 +47,7 @@
   - `validateScopes()` - 验证范围
 
 #### PasswordUtils
+
 - **位置**: `src/auth/password-utils.ts`
 - **作用**: 密码处理工具
 - **主要方法**:
@@ -48,9 +55,11 @@
   - `verifyPassword()` - 密码验证
 
 ### 🛠️ 工具模块 (Utils Module)
+
 **导入路径**: `@repo/lib/utils` 或 `@repo/lib`
 
 #### RateLimitUtils
+
 - **位置**: `src/utils/rate-limit-utils.ts`
 - **作用**: 速率限制工具
 - **主要方法**:
@@ -58,33 +67,39 @@
   - `resetRateLimit()` - 重置速率限制
 
 #### ErrorHandler
+
 - **位置**: `src/utils/error-handler.ts`
 - **作用**: 错误处理工具
 - **主要方法**:
   - `withErrorHandling()` - 错误处理包装器
 
 #### TimeWheel
+
 - **位置**: `src/utils/time-wheel.ts`
 - **作用**: 时间轮算法实现
 - **主要方法**:
   - `getTimeWheelInstance()` - 获取时间轮实例
 
 #### Logger
+
 - **位置**: `src/utils/logger.ts`
 - **作用**: 日志工具
 - **主要方法**:
   - `createLogger()` - 创建日志器
 
 #### 邮箱验证
+
 - **位置**: `src/utils.ts`
 - **作用**: 通用工具函数
 - **主要方法**:
   - `isValidEmail()` - 验证邮箱地址
 
 ### 🏢 服务模块 (Services Module)
+
 **导入路径**: `@repo/lib/services` 或 `@repo/lib`
 
 #### RBACService
+
 - **位置**: `src/services/rbac-service.ts`
 - **作用**: 基于角色的访问控制服务
 - **主要方法**:
@@ -92,6 +107,7 @@
   - `checkPermission()` - 检查权限
 
 #### PermissionService
+
 - **位置**: `src/services/permission-service.ts`
 - **作用**: 权限管理服务
 - **主要方法**:
@@ -99,34 +115,43 @@
   - `updatePermission()` - 更新权限
 
 ### 🚀 中间件模块 (Middleware Module)
+
 **导入路径**: `@repo/lib/middleware` 或 `@repo/lib`
 
 #### BearerAuth
+
 - **位置**: `src/middleware/bearer-auth.ts`
 - **作用**: Bearer 令牌认证中间件
 
 #### CORS
+
 - **位置**: `src/middleware/cors.ts`
 - **作用**: 跨域资源共享中间件
 
 ### 📝 类型定义 (Types)
+
 **导入路径**: `@repo/lib/types` 或 `@repo/lib`
 
 #### API 类型
+
 - **位置**: `src/types/api.ts`
 - **作用**: API 相关类型定义
 
 ### ❌ 错误处理 (Errors)
+
 **导入路径**: `@repo/lib/errors` 或 `@repo/lib`
 
 #### OAuth2ErrorCode
+
 - **位置**: `src/errors.ts`
 - **作用**: OAuth2 错误代码定义
 
 ### 💾 缓存 (Cache)
+
 **导入路径**: `@repo/lib/cache` 或 `@repo/lib`
 
 #### 缓存工具
+
 - **位置**: `src/cache.ts`
 - **作用**: 缓存管理工具
 
@@ -149,4 +174,4 @@ import { isValidEmail } from '@repo/lib/utils';
 1. **避免循环导入**: 不要在 @repo/lib 内部使用相对路径导入
 2. **统一导入路径**: 优先使用 `@repo/lib` 根路径导入
 3. **类型安全**: 所有导出都包含完整的 TypeScript 类型定义
-4. **模块边界**: 每个模块职责单一，避免跨模块依赖 
+4. **模块边界**: 每个模块职责单一，避免跨模块依赖

@@ -3,15 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
+    ".": "./src/index.ts",
     "./components.json": "./components.json",
     "./postcss": "./postcss.config.js",
     "./tailwind.config": "./tailwind.config.ts",
     "./styles": "./src/styles.css",
     "./components/*": "./src/components/ui/*",
-    "./lib/utils": "./src/lib/utils.ts"
+    "./lib/utils": "./src/lib/utils.ts",
+    "./components": "./src/components.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./utils": "./src/lib/utils.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,10 +46,13 @@
   "devDependencies": {
     "@repo/tailwind-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@tailwindcss/cli": "^4.1.5",
     "@types/react": "^19.1.6",
     "eslint": "^9.29.0",
     "tailwindcss": "^4.1.5",
     "typescript": "^5"
-  }
+  },
+  "prettier": "@repo/prettier-config"
 }

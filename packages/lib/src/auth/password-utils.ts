@@ -35,7 +35,8 @@ const UPPERCASE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 export const PasswordComplexitySchema = z
   .string() // 输入必须是字符串
   .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`) // 最小长度验证
-  .refine((password) => { // 自定义验证逻辑 (refine)
+  .refine((password) => {
+    // 自定义验证逻辑 (refine)
     // 定义四种字符类别及其对应的正则表达式
     const categories = [
       /[a-z]/, // 匹配小写字母
@@ -78,7 +79,7 @@ export function generateSecurePassword(length: number = 12): string {
   // 为了简单起见，这里确保至少包含一个小写字母和一个数字，以满足“至少两类字符”的要求。
   // 更健壮的生成器可能会随机选择这两个强制类别，或确保更多类别。
   password += LOWERCASE_CHARACTERS[crypto.randomInt(LOWERCASE_CHARACTERS.length)]; // 添加一个随机小写字母
-  password += NUMBER_CHARACTERS[crypto.randomInt(NUMBER_CHARACTERS.length)];     // 添加一个随机数字
+  password += NUMBER_CHARACTERS[crypto.randomInt(NUMBER_CHARACTERS.length)]; // 添加一个随机数字
 
   // 如果在添加强制字符后，密码长度仍然小于2 (例如，如果期望长度 length 非常小)，则调整 length。
   // (这种情况在 `length >= PASSWORD_MIN_LENGTH` 的前提下不太可能发生，但作为防御性编程)
@@ -107,7 +108,7 @@ export function generateSecurePassword(length: number = 12): string {
     return password; // 如果验证通过，返回密码
   } catch (e) {
     // 如果上面生成的密码未能通过 PasswordComplexitySchema 的验证 (理论上不太可能发生)
-    console.error("Error validating initially generated password:", e); // 记录错误
+    console.error('Error validating initially generated password:', e); // 记录错误
     console.warn(
       'Initial generated password failed complexity check, retrying with simpler fallback logic for safety.'
     );
@@ -115,7 +116,8 @@ export function generateSecurePassword(length: number = 12): string {
     // 这种回退逻辑旨在确保在极端情况下也能生成一个密码，尽管可能不如预期复杂。
     // 理想情况下，应该循环调用主生成逻辑直到生成有效密码。
     let fallbackPassword = '';
-    const charSets = [ // 定义字符集数组
+    const charSets = [
+      // 定义字符集数组
       LOWERCASE_CHARACTERS,
       UPPERCASE_CHARACTERS,
       NUMBER_CHARACTERS,
@@ -147,16 +149,16 @@ export function generateSecurePassword(length: number = 12): string {
  *           此机制可以阻止他们使用该旧密码重新访问账户 (如果用户已更改密码)。
  */
 export async function checkPasswordHistory(
-  userId: string,               // 用户ID
-  newPasswordRaw: string,       // 新的明文密码
-  historyLimit: number = 5      // 检查最近多少条历史记录，默认为5
+  userId: string, // 用户ID
+  newPasswordRaw: string, // 新的明文密码
+  historyLimit: number = 5 // 检查最近多少条历史记录，默认为5
 ): Promise<boolean> {
   // 从数据库中查询指定用户的密码历史记录。
   // 按创建时间降序排序，并只取最近的 `historyLimit` 条记录。
   const passwordHistory = await prisma.passwordHistory.findMany({
-    where: { userId },              // 根据用户ID筛选
+    where: { userId }, // 根据用户ID筛选
     orderBy: { createdAt: 'desc' }, // 按创建时间倒序排列
-    take: historyLimit,             // 获取最新的 N 条记录
+    take: historyLimit, // 获取最新的 N 条记录
   });
 
   // 如果没有密码历史记录，则新密码自然是有效的 (从历史角度看)。

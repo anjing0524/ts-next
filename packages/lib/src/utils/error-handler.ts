@@ -8,9 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { BaseError, OAuth2Error, AuthenticationError, AuthorizationError, ValidationError } from '../errors'; // 导入自定义错误类 (Import custom error classes)
-import { ApiResponse, ApiError } from '../types/api'; // 导入API响应和错误类型 (Import API response and error types)
 import { v4 as uuidv4 } from 'uuid'; // 用于生成唯一的请求ID (For generating unique request IDs)
+import { BaseError, ValidationError } from '../errors'; // 导入自定义错误类 (Import custom error classes)
+import { ApiResponse } from '../types/api'; // 导入API响应和错误类型 (Import API response and error types)
 
 /**
  * 记录错误信息。
@@ -21,7 +21,11 @@ import { v4 as uuidv4 } from 'uuid'; // 用于生成唯一的请求ID (For gener
  * @param req 可选的 NextRequest 对象，用于提取请求相关信息。 (Optional NextRequest object to extract request-related information.)
  * @param requestId 可选的请求ID，用于追踪。 (Optional request ID for tracking.)
  */
-export function logError(error: Error | BaseError | any, req?: NextRequest, requestId?: string): void {
+export function logError(
+  error: Error | BaseError | any,
+  req?: NextRequest,
+  requestId?: string
+): void {
   const logEntry: Record<string, any> = {
     timestamp: new Date().toISOString(),
     requestId: requestId || 'N/A',
@@ -56,7 +60,6 @@ export function logError(error: Error | BaseError | any, req?: NextRequest, requ
   console.error(JSON.stringify(logEntry, null, 2));
 }
 
-
 /**
  * 处理在API路由处理程序中发生的错误，并将其转换为标准化的NextResponse。
  * (Handles errors occurring in API route handlers and converts them into standardized NextResponse.)
@@ -66,7 +69,11 @@ export function logError(error: Error | BaseError | any, req?: NextRequest, requ
  * @returns 一个 NextResponse 对象，包含格式化的错误响应。
  * (A NextResponse object containing the formatted error response.)
  */
-export function handleError(error: Error | any, req?: NextRequest, requestId?: string): NextResponse {
+export function handleError(
+  error: Error | any,
+  req?: NextRequest,
+  requestId?: string
+): NextResponse {
   const currentRequestId = requestId || uuidv4(); // 确保有一个请求ID (Ensure there is a request ID)
 
   logError(error, req, currentRequestId); // 首先记录错误 (Log the error first)
@@ -78,7 +85,7 @@ export function handleError(error: Error | any, req?: NextRequest, requestId?: s
     // 在错误响应中可能也包含 requestId
     // Optionally include requestId in the error response body
     if (apiResponse.error) {
-        apiResponse.error.details = { ...apiResponse.error.details, requestId: currentRequestId };
+      apiResponse.error.details = { ...apiResponse.error.details, requestId: currentRequestId };
     }
     return NextResponse.json(apiResponse, { status: error.status });
   }
@@ -179,7 +186,7 @@ export async function safeExecute<T>(
 ): Promise<{ data?: T; error?: BaseError }> {
   try {
     const result = await fn(); // 执行函数 (Execute the function)
-    return { data: result };  // 返回成功结果 (Return success result)
+    return { data: result }; // 返回成功结果 (Return success result)
   } catch (error: any) {
     // 如果函数执行过程中发生错误
     // If an error occurs during function execution
@@ -199,7 +206,7 @@ export async function safeExecute<T>(
         error.status || 500, // 尝试使用原始错误的状态码 (Try to use status from original error)
         error.code || 'OPERATION_FAILED', // 尝试使用原始错误的代码 (Try to use code from original error)
         { originalErrorName: error.name, requestId } // 包含原始错误名称和请求ID到上下文中 (Include original error name and request ID in context)
-      )
+      ),
     };
   }
 }
@@ -221,20 +228,26 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
       return await handler(req, ...args);
     } catch (error) {
       console.error('API route error:', error);
-      
+
       if (error instanceof BaseError) {
-        return NextResponse.json({
-          success: false,
-          error: error.code,
-          message: error.message
-        }, { status: error.status });
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.code,
+            message: error.message,
+          },
+          { status: error.status }
+        );
       }
-      
-      return NextResponse.json({
-        success: false,
-        error: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred'
-      }, { status: 500 });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred',
+        },
+        { status: 500 }
+      );
     }
   };
 }
@@ -244,11 +257,14 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
  * Error response handling
  */
 export function errorResponse(message: string, status: number, errorCode?: string) {
-  return NextResponse.json({
-    success: false,
-    error: errorCode || 'ERROR',
-    message
-  }, { status });
+  return NextResponse.json(
+    {
+      success: false,
+      error: errorCode || 'ERROR',
+      message,
+    },
+    { status }
+  );
 }
 
 /**
@@ -256,9 +272,12 @@ export function errorResponse(message: string, status: number, errorCode?: strin
  * Success response handling
  */
 export function successResponse(data: any, message?: string, status: number = 200) {
-  return NextResponse.json({
-    success: true,
-    data,
-    message: message || 'Success'
-  }, { status });
+  return NextResponse.json(
+    {
+      success: true,
+      data,
+      message: message || 'Success',
+    },
+    { status }
+  );
 }

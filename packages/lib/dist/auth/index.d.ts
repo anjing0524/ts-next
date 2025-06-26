@@ -11,5 +11,5 @@ export { ScopeUtils } from './scope-utils';
 export { AuthorizationUtils } from './authorization-utils';
 export * from './password-utils';
 export type { JWTPayload, JWTOptions, TokenValidationResult, PKCEChallenge, ScopeValidationResult, PasswordHashResult, } from './types';
-export type { RefreshTokenPayload, AccessTokenPayload, IdTokenPayload, } from './jwt-utils';
+export type { RefreshTokenPayload, AccessTokenPayload, IdTokenPayload } from './jwt-utils';
 //# sourceMappingURL=index.d.ts.map

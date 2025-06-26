@@ -1,7 +1,7 @@
 /**
  * 认证模块统一导出
  * Authentication module exports
- * 
+ *
  * 提供 OAuth2 认证相关的工具类和服务
  * Provides OAuth2 authentication utilities and services
  */
@@ -11,7 +11,6 @@ export { JWTUtils } from './jwt-utils';
 export { PKCEUtils } from './pkce-utils';
 export { ScopeUtils } from './scope-utils';
 export { AuthorizationUtils } from './authorization-utils';
-
 
 // 密码工具函数 (Password utility functions)
 export * from './password-utils';
@@ -27,8 +26,4 @@ export type {
 } from './types';
 
 // JWT 相关类型 (JWT related types)
-export type {
-  RefreshTokenPayload,
-  AccessTokenPayload,
-  IdTokenPayload,
-} from './jwt-utils'; 
+export type { RefreshTokenPayload, AccessTokenPayload, IdTokenPayload } from './jwt-utils';

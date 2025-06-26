@@ -1,9 +1,9 @@
-"use client"; // For DropdownMenu interaction
+'use client'; // For DropdownMenu interaction
 
-import * as React from "react";
-import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "../../avatar"; // from packages/ui
-import { Button } from "../../button";
+import * as React from 'react';
+import Link from 'next/link';
+import { Avatar, AvatarFallback, AvatarImage } from '../../avatar'; // from packages/ui
+import { Button } from '../../button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +12,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../../dropdown-menu"; // from packages/ui
-import * as LucideIcons from "lucide-react"; // For icons
+} from '../../dropdown-menu'; // from packages/ui
+import * as LucideIcons from 'lucide-react'; // For icons
 
 // Define a simple user type for props
 interface UserNavProps {
@@ -44,15 +44,17 @@ export function UserNav({ user, onLogout, isLoading }: UserNavProps) {
   const userInitial = user.displayName
     ? user.displayName.charAt(0).toUpperCase()
     : user.username
-    ? user.username.charAt(0).toUpperCase()
-    : "U";
+      ? user.username.charAt(0).toUpperCase()
+      : 'U';
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
           <Avatar className="h-9 w-9">
-            {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={`@${user.username || 'user'}`} />}
+            {user.avatarUrl && (
+              <AvatarImage src={user.avatarUrl} alt={`@${user.username || 'user'}`} />
+            )}
             <AvatarFallback>{userInitial}</AvatarFallback>
           </Avatar>
         </Button>
@@ -60,26 +62,26 @@ export function UserNav({ user, onLogout, isLoading }: UserNavProps) {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
-              {user.displayName || user.username}
-            </p>
+            <p className="text-sm font-medium leading-none">{user.displayName || user.username}</p>
             {user.email && (
-              <p className="text-xs leading-none text-muted-foreground">
-                {user.email}
-              </p>
+              <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
             )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="flex items-center cursor-pointer w-full"> {/* Ensure links in admin-portal context */}
+            <Link href="/profile" className="flex items-center cursor-pointer w-full">
+              {' '}
+              {/* Ensure links in admin-portal context */}
               <LucideIcons.UserCircle className="mr-2 h-4 w-4" />
               <span>个人资料</span> {/* Profile */}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/admin/system/general" className="flex items-center cursor-pointer w-full"> {/* Example settings link */}
+            <Link href="/admin/system/general" className="flex items-center cursor-pointer w-full">
+              {' '}
+              {/* Example settings link */}
               <LucideIcons.Settings className="mr-2 h-4 w-4" />
               <span>系统设置</span> {/* Settings */}
             </Link>
@@ -87,7 +89,10 @@ export function UserNav({ user, onLogout, isLoading }: UserNavProps) {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {onLogout && (
-          <DropdownMenuItem onClick={onLogout} className="flex items-center cursor-pointer text-destructive dark:text-red-500 focus:text-destructive focus:dark:text-red-500">
+          <DropdownMenuItem
+            onClick={onLogout}
+            className="flex items-center cursor-pointer text-destructive dark:text-red-500 focus:text-destructive focus:dark:text-red-500"
+          >
             <LucideIcons.LogOut className="mr-2 h-4 w-4" />
             <span>登出</span> {/* Log out */}
           </DropdownMenuItem>

@@ -10,10 +10,12 @@ export const revokeTokenRequestSchema = z.object({
    * The token that the client wants to get revoked.
    * This is a REQUIRED parameter.
    */
-  token: z.string({
-    required_error: 'token is required.',
-    invalid_type_error: 'token must be a string.',
-  }).min(1, 'token cannot be empty.'),
+  token: z
+    .string({
+      required_error: 'token is required.',
+      invalid_type_error: 'token must be a string.',
+    })
+    .min(1, 'token cannot be empty.'),
 
   /**
    * A hint about the type of the token submitted for revocation.

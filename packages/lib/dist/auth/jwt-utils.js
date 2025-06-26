@@ -135,7 +135,7 @@ async function createAccessToken(payload, config) {
         scope: payload.scope,
         permissions: payload.permissions || [],
     };
-    Object.keys(jwtPayload).forEach(key => (jwtPayload[key] === undefined) && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
     return await new jose.SignJWT(jwtPayload)
         .setProtectedHeader({ alg: algorithm, kid: keyId })
         .setExpirationTime((config === null || config === void 0 ? void 0 : config.expiresIn) || payload.exp || '1h')
@@ -158,7 +158,7 @@ async function createRefreshToken(payload, config) {
         scope: payload.scope,
         token_type: 'refresh_token',
     };
-    Object.keys(jwtPayload).forEach(key => (jwtPayload[key] === undefined) && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
     return await new jose.SignJWT(jwtPayload)
         .setProtectedHeader({ alg: algorithm, kid: keyId })
         .setExpirationTime((config === null || config === void 0 ? void 0 : config.expiresIn) || '30d')
@@ -182,7 +182,7 @@ async function createIdToken(payload, config) {
         name: payload.name,
         picture: payload.picture,
     };
-    Object.keys(jwtPayload).forEach(key => (jwtPayload[key] === undefined) && delete jwtPayload[key]);
+    Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
     return await new jose.SignJWT(jwtPayload)
         .setProtectedHeader({ alg: algorithm, kid: keyId })
         .setExpirationTime((config === null || config === void 0 ? void 0 : config.expiresIn) || '1h')
@@ -290,7 +290,7 @@ function getScopesFromToken(token) {
     if (!payload || !payload.scope || typeof payload.scope !== 'string') {
         return [];
     }
-    return payload.scope.split(' ').filter(s => s);
+    return payload.scope.split(' ').filter((s) => s);
 }
 /**
  * 解码令牌负载

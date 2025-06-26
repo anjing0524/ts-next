@@ -22,17 +22,9 @@ export const validatePKCEParams = PKCEUtils.validatePKCEParams;
 // Please use import { OAuth2ErrorCode, OAuth2Error } from '@repo/lib/errors'
 
 // OAuth2 类型定义（OAuth2ErrorCode已移至@repo/lib/errors）
-export {
-  ClientType,
-  GrantType,
-  ResponseType,
-  TokenEndpointAuthMethod
-} from './types';
+export { ClientType, GrantType, ResponseType, TokenEndpointAuthMethod } from './types';
 
-export type {
-  AuthContext,
-  AuthenticatedRequest
-} from './types';
+export type { AuthContext, AuthenticatedRequest } from './types';
 
 // OAuth2 认证中间件已移至 @repo/lib/middleware
 // OAuth2 authentication middleware has been moved to @repo/lib/middleware
@@ -42,4 +34,4 @@ export type {
 // OAuth2 业务逻辑函数 (OAuth2 Business Logic Functions)
 export { storeAuthorizationCode, validateAuthorizationCode } from './authorization-code-flow';
 export { authenticateClient, grantClientCredentialsToken } from './client-credentials-flow';
-export type { AuthenticatedClient } from './client-credentials-flow'; 
+export type { AuthenticatedClient } from './client-credentials-flow';

@@ -57,14 +57,14 @@ export class RBACService {
               include: {
                 rolePermissions: {
                   include: {
-                    permission: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    permission: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -72,12 +72,12 @@ export class RBACService {
     }
 
     // 收集所有角色
-    const roles = user.userRoles.map(ur => ur.role.name);
+    const roles = user.userRoles.map((ur) => ur.role.name);
 
     // 收集所有权限（去重）
     const permissionSet = new Set<string>();
-    user.userRoles.forEach(userRole => {
-      userRole.role.rolePermissions.forEach(rolePermission => {
+    user.userRoles.forEach((userRole) => {
+      userRole.role.rolePermissions.forEach((rolePermission) => {
         permissionSet.add(rolePermission.permission.name);
       });
     });
@@ -89,7 +89,7 @@ export class RBACService {
       organizationContext: {
         organization: user.organization || undefined,
         department: user.department || undefined,
-      }
+      },
     };
 
     // 缓存60秒
@@ -107,4 +107,4 @@ export class RBACService {
     }
     return userPermissions.permissions.includes(permissionName);
   }
-} 
+}

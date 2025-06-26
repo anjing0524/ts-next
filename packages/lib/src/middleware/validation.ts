@@ -4,10 +4,8 @@
 // Description: Basic validation middleware (common)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { OAuthClient as Client } from '@prisma/client';
-import { RateLimitUtils } from '../utils';
 import { PKCEUtils } from '../auth';
-import { OAuth2ErrorCode } from '../errors';
+import { RateLimitUtils } from '../utils';
 
 /**
  * 基础验证选项接口
@@ -46,7 +44,7 @@ export interface ValidationResult {
 /**
  * 基础请求验证函数
  * Basic request validation function
- * 
+ *
  * @param request - Next.js请求对象
  * @param options - 验证选项
  * @returns 验证结果
@@ -62,7 +60,7 @@ export async function validateRequest(
   if (options.rateLimit) {
     const { maxRequests, windowMs, keyType } = options.rateLimit;
     const config = { maxRequests, windowMs, keyType };
-    
+
     const rateLimitResult = RateLimitUtils.applyRateLimit(request, config);
     const isLimited = !rateLimitResult.allowed;
     if (isLimited) {
@@ -94,7 +92,8 @@ export async function validateRequest(
         response: NextResponse.json(
           {
             error: 'invalid_request',
-            error_description: 'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.',
+            error_description:
+              'Failed to parse request body. Ensure it is application/x-www-form-urlencoded.',
           },
           { status: 400 }
         ),
@@ -171,7 +170,7 @@ export async function validateRequest(
 /**
  * OAuth重定向URI验证函数
  * OAuth redirect URI validation function
- * 
+ *
  * @param redirectUri - 重定向URI
  * @param registeredUris - 注册的URI列表
  * @returns 验证结果
@@ -197,7 +196,7 @@ export function validateRedirectUri(
   }
 
   // 检查是否在注册的URI列表中
-  const isValid = registeredUris.some(uri => {
+  const isValid = registeredUris.some((uri) => {
     if (uri === redirectUri) return true;
     // 支持通配符匹配
     if (uri.endsWith('/*')) {
@@ -226,7 +225,7 @@ export function validateRedirectUri(
 /**
  * OAuth PKCE验证函数
  * OAuth PKCE validation function
- * 
+ *
  * @param codeChallenge - 代码挑战
  * @param codeChallengeMethod - 代码挑战方法
  * @param required - 是否必需
@@ -301,25 +300,22 @@ export function validatePKCE(
 /**
  * 基础验证中间件包装器
  * Basic validation middleware wrapper
- * 
+ *
  * @param handler - 处理函数
  * @param options - 验证选项
  * @returns 包装后的中间件函数
  */
 export function withValidation(
-  handler: (
-    request: NextRequest,
-    context: ValidationResult['context']
-  ) => Promise<NextResponse>,
+  handler: (request: NextRequest, context: ValidationResult['context']) => Promise<NextResponse>,
   options: ValidationOptions = {}
 ) {
   return async function validationMiddleware(request: NextRequest): Promise<NextResponse> {
     const validation = await validateRequest(request, options);
-    
+
     if (!validation.success) {
       return validation.response!;
     }
 
     return handler(request, validation.context);
   };
-} 
+}

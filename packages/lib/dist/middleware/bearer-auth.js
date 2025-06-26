@@ -40,9 +40,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateBearer = authenticateBearer;
 exports.withAuth = withAuth;
 exports.requirePermission = requirePermission;
-const server_1 = require("next/server");
-const jose = __importStar(require("jose"));
 const client_1 = require("@repo/database/client");
+const jose = __importStar(require("jose"));
+const server_1 = require("next/server");
 const services_1 = require("../services");
 // 实例化真实权限服务 (Instantiate actual PermissionService)
 const permissionServiceInstance = new services_1.PermissionService(client_1.prisma);
@@ -155,7 +155,7 @@ async function authenticateBearer(request, options = {}) {
     // 步骤 7: 验证必需的作用域
     // Step 7: Validate required scopes
     if (options.requiredScopes && options.requiredScopes.length > 0) {
-        const hasRequiredScopes = options.requiredScopes.every(scope => scopes.includes(scope));
+        const hasRequiredScopes = options.requiredScopes.every((scope) => scopes.includes(scope));
         if (!hasRequiredScopes) {
             return {
                 success: false,
@@ -184,7 +184,7 @@ async function authenticateBearer(request, options = {}) {
                 }, { status: 403 }),
             };
         }
-        const hasRequiredPermissions = options.requiredPermissions.every(permission => userPermissions.permissions.includes(permission));
+        const hasRequiredPermissions = options.requiredPermissions.every((permission) => userPermissions.permissions.includes(permission));
         if (!hasRequiredPermissions) {
             return {
                 success: false,
@@ -259,7 +259,7 @@ async function authenticateBearer(request, options = {}) {
  */
 function withAuth(handler, options = {}) {
     return async function authMiddleware(request, routeContext) {
-        const { success, context: authContext, response, } = await authenticateBearer(request, options);
+        const { success, context: authContext, response } = await authenticateBearer(request, options);
         if (!success || !authContext) {
             return response || new server_1.NextResponse('Unauthorized', { status: 401 });
         }

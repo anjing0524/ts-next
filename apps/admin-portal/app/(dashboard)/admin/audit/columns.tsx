@@ -1,7 +1,7 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@repo/ui';
 
 export interface AuditLog {
   id: string;

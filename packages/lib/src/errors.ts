@@ -107,7 +107,6 @@ export enum OAuth2ErrorCode {
   InsufficientScope = 'insufficient_scope',
 }
 
-
 /**
  * 基础错误类 (Base Error Class)
  * 所有自定义错误的基类，提供了标准化的错误处理方式。
@@ -129,7 +128,12 @@ export abstract class BaseError extends Error {
    * @param code 应用特定的错误代码。 (Application-specific error code.)
    * @param context 可选的附加上下文数据。 (Optional additional contextual data.)
    */
-  constructor(message: string, status: number = 500, code: string = 'INTERNAL_SERVER_ERROR', context?: Record<string, any>) {
+  constructor(
+    message: string,
+    status: number = 500,
+    code: string = 'INTERNAL_SERVER_ERROR',
+    context?: Record<string, any>
+  ) {
     super(message); // 调用 Error 类的构造函数 (Call the constructor of the Error class)
     this.name = this.constructor.name; // 设置错误名称为类名 (Set the error name to the class name)
     this.status = status;
@@ -151,7 +155,7 @@ export abstract class BaseError extends Error {
         code: this.code,
         message: this.message,
         details: this.context, // 使用 'details' 而不是 'context' 以符合 ApiError 接口的新规范
-                               // Use 'details' instead of 'context' to align with new ApiError interface spec
+        // Use 'details' instead of 'context' to align with new ApiError interface spec
       },
     };
   }
@@ -162,7 +166,10 @@ export abstract class BaseError extends Error {
    * @param logger 可选的日志记录器实例，默认为 console。 (Optional logger instance, defaults to console.)
    * @param additionalContext 可选的额外上下文信息，用于丰富日志。 (Optional additional context for richer logs.)
    */
-  public log(logger: Pick<Console, 'error'> = console, additionalContext?: Record<string, any>): void {
+  public log(
+    logger: Pick<Console, 'error'> = console,
+    additionalContext?: Record<string, any>
+  ): void {
     logger.error({
       name: this.name,
       message: this.message,
@@ -181,7 +188,11 @@ export abstract class BaseError extends Error {
  * (Indicates that the requested resource does not exist.)
  */
 export class ResourceNotFoundError extends BaseError {
-  constructor(message: string = 'Resource not found.', code: string = 'RESOURCE_NOT_FOUND', context?: Record<string, any>) {
+  constructor(
+    message: string = 'Resource not found.',
+    code: string = 'RESOURCE_NOT_FOUND',
+    context?: Record<string, any>
+  ) {
     super(message, 404, code, context); // HTTP 404 Not Found
   }
 }
@@ -191,7 +202,11 @@ export class ResourceNotFoundError extends BaseError {
  * (Indicates that input data validation failed.)
  */
 export class ValidationError extends BaseError {
-  constructor(message: string = 'Validation failed.', context?: Record<string, any>, code: string = 'VALIDATION_ERROR') {
+  constructor(
+    message: string = 'Validation failed.',
+    context?: Record<string, any>,
+    code: string = 'VALIDATION_ERROR'
+  ) {
     super(message, 400, code, context); // HTTP 400 Bad Request (HTTP 400 Bad Request)
   }
 }
@@ -202,7 +217,11 @@ export class ValidationError extends BaseError {
  * (Indicates user authentication failure (e.g., invalid credentials, missing token).)
  */
 export class AuthenticationError extends BaseError {
-  constructor(message: string = 'Authentication failed.', context?: Record<string, any>, code: string = 'AUTHENTICATION_FAILED') {
+  constructor(
+    message: string = 'Authentication failed.',
+    context?: Record<string, any>,
+    code: string = 'AUTHENTICATION_FAILED'
+  ) {
     super(message, 401, code, context); // HTTP 401 Unauthorized (HTTP 401 Unauthorized)
   }
 }
@@ -213,7 +232,11 @@ export class AuthenticationError extends BaseError {
  * (Indicates that the user is authenticated but not authorized to access the requested resource.)
  */
 export class AuthorizationError extends BaseError {
-  constructor(message: string = 'Forbidden.', context?: Record<string, any>, code: string = 'AUTHORIZATION_FAILED') {
+  constructor(
+    message: string = 'Forbidden.',
+    context?: Record<string, any>,
+    code: string = 'AUTHORIZATION_FAILED'
+  ) {
     super(message, 403, code, context); // HTTP 403 Forbidden (HTTP 403 Forbidden)
   }
 }
@@ -224,7 +247,12 @@ export class AuthorizationError extends BaseError {
  * (Used for more granular distinction of errors related to token operations.)
  */
 export abstract class TokenError extends BaseError {
-  constructor(message: string, status: number = 400, code: string = 'TOKEN_ERROR', context?: Record<string, any>) {
+  constructor(
+    message: string,
+    status: number = 400,
+    code: string = 'TOKEN_ERROR',
+    context?: Record<string, any>
+  ) {
     super(message, status, code, context);
   }
 }
@@ -246,7 +274,11 @@ export class TokenGenerationError extends TokenError {
  * (Indicates that a provided token is invalid (e.g., signature error, malformed).)
  */
 export class TokenValidationError extends TokenError {
-  constructor(message: string = 'Token validation failed.', context?: Record<string, any>, code: string = 'TOKEN_VALIDATION_FAILED') {
+  constructor(
+    message: string = 'Token validation failed.',
+    context?: Record<string, any>,
+    code: string = 'TOKEN_VALIDATION_FAILED'
+  ) {
     super(message, 401, code, context); // 通常导致未授权访问 (Usually results in unauthorized access)
   }
 }
@@ -256,7 +288,8 @@ export class TokenValidationError extends TokenError {
  * 表示提供的令牌已过其有效期。
  * (Indicates that a provided token has passed its expiration time.)
  */
-export class TokenExpiredError extends TokenValidationError { // 继承自 TokenValidationError (Inherits from TokenValidationError)
+export class TokenExpiredError extends TokenValidationError {
+  // 继承自 TokenValidationError (Inherits from TokenValidationError)
   constructor(message: string = 'Token has expired.', context?: Record<string, any>) {
     super(message, context, 'TOKEN_EXPIRED'); // 状态码仍为401 (Status code remains 401)
   }
@@ -268,7 +301,10 @@ export class TokenExpiredError extends TokenValidationError { // 继承自 Token
  * (Indicates an error occurred while trying to revoke a token, or the token was already revoked.)
  */
 export class TokenRevocationError extends TokenError {
-  constructor(message: string = 'Token revocation operation failed or token already revoked.', context?: Record<string, any>) {
+  constructor(
+    message: string = 'Token revocation operation failed or token already revoked.',
+    context?: Record<string, any>
+  ) {
     super(message, 400, 'TOKEN_REVOCATION_ERROR', context); // 可以是400或特定场景下的其他代码 (Can be 400 or other codes depending on context)
   }
 }

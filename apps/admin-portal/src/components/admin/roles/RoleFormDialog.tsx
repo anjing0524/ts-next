@@ -1,11 +1,18 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea'; // Assuming description might be longer
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+  Input,
+  Label,
+  Textarea,
+} from '@repo/ui';
 import type { Role, RoleFormData } from '@/types/admin-entities';
 
 interface RoleFormDialogProps {
@@ -42,15 +49,15 @@ export function RoleFormDialog({
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-        // Basic validation, more robust validation (e.g. Zod) can be added
-        alert("角色名称不能为空。"); // Replace with toast or better validation message
-        return;
+      // Basic validation, more robust validation (e.g. Zod) can be added
+      alert('角色名称不能为空。'); // Replace with toast or better validation message
+      return;
     }
     await onSubmit(formData);
     // onOpenChange(false); // Parent component should handle closing on successful submit
@@ -93,11 +100,16 @@ export function RoleFormDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
               取消
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? (role ? '保存中...' : '创建中...') : (role ? '保存更改' : '创建角色')}
+              {isLoading ? (role ? '保存中...' : '创建中...') : role ? '保存更改' : '创建角色'}
             </Button>
           </DialogFooter>
         </form>
@@ -105,4 +117,3 @@ export function RoleFormDialog({
     </Dialog>
   );
 }
-```

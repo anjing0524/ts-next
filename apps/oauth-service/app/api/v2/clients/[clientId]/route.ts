@@ -1,10 +1,10 @@
 /**
  * 单个OAuth客户端管理API路由
  * Individual OAuth Client Management API Routes
- * 
+ *
  * 提供单个客户端的查看、更新、删除操作
  * Provides view, update, and delete operations for individual clients
- * 
+ *
  * @author OAuth团队
  * @since 1.0.0
  */
@@ -26,7 +26,10 @@ interface RouteParams {
 const updateClientSchema = z.object({
   name: z.string().min(1, '客户端名称不能为空').max(100, '客户端名称不能超过100个字符').optional(),
   description: z.string().optional(),
-  redirectUris: z.array(z.string().url('重定向URI必须是有效的URL')).min(1, '至少需要一个重定向URI').optional(),
+  redirectUris: z
+    .array(z.string().url('重定向URI必须是有效的URL'))
+    .min(1, '至少需要一个重定向URI')
+    .optional(),
   grantTypes: z.array(z.string()).min(1, '至少需要一个授权类型').optional(),
   responseTypes: z.array(z.string()).min(1, '至少需要一个响应类型').optional(),
   allowedScopes: z.array(z.string()).min(1, '至少需要一个允许的权限范围').optional(),
@@ -54,24 +57,30 @@ async function getClientHandler(
 
   try {
     const client = await ClientService.getClientById(clientId);
-    
+
     if (!client) {
-      return NextResponse.json<ApiResponse<never>>({
-        success: false,
-        error: {
-          code: 'client_not_found',
-          message: '客户端不存在',
+      return NextResponse.json<ApiResponse<never>>(
+        {
+          success: false,
+          error: {
+            code: 'client_not_found',
+            message: '客户端不存在',
+          },
         },
-      }, { status: 404 });
+        { status: 404 }
+      );
     }
 
     const { clientSecret, ...safeClient } = client;
 
-    return NextResponse.json<ApiResponse<typeof safeClient>>({
-      success: true,
-      data: safeClient,
-      message: '客户端信息获取成功',
-    }, { status: 200 });
+    return NextResponse.json<ApiResponse<typeof safeClient>>(
+      {
+        success: true,
+        data: safeClient,
+        message: '客户端信息获取成功',
+      },
+      { status: 200 }
+    );
   } catch (error) {
     throw error;
   }
@@ -89,24 +98,28 @@ async function updateClientHandler(
 
   try {
     const body = await request.json();
-    
+
     const validationResult = updateClientSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json<ApiResponse<never>>({
-        success: false,
-        error: {
-          code: 'invalid_request',
-          message: '请求数据验证失败',
-          details: validationResult.error.flatten().fieldErrors,
+      return NextResponse.json<ApiResponse<never>>(
+        {
+          success: false,
+          error: {
+            code: 'invalid_request',
+            message: '请求数据验证失败',
+            details: validationResult.error.flatten().fieldErrors,
+          },
         },
-      }, { status: 400 });
+        { status: 400 }
+      );
     }
 
     const updateParams = validationResult.data;
 
     const auditInfo = {
       userId: authContext.user_id,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
 
@@ -114,11 +127,14 @@ async function updateClientHandler(
 
     const { clientSecret, ...safeClient } = updatedClient;
 
-    return NextResponse.json<ApiResponse<typeof safeClient>>({
-      success: true,
-      data: safeClient,
-      message: '客户端更新成功',
-    }, { status: 200 });
+    return NextResponse.json<ApiResponse<typeof safeClient>>(
+      {
+        success: true,
+        data: safeClient,
+        message: '客户端更新成功',
+      },
+      { status: 200 }
+    );
   } catch (error) {
     throw error;
   }
@@ -137,17 +153,21 @@ async function deleteClientHandler(
   try {
     const auditInfo = {
       userId: authContext.user_id,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
 
     await ClientService.deleteClient(clientId, auditInfo);
 
-    return NextResponse.json<ApiResponse<null>>({
-      success: true,
-      data: null,
-      message: '客户端删除成功',
-    }, { status: 200 });
+    return NextResponse.json<ApiResponse<null>>(
+      {
+        success: true,
+        data: null,
+        message: '客户端删除成功',
+      },
+      { status: 200 }
+    );
   } catch (error) {
     throw error;
   }

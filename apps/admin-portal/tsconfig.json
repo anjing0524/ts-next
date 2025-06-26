@@ -1,5 +1,5 @@
 {
-  "extends": "../../packages/typescript-config/base.json",
+  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
     "baseUrl": ".",
     "plugins": [
@@ -11,7 +11,8 @@
       "@/*": ["./src/*"],
       "@/app/*": ["./app/*"],
       "@/components/*": ["./components/*"],
-      "@/lib/*": ["./lib/*"]
+      "@/lib/*": ["./lib/*"],
+      "@repo/*": ["../../packages/*"]
     }
   },
   "include": [
@@ -20,4 +21,4 @@
     "**/*.tsx",
     ".next/types/**/*.ts"
   ]
-} 
+}

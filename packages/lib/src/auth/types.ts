@@ -49,4 +49,4 @@ export interface ScopeValidationResult {
 export interface PasswordHashResult {
   hash: string;
   salt: string;
-} 
+}

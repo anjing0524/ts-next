@@ -25,7 +25,7 @@ process.env.ID_TOKEN_SECRET = 'test-id-token-secret-string-for-hs256-if-needed';
 beforeAll(async () => {
   // 确保数据库连接
   await prisma.$connect();
-  
+
   // 清理测试数据库
   await cleanupTestDatabase();
 });
@@ -33,7 +33,7 @@ beforeAll(async () => {
 afterAll(async () => {
   // 清理测试数据
   await cleanupTestDatabase();
-  
+
   // 断开数据库连接
   await prisma.$disconnect();
 });
@@ -75,4 +75,4 @@ async function cleanupTestDatabase() {
 }
 
 // 导出清理函数供测试使用
-export { cleanupTestDatabase }; 
+export { cleanupTestDatabase };

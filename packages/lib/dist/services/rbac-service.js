@@ -34,24 +34,24 @@ class RBACService {
                             include: {
                                 rolePermissions: {
                                     include: {
-                                        permission: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                        permission: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
         if (!user) {
             return null;
         }
         // 收集所有角色
-        const roles = user.userRoles.map(ur => ur.role.name);
+        const roles = user.userRoles.map((ur) => ur.role.name);
         // 收集所有权限（去重）
         const permissionSet = new Set();
-        user.userRoles.forEach(userRole => {
-            userRole.role.rolePermissions.forEach(rolePermission => {
+        user.userRoles.forEach((userRole) => {
+            userRole.role.rolePermissions.forEach((rolePermission) => {
                 permissionSet.add(rolePermission.permission.name);
             });
         });
@@ -62,7 +62,7 @@ class RBACService {
             organizationContext: {
                 organization: user.organization || undefined,
                 department: user.department || undefined,
-            }
+            },
         };
         // 缓存60秒
         await cache_1.cache.set(cacheKey, result, 60);

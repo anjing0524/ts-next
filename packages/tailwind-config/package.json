@@ -5,14 +5,18 @@
   "private": true,
   "exports": {
     ".": "./shared-styles.css",
-    "./postcss": "./postcss.config.mjs"
+    "./postcss": "./postcss.config.mjs",
+    "./tailwind.preset": "./tailwind.preset.ts"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.5",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.1.5",
-    "@tailwindcss/postcss": "^4.1.5"
+    "tailwindcss": "^4.1.5"
   },
   "peerDependencies": {
     "tailwindcss": "^4.0.0"
+  },
+  "dependencies": {
+    "tailwindcss-animate": "^1.0.7"
   }
-} 
+}

@@ -2,15 +2,15 @@
 
 import { useSearchParams } from 'next/navigation';
 
-import { Button } from '@/components/ui/button'; // Assuming this path is correct
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'; // Assuming this path is correct
+} from '@repo/ui';
 
 export default function ConsentPage() {
   const searchParams = useSearchParams();

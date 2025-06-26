@@ -9,8 +9,8 @@ exports.validateRedirectUri = validateRedirectUri;
 exports.validatePKCE = validatePKCE;
 exports.withValidation = withValidation;
 const server_1 = require("next/server");
-const utils_1 = require("../utils");
 const auth_1 = require("../auth");
+const utils_1 = require("../utils");
 /**
  * 基础请求验证函数
  * Basic request validation function
@@ -132,7 +132,7 @@ function validateRedirectUri(redirectUri, registeredUris) {
         };
     }
     // 检查是否在注册的URI列表中
-    const isValid = registeredUris.some(uri => {
+    const isValid = registeredUris.some((uri) => {
         if (uri === redirectUri)
             return true;
         // 支持通配符匹配

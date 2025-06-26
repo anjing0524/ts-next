@@ -18,4 +18,4 @@ export interface PermissionCheckResult {
   hasPermission: boolean;
   reason?: string;
   context?: Record<string, any>;
-} 
+}

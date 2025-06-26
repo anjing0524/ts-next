@@ -6,18 +6,19 @@ import { useState } from 'react';
 
 import { z } from 'zod';
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import {
+  Alert,
+  AlertDescription,
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+  Input,
+  Label,
+} from '@repo/ui';
 import { authApi, getOAuthRedirectUri, getFullUrl } from '@/lib/api';
 
 // Define Zod schema

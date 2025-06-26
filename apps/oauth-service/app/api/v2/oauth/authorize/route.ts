@@ -20,7 +20,13 @@ import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
 import { withErrorHandling } from '@repo/lib/utils';
-import { OAuth2Error, OAuth2ErrorCode, ValidationError, ConfigurationError, BaseError } from '@repo/lib/errors';
+import {
+  OAuth2Error,
+  OAuth2ErrorCode,
+  ValidationError,
+  ConfigurationError,
+  BaseError,
+} from '@repo/lib/errors';
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';
@@ -44,7 +50,12 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
 
   // 辅助函数: 构建错误重定向URL (仅在 redirect_uri 已验证且必须重定向错误时使用)
   // Helper function: Build error redirect URL (use only if redirect_uri is validated and error MUST be redirected)
-  const buildErrorRedirect = (baseRedirectUri: string, error: OAuth2ErrorCode, description: string, originalState?: string | null): NextResponse => {
+  const buildErrorRedirect = (
+    baseRedirectUri: string,
+    error: OAuth2ErrorCode,
+    description: string,
+    originalState?: string | null
+  ): NextResponse => {
     try {
       const errorUrl = new URL(baseRedirectUri);
       errorUrl.searchParams.set('error', error);
@@ -56,16 +67,25 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     } catch (e) {
       // 如果 baseRedirectUri 无效，这是一个严重问题，可能表明早期验证不足或配置错误
       // If baseRedirectUri is invalid, this is a serious issue, possibly indicating prior insufficient validation or misconfiguration.
-      console.error("CRITICAL: buildErrorRedirect called with invalid baseRedirectUri", baseRedirectUri, e);
+      console.error(
+        'CRITICAL: buildErrorRedirect called with invalid baseRedirectUri',
+        baseRedirectUri,
+        e
+      );
       // 抛出一个通用错误，让 withErrorHandling 处理
       // Throw a generic error for withErrorHandling to process
-      throw new ConfigurationError(`Server error: Could not construct redirect URL due to invalid base redirect URI. Original error: ${error}`, { code: 'REDIRECT_URI_CONSTRUCTION_FAILED' });
+      throw new ConfigurationError(
+        `Server error: Could not construct redirect URL due to invalid base redirect URI. Original error: ${error}`,
+        { code: 'REDIRECT_URI_CONSTRUCTION_FAILED' }
+      );
     }
   };
 
   // --- 步骤 1: 请求参数验证 (使用Zod) --- (Step 1: Request parameter validation (using Zod))
   const paramsToValidate: Record<string, any> = {};
-  searchParams.forEach((value, key) => { paramsToValidate[key] = value; });
+  searchParams.forEach((value, key) => {
+    paramsToValidate[key] = value;
+  });
 
   const validationResult = authorizeQuerySchema.safeParse(paramsToValidate);
   if (!validationResult.success) {
@@ -76,7 +96,7 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     // However, if redirect_uri itself is problematic or not provided, redirection isn't feasible.
     // 此处抛出 ValidationError，withErrorHandling 将其转换为 JSON 响应。
     // Throw ValidationError here, withErrorHandling will convert it to a JSON response.
-    const errorMessage = firstError 
+    const errorMessage = firstError
       ? `Invalid authorization request: ${firstError.path.join('.')} - ${firstError.message}`
       : 'Invalid authorization request: Validation failed';
     throw new ValidationError(
@@ -87,8 +107,14 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   }
 
   const {
-    client_id, redirect_uri, response_type, scope: requestedScopeString,
-    state, code_challenge, code_challenge_method, nonce
+    client_id,
+    redirect_uri,
+    response_type,
+    scope: requestedScopeString,
+    state,
+    code_challenge,
+    code_challenge_method,
+    nonce,
   } = validationResult.data;
 
   // --- 步骤 2: 第三方客户端验证 --- (Step 2: Third-party client validation)
@@ -120,17 +146,28 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   let registeredRedirectUrisList: string[] = [];
   try {
     registeredRedirectUrisList = JSON.parse(thirdPartyClient.redirectUris || '[]');
-    if (!Array.isArray(registeredRedirectUrisList)) throw new Error("Redirect URIs are not an array.");
+    if (!Array.isArray(registeredRedirectUrisList))
+      throw new Error('Redirect URIs are not an array.');
   } catch (e) {
-    console.error("Failed to parse third-party client's redirectUris:", thirdPartyClient.redirectUris, e);
+    console.error(
+      "Failed to parse third-party client's redirectUris:",
+      thirdPartyClient.redirectUris,
+      e
+    );
     // 客户端配置错误是服务器端的问题
     // Client configuration error is a server-side issue
-    throw new ConfigurationError('Invalid client configuration for redirectUris.', { clientId: client_id, code: 'CLIENT_CONFIG_REDIRECT_URI_INVALID' });
+    throw new ConfigurationError('Invalid client configuration for redirectUris.', {
+      clientId: client_id,
+      code: 'CLIENT_CONFIG_REDIRECT_URI_INVALID',
+    });
   }
   if (!registeredRedirectUrisList.includes(redirect_uri)) {
     // redirect_uri 不匹配，不应重定向。直接返回 JSON 错误。
     // redirect_uri mismatch, should not redirect. Return JSON error directly.
-    throw new OAuth2Error('Invalid redirect_uri.', OAuth2ErrorCode.InvalidRequest, 400, undefined, { provided: redirect_uri, expected: registeredRedirectUrisList });
+    throw new OAuth2Error('Invalid redirect_uri.', OAuth2ErrorCode.InvalidRequest, 400, undefined, {
+      provided: redirect_uri,
+      expected: registeredRedirectUrisList,
+    });
   }
 
   // redirect_uri 已验证，现在可以使用 buildErrorRedirect 安全地重定向错误
@@ -148,50 +185,71 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
         success: false,
         ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
         userAgent: req.headers.get('user-agent') || undefined,
-        errorMessage: 'PKCE (code_challenge and code_challenge_method) is required for this client but one or both were missing.',
+        errorMessage:
+          'PKCE (code_challenge and code_challenge_method) is required for this client but one or both were missing.',
         metadata: {
-            client_id: thirdPartyClient.clientId,
-            clientType: thirdPartyClient.clientType,
-            requirePkceField: thirdPartyClient.requirePkce,
-            hasCodeChallenge: !!code_challenge,
-            hasCodeChallengeMethod: !!code_challenge_method,
+          client_id: thirdPartyClient.clientId,
+          clientType: thirdPartyClient.clientType,
+          requirePkceField: thirdPartyClient.requirePkce,
+          hasCodeChallenge: !!code_challenge,
+          hasCodeChallengeMethod: !!code_challenge_method,
         },
       });
-      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'PKCE (code_challenge and code_challenge_method) is required for this client.', state);
+      return buildErrorRedirect(
+        redirect_uri,
+        OAuth2ErrorCode.InvalidRequest,
+        'PKCE (code_challenge and code_challenge_method) is required for this client.',
+        state
+      );
     }
   }
 
   // PKCE code_challenge 格式验证 (如果提供了 code_challenge)
   // PKCE code_challenge format validation (if code_challenge is provided)
   if (code_challenge && !PKCEUtils.validateCodeChallenge(code_challenge)) {
-     await AuthorizationUtils.logAuditEvent({
-        clientId: thirdPartyClient.clientId,
-        action: 'AUTH_CODE_PKCE_INVALID_CHALLENGE_FORMAT',
-        success: false,
-        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-        userAgent: req.headers.get('user-agent') || undefined,
-        errorMessage: 'Invalid PKCE code_challenge format.',
-        metadata: {
-            client_id: thirdPartyClient.clientId,
-            code_challenge_provided: code_challenge, // Be cautious logging the challenge itself if it's sensitive or too long
-        },
-      });
-     return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidRequest, 'Invalid code_challenge format.', state);
+    await AuthorizationUtils.logAuditEvent({
+      clientId: thirdPartyClient.clientId,
+      action: 'AUTH_CODE_PKCE_INVALID_CHALLENGE_FORMAT',
+      success: false,
+      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+      userAgent: req.headers.get('user-agent') || undefined,
+      errorMessage: 'Invalid PKCE code_challenge format.',
+      metadata: {
+        client_id: thirdPartyClient.clientId,
+        code_challenge_provided: code_challenge, // Be cautious logging the challenge itself if it's sensitive or too long
+      },
+    });
+    return buildErrorRedirect(
+      redirect_uri,
+      OAuth2ErrorCode.InvalidRequest,
+      'Invalid code_challenge format.',
+      state
+    );
   }
 
   // --- 步骤 3: 范围 (Scope) 验证 --- (Step 3: Scope validation)
-  if (!requestedScopeString) { // Zod schema should enforce 'scope' presence
-      return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidScope, 'Scope parameter is required.', state);
+  if (!requestedScopeString) {
+    // Zod schema should enforce 'scope' presence
+    return buildErrorRedirect(
+      redirect_uri,
+      OAuth2ErrorCode.InvalidScope,
+      'Scope parameter is required.',
+      state
+    );
   }
   const parsedRequestedScopes = ScopeUtils.parseScopes(requestedScopeString);
-  const scopeValidationResult = await ScopeUtils.validateScopes(parsedRequestedScopes, thirdPartyClient);
+  const scopeValidationResult = await ScopeUtils.validateScopes(
+    parsedRequestedScopes,
+    thirdPartyClient
+  );
   if (!scopeValidationResult.valid) {
-    const errorDesc = scopeValidationResult.error_description ||
-                      `Invalid or not allowed scope(s): ${scopeValidationResult.invalidScopes.join(', ')}.`;
+    const errorDesc =
+      scopeValidationResult.error_description ||
+      `Invalid or not allowed scope(s): ${scopeValidationResult.invalidScopes.join(', ')}.`;
     return buildErrorRedirect(redirect_uri, OAuth2ErrorCode.InvalidScope, errorDesc, state);
   }
-  const finalGrantedScopesArray = parsedRequestedScopes.filter(s =>
-    !scopeValidationResult.invalidScopes.includes(s)
+  const finalGrantedScopesArray = parsedRequestedScopes.filter(
+    (s) => !scopeValidationResult.invalidScopes.includes(s)
   );
 
   // --- 步骤 4: 用户认证 (针对认证中心UI会话) --- (Step 4: User authentication for Auth Center UI session)
@@ -201,23 +259,36 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   if (internalAuthToken) {
     try {
       const jwksUriString = process.env.JWKS_URI;
-      if (!jwksUriString) throw new ConfigurationError('JWKS_URI not configured for internal auth.', { code: 'CONFIG_JWKS_URI_MISSING' });
+      if (!jwksUriString)
+        throw new ConfigurationError('JWKS_URI not configured for internal auth.', {
+          code: 'CONFIG_JWKS_URI_MISSING',
+        });
       const JWKS = jose.createRemoteJWKSet(new URL(jwksUriString));
 
       const expectedIssuer = process.env.JWT_ISSUER;
-      if (!expectedIssuer) throw new ConfigurationError('JWT_ISSUER not configured for internal auth.', { code: 'CONFIG_JWT_ISSUER_MISSING' });
+      if (!expectedIssuer)
+        throw new ConfigurationError('JWT_ISSUER not configured for internal auth.', {
+          code: 'CONFIG_JWT_ISSUER_MISSING',
+        });
 
       const { payload: internalAuthTokenPayload } = await jose.jwtVerify(internalAuthToken, JWKS, {
-        issuer: expectedIssuer, audience: AUTH_CENTER_UI_AUDIENCE, algorithms: ['RS256'],
+        issuer: expectedIssuer,
+        audience: AUTH_CENTER_UI_AUDIENCE,
+        algorithms: ['RS256'],
       });
 
       if (internalAuthTokenPayload && internalAuthTokenPayload.sub) {
-        currentUser = await prisma.user.findUnique({ where: { id: internalAuthTokenPayload.sub as string, isActive: true }});
+        currentUser = await prisma.user.findUnique({
+          where: { id: internalAuthTokenPayload.sub as string, isActive: true },
+        });
       }
     } catch (error: any) {
       // 如果内部令牌验证失败 (例如过期、签名无效)，清除它并继续，将用户视为未登录
       // If internal token verification fails (e.g., expired, invalid signature), clear it and proceed, treating user as not logged in
-      console.warn('Auth Center UI session token verification failed during /authorize:', error.message);
+      console.warn(
+        'Auth Center UI session token verification failed during /authorize:',
+        error.message
+      );
       // Potentially clear the invalid cookie here
       // res.cookies.delete('auth_center_session_token'); // Need to return NextResponse to set cookie
     }
@@ -226,18 +297,24 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   if (!currentUser) {
     const authCenterLoginUrl = new URL(AUTH_CENTER_LOGIN_PAGE_URL, req.nextUrl.origin);
     const paramsForUiLogin = new URLSearchParams({
-      client_id: AUTH_CENTER_UI_CLIENT_ID, redirect_uri: req.nextUrl.href,
-      response_type: 'code', scope: 'openid profile email auth-center:interact',
+      client_id: AUTH_CENTER_UI_CLIENT_ID,
+      redirect_uri: req.nextUrl.href,
+      response_type: 'code',
+      scope: 'openid profile email auth-center:interact',
       // 将原始请求的 state 和 nonce（如果有）传递给登录流程，以便登录后可以恢复它们
       // Pass original request's state and nonce (if any) to login flow so they can be restored after login
       ...(state && { state_passthrough: state }),
       ...(nonce && { nonce_passthrough: nonce }),
     });
     authCenterLoginUrl.search = paramsForUiLogin.toString();
-    console.log(`User not authenticated with Auth Center. Redirecting to Auth Center login: ${authCenterLoginUrl.toString()}`);
+    console.log(
+      `User not authenticated with Auth Center. Redirecting to Auth Center login: ${authCenterLoginUrl.toString()}`
+    );
     return NextResponse.redirect(authCenterLoginUrl.toString(), 302);
   }
-  console.log(`User ${currentUser.id} authenticated to Auth Center UI. Continuing /authorize flow for client ${client_id}.`);
+  console.log(
+    `User ${currentUser.id} authenticated to Auth Center UI. Continuing /authorize flow for client ${client_id}.`
+  );
 
   // --- 步骤 5: 同意检查 --- (Step 5: Consent check)
   const existingConsent = await prisma.consentGrant.findFirst({
@@ -246,7 +323,9 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   let hasFullConsent = false;
   if (existingConsent) {
     const previouslyGrantedScopes = ScopeUtils.parseScopes(existingConsent.scopes);
-    hasFullConsent = finalGrantedScopesArray.every(scope => previouslyGrantedScopes.includes(scope));
+    hasFullConsent = finalGrantedScopesArray.every((scope) =>
+      previouslyGrantedScopes.includes(scope)
+    );
   }
 
   if (!hasFullConsent) {
@@ -257,18 +336,25 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     if (state) consentUrl.searchParams.set('state', state);
     consentUrl.searchParams.set('response_type', response_type);
     if (code_challenge) consentUrl.searchParams.set('code_challenge', code_challenge);
-    if (code_challenge_method) consentUrl.searchParams.set('code_challenge_method', code_challenge_method);
+    if (code_challenge_method)
+      consentUrl.searchParams.set('code_challenge_method', code_challenge_method);
     if (nonce) consentUrl.searchParams.set('nonce', nonce);
 
-    console.log(`Redirecting user ${currentUser.id} to consent page for client ${thirdPartyClient.clientId}`);
+    console.log(
+      `Redirecting user ${currentUser.id} to consent page for client ${thirdPartyClient.clientId}`
+    );
     return NextResponse.redirect(consentUrl.toString(), 302);
   }
-  console.log(`User ${currentUser.id} already consented for client ${thirdPartyClient.clientId}. Issuing code.`);
+  console.log(
+    `User ${currentUser.id} already consented for client ${thirdPartyClient.clientId}. Issuing code.`
+  );
 
   // --- 步骤 6: 生成并存储授权码 --- (Step 6: Generate and store authorization code)
   // 使用恢复的 authorization-code-flow 业务逻辑
-  const { storeAuthorizationCode } = await import('../../../../../lib/auth/authorization-code-flow');
-  
+  const { storeAuthorizationCode } = await import(
+    '../../../../../lib/auth/authorization-code-flow'
+  );
+
   const authCodeResult = await storeAuthorizationCode(
     currentUser.id,
     thirdPartyClient.id,
@@ -303,7 +389,9 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
     },
   });
 
-  console.log(`Authorization code issued for user ${currentUser.id} and client ${thirdPartyClient.clientId}`);
+  console.log(
+    `Authorization code issued for user ${currentUser.id} and client ${thirdPartyClient.clientId}`
+  );
   return NextResponse.redirect(successRedirectUrl.toString(), 302);
 }
 

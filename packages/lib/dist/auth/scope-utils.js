@@ -59,7 +59,7 @@ exports.differenceScopes = differenceScopes;
 function parseScopes(scopeString) {
     if (!scopeString)
         return [];
-    return scopeString.split(' ').filter(s => s.length > 0);
+    return scopeString.split(' ').filter((s) => s.length > 0);
 }
 /**
  * 将 scope 字符串数组格式化为以空格分隔的单个字符串
@@ -80,14 +80,14 @@ function hasScope(userScopes, requiredScope) {
  * (Checks if user scopes contain any of the specified scopes)
  */
 function hasAnyScope(userScopes, requiredScopes) {
-    return requiredScopes.some(scope => userScopes.includes(scope));
+    return requiredScopes.some((scope) => userScopes.includes(scope));
 }
 /**
  * 检查用户权限范围是否包含所有指定的权限
  * (Checks if user scopes contain all specified scopes)
  */
 function hasAllScopes(userScopes, requiredScopes) {
-    return requiredScopes.every(scope => userScopes.includes(scope));
+    return requiredScopes.every((scope) => userScopes.includes(scope));
 }
 /**
  * 验证scope字符串格式是否合法
@@ -102,7 +102,7 @@ function isValidScopeFormat(scope) {
  * (Validates if all scopes in array have valid format)
  */
 function validateScopeFormats(scopes) {
-    const invalidScopes = scopes.filter(scope => !isValidScopeFormat(scope));
+    const invalidScopes = scopes.filter((scope) => !isValidScopeFormat(scope));
     return {
         valid: invalidScopes.length === 0,
         invalidScopes,
@@ -118,7 +118,7 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
     }
     // 1. 简单验证: allowedScopesOrClient 是一个字符串数组
     if (Array.isArray(allowedScopesOrClient)) {
-        const invalidScopes = requestedScopes.filter(scope => !allowedScopesOrClient.includes(scope));
+        const invalidScopes = requestedScopes.filter((scope) => !allowedScopesOrClient.includes(scope));
         return {
             valid: invalidScopes.length === 0,
             invalidScopes,
@@ -144,7 +144,7 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
                     clientAllowedScopes = [];
                 }
             }
-            const invalidAgainstClientAllowed = requestedScopes.filter(scope => !clientAllowedScopes.includes(scope));
+            const invalidAgainstClientAllowed = requestedScopes.filter((scope) => !clientAllowedScopes.includes(scope));
             if (invalidAgainstClientAllowed.length > 0) {
                 return {
                     valid: false,
@@ -160,8 +160,8 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
                         isActive: true,
                     },
                 });
-                const validDbScopeNames = validDbScopes.map(scope => scope.name);
-                const invalidAgainstDb = requestedScopes.filter(scope => !validDbScopeNames.includes(scope));
+                const validDbScopeNames = validDbScopes.map((scope) => scope.name);
+                const invalidAgainstDb = requestedScopes.filter((scope) => !validDbScopeNames.includes(scope));
                 return {
                     valid: invalidAgainstDb.length === 0,
                     invalidScopes: invalidAgainstDb,
@@ -183,11 +183,12 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
         const scopeString = clientObj.allowedScopes || clientObj.clientScopes || clientObj.scopes || '';
         try {
             if (scopeString) {
-                allowedScopes = typeof scopeString === 'string'
-                    ? parseScopes(scopeString)
-                    : Array.isArray(scopeString)
-                        ? scopeString
-                        : [];
+                allowedScopes =
+                    typeof scopeString === 'string'
+                        ? parseScopes(scopeString)
+                        : Array.isArray(scopeString)
+                            ? scopeString
+                            : [];
             }
         }
         catch (error) {
@@ -195,10 +196,10 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
             return {
                 valid: false,
                 invalidScopes: requestedScopes,
-                error_description: 'Failed to parse client allowed scopes'
+                error_description: 'Failed to parse client allowed scopes',
             };
         }
-        const invalidScopes = requestedScopes.filter(scope => !allowedScopes.includes(scope));
+        const invalidScopes = requestedScopes.filter((scope) => !allowedScopes.includes(scope));
         return {
             valid: invalidScopes.length === 0,
             invalidScopes,
@@ -213,7 +214,7 @@ function validateScopes(requestedScopes, allowedScopesOrClient) {
  * (Filters out valid scopes)
  */
 function filterValidScopes(requestedScopes, allowedScopes) {
-    return requestedScopes.filter(scope => allowedScopes.includes(scope));
+    return requestedScopes.filter((scope) => allowedScopes.includes(scope));
 }
 /**
  * 判断是否是 OpenID Connect 相关的scope
@@ -235,7 +236,7 @@ function extractOpenIdConnectScopes(scopes) {
  * (Extracts all non-OIDC custom scopes from a scope array)
  */
 function extractCustomScopes(scopes) {
-    return scopes.filter(scope => !isOpenIdConnectScope(scope));
+    return scopes.filter((scope) => !isOpenIdConnectScope(scope));
 }
 /**
  * 判断授权请求是否包含OIDC的scope
@@ -257,7 +258,7 @@ function normalizeScopes(scopes) {
  */
 function intersectScopes(scopes1, scopes2) {
     const set1 = new Set(scopes1);
-    return scopes2.filter(scope => set1.has(scope));
+    return scopes2.filter((scope) => set1.has(scope));
 }
 /**
  * 计算两个scope数组的并集
@@ -272,7 +273,7 @@ function unionScopes(scopes1, scopes2) {
  */
 function differenceScopes(scopes1, scopes2) {
     const set2 = new Set(scopes2);
-    return scopes1.filter(scope => !set2.has(scope));
+    return scopes1.filter((scope) => !set2.has(scope));
 }
 // ===== 兼容旧调用：导出同名对象 =====
 /**

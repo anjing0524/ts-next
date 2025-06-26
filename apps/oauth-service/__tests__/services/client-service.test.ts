@@ -25,11 +25,8 @@ describe('ClientService', () => {
   afterAll(async () => {
     // 清理测试数据
     await prisma.oAuthClient.deleteMany({
-      where: { 
-        OR: [
-          { name: { contains: 'test-client' } },
-          { clientId: { contains: 'test-client' } }
-        ]
+      where: {
+        OR: [{ name: { contains: 'test-client' } }, { clientId: { contains: 'test-client' } }],
       },
     });
     await prisma.user.deleteMany({
@@ -40,11 +37,8 @@ describe('ClientService', () => {
   beforeEach(async () => {
     // 每个测试前清理相关数据
     await prisma.oAuthClient.deleteMany({
-      where: { 
-        OR: [
-          { name: { contains: 'test-client' } },
-          { clientId: { contains: 'test-client' } }
-        ]
+      where: {
+        OR: [{ name: { contains: 'test-client' } }, { clientId: { contains: 'test-client' } }],
       },
     });
   });
@@ -107,9 +101,7 @@ describe('ClientService', () => {
       await ClientService.createClient(clientData, testUserId);
 
       // 尝试创建同名客户端
-      await expect(
-        ClientService.createClient(clientData, testUserId)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.createClient(clientData, testUserId)).rejects.toThrow(OAuth2Error);
     });
 
     it('应该验证重定向URI格式', async () => {
@@ -121,30 +113,34 @@ describe('ClientService', () => {
         scopes: ['read'],
       };
 
-      await expect(
-        ClientService.createClient(clientData, testUserId)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.createClient(clientData, testUserId)).rejects.toThrow(OAuth2Error);
     });
   });
 
   describe('getClients', () => {
     beforeEach(async () => {
       // 创建测试客户端
-      await ClientService.createClient({
-        name: 'test-client-list-1',
-        clientType: 'CONFIDENTIAL',
-        redirectUris: ['https://example1.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-      }, testUserId);
+      await ClientService.createClient(
+        {
+          name: 'test-client-list-1',
+          clientType: 'CONFIDENTIAL',
+          redirectUris: ['https://example1.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+        },
+        testUserId
+      );
 
-      await ClientService.createClient({
-        name: 'test-client-list-2',
-        clientType: 'PUBLIC',
-        redirectUris: ['https://example2.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['write'],
-      }, testUserId);
+      await ClientService.createClient(
+        {
+          name: 'test-client-list-2',
+          clientType: 'PUBLIC',
+          redirectUris: ['https://example2.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['write'],
+        },
+        testUserId
+      );
     });
 
     it('应该返回所有客户端列表', async () => {
@@ -182,7 +178,7 @@ describe('ClientService', () => {
         clientType: 'PUBLIC',
       });
 
-      const publicClients = result.clients.filter(c => c.clientType === 'PUBLIC');
+      const publicClients = result.clients.filter((c) => c.clientType === 'PUBLIC');
       expect(publicClients.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -191,19 +187,22 @@ describe('ClientService', () => {
         isActive: true,
       });
 
-      expect(result.clients.every(c => c.isActive)).toBe(true);
+      expect(result.clients.every((c) => c.isActive)).toBe(true);
     });
   });
 
   describe('getClientById', () => {
     beforeEach(async () => {
-      testClient = await ClientService.createClient({
-        name: 'test-client-get-by-id',
-        clientType: 'CONFIDENTIAL',
-        redirectUris: ['https://example.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-      }, testUserId);
+      testClient = await ClientService.createClient(
+        {
+          name: 'test-client-get-by-id',
+          clientType: 'CONFIDENTIAL',
+          redirectUris: ['https://example.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+        },
+        testUserId
+      );
     });
 
     it('应该成功获取客户端详情', async () => {
@@ -216,22 +215,23 @@ describe('ClientService', () => {
     });
 
     it('应该在客户端不存在时抛出错误', async () => {
-      await expect(
-        ClientService.getClientById('non-existent-id')
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.getClientById('non-existent-id')).rejects.toThrow(OAuth2Error);
     });
   });
 
   describe('updateClient', () => {
     beforeEach(async () => {
-      testClient = await ClientService.createClient({
-        name: 'test-client-update',
-        clientType: 'CONFIDENTIAL',
-        redirectUris: ['https://example.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-        description: '原始描述',
-      }, testUserId);
+      testClient = await ClientService.createClient(
+        {
+          name: 'test-client-update',
+          clientType: 'CONFIDENTIAL',
+          redirectUris: ['https://example.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+          description: '原始描述',
+        },
+        testUserId
+      );
     });
 
     it('应该成功更新客户端信息', async () => {
@@ -242,11 +242,7 @@ describe('ClientService', () => {
         scopes: ['read', 'write'],
       };
 
-      const result = await ClientService.updateClient(
-        testClient.id,
-        updateData,
-        testUserId
-      );
+      const result = await ClientService.updateClient(testClient.id, updateData, testUserId);
 
       expect(result.name).toBe('test-client-updated');
       expect(result.description).toBe('更新后的描述');
@@ -262,62 +258,57 @@ describe('ClientService', () => {
 
     it('应该验证重定向URI格式', async () => {
       await expect(
-        ClientService.updateClient(
-          testClient.id,
-          { redirectUris: ['invalid-uri'] },
-          testUserId
-        )
+        ClientService.updateClient(testClient.id, { redirectUris: ['invalid-uri'] }, testUserId)
       ).rejects.toThrow(OAuth2Error);
     });
   });
 
   describe('deleteClient', () => {
     beforeEach(async () => {
-      testClient = await ClientService.createClient({
-        name: 'test-client-delete',
-        clientType: 'CONFIDENTIAL',
-        redirectUris: ['https://example.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-      }, testUserId);
+      testClient = await ClientService.createClient(
+        {
+          name: 'test-client-delete',
+          clientType: 'CONFIDENTIAL',
+          redirectUris: ['https://example.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+        },
+        testUserId
+      );
     });
 
     it('应该成功删除客户端', async () => {
-      await expect(
-        ClientService.deleteClient(testClient.id, testUserId)
-      ).resolves.not.toThrow();
+      await expect(ClientService.deleteClient(testClient.id, testUserId)).resolves.not.toThrow();
 
       // 验证客户端已被删除
-      await expect(
-        ClientService.getClientById(testClient.id)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.getClientById(testClient.id)).rejects.toThrow(OAuth2Error);
     });
 
     it('应该在客户端不存在时抛出错误', async () => {
-      await expect(
-        ClientService.deleteClient('non-existent-id', testUserId)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.deleteClient('non-existent-id', testUserId)).rejects.toThrow(
+        OAuth2Error
+      );
     });
   });
 
   describe('rotateClientSecret', () => {
     beforeEach(async () => {
-      testClient = await ClientService.createClient({
-        name: 'test-client-rotate-secret',
-        clientType: 'CONFIDENTIAL',
-        redirectUris: ['https://example.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-      }, testUserId);
+      testClient = await ClientService.createClient(
+        {
+          name: 'test-client-rotate-secret',
+          clientType: 'CONFIDENTIAL',
+          redirectUris: ['https://example.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+        },
+        testUserId
+      );
     });
 
     it('应该成功轮换机密客户端的密钥', async () => {
       const originalSecret = testClient.clientSecret;
 
-      const result = await ClientService.rotateClientSecret(
-        testClient.id,
-        testUserId
-      );
+      const result = await ClientService.rotateClientSecret(testClient.id, testUserId);
 
       expect(result.clientSecret).toBeDefined();
       expect(result.clientSecret).not.toBe(originalSecret);
@@ -325,23 +316,26 @@ describe('ClientService', () => {
     });
 
     it('应该在公开客户端上抛出错误', async () => {
-      const publicClient = await ClientService.createClient({
-        name: 'test-client-public-rotate',
-        clientType: 'PUBLIC',
-        redirectUris: ['https://example.com/callback'],
-        grantTypes: ['authorization_code'],
-        scopes: ['read'],
-      }, testUserId);
+      const publicClient = await ClientService.createClient(
+        {
+          name: 'test-client-public-rotate',
+          clientType: 'PUBLIC',
+          redirectUris: ['https://example.com/callback'],
+          grantTypes: ['authorization_code'],
+          scopes: ['read'],
+        },
+        testUserId
+      );
 
-      await expect(
-        ClientService.rotateClientSecret(publicClient.id, testUserId)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.rotateClientSecret(publicClient.id, testUserId)).rejects.toThrow(
+        OAuth2Error
+      );
     });
 
     it('应该在客户端不存在时抛出错误', async () => {
-      await expect(
-        ClientService.rotateClientSecret('non-existent-id', testUserId)
-      ).rejects.toThrow(OAuth2Error);
+      await expect(ClientService.rotateClientSecret('non-existent-id', testUserId)).rejects.toThrow(
+        OAuth2Error
+      );
     });
   });
 
@@ -353,7 +347,7 @@ describe('ClientService', () => {
         'https://subdomain.example.com/auth/callback',
       ];
 
-      validUris.forEach(uri => {
+      validUris.forEach((uri) => {
         expect(() => {
           // 这里应该调用内部验证方法，但由于是私有方法，我们通过创建客户端来测试
         }).not.toThrow();
@@ -361,24 +355,22 @@ describe('ClientService', () => {
     });
 
     it('应该拒绝无效的重定向URI', async () => {
-      const invalidUris = [
-        'invalid-uri',
-        'ftp://example.com/callback',
-        'javascript:alert(1)',
-        '',
-      ];
+      const invalidUris = ['invalid-uri', 'ftp://example.com/callback', 'javascript:alert(1)', ''];
 
       for (const uri of invalidUris) {
         await expect(
-          ClientService.createClient({
-            name: `test-client-invalid-${Date.now()}`,
-            clientType: 'CONFIDENTIAL',
-            redirectUris: [uri],
-            grantTypes: ['authorization_code'],
-            scopes: ['read'],
-          }, testUserId)
+          ClientService.createClient(
+            {
+              name: `test-client-invalid-${Date.now()}`,
+              clientType: 'CONFIDENTIAL',
+              redirectUris: [uri],
+              grantTypes: ['authorization_code'],
+              scopes: ['read'],
+            },
+            testUserId
+          )
         ).rejects.toThrow(OAuth2Error);
       }
     });
   });
-}); 
+});

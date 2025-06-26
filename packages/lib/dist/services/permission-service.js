@@ -49,6 +49,7 @@ class PermissionService {
             where: { id: userId, isActive: true }, // 确保用户是活动的 (Ensure user is active)
             include: {
                 userRoles: {
+                    // 包含用户的角色关联 (Include user's role assignments)
                     where: {
                         role: { isActive: true }, // 确保关联的角色是活动的 (Ensure role is active)
                         // 确保用户角色关联未过期
@@ -57,8 +58,10 @@ class PermissionService {
                     },
                     include: {
                         role: {
+                            // 包含角色详情 (Include role details)
                             include: {
                                 rolePermissions: {
+                                    // 包含角色的权限关联 (Include role's permission assignments)
                                     where: {
                                         permission: { isActive: true }, // 确保关联的权限是活动的 (Ensure permission is active)
                                     },
@@ -96,7 +99,9 @@ class PermissionService {
                     userRole.role.rolePermissions.forEach((rolePermission) => {
                         // 确保权限对象存在、活动且有名称
                         // Ensure permission object exists, is active, and has a name
-                        if (rolePermission.permission && rolePermission.permission.isActive && rolePermission.permission.name) {
+                        if (rolePermission.permission &&
+                            rolePermission.permission.isActive &&
+                            rolePermission.permission.name) {
                             effectivePermissions.add(rolePermission.permission.name);
                         }
                     });

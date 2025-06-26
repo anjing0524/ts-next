@@ -64,20 +64,23 @@ export class RateLimitUtils {
   private static startCleanupTimer(): void {
     if (this.cleanupInterval) return;
 
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      const expiredKeys: string[] = [];
+    this.cleanupInterval = setInterval(
+      () => {
+        const now = Date.now();
+        const expiredKeys: string[] = [];
 
-      for (const [key, record] of this.store.entries()) {
-        // 清理超过24小时未使用的记录
-        // Clean up records not used for more than 24 hours
-        if (now - record.lastRequest > 24 * 60 * 60 * 1000) {
-          expiredKeys.push(key);
+        for (const [key, record] of this.store.entries()) {
+          // 清理超过24小时未使用的记录
+          // Clean up records not used for more than 24 hours
+          if (now - record.lastRequest > 24 * 60 * 60 * 1000) {
+            expiredKeys.push(key);
+          }
         }
-      }
 
-      expiredKeys.forEach(key => this.store.delete(key));
-    }, 5 * 60 * 1000); // 每5分钟清理一次 (Clean up every 5 minutes)
+        expiredKeys.forEach((key) => this.store.delete(key));
+      },
+      5 * 60 * 1000
+    ); // 每5分钟清理一次 (Clean up every 5 minutes)
   }
 
   /**
@@ -125,9 +128,9 @@ export class RateLimitUtils {
    */
   static generateKey(request: NextRequest, config: RateLimitConfig): string {
     const { keyType = 'ip', keyPrefix = 'rate_limit' } = config;
-    
+
     let identifier: string;
-    
+
     switch (keyType) {
       case 'ip':
         identifier = this.getClientIP(request);
@@ -168,9 +171,9 @@ export class RateLimitUtils {
 
     const now = Date.now();
     const { maxRequests, windowMs } = config;
-    
+
     let record = this.store.get(key);
-    
+
     if (!record) {
       // 首次请求，创建新记录
       // First request, create new record
@@ -180,7 +183,7 @@ export class RateLimitUtils {
         lastRequest: now,
       };
       this.store.set(key, record);
-      
+
       return {
         allowed: true,
         remaining: maxRequests - 1,
@@ -195,7 +198,7 @@ export class RateLimitUtils {
       record.count = 1;
       record.windowStart = now;
       record.lastRequest = now;
-      
+
       return {
         allowed: true,
         remaining: maxRequests - 1,
@@ -207,11 +210,11 @@ export class RateLimitUtils {
     // 在当前窗口内，检查是否超限
     // Within current window, check if limit is exceeded
     record.lastRequest = now;
-    
+
     if (record.count >= maxRequests) {
       const resetTime = record.windowStart + windowMs;
       const retryAfter = resetTime - now;
-      
+
       return {
         allowed: false,
         remaining: 0,
@@ -224,7 +227,7 @@ export class RateLimitUtils {
     // 未超限，增加计数
     // Not exceeded, increment count
     record.count++;
-    
+
     return {
       allowed: true,
       remaining: maxRequests - record.count,
@@ -257,7 +260,7 @@ export class RateLimitUtils {
   static getRateLimitStatus(key: string, config: RateLimitConfig): RateLimitResult {
     const record = this.store.get(key);
     const now = Date.now();
-    
+
     if (!record) {
       return {
         allowed: true,
@@ -281,7 +284,7 @@ export class RateLimitUtils {
     const resetTime = record.windowStart + config.windowMs;
     const remaining = Math.max(0, config.maxRequests - record.count);
     const allowed = record.count < config.maxRequests;
-    
+
     return {
       allowed,
       remaining,
@@ -322,7 +325,13 @@ export const defaultRateLimiter = {
  * 创建一个简单的限流检查函数
  * Creates a simple rate limiting check function
  */
-export function createRateLimit({ maxRequests, windowMs }: { maxRequests: number; windowMs: number }) {
+export function createRateLimit({
+  maxRequests,
+  windowMs,
+}: {
+  maxRequests: number;
+  windowMs: number;
+}) {
   return (key: string) => {
     return RateLimitUtils.checkRateLimit(key, { maxRequests, windowMs });
   };
@@ -337,4 +346,4 @@ export function createRequestRateLimit(config: RateLimitConfig) {
     const key = RateLimitUtils.generateKey(request, config);
     return RateLimitUtils.checkRateLimit(key, config);
   };
-} 
+}

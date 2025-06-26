@@ -9,7 +9,12 @@ import { withErrorHandling } from '@/lib/utils/error-handler';
 import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
 import { ScopeUtils, JWTUtils } from '@repo/lib/auth';
 import * as jose from 'jose';
-import { introspectTokenRequestSchema, IntrospectResponseActive, IntrospectResponseInactive, introspectResponseActiveSchema } from './schemas';
+import {
+  introspectTokenRequestSchema,
+  IntrospectResponseActive,
+  IntrospectResponseInactive,
+  introspectResponseActiveSchema,
+} from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
 import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from '@/lib/errors';
 
@@ -116,11 +121,15 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
 
   const bodyParams = new URLSearchParams(await request.text());
   const rawBodyData: Record<string, any> = {};
-  bodyParams.forEach((value, key) => { rawBodyData[key] = value; });
+  bodyParams.forEach((value, key) => {
+    rawBodyData[key] = value;
+  });
 
   // 转换为FormData以符合ClientAuthUtils.authenticateClient的参数类型
   const formData = new FormData();
-  bodyParams.forEach((value, key) => { formData.append(key, value); });
+  bodyParams.forEach((value, key) => {
+    formData.append(key, value);
+  });
 
   // --- 客户端认证 --- (Client Authentication)
   const authenticatedClient = await ClientAuthUtils.authenticateClient(request, formData);
@@ -130,19 +139,26 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
   const validationResult = introspectTokenRequestSchema.safeParse(rawBodyData);
   if (!validationResult.success) {
     throw new OAuth2Error(
-        validationResult.error.errors[0]?.message || 'Invalid introspection request parameters.',
-        OAuth2ErrorCode.InvalidRequest,
-        400,
-        undefined,
-        { issues: validationResult.error.flatten().fieldErrors }
+      validationResult.error.errors[0]?.message || 'Invalid introspection request parameters.',
+      OAuth2ErrorCode.InvalidRequest,
+      400,
+      undefined,
+      { issues: validationResult.error.flatten().fieldErrors }
     );
   }
   // client_id (如果提供) 必须与已认证客户端匹配 - ClientAuthUtils 已处理基础的客户端认证。
   // client_id (if provided) must match authenticated client - ClientAuthUtils has handled basic client auth.
   // 此处是可选的额外检查，确保请求体中的 client_id (如果存在) 与认证的客户端一致。
   // This is an optional extra check to ensure client_id in body (if present) matches the authenticated client.
-  if (validationResult.data.client_id && validationResult.data.client_id !== authenticatedClient.clientId) {
-     throw new OAuth2Error("client_id in body does not match authenticated client.", OAuth2ErrorCode.InvalidRequest, 400);
+  if (
+    validationResult.data.client_id &&
+    validationResult.data.client_id !== authenticatedClient.clientId
+  ) {
+    throw new OAuth2Error(
+      'client_id in body does not match authenticated client.',
+      OAuth2ErrorCode.InvalidRequest,
+      400
+    );
   }
 
   const { token, token_type_hint } = validationResult.data;
@@ -157,33 +173,40 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
       if (payload.jti) {
         const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
         if (blacklisted) {
-          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>({ success: true, data: { active: false }, message: "Token is blacklisted." }, { status: 200 });
+          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
+            { success: true, data: { active: false }, message: 'Token is blacklisted.' },
+            { status: 200 }
+          );
         }
       }
       const dbAccessToken = await prisma.accessToken.findFirst({
         where: { tokenHash: JWTUtils.getTokenHash(token), expiresAt: { gt: new Date() } },
-        include: { user: true }
+        include: { user: true },
       });
 
       // RFC7662: 令牌的 client_id 是指颁发给哪个客户端的，不一定与发起内省请求的客户端相同。
       // RFC7662: The token's client_id refers to whom it was issued, not necessarily the client making the introspection request.
       // 此处检查 payload.sub 是否与 dbAccessToken.userId 匹配是正确的。
       // Checking if payload.sub matches dbAccessToken.userId is correct here.
-      if (dbAccessToken && payload.sub === dbAccessToken.userId /* && payload.client_id === dbAccessToken.clientId - This check is too restrictive for general introspection */) {
+      if (
+        dbAccessToken &&
+        payload.sub ===
+          dbAccessToken.userId /* && payload.client_id === dbAccessToken.clientId - This check is too restrictive for general introspection */
+      ) {
         activeResponsePayload = {
-            active: true,
-            scope: (payload.scope as string || dbAccessToken.scope) ?? undefined,
-            client_id: payload.client_id as string, // client_id from the token being introspected
-            username: dbAccessToken.user?.username || undefined,
-            sub: payload.sub as string,
-            aud: (payload.aud as string | string[]) ?? undefined,
-            iss: payload.iss as string,
-            exp: payload.exp,
-            iat: payload.iat,
-            jti: payload.jti,
-            token_type: 'Bearer', // RFC 7662 (section 2.2) - "token_type" is optional
-            user_id: dbAccessToken.userId ?? undefined,
-            permissions: (payload.permissions as string[]) ?? undefined,
+          active: true,
+          scope: ((payload.scope as string) || dbAccessToken.scope) ?? undefined,
+          client_id: payload.client_id as string, // client_id from the token being introspected
+          username: dbAccessToken.user?.username || undefined,
+          sub: payload.sub as string,
+          aud: (payload.aud as string | string[]) ?? undefined,
+          iss: payload.iss as string,
+          exp: payload.exp,
+          iat: payload.iat,
+          jti: payload.jti,
+          token_type: 'Bearer', // RFC 7662 (section 2.2) - "token_type" is optional
+          user_id: dbAccessToken.userId ?? undefined,
+          permissions: (payload.permissions as string[]) ?? undefined,
         };
       }
     }
@@ -198,27 +221,37 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
       if (payload.jti) {
         const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
         if (blacklisted) {
-          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>({ success: true, data: { active: false }, message: "Token is blacklisted." }, { status: 200 });
+          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
+            { success: true, data: { active: false }, message: 'Token is blacklisted.' },
+            { status: 200 }
+          );
         }
       }
       const dbRefreshToken = await prisma.refreshToken.findFirst({
-          where: { tokenHash: JWTUtils.getTokenHash(token), isRevoked: false, expiresAt: { gt: new Date() }},
-          include: { user: true }
+        where: {
+          tokenHash: JWTUtils.getTokenHash(token),
+          isRevoked: false,
+          expiresAt: { gt: new Date() },
+        },
+        include: { user: true },
       });
-      if (dbRefreshToken && payload.sub === dbRefreshToken.userId /* && payload.client_id === dbRefreshToken.clientId */) {
+      if (
+        dbRefreshToken &&
+        payload.sub === dbRefreshToken.userId /* && payload.client_id === dbRefreshToken.clientId */
+      ) {
         activeResponsePayload = {
-            active: true,
-            scope: (payload.scope as string || dbRefreshToken.scope) ?? undefined,
-            client_id: payload.client_id as string,
-            username: dbRefreshToken.user?.username || undefined,
-            sub: payload.sub as string,
-            aud: (payload.aud as string | string[]) ?? undefined,
-            iss: payload.iss as string,
-            exp: payload.exp,
-            iat: payload.iat,
-            jti: payload.jti,
-            token_type: 'refresh_token',
-            user_id: dbRefreshToken.userId ?? undefined,
+          active: true,
+          scope: ((payload.scope as string) || dbRefreshToken.scope) ?? undefined,
+          client_id: payload.client_id as string,
+          username: dbRefreshToken.user?.username || undefined,
+          sub: payload.sub as string,
+          aud: (payload.aud as string | string[]) ?? undefined,
+          iss: payload.iss as string,
+          exp: payload.exp,
+          iat: payload.iat,
+          jti: payload.jti,
+          token_type: 'refresh_token',
+          user_id: dbRefreshToken.userId ?? undefined,
         };
       }
     }
@@ -227,27 +260,48 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
   // 最终响应构建 (Final response construction)
   if (activeResponsePayload) {
     if (!activeResponsePayload.client_id) {
-        console.warn("Active token introspection, but client_id could not be determined from token payload. Marking inactive.");
-        return NextResponse.json<ApiResponse<IntrospectResponseInactive>>({ success: true, data: { active: false }, message: "Token details inconsistent (missing client_id in token)." }, { status: 200 });
+      console.warn(
+        'Active token introspection, but client_id could not be determined from token payload. Marking inactive.'
+      );
+      return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
+        {
+          success: true,
+          data: { active: false },
+          message: 'Token details inconsistent (missing client_id in token).',
+        },
+        { status: 200 }
+      );
     }
 
     // 使用 Zod 验证构建的活动响应 (Validate constructed active response with Zod)
     const parsedActiveResponse = introspectResponseActiveSchema.safeParse(activeResponsePayload);
     if (parsedActiveResponse.success) {
-        return NextResponse.json<ApiResponse<IntrospectResponseActive>>({ success: true, data: parsedActiveResponse.data, message: "Token is active." }, { status: 200 });
+      return NextResponse.json<ApiResponse<IntrospectResponseActive>>(
+        { success: true, data: parsedActiveResponse.data, message: 'Token is active.' },
+        { status: 200 }
+      );
     } else {
-        console.error("Introspection active response schema validation failed:", parsedActiveResponse.error.flatten());
-        throw new ConfigurationError('Internal server error processing token details for active token.', { zodIssues: parsedActiveResponse.error.flatten().fieldErrors });
+      console.error(
+        'Introspection active response schema validation failed:',
+        parsedActiveResponse.error.flatten()
+      );
+      throw new ConfigurationError(
+        'Internal server error processing token details for active token.',
+        { zodIssues: parsedActiveResponse.error.flatten().fieldErrors }
+      );
     }
   }
 
   // 如果令牌无效、已过期、已撤销，或通过任何方式都找不到，则返回 active: false
   // If token is invalid, expired, revoked, or not found by any means, return active: false
-  return NextResponse.json<ApiResponse<IntrospectResponseInactive>>({
-    success: true,
-    data: { active: false },
-    message: "Token is not active."
-  }, { status: 200 });
+  return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
+    {
+      success: true,
+      data: { active: false },
+      message: 'Token is not active.',
+    },
+    { status: 200 }
+  );
 }
 
 // 使用 withErrorHandling 包装处理函数 (Wrap the handler with withErrorHandling)

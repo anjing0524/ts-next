@@ -4,17 +4,17 @@ import { useState } from 'react';
 
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input'; // Using Input instead of Textarea
-import { Label } from '@/components/ui/label';
+  Input,
+  Label,
+} from '@repo/ui';
 import { adminApi } from '@/lib/api';
 
 // Zod schema for client registration (matches backend)

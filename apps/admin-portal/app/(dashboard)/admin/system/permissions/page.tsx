@@ -4,11 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
-import { DataTable, type ColumnDef } from '@/components/data-table/data-table';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import { Badge } from '@/components/ui/badge';
+import { DataTable, type ColumnDef } from '@repo/ui';
+import { Input, Button, toast, Badge } from '@repo/ui';
 import type { Permission, PaginatedResponse } from '@/types/admin-entities'; // 引入共享类型
 
 // --- 页面状态和常量 ---
@@ -47,29 +44,32 @@ function PermissionsPageContent() {
   };
 
   // --- DataTable Columns ---
-  const columns = useMemo<ColumnDef<Permission>[]>(() => [
-    {
-      accessorKey: 'name',
-      header: '权限名称',
-      cell: ({ row }) => <Badge variant="secondary">{row.original.name}</Badge>
-    },
-    { accessorKey: 'description', header: '描述' },
-    {
-      accessorKey: 'group',
-      header: '分组',
-      cell: ({ row }) => row.original.group || <span className="text-muted-foreground">N/A</span>
-    },
-    // No actions column usually, as permissions are typically system-defined
-    // {
-    //   id: 'actions',
-    //   header: '操作',
-    //   cell: ({ row }) => (
-    //     <div className="space-x-2">
-    //       {/* Placeholder for any potential future actions */}
-    //     </div>
-    //   ),
-    // },
-  ], []);
+  const columns = useMemo<ColumnDef<Permission>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: '权限名称',
+        cell: ({ row }) => <Badge variant="secondary">{row.original.name}</Badge>,
+      },
+      { accessorKey: 'description', header: '描述' },
+      {
+        accessorKey: 'group',
+        header: '分组',
+        cell: ({ row }) => row.original.group || <span className="text-muted-foreground">N/A</span>,
+      },
+      // No actions column usually, as permissions are typically system-defined
+      // {
+      //   id: 'actions',
+      //   header: '操作',
+      //   cell: ({ row }) => (
+      //     <div className="space-x-2">
+      //       {/* Placeholder for any potential future actions */}
+      //     </div>
+      //   ),
+      // },
+    ],
+    []
+  );
 
   if (isLoading && !permissions.length && page === 1) {
     return <div className="p-6 text-center">加载权限数据中...</div>;
@@ -104,7 +104,10 @@ function PermissionsPageContent() {
         pageIndex={page - 1}
         pageSize={limit}
         onPageChange={(newPageIndex) => setPage(newPageIndex + 1)}
-        onPageSizeChange={(newPageSize) => { setLimit(newPageSize); setPage(1); }}
+        onPageSizeChange={(newPageSize) => {
+          setLimit(newPageSize);
+          setPage(1);
+        }}
       />
       {(totalItems > 0 || page > 1) && !isLoading && !error && (
         <div className="flex items-center justify-between mt-4 py-2 border-t">
@@ -129,4 +132,3 @@ export default function GuardedPermissionsPage() {
     </PermissionGuard>
   );
 }
-```

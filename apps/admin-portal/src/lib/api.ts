@@ -3,7 +3,7 @@ import { TokenStorage } from './auth/token-storage'; // Corrected import path
 // Helper function to construct authorization headers
 const getAuthHeaders = (contentType: string = 'application/json') => {
   const headers: HeadersInit = {
-    'Authorization': `Bearer ${TokenStorage.getAccessToken()}`,
+    Authorization: `Bearer ${TokenStorage.getAccessToken()}`,
   };
   if (contentType) {
     headers['Content-Type'] = contentType;
@@ -22,12 +22,13 @@ const handleResponse = async (response: Response) => {
       errorData = { message: response.statusText || `请求失败，状态码: ${response.status}` };
     }
     // Prefer message from errorData if available
-    const message = errorData?.message || errorData?.error_description || `请求失败，状态码: ${response.status}`;
+    const message =
+      errorData?.message || errorData?.error_description || `请求失败，状态码: ${response.status}`;
     throw new Error(message);
   }
   // Handle cases where response might be empty (e.g., 204 No Content)
-  const contentType = response.headers.get("content-type");
-  if (contentType && contentType.indexOf("application/json") !== -1) {
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.indexOf('application/json') !== -1) {
     return response.json();
   }
   return response.text(); // Or handle as appropriate for non-JSON responses
@@ -66,7 +67,8 @@ export const authApi = {
           headers: getAuthHeaders(),
         });
         // We might not need to handle the response strictly if client-side cleanup is sufficient.
-        if (!response.ok) console.warn('Server logout failed, proceeding with client-side cleanup.');
+        if (!response.ok)
+          console.warn('Server logout failed, proceeding with client-side cleanup.');
       } catch (error) {
         console.warn('Error during server logout:', error);
       }
@@ -153,16 +155,20 @@ export const adminApi = {
     // For DELETE, often a 204 No Content is returned.
     // handleResponse needs to be flexible or have a variant for this.
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
     }
     return response.status === 204 ? Promise.resolve() : response.json();
   },
-  async updateUserProfile(profileData: any) { // Specific for current user's profile
-    const response = await fetch('/api/v2/users/me/profile', { // Assuming endpoint for profile update
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(profileData),
+  async updateUserProfile(profileData: any) {
+    // Specific for current user's profile
+    const response = await fetch('/api/v2/users/me/profile', {
+      // Assuming endpoint for profile update
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(profileData),
     });
     return handleResponse(response);
   },
@@ -173,7 +179,9 @@ export const adminApi = {
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     if (params?.search) searchParams.set('search', params.search);
-    const response = await fetch(`/api/v2/roles?${searchParams.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`/api/v2/roles?${searchParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
   async getRoleById(roleId: string) {
@@ -188,7 +196,10 @@ export const adminApi = {
     });
     return handleResponse(response);
   },
-  async updateRole(roleId: string, roleData: { name?: string; description?: string; permissions?: string[] }) {
+  async updateRole(
+    roleId: string,
+    roleData: { name?: string; description?: string; permissions?: string[] }
+  ) {
     const response = await fetch(`/api/v2/roles/${roleId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
@@ -202,8 +213,10 @@ export const adminApi = {
       headers: getAuthHeaders(''), // No content-type for DELETE with no body
     });
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
     }
     return response.status === 204 ? Promise.resolve() : response.json();
   },
@@ -211,7 +224,9 @@ export const adminApi = {
     // This might be part of getRoleById or a separate endpoint like /api/v2/roles/{roleId}/permissions
     // Assuming it's included in getRoleById for now, or needs a specific endpoint.
     // For a dedicated endpoint:
-    const response = await fetch(`/api/v2/roles/${roleId}/permissions`, { headers: getAuthHeaders() });
+    const response = await fetch(`/api/v2/roles/${roleId}/permissions`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
   async updateRolePermissions(roleId: string, permissionIds: string[]) {
@@ -229,7 +244,9 @@ export const adminApi = {
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     if (params?.search) searchParams.set('search', params.search);
-    const response = await fetch(`/api/v2/permissions?${searchParams.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`/api/v2/permissions?${searchParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
   // ... other permission CRUDs
@@ -240,14 +257,18 @@ export const adminApi = {
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     if (params?.search) searchParams.set('search', params.search);
-    const response = await fetch(`/api/v2/clients?${searchParams.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`/api/v2/clients?${searchParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
-  async getClientById(id: string) { // id here is the internal DB ID, not client_id
+  async getClientById(id: string) {
+    // id here is the internal DB ID, not client_id
     const response = await fetch(`/api/v2/clients/${id}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
-  async createClient(clientData: any) { // Define a proper type for clientData
+  async createClient(clientData: any) {
+    // Define a proper type for clientData
     const response = await fetch('/api/v2/clients', {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -255,7 +276,8 @@ export const adminApi = {
     });
     return handleResponse(response); // This might return the created client with its secret
   },
-  async updateClient(id: string, clientData: any) { // Define a proper type for clientData
+  async updateClient(id: string, clientData: any) {
+    // Define a proper type for clientData
     const response = await fetch(`/api/v2/clients/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
@@ -269,13 +291,16 @@ export const adminApi = {
       headers: getAuthHeaders(''),
     });
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
     }
     return response.status === 204 ? Promise.resolve() : response.json();
   },
   async rotateClientSecret(id: string) {
-    const response = await fetch(`/api/v2/clients/${id}/rotate-secret`, { // Assuming this endpoint
+    const response = await fetch(`/api/v2/clients/${id}/rotate-secret`, {
+      // Assuming this endpoint
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -288,7 +313,9 @@ export const adminApi = {
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
     if (params?.search) searchParams.set('search', params.search);
-    const response = await fetch(`/api/v2/scopes?${searchParams.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`/api/v2/scopes?${searchParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
     return handleResponse(response);
   },
   // ... other scope CRUDs

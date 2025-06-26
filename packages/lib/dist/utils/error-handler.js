@@ -16,8 +16,8 @@ exports.withErrorHandler = withErrorHandler;
 exports.errorResponse = errorResponse;
 exports.successResponse = successResponse;
 const server_1 = require("next/server");
-const errors_1 = require("../errors"); // 导入自定义错误类 (Import custom error classes)
 const uuid_1 = require("uuid"); // 用于生成唯一的请求ID (For generating unique request IDs)
+const errors_1 = require("../errors"); // 导入自定义错误类 (Import custom error classes)
 /**
  * 记录错误信息。
  * (Logs error information.)
@@ -187,7 +187,7 @@ async function safeExecute(fn, failureMessage = 'Operation failed', ErrorType = 
             error: new ErrorType(`${failureMessage}: ${error.message || 'Unknown reason'}`, error.status || 500, // 尝试使用原始错误的状态码 (Try to use status from original error)
             error.code || 'OPERATION_FAILED', // 尝试使用原始错误的代码 (Try to use code from original error)
             { originalErrorName: error.name, requestId } // 包含原始错误名称和请求ID到上下文中 (Include original error name and request ID in context)
-            )
+            ),
         };
     }
 }
@@ -206,13 +206,13 @@ function withErrorHandler(handler) {
                 return server_1.NextResponse.json({
                     success: false,
                     error: error.code,
-                    message: error.message
+                    message: error.message,
                 }, { status: error.status });
             }
             return server_1.NextResponse.json({
                 success: false,
                 error: 'INTERNAL_SERVER_ERROR',
-                message: 'An unexpected error occurred'
+                message: 'An unexpected error occurred',
             }, { status: 500 });
         }
     };
@@ -225,7 +225,7 @@ function errorResponse(message, status, errorCode) {
     return server_1.NextResponse.json({
         success: false,
         error: errorCode || 'ERROR',
-        message
+        message,
     }, { status });
 }
 /**
@@ -236,6 +236,6 @@ function successResponse(data, message, status = 200) {
     return server_1.NextResponse.json({
         success: true,
         data,
-        message: message || 'Success'
+        message: message || 'Success',
     }, { status });
 }

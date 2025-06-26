@@ -1,10 +1,10 @@
 /**
  * JWT (JSON Web Token) 通用工具类
  * JWT (JSON Web Token) Universal Utility Class
- * 
+ *
  * 提供JWT令牌的创建、验证、解析等通用功能
  * Provides universal JWT token creation, verification, parsing functionality
- * 
+ *
  * @author OAuth团队
  * @since 2.0.0
  */
@@ -117,7 +117,7 @@ export async function getRSAPrivateKeyForSigning(): Promise<jose.KeyLike> {
   if (!privateKeyPEM) {
     throw new Error('JWT_PRIVATE_KEY environment variable is required');
   }
-  
+
   try {
     return await jose.importPKCS8(privateKeyPEM, 'RS256');
   } catch (error) {
@@ -134,7 +134,7 @@ export async function getRSAPublicKeyForVerification(): Promise<jose.KeyLike> {
   if (!publicKeyPEM) {
     throw new Error('JWT_PUBLIC_KEY environment variable is required');
   }
-  
+
   try {
     return await jose.importSPKI(publicKeyPEM, 'RS256');
   } catch (error) {
@@ -164,9 +164,7 @@ export async function createAccessToken(
     permissions: payload.permissions || [],
   };
 
-  Object.keys(jwtPayload).forEach(
-    key => (jwtPayload[key] === undefined) && delete jwtPayload[key]
-  );
+  Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
   return await new jose.SignJWT(jwtPayload)
     .setProtectedHeader({ alg: algorithm, kid: keyId })
@@ -196,9 +194,7 @@ export async function createRefreshToken(
     token_type: 'refresh_token',
   };
 
-  Object.keys(jwtPayload).forEach(
-    key => (jwtPayload[key] === undefined) && delete jwtPayload[key]
-  );
+  Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
   return await new jose.SignJWT(jwtPayload)
     .setProtectedHeader({ alg: algorithm, kid: keyId })
@@ -229,9 +225,7 @@ export async function createIdToken(
     picture: payload.picture,
   };
 
-  Object.keys(jwtPayload).forEach(
-    key => (jwtPayload[key] === undefined) && delete jwtPayload[key]
-  );
+  Object.keys(jwtPayload).forEach((key) => jwtPayload[key] === undefined && delete jwtPayload[key]);
 
   return await new jose.SignJWT(jwtPayload)
     .setProtectedHeader({ alg: algorithm, kid: keyId })
@@ -351,7 +345,7 @@ export function getScopesFromToken(token: string): string[] {
   if (!payload || !payload.scope || typeof payload.scope !== 'string') {
     return [];
   }
-  return payload.scope.split(' ').filter(s => s);
+  return payload.scope.split(' ').filter((s) => s);
 }
 
 /**
@@ -365,7 +359,7 @@ export async function decodeTokenPayload(token: string, secret?: string): Promis
       const decoded = jose.decodeJwt(token);
       return decoded;
     } catch (e: any) {
-      throw new Error('Invalid token format'+ e );
+      throw new Error('Invalid token format' + e);
     }
   }
 
@@ -386,7 +380,10 @@ export async function decodeTokenPayload(token: string, secret?: string): Promis
  * 验证和解码刷新令牌
  * (Verifies and decodes a refresh token)
  */
-export async function verifyAndDecodeRefreshToken(token: string, client: any): Promise<RefreshTokenPayload> {
+export async function verifyAndDecodeRefreshToken(
+  token: string,
+  client: any
+): Promise<RefreshTokenPayload> {
   const result = await verifyRefreshToken(token);
 
   if (!result.valid || !result.payload) {
@@ -394,7 +391,7 @@ export async function verifyAndDecodeRefreshToken(token: string, client: any): P
   }
 
   const payload = result.payload as RefreshTokenPayload;
-  
+
   if (payload.client_id !== client.clientId) {
     throw new Error('Refresh token was not issued to this client');
   }
@@ -436,4 +433,4 @@ export const JWTUtils = {
   decodeTokenPayload,
   verifyAndDecodeRefreshToken,
   extractTokenFromHeader,
-} as const; 
+} as const;

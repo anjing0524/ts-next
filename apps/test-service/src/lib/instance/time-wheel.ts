@@ -6,4 +6,4 @@ import TimeWheelClass, { getTimeWheelInstance } from '@repo/lib/utils/time-wheel
 
 export const TimeWheel = TimeWheelClass;
 export { getTimeWheelInstance };
-export default TimeWheelClass; 
+export default TimeWheelClass;

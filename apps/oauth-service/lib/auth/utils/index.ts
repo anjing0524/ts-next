@@ -26,4 +26,4 @@ export type { OAuthClient } from '@prisma/client';
 // import { bearerAuth, corsMiddleware } from '@repo/lib';
 
 // 本地工具类 (Local utilities)
-export { ClientAuthUtils } from './client-auth-utils'; 
+export { ClientAuthUtils } from './client-auth-utils';

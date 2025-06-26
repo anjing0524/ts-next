@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DataTable } from '@/components/data-table/data-table';
-import { Badge } from '@/components/ui/badge';
+import { DataTable } from '@repo/ui';
+import { Badge } from '@repo/ui';
 import { adminApi } from '@/lib/api';
 
 interface AuditLog {

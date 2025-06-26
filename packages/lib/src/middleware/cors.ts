@@ -45,22 +45,22 @@ const DEFAULT_CORS_OPTIONS: CORSOptions = {
 /**
  * 检查源域名是否被允许
  * Check if origin is allowed
- * 
+ *
  * @param origin - 请求的源域名
  * @param allowedOrigins - 允许的源域名列表
  * @returns 是否允许该源域名
  */
 function isOriginAllowed(origin: string | null, allowedOrigins: string[]): boolean {
   if (!origin) return false;
-  
+
   // 如果配置为允许所有源 (If configured to allow all origins)
   if (allowedOrigins.includes('*')) return true;
-  
+
   // 检查精确匹配 (Check exact match)
   if (allowedOrigins.includes(origin)) return true;
-  
+
   // 检查通配符匹配 (Check wildcard match)
-  return allowedOrigins.some(allowedOrigin => {
+  return allowedOrigins.some((allowedOrigin) => {
     if (allowedOrigin.includes('*')) {
       const pattern = allowedOrigin.replace(/\*/g, '.*');
       const regex = new RegExp(`^${pattern}$`);
@@ -73,7 +73,7 @@ function isOriginAllowed(origin: string | null, allowedOrigins: string[]): boole
 /**
  * 处理预检请求
  * Handle preflight request
- * 
+ *
  * @param request - Next.js请求对象
  * @param options - CORS配置选项
  * @returns 预检响应
@@ -87,7 +87,10 @@ function handlePreflightRequest(request: NextRequest, options: CORSOptions): Nex
   const response = new NextResponse(null, { status: 204 });
 
   // 设置允许的源 (Set allowed origin)
-  if (origin && isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins!)) {
+  if (
+    origin &&
+    isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins!)
+  ) {
     response.headers.set('Access-Control-Allow-Origin', origin);
   }
 
@@ -98,12 +101,12 @@ function handlePreflightRequest(request: NextRequest, options: CORSOptions): Nex
 
   // 设置允许的请求头 (Set allowed headers)
   if (requestHeaders) {
-    const requestedHeaders = requestHeaders.split(',').map(h => h.trim());
+    const requestedHeaders = requestHeaders.split(',').map((h) => h.trim());
     const allowedHeaders = options.allowedHeaders || DEFAULT_CORS_OPTIONS.allowedHeaders!;
-    const validHeaders = requestedHeaders.filter(header => 
-      allowedHeaders.some(allowed => allowed.toLowerCase() === header.toLowerCase())
+    const validHeaders = requestedHeaders.filter((header) =>
+      allowedHeaders.some((allowed) => allowed.toLowerCase() === header.toLowerCase())
     );
-    
+
     if (validHeaders.length > 0) {
       response.headers.set('Access-Control-Allow-Headers', validHeaders.join(', '));
     }
@@ -125,27 +128,36 @@ function handlePreflightRequest(request: NextRequest, options: CORSOptions): Nex
 /**
  * 为响应添加CORS头
  * Add CORS headers to response
- * 
+ *
  * @param response - 响应对象
  * @param request - 请求对象
  * @param options - CORS配置选项
  * @returns 添加了CORS头的响应
  */
-function addCORSHeaders(response: NextResponse, request: NextRequest, options: CORSOptions): NextResponse {
+function addCORSHeaders(
+  response: NextResponse,
+  request: NextRequest,
+  options: CORSOptions
+): NextResponse {
   const origin = request.headers.get('origin');
 
   // 设置允许的源 (Set allowed origin)
-  if (origin && isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins!)) {
+  if (
+    origin &&
+    isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins!)
+  ) {
     response.headers.set('Access-Control-Allow-Origin', origin);
   }
 
   // 设置允许的方法 (Set allowed methods)
-  response.headers.set('Access-Control-Allow-Methods', 
+  response.headers.set(
+    'Access-Control-Allow-Methods',
     (options.allowedMethods || DEFAULT_CORS_OPTIONS.allowedMethods!).join(', ')
   );
 
   // 设置允许的请求头 (Set allowed headers)
-  response.headers.set('Access-Control-Allow-Headers', 
+  response.headers.set(
+    'Access-Control-Allow-Headers',
     (options.allowedHeaders || DEFAULT_CORS_OPTIONS.allowedHeaders!).join(', ')
   );
 
@@ -163,7 +175,7 @@ function addCORSHeaders(response: NextResponse, request: NextRequest, options: C
 /**
  * CORS中间件包装器
  * CORS middleware wrapper
- * 
+ *
  * @param handler - 处理函数
  * @param options - CORS配置选项
  * @returns 包装后的中间件函数
@@ -187,12 +199,12 @@ export function withCORS(
     try {
       // 调用原始处理函数 (Call original handler)
       const response = await handler(request);
-      
+
       // 为响应添加CORS头 (Add CORS headers to response)
       return addCORSHeaders(response, request, corsOptions);
     } catch (error) {
       console.error('CORS中间件处理错误 (CORS middleware error):', error);
-      
+
       // 创建错误响应并添加CORS头 (Create error response with CORS headers)
       const errorResponse = NextResponse.json(
         {
@@ -202,7 +214,7 @@ export function withCORS(
         },
         { status: 500 }
       );
-      
+
       return addCORSHeaders(errorResponse, request, corsOptions);
     }
   };
@@ -211,7 +223,7 @@ export function withCORS(
 /**
  * 简化的CORS中间件，使用默认配置
  * Simplified CORS middleware with default configuration
- * 
+ *
  * @param handler - 处理函数
  * @returns 包装后的中间件函数
  */
@@ -222,18 +234,21 @@ export function withDefaultCORS(handler: (request: NextRequest) => Promise<NextR
 /**
  * 获取环境变量中配置的CORS选项
  * Get CORS options from environment variables
- * 
+ *
  * @returns CORS配置选项
  */
 export function getCORSOptionsFromEnv(): CORSOptions {
-  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || ['*'];
-  const allowedMethods = process.env.CORS_ALLOWED_METHODS?.split(',').map(m => m.trim()) || 
+  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) || ['*'];
+  const allowedMethods =
+    process.env.CORS_ALLOWED_METHODS?.split(',').map((m) => m.trim()) ||
     DEFAULT_CORS_OPTIONS.allowedMethods!;
-  const allowedHeaders = process.env.CORS_ALLOWED_HEADERS?.split(',').map(h => h.trim()) || 
+  const allowedHeaders =
+    process.env.CORS_ALLOWED_HEADERS?.split(',').map((h) => h.trim()) ||
     DEFAULT_CORS_OPTIONS.allowedHeaders!;
   const allowCredentials = process.env.CORS_ALLOW_CREDENTIALS === 'true';
-  const maxAge = process.env.CORS_MAX_AGE ? parseInt(process.env.CORS_MAX_AGE, 10) : 
-    DEFAULT_CORS_OPTIONS.maxAge!;
+  const maxAge = process.env.CORS_MAX_AGE
+    ? parseInt(process.env.CORS_MAX_AGE, 10)
+    : DEFAULT_CORS_OPTIONS.maxAge!;
 
   return {
     allowedOrigins,
@@ -247,10 +262,10 @@ export function getCORSOptionsFromEnv(): CORSOptions {
 /**
  * 环境配置的CORS中间件
  * Environment-configured CORS middleware
- * 
+ *
  * @param handler - 处理函数
  * @returns 包装后的中间件函数
  */
 export function withEnvCORS(handler: (request: NextRequest) => Promise<NextResponse>) {
   return withCORS(handler, getCORSOptionsFromEnv());
-} 
+}

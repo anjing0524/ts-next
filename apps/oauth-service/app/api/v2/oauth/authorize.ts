@@ -5,10 +5,7 @@ import { addMinutes } from 'date-fns';
 import { jwtVerify, JWTPayload } from 'jose';
 
 // import { withOAuthAuthorizeValidation, OAuthValidationResult } from '@/lib/auth';
-import {
-  PKCEUtils,
-  ScopeUtils,
-} from '@repo/lib';
+import { PKCEUtils, ScopeUtils } from '@repo/lib';
 import { AuthorizationUtils } from '@repo/lib';
 import { OAuth2ErrorCode } from '@repo/lib/errors';
 import { prisma } from '@repo/database';
@@ -79,7 +76,8 @@ async function handleAuthorizeRequest(
       if (!code_challenge || !code_challenge_method || code_challenge_method !== 'S256') {
         const error = {
           error: OAuth2ErrorCode.InvalidRequest,
-          error_description: 'PKCE (code_challenge and code_challenge_method=S256) is required for public clients.',
+          error_description:
+            'PKCE (code_challenge and code_challenge_method=S256) is required for public clients.',
         };
 
         await AuthorizationUtils.logAuditEvent({

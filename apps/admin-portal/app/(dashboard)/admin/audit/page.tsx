@@ -4,17 +4,29 @@ import { useState, useEffect, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard'; // 引入 PermissionGuard
-import { DataTable, type ColumnDef } from '@/components/data-table/data-table';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { DateRangePicker } from '@/components/ui/date-range-picker'; // DateRangePicker 暂时注释
+import {
+  Badge,
+  Input,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+  ScrollArea,
+} from '@repo/ui';
+// import { DateRangePicker } from '@repo/ui'; // DateRangePicker 暂时注释
+import { DataTable, type ColumnDef } from '@repo/ui';
 // import { type DateRange } from 'react-day-picker';
 import type { AuditLog, PaginatedResponse } from '@/types/admin-entities'; // 引入共享类型
 import { usePaginatedResource } from '@/hooks/usePaginatedResource'; // Import the hook
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'; // Dialog components
-import { ScrollArea } from '@/components/ui/scroll-area'; // For scrollable details
 
 // 定义 AuditLog API 的参数类型，需要与 usePaginatedResource 和 adminApi.getAuditLogs 匹配
 interface AuditLogApiParams {
@@ -27,7 +39,6 @@ interface AuditLogApiParams {
   endDate?: string;
   sort?: string;
 }
-
 
 const INITIAL_PAGE_LIMIT = 10;
 const REQUIRED_PERMISSIONS = ['menu:system:audit:view', 'audit:list'];
@@ -49,18 +60,17 @@ function AuditLogPageContent() {
     setSearchParams: setHookSearchParams, // Rename
     applyFilters,
     // refreshData: fetchAuditLogs, // Can be used if needed
-  } = usePaginatedResource<AuditLog, AuditLogApiParams>(
-    adminApi.getAuditLogs,
-    {
-      initialLimit: INITIAL_PAGE_LIMIT,
-      initialSearchParams: { action: '', status: '', sort: 'timestamp:desc' } // Default sort
-    }
-  );
+  } = usePaginatedResource<AuditLog, AuditLogApiParams>(adminApi.getAuditLogs, {
+    initialLimit: INITIAL_PAGE_LIMIT,
+    initialSearchParams: { action: '', status: '', sort: 'timestamp:desc' }, // Default sort
+  });
 
   // Local state for filter inputs before applying them via the hook
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm || '');
   const [localActionFilter, setLocalActionFilter] = useState(searchParams.action || '');
-  const [localStatusFilter, setLocalStatusFilter] = useState<'SUCCESS' | 'FAILURE' | ''>(searchParams.status || '');
+  const [localStatusFilter, setLocalStatusFilter] = useState<'SUCCESS' | 'FAILURE' | ''>(
+    searchParams.status || ''
+  );
   // const [localDateRange, setLocalDateRange] = useState<DateRange | undefined>(undefined); // For DatePicker
 
   // Detail Dialog State
@@ -73,7 +83,8 @@ function AuditLogPageContent() {
   };
 
   // Sync local filter states to hook's searchParams when they change, then call applyFilters
-  const handleApplyFiltersFromUI = () => { // Renamed to avoid conflict with hook's applyFilters
+  const handleApplyFiltersFromUI = () => {
+    // Renamed to avoid conflict with hook's applyFilters
     setHookSearchTerm(localSearchTerm);
     setHookSearchParams({
       action: localActionFilter,
@@ -91,42 +102,44 @@ function AuditLogPageContent() {
     setLocalStatusFilter(searchParams.status || '');
   }, [searchTerm, searchParams]);
 
-
   // DataTable 列定义
-  const columns = useMemo<ColumnDef<AuditLog>[]>(() => [
-    {
-      accessorKey: 'timestamp',
-      header: '时间戳',
-      cell: ({ row }) => new Date(row.getValue('timestamp')).toLocaleString(),
-    },
-    {
-      accessorKey: 'userDisplay',
-      header: '操作用户',
-      cell: ({ row }) => row.original.userDisplay || row.original.userId,
-    },
-    { accessorKey: 'action', header: '操作类型' },
-    { accessorKey: 'resource', header: '资源类型' },
-    { accessorKey: 'resourceId', header: '资源ID' },
-    {
-      accessorKey: 'status',
-      header: '状态',
-      cell: ({ row }) => (
-        <Badge variant={row.original.status === 'FAILURE' ? 'destructive' : 'default'}>
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    { accessorKey: 'ipAddress', header: 'IP 地址' },
-    {
-      id: 'details',
-      header: '详情',
-      cell: ({ row }) => (
-        <Button variant="outline" size="sm" onClick={() => openDetailDialog(row.original)}>
-          查看
-        </Button>
-      ),
-    },
-  ], []); // Removed handlePageChange, handleLimitChange, handleApplyFilters, pageState as they are not direct dependencies or managed by hook
+  const columns = useMemo<ColumnDef<AuditLog>[]>(
+    () => [
+      {
+        accessorKey: 'timestamp',
+        header: '时间戳',
+        cell: ({ row }) => new Date(row.getValue('timestamp')).toLocaleString(),
+      },
+      {
+        accessorKey: 'userDisplay',
+        header: '操作用户',
+        cell: ({ row }) => row.original.userDisplay || row.original.userId,
+      },
+      { accessorKey: 'action', header: '操作类型' },
+      { accessorKey: 'resource', header: '资源类型' },
+      { accessorKey: 'resourceId', header: '资源ID' },
+      {
+        accessorKey: 'status',
+        header: '状态',
+        cell: ({ row }) => (
+          <Badge variant={row.original.status === 'FAILURE' ? 'destructive' : 'default'}>
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      { accessorKey: 'ipAddress', header: 'IP 地址' },
+      {
+        id: 'details',
+        header: '详情',
+        cell: ({ row }) => (
+          <Button variant="outline" size="sm" onClick={() => openDetailDialog(row.original)}>
+            查看
+          </Button>
+        ),
+      },
+    ],
+    []
+  ); // Removed handlePageChange, handleLimitChange, handleApplyFilters, pageState as they are not direct dependencies or managed by hook
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6 space-y-6">
@@ -143,58 +156,68 @@ function AuditLogPageContent() {
           onKeyPress={(e) => e.key === 'Enter' && handleApplyFiltersFromUI()}
           className="lg:col-span-2"
         />
-         <div>
-            <Select
-                value={localActionFilter} // Use local state
-                onValueChange={(value) => setLocalActionFilter(value)}
-            >
-                <SelectTrigger><SelectValue placeholder="按操作类型过滤" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="">所有操作</SelectItem>
-                    <SelectItem value="USER_LOGIN">用户登录</SelectItem>
-                    <SelectItem value="USER_LOGOUT">用户登出</SelectItem>
-                    <SelectItem value="USER_CREATE">用户创建</SelectItem>
-                    <SelectItem value="USER_UPDATE">用户更新</SelectItem>
-                    <SelectItem value="USER_DELETE">用户删除</SelectItem>
-                    <SelectItem value="ROLE_CREATE">角色创建</SelectItem>
-                    <SelectItem value="ROLE_UPDATE">角色更新</SelectItem>
-                    <SelectItem value="ROLE_DELETE">角色删除</SelectItem>
-                </SelectContent>
-            </Select>
+        <div>
+          <Select
+            value={localActionFilter} // Use local state
+            onValueChange={(value) => setLocalActionFilter(value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="按操作类型过滤" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有操作</SelectItem>
+              <SelectItem value="USER_LOGIN">用户登录</SelectItem>
+              <SelectItem value="USER_LOGOUT">用户登出</SelectItem>
+              <SelectItem value="USER_CREATE">用户创建</SelectItem>
+              <SelectItem value="USER_UPDATE">用户更新</SelectItem>
+              <SelectItem value="USER_DELETE">用户删除</SelectItem>
+              <SelectItem value="ROLE_CREATE">角色创建</SelectItem>
+              <SelectItem value="ROLE_UPDATE">角色更新</SelectItem>
+              <SelectItem value="ROLE_DELETE">角色删除</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
-            <Select
-                value={localStatusFilter} // Use local state
-                onValueChange={(value: 'SUCCESS' | 'FAILURE' | '') => setLocalStatusFilter(value)}
-            >
-                <SelectTrigger><SelectValue placeholder="按操作类型过滤" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="">所有操作</SelectItem>
-                    <SelectItem value="USER_LOGIN">用户登录</SelectItem>
-                    <SelectItem value="USER_LOGOUT">用户登出</SelectItem>
-                    <SelectItem value="USER_CREATE">用户创建</SelectItem>
-                    <SelectItem value="USER_UPDATE">用户更新</SelectItem>
-                    <SelectItem value="USER_DELETE">用户删除</SelectItem>
-                    <SelectItem value="ROLE_CREATE">角色创建</SelectItem>
-                    <SelectItem value="ROLE_UPDATE">角色更新</SelectItem>
-                    <SelectItem value="ROLE_DELETE">角色删除</SelectItem>
-                </SelectContent>
-            </Select>
+          <Select
+            value={localStatusFilter} // Use local state
+            onValueChange={(value: 'SUCCESS' | 'FAILURE' | '') => setLocalStatusFilter(value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="按操作类型过滤" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有操作</SelectItem>
+              <SelectItem value="USER_LOGIN">用户登录</SelectItem>
+              <SelectItem value="USER_LOGOUT">用户登出</SelectItem>
+              <SelectItem value="USER_CREATE">用户创建</SelectItem>
+              <SelectItem value="USER_UPDATE">用户更新</SelectItem>
+              <SelectItem value="USER_DELETE">用户删除</SelectItem>
+              <SelectItem value="ROLE_CREATE">角色创建</SelectItem>
+              <SelectItem value="ROLE_UPDATE">角色更新</SelectItem>
+              <SelectItem value="ROLE_DELETE">角色删除</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
-            <Select
-                value={statusFilter}
-                onValueChange={(value: 'SUCCESS' | 'FAILURE' | '') => setPageState(prev => ({ ...prev, statusFilter: value, page: 1}))}
-            >
-                <SelectTrigger><SelectValue placeholder="按状态过滤" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="">所有状态</SelectItem>
-                    <SelectItem value="SUCCESS">成功 (SUCCESS)</SelectItem>
-                    <SelectItem value="FAILURE">失败 (FAILURE)</SelectItem>
-                </SelectContent>
-            </Select>
+          <Select
+            value={statusFilter}
+            onValueChange={(value: 'SUCCESS' | 'FAILURE' | '') =>
+              setPageState((prev) => ({ ...prev, statusFilter: value, page: 1 }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="按状态过滤" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">所有状态</SelectItem>
+              <SelectItem value="SUCCESS">成功 (SUCCESS)</SelectItem>
+              <SelectItem value="FAILURE">失败 (FAILURE)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Button onClick={handleApplyFilters} className="lg:col-start-4">应用筛选</Button>
+        <Button onClick={handleApplyFilters} className="lg:col-start-4">
+          应用筛选
+        </Button>
       </div>
 
       {isLoading && !logs.length && pageState.page === 1 ? (
@@ -213,34 +236,34 @@ function AuditLogPageContent() {
           onPageSizeChange={handleLimitChange}
         />
       )}
-       {(totalItems > 0 || page > 1) && !isLoading && !error && (
-          <div className="flex items-center justify-between mt-4 py-2 border-t">
-            <span className="text-sm text-muted-foreground">
-              第 {page} / {totalPages} 页 (共 {totalItems} 条记录)
-            </span>
-            <div className="space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page <= 1}
-              >
-                上一页
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page >= totalPages}
-              >
-                下一页
-              </Button>
-            </div>
+      {(totalItems > 0 || page > 1) && !isLoading && !error && (
+        <div className="flex items-center justify-between mt-4 py-2 border-t">
+          <span className="text-sm text-muted-foreground">
+            第 {page} / {totalPages} 页 (共 {totalItems} 条记录)
+          </span>
+          <div className="space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page <= 1}
+            >
+              上一页
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages}
+            >
+              下一页
+            </Button>
           </div>
-        )}
-        {logs.length === 0 && !isLoading && !error && (
-             <div className="text-center py-10 text-muted-foreground">没有找到符合条件的审计日志。</div>
-        )}
+        </div>
+      )}
+      {logs.length === 0 && !isLoading && !error && (
+        <div className="text-center py-10 text-muted-foreground">没有找到符合条件的审计日志。</div>
+      )}
     </div>
   );
 }

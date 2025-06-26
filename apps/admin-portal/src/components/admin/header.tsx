@@ -3,19 +3,21 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@repo/ui';
 import { LogOut, UserCircle, Settings, Menu as MenuIcon } from 'lucide-react'; // MenuIcon for mobile
 import { useAuth } from '@/hooks/useAuth'; // Placeholder auth hook
-// import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'; // For mobile sidebar
+// import { Sheet, SheetContent, SheetTrigger } from '@repo/ui'; // For mobile sidebar
 // import AdminSidebar from './sidebar'; // To embed sidebar in sheet for mobile
 
 /**
@@ -41,8 +43,11 @@ export default function AdminHeader() {
   if (isLoading) {
     return (
       <header className="flex items-center justify-between h-16 px-4 md:px-6 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm">
-        <div className="text-lg font-semibold text-slate-900 dark:text-slate-50">管理中心 (Admin Center)</div>
-        <div className="h-8 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse"></div> {/* User info placeholder */}
+        <div className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          管理中心 (Admin Center)
+        </div>
+        <div className="h-8 w-24 bg-gray-200 dark:bg-slate-700 rounded animate-pulse"></div>{' '}
+        {/* User info placeholder */}
       </header>
     );
   }
@@ -70,7 +75,6 @@ export default function AdminHeader() {
         管理中心 (Admin Center)
       </div>
 
-
       {user ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -78,7 +82,9 @@ export default function AdminHeader() {
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.avatar || undefined} alt={`@${user.username}`} />
                 <AvatarFallback>
-                  {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
+                  {user.displayName
+                    ? user.displayName.charAt(0).toUpperCase()
+                    : user.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -110,7 +116,10 @@ export default function AdminHeader() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="flex items-center cursor-pointer text-red-600 dark:text-red-400 hover:!text-red-700 dark:hover:!text-red-500">
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="flex items-center cursor-pointer text-red-600 dark:text-red-400 hover:!text-red-700 dark:hover:!text-red-500"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               <span>登出 (Log out)</span>
             </DropdownMenuItem>

@@ -24,7 +24,7 @@ import {
   AuthenticationError,
   CryptoError,
   TokenValidationError,
-  TokenExpiredError
+  TokenExpiredError,
 } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
 import { AuthorizationCode as PrismaAuthorizationCode, Prisma } from '@prisma/client'; // Prisma 类型 (Prisma type)
 
@@ -53,7 +53,6 @@ export function generateSecureRandomString(length: number = 32): string {
   return crypto.randomBytes(length).toString('hex');
 }
 
-
 /**
  * 存储授权码到数据库。
  * Stores the authorization code in the database.
@@ -78,12 +77,16 @@ export async function storeAuthorizationCode(
   codeChallengeMethod: string, // 允许 string 类型以便进行验证 (Allow string type for validation)
   scope: string,
   expiresInSeconds: number = DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS,
-  nonce?: string,
+  nonce?: string
 ): Promise<PrismaAuthorizationCode> {
   // 验证 codeChallengeMethod 是否为 "S256"
   // Validate if codeChallengeMethod is "S256"
   if (codeChallengeMethod !== 'S256') {
-          throw new ValidationError(`Unsupported code challenge method: ${codeChallengeMethod}. Only 'S256' is supported.`, { codeChallengeMethod }, 'UNSUPPORTED_CHALLENGE_METHOD');
+    throw new ValidationError(
+      `Unsupported code challenge method: ${codeChallengeMethod}. Only 'S256' is supported.`,
+      { codeChallengeMethod },
+      'UNSUPPORTED_CHALLENGE_METHOD'
+    );
   }
 
   // 生成一个安全的随机授权码
@@ -116,7 +119,9 @@ export async function storeAuthorizationCode(
     // Database operation failed, log error and throw BaseError
     console.error('Failed to store authorization code:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-          throw new CryptoError('Database error while storing authorization code.', { originalError: errorMessage });
+    throw new CryptoError('Database error while storing authorization code.', {
+      originalError: errorMessage,
+    });
   }
 }
 
@@ -142,8 +147,9 @@ export async function validateAuthorizationCode(
   code: string,
   expectedClientId: string, // 这是 OAuthClient.id (cuid) (This is OAuthClient.id (cuid))
   expectedRedirectUri: string,
-  codeVerifier: string,
-): Promise<PrismaAuthorizationCode> { // 返回 Prisma 模型类型 (Return Prisma model type)
+  codeVerifier: string
+): Promise<PrismaAuthorizationCode> {
+  // 返回 Prisma 模型类型 (Return Prisma model type)
   let storedCode: PrismaAuthorizationCode | null = null;
   try {
     // 从数据库中查找授权码
@@ -155,7 +161,10 @@ export async function validateAuthorizationCode(
     // 如果授权码不存在
     // If authorization code does not exist
     if (!storedCode) {
-      throw new ResourceNotFoundError('Invalid authorization code: Code not found.', 'AUTH_CODE_NOT_FOUND');
+      throw new ResourceNotFoundError(
+        'Invalid authorization code: Code not found.',
+        'AUTH_CODE_NOT_FOUND'
+      );
     }
 
     // 如果授权码已被使用
@@ -168,7 +177,11 @@ export async function validateAuthorizationCode(
       // 为简化，此处删除已使用的授权码以防止进一步尝试，并抛出错误。
       // For simplicity, delete the used code to prevent further attempts and throw an error.
       await prisma.authorizationCode.delete({ where: { id: storedCode.id } });
-              throw new TokenValidationError('Invalid authorization code: Code has already been used.', { code: code }, 'AUTH_CODE_USED');
+      throw new TokenValidationError(
+        'Invalid authorization code: Code has already been used.',
+        { code: code },
+        'AUTH_CODE_USED'
+      );
     }
 
     // 如果授权码已过期
@@ -177,13 +190,20 @@ export async function validateAuthorizationCode(
       // 删除已过期的授权码
       // Delete the expired authorization code
       await prisma.authorizationCode.delete({ where: { id: storedCode.id } });
-              throw new TokenExpiredError('Invalid authorization code: Code has expired.', { code: code, expiresAt: storedCode.expiresAt });
+      throw new TokenExpiredError('Invalid authorization code: Code has expired.', {
+        code: code,
+        expiresAt: storedCode.expiresAt,
+      });
     }
 
     // 验证客户端ID是否匹配
     // Validate if client ID matches
     if (storedCode.clientId !== expectedClientId) {
-      throw new ValidationError('Invalid authorization code: Client ID mismatch.', { expected: expectedClientId, actual: storedCode.clientId }, 'AUTH_CODE_CLIENT_ID_MISMATCH');
+      throw new ValidationError(
+        'Invalid authorization code: Client ID mismatch.',
+        { expected: expectedClientId, actual: storedCode.clientId },
+        'AUTH_CODE_CLIENT_ID_MISMATCH'
+      );
     }
 
     // 验证重定向URI是否匹配
@@ -195,7 +215,11 @@ export async function validateAuthorizationCode(
     // 此处假设如果已存储，则必须匹配。
     // Here, we assume if it was stored, it must match.
     if (storedCode.redirectUri !== expectedRedirectUri) {
-       throw new ValidationError('Invalid authorization code: Redirect URI mismatch.', { expected: expectedRedirectUri, actual: storedCode.redirectUri }, 'AUTH_CODE_REDIRECT_URI_MISMATCH');
+      throw new ValidationError(
+        'Invalid authorization code: Redirect URI mismatch.',
+        { expected: expectedRedirectUri, actual: storedCode.redirectUri },
+        'AUTH_CODE_REDIRECT_URI_MISMATCH'
+      );
     }
 
     // PKCE 校验 (S256)
@@ -203,19 +227,24 @@ export async function validateAuthorizationCode(
     if (storedCode.codeChallengeMethod === 'S256') {
       // 使用提供的 codeVerifier 计算哈希值
       // Calculate hash value using the provided codeVerifier
-      const hashedVerifier = crypto
-        .createHash('sha256')
-        .update(codeVerifier)
-        .digest('base64url'); // 使用 base64url 编码 (Use base64url encoding)
+      const hashedVerifier = crypto.createHash('sha256').update(codeVerifier).digest('base64url'); // 使用 base64url 编码 (Use base64url encoding)
       // 比较计算出的哈希值与存储的 codeChallenge
       // Compare the calculated hash value with the stored codeChallenge
       if (hashedVerifier !== storedCode.codeChallenge) {
-        throw new AuthenticationError('Invalid authorization code: PKCE verification failed.', undefined, 'PKCE_VERIFICATION_FAILED');
+        throw new AuthenticationError(
+          'Invalid authorization code: PKCE verification failed.',
+          undefined,
+          'PKCE_VERIFICATION_FAILED'
+        );
       }
     } else {
       // 如果 storeAuthorizationCode 强制使用 S256，则不应发生此情况
       // Should not happen if storeAuthorizationCode enforces S256
-              throw new ValidationError(`Unsupported code challenge method in stored code: ${storedCode.codeChallengeMethod}. Only 'S256' is supported.`, { storedMethod: storedCode.codeChallengeMethod }, 'UNSUPPORTED_STORED_CHALLENGE_METHOD');
+      throw new ValidationError(
+        `Unsupported code challenge method in stored code: ${storedCode.codeChallengeMethod}. Only 'S256' is supported.`,
+        { storedMethod: storedCode.codeChallengeMethod },
+        'UNSUPPORTED_STORED_CHALLENGE_METHOD'
+      );
     }
 
     // 验证成功，将授权码标记为已使用
@@ -230,7 +259,6 @@ export async function validateAuthorizationCode(
     });
 
     return updatedCode; // 返回更新后的（已标记为使用）授权码对象 (Return the updated (marked as used) authorization code object)
-
   } catch (error) {
     // 如果错误已经是我们定义的自定义错误类型，直接重新抛出
     // If the error is already an instance of our custom error types, re-throw it directly
@@ -244,8 +272,13 @@ export async function validateAuthorizationCode(
     // Check if it's a Prisma known request error and provide a more specific error code if possible
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new CryptoError(`Database error during authorization code validation: ${errorMessage}`, { originalError: errorMessage, code: error.code });
+      throw new CryptoError(
+        `Database error during authorization code validation: ${errorMessage}`,
+        { originalError: errorMessage, code: error.code }
+      );
     }
-    throw new CryptoError('Database error during authorization code validation.', { originalError: errorMessage });
+    throw new CryptoError('Database error during authorization code validation.', {
+      originalError: errorMessage,
+    });
   }
 }

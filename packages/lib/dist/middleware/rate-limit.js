@@ -176,7 +176,7 @@ function withRateLimit(handler, options = {}) {
             // 检查速率限制 (Check rate limit)
             const rateLimitResult = utils_1.RateLimitUtils.checkRateLimit(rateLimitKey, {
                 maxRequests: rateLimitOptions.maxRequests,
-                windowMs: rateLimitOptions.windowMs
+                windowMs: rateLimitOptions.windowMs,
             });
             if (!rateLimitResult.allowed) {
                 // 超出速率限制 (Rate limit exceeded)

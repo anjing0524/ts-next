@@ -130,7 +130,7 @@ export class CacheManager {
 
   private initializeCache(): void {
     const redisUrl = process.env.REDIS_URL;
-    
+
     if (redisUrl) {
       try {
         this.redisClient = new Redis(redisUrl, {
@@ -187,4 +187,4 @@ export class CacheManager {
       await this.redisClient.quit();
     }
   }
-} 
+}

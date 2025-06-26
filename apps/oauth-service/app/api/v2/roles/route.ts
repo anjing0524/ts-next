@@ -18,19 +18,28 @@ const MAX_PAGE_SIZE = 100;
 // --- Zod Schema 定义 ---
 // 用于验证创建角色请求体的数据结构和规则。
 const CreateRoleSchema = z.object({
-  name: z.string()
-    .min(3, "角色名称至少需要3个字符 (Role name must be at least 3 characters long)")
-    .max(50, "角色名称不能超过50个字符 (Role name cannot exceed 50 characters long)")
-    .regex(/^[a-zA-Z0-9_:-]+$/, "角色名称只能包含字母、数字、下划线、冒号和连字符 (Role name can only contain letters, numbers, underscores, colons, and hyphens)"),
-  displayName: z.string()
-    .min(1, "显示名称不能为空 (Display name cannot be empty)")
-    .max(100, "显示名称不能超过100个字符 (Display name cannot exceed 100 characters long)"),
-  description: z.string()
-    .max(255, "描述信息不能超过255个字符 (Description cannot exceed 255 characters long)")
-    .optional().nullable(), // 描述是可选的，且可以为null来清空
+  name: z
+    .string()
+    .min(3, '角色名称至少需要3个字符 (Role name must be at least 3 characters long)')
+    .max(50, '角色名称不能超过50个字符 (Role name cannot exceed 50 characters long)')
+    .regex(
+      /^[a-zA-Z0-9_:-]+$/,
+      '角色名称只能包含字母、数字、下划线、冒号和连字符 (Role name can only contain letters, numbers, underscores, colons, and hyphens)'
+    ),
+  displayName: z
+    .string()
+    .min(1, '显示名称不能为空 (Display name cannot be empty)')
+    .max(100, '显示名称不能超过100个字符 (Display name cannot exceed 100 characters long)'),
+  description: z
+    .string()
+    .max(255, '描述信息不能超过255个字符 (Description cannot exceed 255 characters long)')
+    .optional()
+    .nullable(), // 描述是可选的，且可以为null来清空
   isActive: z.boolean().optional().default(true),
-  permissionIds: z.array(z.string().cuid("无效的权限ID格式 (Invalid Permission ID format: must be a CUID)"))
-    .optional().default([]), // 权限ID列表，可选，默认为空数组
+  permissionIds: z
+    .array(z.string().cuid('无效的权限ID格式 (Invalid Permission ID format: must be a CUID)'))
+    .optional()
+    .default([]), // 权限ID列表，可选，默认为空数组
 });
 
 /**
@@ -65,12 +74,13 @@ async function listRolesHandler(
   try {
     const roles = await prisma.role.findMany({
       where,
-      include: { // 包含与角色关联的权限信息
+      include: {
+        // 包含与角色关联的权限信息
         rolePermissions: {
           include: {
             permission: true, // 包含每个关联的完整权限对象
-          }
-        }
+          },
+        },
       },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -79,11 +89,11 @@ async function listRolesHandler(
     const totalRoles = await prisma.role.count({ where });
 
     // 格式化角色数据以包含扁平化的权限列表
-    const formattedRoles = roles.map(role => {
+    const formattedRoles = roles.map((role) => {
       const { rolePermissions, ...roleData } = role;
       return {
         ...roleData,
-        permissions: rolePermissions.map(rp => rp.permission), // 直接提取permission对象
+        permissions: rolePermissions.map((rp) => rp.permission), // 直接提取permission对象
       };
     });
 
@@ -94,12 +104,15 @@ async function listRolesHandler(
         page,
         pageSize,
         totalItems: totalRoles,
-        totalPages: Math.ceil(totalRoles / pageSize)
+        totalPages: Math.ceil(totalRoles / pageSize),
       },
     });
   } catch (error) {
     console.error('列出角色失败 (Failed to list roles):', error);
-    return NextResponse.json({ message: '获取角色列表失败 (Failed to retrieve roles list)' }, { status: 500 });
+    return NextResponse.json(
+      { message: '获取角色列表失败 (Failed to retrieve roles list)' },
+      { status: 500 }
+    );
   }
 }
 
@@ -125,32 +138,38 @@ async function createRoleHandler(
     body = await req.json();
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdminId,
-        action: 'ROLE_CREATE_FAILURE_INVALID_JSON',
-          success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: 'Invalid JSON request body for role creation.',
-        metadata: { error: e.message }
+      userId: performingAdminId,
+      action: 'ROLE_CREATE_FAILURE_INVALID_JSON',
+      success: false,
+      ipAddress,
+      userAgent,
+      errorMessage: 'Invalid JSON request body for role creation.',
+      metadata: { error: e.message },
     });
-    return NextResponse.json({ message: '无效的JSON请求体 (Invalid JSON request body)' }, { status: 400 });
+    return NextResponse.json(
+      { message: '无效的JSON请求体 (Invalid JSON request body)' },
+      { status: 400 }
+    );
   }
 
   const validationResult = CreateRoleSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdminId,
-        action: 'ROLE_CREATE_FAILURE_VALIDATION',
-          success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: 'Role creation payload validation failed.',
-        metadata: { issues: validationResult.error.format(), receivedBody: body }
+      userId: performingAdminId,
+      action: 'ROLE_CREATE_FAILURE_VALIDATION',
+      success: false,
+      ipAddress,
+      userAgent,
+      errorMessage: 'Role creation payload validation failed.',
+      metadata: { issues: validationResult.error.format(), receivedBody: body },
     });
-    return NextResponse.json({
-      message: '创建角色验证失败 (Role creation input validation failed)',
-      errors: validationResult.error.format()
-    }, { status: 400 });
+    return NextResponse.json(
+      {
+        message: '创建角色验证失败 (Role creation input validation failed)',
+        errors: validationResult.error.format(),
+      },
+      { status: 400 }
+    );
   }
 
   const { name, displayName, description, isActive, permissionIds } = validationResult.data;
@@ -160,16 +179,19 @@ async function createRoleHandler(
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdminId,
-          action: 'ROLE_CREATE_FAILURE_CONFLICT',
-          resource: `Role:${existingRole.id}`,
-          success: false,
-          ipAddress,
-          userAgent,
-          errorMessage: `Role name "${name}" already exists.`,
-          metadata: { name }
+        userId: performingAdminId,
+        action: 'ROLE_CREATE_FAILURE_CONFLICT',
+        resource: `Role:${existingRole.id}`,
+        success: false,
+        ipAddress,
+        userAgent,
+        errorMessage: `Role name "${name}" already exists.`,
+        metadata: { name },
       });
-      return NextResponse.json({ message: `角色名称 "${name}" 已存在 (Role name "${name}" already exists)` }, { status: 409 });
+      return NextResponse.json(
+        { message: `角色名称 "${name}" 已存在 (Role name "${name}" already exists)` },
+        { status: 409 }
+      );
     }
 
     // 如果提供了 permissionIds，验证它们是否存在
@@ -179,19 +201,24 @@ async function createRoleHandler(
         select: { id: true },
       });
       if (foundPermissions.length !== permissionIds.length) {
-        const notFoundIds = permissionIds.filter(id => !foundPermissions.some(p => p.id === id));
+        const notFoundIds = permissionIds.filter(
+          (id) => !foundPermissions.some((p) => p.id === id)
+        );
         await AuthorizationUtils.logAuditEvent({
-            userId: performingAdminId,
-            action: 'ROLE_CREATE_FAILURE_INVALID_PERMISSIONS',
+          userId: performingAdminId,
+          action: 'ROLE_CREATE_FAILURE_INVALID_PERMISSIONS',
           success: false,
-            ipAddress,
-            userAgent,
-            errorMessage: 'Invalid or non-existent permissionIds provided.',
-            metadata: { providedIds: permissionIds, notFoundIds }
+          ipAddress,
+          userAgent,
+          errorMessage: 'Invalid or non-existent permissionIds provided.',
+          metadata: { providedIds: permissionIds, notFoundIds },
         });
-        return NextResponse.json({
-          message: `提供了无效或不存在的权限ID (Invalid or non-existent permissionIds provided): ${notFoundIds.join(', ')}`
-        }, { status: 400 });
+        return NextResponse.json(
+          {
+            message: `提供了无效或不存在的权限ID (Invalid or non-existent permissionIds provided): ${notFoundIds.join(', ')}`,
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -202,12 +229,12 @@ async function createRoleHandler(
           name,
           displayName,
           description: description || null,
-          isActive
+          isActive,
         },
       });
 
       if (permissionIds && permissionIds.length > 0) {
-        const rolePermissionData = permissionIds.map(permissionId => ({
+        const rolePermissionData = permissionIds.map((permissionId) => ({
           roleId: newRole.id,
           permissionId: permissionId,
         }));
@@ -220,34 +247,34 @@ async function createRoleHandler(
 
     // 获取新创建的角色及其关联的权限用于响应
     const roleForResponse = await prisma.role.findUnique({
-        where: { id: newRoleWithPermissions.id },
-        include: {
-            rolePermissions: {
-                include: { permission: true }
-            }
-        }
+      where: { id: newRoleWithPermissions.id },
+      include: {
+        rolePermissions: {
+          include: { permission: true },
+        },
+      },
     });
 
     // 格式化响应
     const { rolePermissions, ...roleData } = roleForResponse!;
     const formattedRole = {
-        ...roleData,
-        permissions: rolePermissions.map(rp => rp.permission)
+      ...roleData,
+      permissions: rolePermissions.map((rp) => rp.permission),
     };
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdminId,
-        action: 'ROLE_CREATE_SUCCESS',
-          resource: `Role:${newRoleWithPermissions.id}`,
-          success: true,
-        ipAddress,
-        userAgent,
-        metadata: {
-            roleId: newRoleWithPermissions.id,
-            name: newRoleWithPermissions.name,
-            displayName: newRoleWithPermissions.displayName,
-            permissionIds: permissionIds
-        }
+      userId: performingAdminId,
+      action: 'ROLE_CREATE_SUCCESS',
+      resource: `Role:${newRoleWithPermissions.id}`,
+      success: true,
+      ipAddress,
+      userAgent,
+      metadata: {
+        roleId: newRoleWithPermissions.id,
+        name: newRoleWithPermissions.name,
+        displayName: newRoleWithPermissions.displayName,
+        permissionIds: permissionIds,
+      },
     });
 
     return NextResponse.json(formattedRole, { status: 201 });
@@ -262,19 +289,31 @@ async function createRoleHandler(
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdminId,
-        action: actionCode,
-          success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: errorMessage,
-        metadata: { name, displayName, permissionIds, error: error.message, errorCode: (error as any).code }
+      userId: performingAdminId,
+      action: actionCode,
+      success: false,
+      ipAddress,
+      userAgent,
+      errorMessage: errorMessage,
+      metadata: {
+        name,
+        displayName,
+        permissionIds,
+        error: error.message,
+        errorCode: (error as any).code,
+      },
     });
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ message: errorMessage }, { status: 409 });
     }
-    return NextResponse.json({ message: '创建角色时发生服务器错误 (An unexpected server error occurred during role creation)' }, { status: 500 });
+    return NextResponse.json(
+      {
+        message:
+          '创建角色时发生服务器错误 (An unexpected server error occurred during role creation)',
+      },
+      { status: 500 }
+    );
   }
 }
 

@@ -3,6 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
+
 1. 本项目使用turborepo管理的monorepo项目
 2. 本项目使用nextjs@15，结合shadcn/ui tailwindcss@4 
 2. 本项目可能需要rust 以及 wasm-pack 编译webassemble

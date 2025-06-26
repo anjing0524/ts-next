@@ -46,7 +46,7 @@ function isOriginAllowed(origin, allowedOrigins) {
     if (allowedOrigins.includes(origin))
         return true;
     // 检查通配符匹配 (Check wildcard match)
-    return allowedOrigins.some(allowedOrigin => {
+    return allowedOrigins.some((allowedOrigin) => {
         if (allowedOrigin.includes('*')) {
             const pattern = allowedOrigin.replace(/\*/g, '.*');
             const regex = new RegExp(`^${pattern}$`);
@@ -71,7 +71,8 @@ function handlePreflightRequest(request, options) {
     // 创建预检响应 (Create preflight response)
     const response = new server_1.NextResponse(null, { status: 204 });
     // 设置允许的源 (Set allowed origin)
-    if (origin && isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins)) {
+    if (origin &&
+        isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins)) {
         response.headers.set('Access-Control-Allow-Origin', origin);
     }
     // 设置允许的方法 (Set allowed methods)
@@ -80,9 +81,9 @@ function handlePreflightRequest(request, options) {
     }
     // 设置允许的请求头 (Set allowed headers)
     if (requestHeaders) {
-        const requestedHeaders = requestHeaders.split(',').map(h => h.trim());
+        const requestedHeaders = requestHeaders.split(',').map((h) => h.trim());
         const allowedHeaders = options.allowedHeaders || DEFAULT_CORS_OPTIONS.allowedHeaders;
-        const validHeaders = requestedHeaders.filter(header => allowedHeaders.some(allowed => allowed.toLowerCase() === header.toLowerCase()));
+        const validHeaders = requestedHeaders.filter((header) => allowedHeaders.some((allowed) => allowed.toLowerCase() === header.toLowerCase()));
         if (validHeaders.length > 0) {
             response.headers.set('Access-Control-Allow-Headers', validHeaders.join(', '));
         }
@@ -109,7 +110,8 @@ function handlePreflightRequest(request, options) {
 function addCORSHeaders(response, request, options) {
     const origin = request.headers.get('origin');
     // 设置允许的源 (Set allowed origin)
-    if (origin && isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins)) {
+    if (origin &&
+        isOriginAllowed(origin, options.allowedOrigins || DEFAULT_CORS_OPTIONS.allowedOrigins)) {
         response.headers.set('Access-Control-Allow-Origin', origin);
     }
     // 设置允许的方法 (Set allowed methods)
@@ -176,14 +178,15 @@ function withDefaultCORS(handler) {
  */
 function getCORSOptionsFromEnv() {
     var _a, _b, _c;
-    const allowedOrigins = ((_a = process.env.CORS_ALLOWED_ORIGINS) === null || _a === void 0 ? void 0 : _a.split(',').map(o => o.trim())) || ['*'];
-    const allowedMethods = ((_b = process.env.CORS_ALLOWED_METHODS) === null || _b === void 0 ? void 0 : _b.split(',').map(m => m.trim())) ||
+    const allowedOrigins = ((_a = process.env.CORS_ALLOWED_ORIGINS) === null || _a === void 0 ? void 0 : _a.split(',').map((o) => o.trim())) || ['*'];
+    const allowedMethods = ((_b = process.env.CORS_ALLOWED_METHODS) === null || _b === void 0 ? void 0 : _b.split(',').map((m) => m.trim())) ||
         DEFAULT_CORS_OPTIONS.allowedMethods;
-    const allowedHeaders = ((_c = process.env.CORS_ALLOWED_HEADERS) === null || _c === void 0 ? void 0 : _c.split(',').map(h => h.trim())) ||
+    const allowedHeaders = ((_c = process.env.CORS_ALLOWED_HEADERS) === null || _c === void 0 ? void 0 : _c.split(',').map((h) => h.trim())) ||
         DEFAULT_CORS_OPTIONS.allowedHeaders;
     const allowCredentials = process.env.CORS_ALLOW_CREDENTIALS === 'true';
-    const maxAge = process.env.CORS_MAX_AGE ? parseInt(process.env.CORS_MAX_AGE, 10) :
-        DEFAULT_CORS_OPTIONS.maxAge;
+    const maxAge = process.env.CORS_MAX_AGE
+        ? parseInt(process.env.CORS_MAX_AGE, 10)
+        : DEFAULT_CORS_OPTIONS.maxAge;
     return {
         allowedOrigins,
         allowedMethods,

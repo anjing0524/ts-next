@@ -7,8 +7,10 @@ import { withErrorHandler } from '@repo/lib/utils/error-handler'; // 基本错�
 
 // 辅助函数获取基础URL
 function getBaseUrl(request: NextRequest): string {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
-  const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.slice(0, -1);
+  const host =
+    request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
+  const protocol =
+    request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.slice(0, -1);
   return `${protocol}://${host}`;
 }
 
@@ -61,71 +63,80 @@ async function discoveryHandler(request: NextRequest) {
     // RFC 8414: OAuth 2.0 Authorization Server Metadata
     issuer: issuerIdentifier, // 发行者标识URL
     authorization_endpoint: `${baseUrl}/api/v2/oauth/authorize`, // 授权端点URL
-    token_endpoint: `${baseUrl}/api/v2/oauth/token`,             // 令牌端点URL
-    introspection_endpoint: `${baseUrl}/api/v2/oauth/introspect`,// 令牌自省端点URL (RFC 7662)
-    revocation_endpoint: `${baseUrl}/api/v2/oauth/revoke`,       // 令牌撤销端点URL (RFC 7009)
+    token_endpoint: `${baseUrl}/api/v2/oauth/token`, // 令牌端点URL
+    introspection_endpoint: `${baseUrl}/api/v2/oauth/introspect`, // 令牌自省端点URL (RFC 7662)
+    revocation_endpoint: `${baseUrl}/api/v2/oauth/revoke`, // 令牌撤销端点URL (RFC 7009)
 
     // RFC 7517: JSON Web Key Set
     jwks_uri: `${baseUrl}/api/v2/.well-known/jwks.json`, // JWKS文档URL (RFC 7517)
 
     // RFC 8414 Section 2 & OIDC Discovery 1.0 Section 3
-    scopes_supported: [ // 支持的OAuth范围
-      "openid",         // OIDC: 必须, 用于身份认证 (OIDC: REQUIRED, for identity authentication)
-      "profile",        // OIDC: 可选, 请求用户的基本资料信息 (OIDC: OPTIONAL, requests user's default profile claims)
-      "email",          // OIDC: 可选, 请求用户的邮箱地址 (OIDC: OPTIONAL, requests user's email address)
-      "offline_access", // OAuth 2.0: 可选, 请求刷新令牌 (OAuth 2.0: OPTIONAL, requests a refresh token)
-      "api:read",       // 示例API读取权限 (Example API read permission)
-      "api:write",      // 示例API写入权限 (Example API write permission)
-      "user:read",      // 示例用户读取权限 (Example user read permission)
-      "user:write",     // 示例用户写入权限 (Example user write permission)
+    scopes_supported: [
+      // 支持的OAuth范围
+      'openid', // OIDC: 必须, 用于身份认证 (OIDC: REQUIRED, for identity authentication)
+      'profile', // OIDC: 可选, 请求用户的基本资料信息 (OIDC: OPTIONAL, requests user's default profile claims)
+      'email', // OIDC: 可选, 请求用户的邮箱地址 (OIDC: OPTIONAL, requests user's email address)
+      'offline_access', // OAuth 2.0: 可选, 请求刷新令牌 (OAuth 2.0: OPTIONAL, requests a refresh token)
+      'api:read', // 示例API读取权限 (Example API read permission)
+      'api:write', // 示例API写入权限 (Example API write permission)
+      'user:read', // 示例用户读取权限 (Example user read permission)
+      'user:write', // 示例用户写入权限 (Example user write permission)
     ],
-    response_types_supported: [ // 支持的response_type值
-      "code",             // OAuth 2.0: 授权码模式 (OAuth 2.0: Authorization Code Flow)
+    response_types_supported: [
+      // 支持的response_type值
+      'code', // OAuth 2.0: 授权码模式 (OAuth 2.0: Authorization Code Flow)
     ],
-    grant_types_supported: [ // 支持的授权类型
-      "authorization_code", // OAuth 2.0: 授权码模式 (OAuth 2.0: Authorization Code Grant)
-      "refresh_token",      // OAuth 2.0: 刷新令牌 (OAuth 2.0: Refresh Token Grant)
-      "client_credentials", // OAuth 2.0: 客户端凭据模式 (OAuth 2.0: Client Credentials Grant)
+    grant_types_supported: [
+      // 支持的授权类型
+      'authorization_code', // OAuth 2.0: 授权码模式 (OAuth 2.0: Authorization Code Grant)
+      'refresh_token', // OAuth 2.0: 刷新令牌 (OAuth 2.0: Refresh Token Grant)
+      'client_credentials', // OAuth 2.0: 客户端凭据模式 (OAuth 2.0: Client Credentials Grant)
     ],
-    token_endpoint_auth_methods_supported: [ // 令牌端点支持的客户端认证方法
-      "client_secret_basic", // RFC 6749: HTTP Basic (HTTP Basic Authentication)
-      "client_secret_post",  // RFC 6749: client_id 和 client_secret 在请求体中 (client_id and client_secret in request body)
+    token_endpoint_auth_methods_supported: [
+      // 令牌端点支持的客户端认证方法
+      'client_secret_basic', // RFC 6749: HTTP Basic (HTTP Basic Authentication)
+      'client_secret_post', // RFC 6749: client_id 和 client_secret 在请求体中 (client_id and client_secret in request body)
     ],
-    revocation_endpoint_auth_methods_supported: [ // 撤销端点支持的客户端认证方法 (RFC 7009)
-      "client_secret_basic",
-      "client_secret_post",
+    revocation_endpoint_auth_methods_supported: [
+      // 撤销端点支持的客户端认证方法 (RFC 7009)
+      'client_secret_basic',
+      'client_secret_post',
     ],
-    introspection_endpoint_auth_methods_supported: [ // 自省端点支持的认证方法 (RFC 7662)
+    introspection_endpoint_auth_methods_supported: [
+      // 自省端点支持的认证方法 (RFC 7662)
       // Typically Resource Servers use Bearer tokens for introspection endpoint if it's protected by itself as a resource.
       // If the introspection endpoint requires client authentication (the client introspecting its own tokens, or a special RS client),
       // then methods like client_secret_basic/post could be listed.
       // For now, assuming it's protected and requires client credentials for the RS.
-       "client_secret_basic",
-       "client_secret_post",
-       // "bearer_token" // Custom or if RS is a confidential client with its own credentials for introspection
+      'client_secret_basic',
+      'client_secret_post',
+      // "bearer_token" // Custom or if RS is a confidential client with its own credentials for introspection
     ],
-    code_challenge_methods_supported: ["S256"], // PKCE代码挑战方法 (RFC 7636) - S256 is REQUIRED by OAuth 2.1
+    code_challenge_methods_supported: ['S256'], // PKCE代码挑战方法 (RFC 7636) - S256 is REQUIRED by OAuth 2.1
 
     // OpenID Connect Discovery 1.0 specific metadata
     userinfo_endpoint: `${baseUrl}/api/v2/oauth/userinfo`, // UserInfo端点URL (OIDC)
-    subject_types_supported: ["public"], // 支持的主体标识类型 (e.g., "public", "pairwise")
-    id_token_signing_alg_values_supported: process.env.JWT_ALGORITHM ? [process.env.JWT_ALGORITHM as string] : ["RS256"], // ID令牌支持的JWS签名算法
+    subject_types_supported: ['public'], // 支持的主体标识类型 (e.g., "public", "pairwise")
+    id_token_signing_alg_values_supported: process.env.JWT_ALGORITHM
+      ? [process.env.JWT_ALGORITHM as string]
+      : ['RS256'], // ID令牌支持的JWS签名算法
 
-    claims_supported: [ // UserInfo端点或ID令牌中可能返回的声明 (Claims that can be returned from UserInfo or in ID Token)
-        // Standard OIDC claims based on current User model and userInfoResponseSchema
-        "sub",
-        "name",
-        "given_name",
-        "family_name",
-        "preferred_username",
-        "picture",
-        "updated_at",
-        // Custom claims available from User model
-        "organization",
-        "department"
-        // NOTE: "iss", "aud", "exp", "iat", "jti" are JWT envelope claims, not typically listed in OIDC 'claims_supported'.
-        // 'claims_supported' refers to claims about the End-User.
-        // Email, phone, address related claims are omitted as they are not in the current User model.
+    claims_supported: [
+      // UserInfo端点或ID令牌中可能返回的声明 (Claims that can be returned from UserInfo or in ID Token)
+      // Standard OIDC claims based on current User model and userInfoResponseSchema
+      'sub',
+      'name',
+      'given_name',
+      'family_name',
+      'preferred_username',
+      'picture',
+      'updated_at',
+      // Custom claims available from User model
+      'organization',
+      'department',
+      // NOTE: "iss", "aud", "exp", "iat", "jti" are JWT envelope claims, not typically listed in OIDC 'claims_supported'.
+      // 'claims_supported' refers to claims about the End-User.
+      // Email, phone, address related claims are omitted as they are not in the current User model.
     ],
     // 以下是一些其他常见的OIDC元数据字段，根据实际支持情况添加
     // (Below are some other common OIDC metadata fields, add based on actual support)

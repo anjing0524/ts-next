@@ -73,6 +73,7 @@ exports.PasswordComplexitySchema = zod_1.z
     .string() // 输入必须是字符串
     .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`) // 最小长度验证
     .refine((password) => {
+    // 自定义验证逻辑 (refine)
     // 定义四种字符类别及其对应的正则表达式
     const categories = [
         /[a-z]/, // 匹配小写字母
@@ -137,13 +138,14 @@ function generateSecurePassword(length = 12) {
     }
     catch (e) {
         // 如果上面生成的密码未能通过 PasswordComplexitySchema 的验证 (理论上不太可能发生)
-        console.error("Error validating initially generated password:", e); // 记录错误
+        console.error('Error validating initially generated password:', e); // 记录错误
         console.warn('Initial generated password failed complexity check, retrying with simpler fallback logic for safety.');
         // --- 回退密码生成逻辑 ---
         // 这种回退逻辑旨在确保在极端情况下也能生成一个密码，尽管可能不如预期复杂。
         // 理想情况下，应该循环调用主生成逻辑直到生成有效密码。
         let fallbackPassword = '';
         const charSets = [
+            // 定义字符集数组
             LOWERCASE_CHARACTERS,
             UPPERCASE_CHARACTERS,
             NUMBER_CHARACTERS,

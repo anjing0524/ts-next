@@ -3,16 +3,16 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
+  Badge,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@repo/ui';
 
 export interface User {
   id: string;
@@ -47,24 +47,26 @@ export const columns: ColumnDef<User>[] = [
     header: 'Status',
     cell: ({ row }) => {
       const isActive = row.getValue('isActive');
-      return <Badge variant={isActive ? 'default' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>;
+      return (
+        <Badge variant={isActive ? 'default' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>
+      );
     },
   },
   {
     accessorKey: 'lastLogin',
     header: 'Last Login',
     cell: ({ row }) => {
-        const date = new Date(row.getValue('lastLogin'));
-        return date.toLocaleString();
-      },
+      const date = new Date(row.getValue('lastLogin'));
+      return date.toLocaleString();
+    },
   },
   {
     accessorKey: 'createdAt',
     header: 'Created At',
     cell: ({ row }) => {
-        const date = new Date(row.getValue('createdAt'));
-        return date.toLocaleString();
-      },
+      const date = new Date(row.getValue('createdAt'));
+      return date.toLocaleString();
+    },
   },
   {
     id: 'actions',
@@ -81,9 +83,7 @@ export const columns: ColumnDef<User>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(user.id)}
-            >
+            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
               Copy user ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />

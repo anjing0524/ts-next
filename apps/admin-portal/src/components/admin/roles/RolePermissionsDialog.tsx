@@ -1,11 +1,19 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { MultiSelect } from '@packages/ui/src/components/multi-select'; // Corrected path
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+  MultiSelect,
+  Label,
+  toast,
+} from '@repo/ui';
 import type { Permission, Role } from '@/types/admin-entities';
-import { toast } from '@/components/ui/use-toast';
 
 interface RolePermissionsDialogProps {
   isOpen: boolean;
@@ -30,7 +38,7 @@ export function RolePermissionsDialog({
 
   // Memoize options for MultiSelect to prevent re-computation on every render
   const permissionOptions = useMemo(() => {
-    return allPermissions.map(p => ({
+    return allPermissions.map((p) => ({
       value: p.id, // Will be used by MultiSelect's internal logic if it supported object options
       label: `${p.name}${p.description ? ` (${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''})` : ''}`,
       // For the current MultiSelect which expects string[], we'll just pass an array of labels (names)
@@ -44,25 +52,26 @@ export function RolePermissionsDialog({
   // Create a map for quick lookup from permission name back to ID
   const permissionNameToIdMap = useMemo(() => {
     const map = new Map<string, string>();
-    allPermissions.forEach(p => map.set(p.name, p.id));
+    allPermissions.forEach((p) => map.set(p.name, p.id));
     return map;
   }, [allPermissions]);
 
   // Create a map for quick lookup from permission ID back to name
   const permissionIdToNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    allPermissions.forEach(p => map.set(p.id, p.name));
+    allPermissions.forEach((p) => map.set(p.id, p.name));
     return map;
   }, [allPermissions]);
 
   useEffect(() => {
     if (role && role.permissions) {
       // If role.permissions (Permission objects) are provided, map them to their IDs
-      setSelectedPermissionIds(role.permissions.map(p => p.id));
+      setSelectedPermissionIds(role.permissions.map((p) => p.id));
     } else if (role && (role as any).permissionIds) {
       // Fallback if only permissionIds are directly on the role object (less ideal)
       setSelectedPermissionIds((role as any).permissionIds);
-    } else if (isOpen) { // When opening for a new role or role without permissions
+    } else if (isOpen) {
+      // When opening for a new role or role without permissions
       setSelectedPermissionIds([]);
     }
   }, [role, isOpen, allPermissions]); // Rerun if allPermissions changes too, to ensure map is up-to-date
@@ -70,15 +79,14 @@ export function RolePermissionsDialog({
   // Convert selected IDs to names for the current MultiSelect component
   const selectedPermissionNamesForMultiSelect = useMemo(() => {
     return selectedPermissionIds
-      .map(id => permissionIdToNameMap.get(id))
+      .map((id) => permissionIdToNameMap.get(id))
       .filter((name): name is string => !!name);
   }, [selectedPermissionIds, permissionIdToNameMap]);
-
 
   const handleMultiSelectChange = (selectedNames: string[]) => {
     // Convert selected names back to IDs
     const ids = selectedNames
-      .map(name => permissionNameToIdMap.get(name))
+      .map((name) => permissionNameToIdMap.get(name))
       .filter((id): id is string => !!id);
     setSelectedPermissionIds(ids);
   };
@@ -86,14 +94,17 @@ export function RolePermissionsDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role) {
-      toast({ variant: "destructive", title: "错误", description: "未指定角色。" });
+      toast({ variant: 'destructive', title: '错误', description: '未指定角色。' });
       return;
     }
     await onSave(role.id, selectedPermissionIds);
   };
 
   // Options for the MultiSelect component (array of permission names)
-  const multiSelectStringOptions = useMemo(() => allPermissions.map(p => p.name), [allPermissions]);
+  const multiSelectStringOptions = useMemo(
+    () => allPermissions.map((p) => p.name),
+    [allPermissions]
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -161,7 +172,12 @@ export function RolePermissionsDialog({
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
               取消
             </Button>
             <Button type="submit" disabled={isLoading || isFetchingPermissions}>
@@ -173,5 +189,3 @@ export function RolePermissionsDialog({
     </Dialog>
   );
 }
-
-```

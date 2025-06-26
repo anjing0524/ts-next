@@ -24,4 +24,4 @@ export interface TaskOptions {
   callback: () => void;
   repeat: boolean;
   maxExecutions?: number;
-} 
+}

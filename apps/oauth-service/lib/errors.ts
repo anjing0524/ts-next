@@ -16,5 +16,5 @@ export {
   TokenExpiredError,
   TokenRevocationError,
   CryptoError,
-  ConfigurationError
-} from '@repo/lib/errors'; 
+  ConfigurationError,
+} from '@repo/lib/errors';

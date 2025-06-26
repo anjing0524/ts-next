@@ -3,15 +3,19 @@ import { z } from 'zod';
 
 // --- Base Schemas for common parameters ---
 
-const clientIdSchema = z.string({
-  required_error: 'client_id is required.',
-  invalid_type_error: 'client_id must be a string.',
-}).min(1, 'client_id cannot be empty.');
+const clientIdSchema = z
+  .string({
+    required_error: 'client_id is required.',
+    invalid_type_error: 'client_id must be a string.',
+  })
+  .min(1, 'client_id cannot be empty.');
 
-const clientSecretSchema = z.string({
-  required_error: 'client_secret is required for confidential clients.',
-  invalid_type_error: 'client_secret must be a string.',
-}).min(1, 'client_secret cannot be empty.');
+const clientSecretSchema = z
+  .string({
+    required_error: 'client_secret is required for confidential clients.',
+    invalid_type_error: 'client_secret must be a string.',
+  })
+  .min(1, 'client_secret cannot be empty.');
 
 const scopeSchema = z.string().optional(); // Optional scope for token requests
 
@@ -23,9 +27,9 @@ const scopeSchema = z.string().optional(); // Optional scope for token requests
  */
 export const tokenAuthorizationCodeGrantSchema = z.object({
   grant_type: z.literal('authorization_code'),
-  code: z.string({ required_error: 'code is required.' })
-    .min(1, 'code cannot be empty.'),
-  redirect_uri: z.string({ required_error: 'redirect_uri is required.' })
+  code: z.string({ required_error: 'code is required.' }).min(1, 'code cannot be empty.'),
+  redirect_uri: z
+    .string({ required_error: 'redirect_uri is required.' })
     .url({ message: 'redirect_uri must be a valid URL.' }),
   client_id: clientIdSchema,
   /**
@@ -33,7 +37,8 @@ export const tokenAuthorizationCodeGrantSchema = z.object({
    * Required if the original authorization request included a code_challenge.
    * RFC 7636 Section 4.3
    */
-  code_verifier: z.string({ required_error: 'code_verifier is required for PKCE.' })
+  code_verifier: z
+    .string({ required_error: 'code_verifier is required for PKCE.' })
     .min(43, 'code_verifier must be at least 43 characters for PKCE.')
     .max(128, 'code_verifier must be at most 128 characters.'),
   // client_secret might be required for confidential clients using auth code,
@@ -64,7 +69,8 @@ export type TokenClientCredentialsGrantPayload = z.infer<typeof tokenClientCrede
  */
 export const tokenRefreshTokenGrantSchema = z.object({
   grant_type: z.literal('refresh_token'),
-  refresh_token: z.string({ required_error: 'refresh_token is required.' })
+  refresh_token: z
+    .string({ required_error: 'refresh_token is required.' })
     .min(1, 'refresh_token cannot be empty.'),
   scope: scopeSchema, // Optional: requested scope must be a subset of original scope
   // Client authentication is also required for confidential clients when refreshing tokens.
@@ -72,7 +78,6 @@ export const tokenRefreshTokenGrantSchema = z.object({
   client_secret: clientSecretSchema.optional(),
 });
 export type TokenRefreshTokenGrantPayload = z.infer<typeof tokenRefreshTokenGrantSchema>;
-
 
 // --- Discriminated Union for all supported grant type schemas ---
 // This allows parsing based on the grant_type value.
@@ -84,7 +89,6 @@ export const tokenRequestSchema = z.discriminatedUnion('grant_type', [
   // z.object({ grant_type: z.literal('urn:ietf:params:oauth:grant-type:jwt-bearer'), ... })
 ]);
 export type TokenRequestPayload = z.infer<typeof tokenRequestSchema>;
-
 
 // --- Token Response Schema ---
 // RFC 6749 Section 5.1 (Successful Response)

@@ -9,10 +9,12 @@ export const introspectTokenRequestSchema = z.object({
   /**
    * The token that the client wants to get introspected. (REQUIRED)
    */
-  token: z.string({
-    required_error: 'token is required.',
-    invalid_type_error: 'token must be a string.',
-  }).min(1, 'token cannot be empty.'),
+  token: z
+    .string({
+      required_error: 'token is required.',
+      invalid_type_error: 'token must be a string.',
+    })
+    .min(1, 'token cannot be empty.'),
 
   /**
    * A hint about the type of the token submitted for introspection. (OPTIONAL)
@@ -33,7 +35,6 @@ export const introspectTokenRequestSchema = z.object({
 });
 
 export type IntrospectTokenRequestPayload = z.infer<typeof introspectTokenRequestSchema>;
-
 
 /**
  * Schema for a successful token introspection response when the token is active.
@@ -111,7 +112,7 @@ export const introspectResponseActiveSchema = z.object({
   // You can add other custom claims that might be in your tokens
   // e.g., 'permissions', 'organization_id', etc.
   permissions: z.array(z.string()).optional(), // Example custom claim
-  
+
   /**
    * User ID associated with this token.
    */

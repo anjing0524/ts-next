@@ -1,11 +1,11 @@
-"use client"; // Now a client component
+'use client'; // Now a client component
 
-import * as React from "react";
-import { cn } from "../../../utils";
+import * as React from 'react';
+import { cn } from '../../../utils';
 // import { MainNav } from "./nav-main"; // Assuming MainNav might be used
-import { UserNav } from "./user-nav";
-import { Button } from "../../button"; // For the mobile menu button
-import { Menu as MenuIcon } from "lucide-react"; // Hamburger icon
+import { UserNav } from './user-nav';
+import { Button } from '../../button'; // For the mobile menu button
+import { Menu as MenuIcon } from 'lucide-react'; // Hamburger icon
 
 interface UserDataForHeader {
   id?: string;
@@ -26,7 +26,7 @@ interface SiteHeaderProps extends React.HTMLAttributes<HTMLElement> {
 
 export function SiteHeader({
   className,
-  brandName = "管理中心", // Admin Center
+  brandName = '管理中心', // Admin Center
   user,
   onLogout,
   isUserLoading,
@@ -36,7 +36,7 @@ export function SiteHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        'sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
         className
       )}
       {...props}
@@ -54,15 +54,13 @@ export function SiteHeader({
             <MenuIcon className="h-6 w-6" />
           </Button>
         )}
-
         {typeof brandName === 'string' ? (
           <div className="mr-4 font-bold flex items-center">{brandName}</div> // Show brand on mobile too if toggle is present
         ) : (
           <div className="mr-4 flex items-center">{brandName}</div>
         )}
-
-        {/* <MainNav className="mx-6 hidden md:flex" /> */} {/* Hide MainNav on mobile for now, can be part of drawer */}
-
+        {/* <MainNav className="mx-6 hidden md:flex" /> */}{' '}
+        {/* Hide MainNav on mobile for now, can be part of drawer */}
         <div className="flex flex-1 items-center justify-end space-x-4">
           <UserNav user={user} onLogout={onLogout} isLoading={isUserLoading} />
         </div>

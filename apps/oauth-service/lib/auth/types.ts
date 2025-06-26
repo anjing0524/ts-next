@@ -79,4 +79,4 @@ export interface AuthenticatedRequest extends NextRequest {
     permissions?: string[];
     [key: string]: any;
   };
-} 
+}

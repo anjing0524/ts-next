@@ -131,16 +131,12 @@ interface ConsentPageData {
  *     # ApiResponseBase, ApiError, ApiResponseError 已在其他地方定义 (Defined elsewhere)
  */
 // GET 请求处理函数的内部实现 (Internal implementation of GET request handler)
-async function getConsentPageDataHandlerInternal(
-  request: NextRequest
-): Promise<NextResponse> {
+async function getConsentPageDataHandlerInternal(request: NextRequest): Promise<NextResponse> {
   // 在这里手动获取用户身份验证信息
   // Manually get user authentication information here
   const authUser = (request as any).user; // 临时处理，实际应该通过中间件设置
   if (!authUser || !authUser.id) {
-    throw new ConfigurationError(
-      'User context not found after permission check.'
-    );
+    throw new ConfigurationError('User context not found after permission check.');
   }
   const userId = authUser.id;
 
@@ -216,10 +212,9 @@ async function getConsentPageDataHandlerInternal(
     console.error(`Failed to parse redirectUris for client ${clientId}:`, e);
     // 客户端 redirectUris 配置错误
     // Client redirectUris configuration error
-    throw new ConfigurationError(
-      'Server error: Invalid client configuration for redirectUris.',
-      { clientId }
-    );
+    throw new ConfigurationError('Server error: Invalid client configuration for redirectUris.', {
+      clientId,
+    });
   }
   if (!AuthorizationUtils.validateRedirectUri(redirectUri, registeredRedirectUris)) {
     // 提供的 redirect_uri 未注册
@@ -287,16 +282,12 @@ async function getConsentPageDataHandlerInternal(
 }
 
 // POST 请求处理函数的内部实现 (Internal implementation of POST request handler)
-async function submitConsentDecisionHandlerInternal(
-  request: NextRequest
-): Promise<NextResponse> {
+async function submitConsentDecisionHandlerInternal(request: NextRequest): Promise<NextResponse> {
   // 在这里手动获取用户身份验证信息
   // Manually get user authentication information here
   const authUser = (request as any).user; // 临时处理，实际应该通过中间件设置
   if (!authUser || !authUser.id) {
-    throw new ConfigurationError(
-      'User context not found after permission check.'
-    );
+    throw new ConfigurationError('User context not found after permission check.');
   }
   const userId = authUser.id;
 
@@ -447,8 +438,10 @@ async function submitConsentDecisionHandlerInternal(
     });
 
     // 使用恢复的 authorization-code-flow 业务逻辑
-    const { storeAuthorizationCode } = await import('../../../../../lib/auth/authorization-code-flow');
-    
+    const { storeAuthorizationCode } = await import(
+      '../../../../../lib/auth/authorization-code-flow'
+    );
+
     const authCodeResult = await storeAuthorizationCode(
       user.id,
       client.id,
@@ -469,7 +462,8 @@ async function submitConsentDecisionHandlerInternal(
       clientId: client.clientId,
       action: 'CONSENT_GRANTED_AUTH_CODE_ISSUED',
       success: true,
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || undefined,
       metadata: {
         client_id: client.clientId,

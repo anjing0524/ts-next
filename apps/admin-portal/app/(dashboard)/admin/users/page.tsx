@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect } from 'react'; // Removed useState as it's managed by the hook
-import { DataTable } from '@/components/data-table/data-table';
+import { DataTable } from '@repo/ui';
 import { columns } from './columns';
 import { useAuth } from '@/hooks/useAuth'; // Ensure useAuth is imported
 import { PermissionGuard } from '@/components/auth/permission-guard';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button, Input } from '@repo/ui';
 import type { User } from '@/types/admin-entities';
 import { usePaginatedResource } from '@/hooks/usePaginatedResource';
 import { PlusCircle, RefreshCw } from 'lucide-react';
@@ -48,11 +47,13 @@ function UsersPageContent() {
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = Math.ceil(totalItems / limit);
 
-  if (isLoading && offset === 0 && usersData.length === 0) { // Initial load state
+  if (isLoading && offset === 0 && usersData.length === 0) {
+    // Initial load state
     return <div className="p-6 text-center">加载用户数据中...</div>;
   }
 
-  if (error && usersData.length === 0) { // Error when no data is available
+  if (error && usersData.length === 0) {
+    // Error when no data is available
     return <div className="p-6 text-red-600 text-center">错误: {error}</div>;
   }
 
@@ -61,16 +62,22 @@ function UsersPageContent() {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">用户管理</h1>
-          <p className="text-muted-foreground mt-1">
-            查看、创建、编辑和管理系统用户。
-          </p>
+          <p className="text-muted-foreground mt-1">查看、创建、编辑和管理系统用户。</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={refreshData} disabled={isLoading} title="刷新数据">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshData}
+            disabled={isLoading}
+            title="刷新数据"
+          >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
           {hasPermission(CAN_CREATE_USER) && (
-            <Button> {/* TODO: Implement Add User Modal/Page */}
+            <Button>
+              {' '}
+              {/* TODO: Implement Add User Modal/Page */}
               <PlusCircle className="mr-2 h-4 w-4" />
               添加用户
             </Button>
@@ -86,7 +93,9 @@ function UsersPageContent() {
           onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit()}
           className="flex-grow"
         />
-        <Button onClick={handleSearchSubmit} disabled={isLoading}>搜索</Button>
+        <Button onClick={handleSearchSubmit} disabled={isLoading}>
+          搜索
+        </Button>
       </div>
 
       <DataTable
@@ -124,7 +133,7 @@ function UsersPageContent() {
         )}
       </div>
       {usersData.length === 0 && !isLoading && !error && (
-           <div className="text-center py-10 text-muted-foreground">没有找到符合条件的用户。</div>
+        <div className="text-center py-10 text-muted-foreground">没有找到符合条件的用户。</div>
       )}
     </div>
   );

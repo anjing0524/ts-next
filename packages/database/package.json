@@ -11,7 +11,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\""
   },
   "dependencies": {
     "@prisma/client": "^6.0.1",
@@ -20,6 +21,8 @@
     "mysql2": "^3.11.5"
   },
   "devDependencies": {
+    "@repo/prettier-config": "workspace:*",
     "tsx": "^4.0.0"
-  }
-} 
+  },
+  "prettier": "@repo/prettier-config"
+}

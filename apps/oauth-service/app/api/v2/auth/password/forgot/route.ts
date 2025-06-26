@@ -14,9 +14,13 @@ const RESET_TOKEN_EXPIRY_HOURS = 1; // 重置令牌的有效期（小时）(Expi
 // 为了防止用户枚举，无论邮箱是否存在或用户状态如何，都返回此响应
 // (To prevent user enumeration, this response is returned regardless of email existence or user status)
 function genericSuccessResponse() {
-  return NextResponse.json({
-    message: "If your email address exists in our system and is associated with an active account, you will receive a password reset link shortly."
-  }, { status: 200 });
+  return NextResponse.json(
+    {
+      message:
+        'If your email address exists in our system and is associated with an active account, you will receive a password reset link shortly.',
+    },
+    { status: 200 }
+  );
 }
 
 // 辅助函数：错误响应 (Helper function: Error response for server errors)
@@ -31,7 +35,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     // 虽然我们通常返回通用成功响应，但无效的JSON是一个客户端错误，可以明确指出
     // (Although we usually return a generic success response, invalid JSON is a client error that can be pointed out)
-    return NextResponse.json({ error: 'invalid_request', message: 'Invalid JSON request body.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'invalid_request', message: 'Invalid JSON request body.' },
+      { status: 400 }
+    );
   }
 
   const { email } = requestBody;
@@ -73,14 +80,14 @@ export async function POST(req: NextRequest) {
         where: {
           userId: user.id,
           isUsed: false,
-          expiresAt: { gt: new Date() } // 只将未过期且未使用的令牌标记为已使用（或删除）
-                                       // (Only mark unused and unexpired tokens as used (or delete them))
+          expiresAt: { gt: new Date() }, // 只将未过期且未使用的令牌标记为已使用（或删除）
+          // (Only mark unused and unexpired tokens as used (or delete them))
         },
         data: {
           isUsed: true, // 将旧令牌标记为已用，或设置一个非常早的过期时间
-                        // (Mark old tokens as used, or set a very early expiry)
+          // (Mark old tokens as used, or set a very early expiry)
           // expiresAt: new Date(0) // 另一种使其失效的方法 (Another way to invalidate)
-        }
+        },
       });
 
       await prisma.passwordResetRequest.create({
@@ -102,7 +109,9 @@ export async function POST(req: NextRequest) {
       console.log(`Subject: Password Reset Request`);
       console.log(`Body: Please reset your password using the following link: ${resetLink}`);
       console.log(`   This link will expire in ${RESET_TOKEN_EXPIRY_HOURS} hour(s).`);
-      console.log(`   Password Reset Token (for testing/logging only, DO NOT include in real email body like this): ${resetToken}`);
+      console.log(
+        `   Password Reset Token (for testing/logging only, DO NOT include in real email body like this): ${resetToken}`
+      );
       console.log(`---- END SIMULATED EMAIL ----`);
     } else {
       // 用户未找到或不活跃 (User not found or inactive)
@@ -115,7 +124,6 @@ export async function POST(req: NextRequest) {
 
     // 6. 返回通用成功响应 (Return generic success response)
     return genericSuccessResponse();
-
   } catch (error: any) {
     console.error('Password forgot endpoint error:', error);
     // 即便发生服务器错误，为了安全，也可能选择返回通用成功消息
@@ -124,8 +132,11 @@ export async function POST(req: NextRequest) {
     // (However, for genuine server issues, logging the error and returning 500 might be more appropriate for debugging)
     // 此处我们选择区分：如果是Prisma错误，可能与数据库有关，返回500。
     // (Here we choose to differentiate: if it's a Prisma error, possibly DB related, return 500.)
-    if (error.code && error.meta) { // Prisma error heuristic
-        return serverErrorResponse('Failed to process password reset request due to a database error.');
+    if (error.code && error.meta) {
+      // Prisma error heuristic
+      return serverErrorResponse(
+        'Failed to process password reset request due to a database error.'
+      );
     }
     return serverErrorResponse();
   }

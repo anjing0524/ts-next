@@ -11,20 +11,24 @@ export const authorizeQuerySchema = z.object({
    * 客户端ID (Client ID).
    * OAuth 2.0 客户端的唯一标识符.
    */
-  client_id: z.string({
-    required_error: 'client_id is required.',
-    invalid_type_error: 'client_id must be a string.',
-  }).min(1, 'client_id cannot be empty.'),
+  client_id: z
+    .string({
+      required_error: 'client_id is required.',
+      invalid_type_error: 'client_id must be a string.',
+    })
+    .min(1, 'client_id cannot be empty.'),
 
   /**
    * 重定向URI (Redirect URI).
    * 授权服务器在完成授权流程后将用户代理重定向到的URI.
    * 必须与客户端注册时提供的URI之一匹配.
    */
-  redirect_uri: z.string({
-    required_error: 'redirect_uri is required.',
-    invalid_type_error: 'redirect_uri must be a string.',
-  }).url({ message: 'redirect_uri must be a valid URL.' }),
+  redirect_uri: z
+    .string({
+      required_error: 'redirect_uri is required.',
+      invalid_type_error: 'redirect_uri must be a string.',
+    })
+    .url({ message: 'redirect_uri must be a valid URL.' }),
 
   /**
    * 响应类型 (Response Type).
@@ -42,10 +46,12 @@ export const authorizeQuerySchema = z.object({
    * or more detailed validation later. If truly required by spec always, can be .min(1).
    * The route handler seems to check for its presence later.
    */
-  scope: z.string({
-    required_error: 'scope is required.',
-    invalid_type_error: 'scope must be a string.',
-  }).min(1, 'scope cannot be empty.'),
+  scope: z
+    .string({
+      required_error: 'scope is required.',
+      invalid_type_error: 'scope must be a string.',
+    })
+    .min(1, 'scope cannot be empty.'),
 
   /**
    * 状态参数 (State).
@@ -60,10 +66,15 @@ export const authorizeQuerySchema = z.object({
    * 使用 `code_challenge_method` 指定的方法从 `code_verifier` 生成的哈希值.
    * (RFC 7636)
    */
-  code_challenge: z.string({
-    required_error: 'code_challenge is required for PKCE.',
-    invalid_type_error: 'code_challenge must be a string.',
-  }).min(43, 'code_challenge must be at least 43 characters for S256 (Base64url-encoded SHA-256 hash).')
+  code_challenge: z
+    .string({
+      required_error: 'code_challenge is required for PKCE.',
+      invalid_type_error: 'code_challenge must be a string.',
+    })
+    .min(
+      43,
+      'code_challenge must be at least 43 characters for S256 (Base64url-encoded SHA-256 hash).'
+    )
     .max(128, 'code_challenge must be at most 128 characters (PKCE spec limit).'),
 
   /**
