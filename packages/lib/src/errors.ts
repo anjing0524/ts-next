@@ -7,7 +7,7 @@
  * @see docs/工具函数规范.md Section 5.1
  */
 
-import { ApiError, ApiResponse } from './types/api'; // 导入API错误和响应类型 (Import API error and response types)
+import { ApiResponse } from './types/api'; // 导入API错误和响应类型 (Import API error and response types)
 
 /**
  * @enum {string}

@@ -146,7 +146,7 @@ export function validateScopes(
             : undefined,
         };
       } catch (error) {
-        console.warn('Database validation not available, falling back to client-only validation');
+        console.warn('Database validation not available, falling back to client-only validation'+error);
         return { valid: true, invalidScopes: [] };
       }
     })();

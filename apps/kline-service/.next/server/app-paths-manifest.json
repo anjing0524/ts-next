@@ -1,5 +1,0 @@
-{
-  "/api/kline/route": "app/api/kline/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/(dashboard)/kline/page": "app/(dashboard)/kline/page.js"
-}

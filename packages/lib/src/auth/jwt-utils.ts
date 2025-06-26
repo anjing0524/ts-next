@@ -365,7 +365,7 @@ export async function decodeTokenPayload(token: string, secret?: string): Promis
       const decoded = jose.decodeJwt(token);
       return decoded;
     } catch (e: any) {
-      throw new Error('Invalid token format');
+      throw new Error('Invalid token format'+ e );
     }
   }
 

@@ -14,7 +14,6 @@ export * from "./components/ui/dropdown-menu";
 export * from "./components/ui/input";
 export * from "./components/ui/label";
 export * from "./components/multi-select";
-<<<<<<< HEAD
 export * from "./components/ui/pagination";
 export * from "./components/ui/popover";
 export * from "./components/ui/radio-group";
@@ -27,22 +26,6 @@ export * from "./components/ui/table";
 export * from "./components/ui/tabs";
 export * from "./components/ui/tooltip";
 export * from "./components/ui/use-toast";
-=======
-export * from "./components/pagination";
-export * from "./components/popover";
-export * from "./components/radio-group";
-export * from "./components/scroll-area";
-export * from "./components/select";
-export * from "./components/separator";
-export * from "./components/skeleton";
-export * from "./components/switch";
-export * from "./components/table";
-export * from "./components/tabs";
-export * from "./components/tooltip";
-export * from "./components/use-toast";
-export * from "./components/avatar"; // Added Avatar
-export * from "./components/drawer"; // Added Drawer
->>>>>>> 9e72eed899a58d560b457dcbde4d4a242451d218
 
 // 新迁移的组件 (Newly migrated components)
 export * from "./components/data-table/data-table";

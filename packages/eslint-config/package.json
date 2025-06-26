@@ -3,11 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "index.js",
+  "main": "flat.js",
   "exports": {
-    "./base": "./base.js",
-    "./next": "./next.js",
-    "./react": "./react.js",
     "./flat": "./flat.js"
   },
   "devDependencies": {
@@ -18,7 +15,8 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@eslint/eslintrc": "^3.0.0",
-    "eslint-plugin-import": "^2.29.0"
+    "eslint-plugin-import": "^2.29.0",
+    "@eslint/js": "^9.1.0"
   },
   "dependencies": {
     "next": "^15.3.2"
