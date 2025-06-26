@@ -1,5 +1,5 @@
 {
-  "extends": "@repo/typescript-config/base.json",
+  "extends": "@repo/typescript-config/nextjs.json",
   "compilerOptions": {
     "baseUrl": ".",
     "plugins": [
@@ -7,13 +7,7 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/app/*": ["./app/*"],
-      "@/components/*": ["./components/*"],
-      "@/lib/*": ["./lib/*"],
-      "@repo/*": ["../../packages/*"]
-    }
+    // 路径别名统一由 @repo/typescript-config/nextjs.json 提供，如有额外需求可在此覆盖
   },
   "include": [
     "next-env.d.ts",

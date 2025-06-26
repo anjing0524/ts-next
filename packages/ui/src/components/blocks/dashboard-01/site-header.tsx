@@ -1,10 +1,10 @@
 'use client'; // Now a client component
 
 import * as React from 'react';
-import { cn } from '../../../utils';
+import { cn } from '../../../lib/utils';
 // import { MainNav } from "./nav-main"; // Assuming MainNav might be used
 import { UserNav } from './user-nav';
-import { Button } from '../../button'; // For the mobile menu button
+import { Button } from '../../ui/button';
 import { Menu as MenuIcon } from 'lucide-react'; // Hamburger icon
 
 interface UserDataForHeader {

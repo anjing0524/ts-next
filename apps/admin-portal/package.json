@@ -18,9 +18,12 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwindcss-animate": "^1.0.7",
+    "lucide-react": "^0.513.0",
     "@repo/ui": "workspace:*",
     "@repo/lib": "workspace:*",
-    "@repo/database": "workspace:*"
+    "@repo/database": "workspace:*",
+    "zod": "^3.24.4",
+    "@tanstack/react-table": "^8.14.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

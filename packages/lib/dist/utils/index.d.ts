@@ -8,5 +8,6 @@
 export { RateLimitUtils } from './rate-limit-utils';
 export { withErrorHandling } from './error-handler';
 export { getTimeWheelInstance } from './time-wheel';
+export { default as logger } from './logger';
 export type { RateLimitConfig, RateLimitResult, TaskOptions } from './types';
 //# sourceMappingURL=index.d.ts.map

@@ -1,18 +1,12 @@
 {
-  "extends": "../../packages/typescript-config/base.json",
+  "extends": "@repo/typescript-config/nextjs.json",
   "compilerOptions": {
     "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
       }
-    ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/app/*": ["./app/*"],
-      "@/components/*": ["./components/*"],
-      "@/lib/*": ["./lib/*"]
-    }
+    ]
   },
   "include": [
     "next-env.d.ts",

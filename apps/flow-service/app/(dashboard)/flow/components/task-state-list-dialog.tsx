@@ -14,23 +14,23 @@ import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtua
 import { format } from 'date-fns';
 import { useShallow } from 'zustand/react/shallow';
 
-import { useFlowStore } from '@/app/dashboard/flow/store/flow-store';
-import { TaskStateDetailType } from '@/app/dashboard/flow/types/type';
-import { getTaskDetails } from '@/app/actions/flow-actions';
+import { useFlowStore } from '../store/flow-store';
+import { TaskStateDetailType } from '../types/type';
+import { getTaskDetails } from '../../../actions/flow-actions';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@repo/ui';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@repo/ui';
 
 import { TASK_STATE_MAP } from '../cons';
 import { TaskStateDetail } from './task-state-detail';

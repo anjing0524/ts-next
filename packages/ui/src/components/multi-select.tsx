@@ -18,7 +18,7 @@ import {
 import { Label } from './ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { ScrollArea } from './ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { cn } from '../lib/utils';
 
 interface MultiSelectProps {
   label: string;

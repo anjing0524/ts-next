@@ -1,4 +1,4 @@
-import { PlanState, TaskConf, TaskState } from '@/types/db-types';
+import { PlanState, TaskConf, TaskState } from '../../../../../../types/db-types';
 
 export type PlanStateWithStatus = PlanState & {
   status: string;

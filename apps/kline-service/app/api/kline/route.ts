@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as flatbuffers from 'flatbuffers';
-import * as Kline from '@/generated/kline';
+import * as Kline from '@/src/generated/kline';
 
 // K线数据类型定义
 type KlineDataItem = {

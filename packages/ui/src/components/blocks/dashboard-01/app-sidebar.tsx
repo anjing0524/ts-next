@@ -2,10 +2,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation'; // For highlighting active links
 import * as LucideIcons from 'lucide-react'; // Import all icons
-import { cn } from '../../../utils';
-import { Button } from '../../button'; // Assuming button.tsx is directly in components/
-import { ScrollArea } from '../../scroll-area'; // Assuming scroll-area.tsx is directly in components/
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../collapsible'; // Assuming collapsible.tsx is directly in components/
+import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/button';
+import { ScrollArea } from '../../ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
 import type { MenuItem } from '../../../types'; // Import MenuItem type
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -20,7 +20,7 @@ const DynamicIcon = ({
   name,
   ...props
 }: { name: keyof typeof LucideIcons } & LucideIcons.LucideProps) => {
-  const IconComponent = LucideIcons[name];
+  const IconComponent = LucideIcons[name] as React.ComponentType<LucideIcons.LucideProps>;
   if (!IconComponent) {
     // Fallback or default icon if name is invalid
     return <LucideIcons.CircleHelp {...props} />;

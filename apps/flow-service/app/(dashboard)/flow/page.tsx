@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic';
 import '@xyflow/react/dist/style.css';
 import { Suspense } from 'react';
 
-import { getAllPlanConf, handleSearch } from '@/app/actions/flow-actions';
-import { PlanConf } from '@/types/db-types';
+import { getAllPlanConf, handleSearch } from '../../actions/flow-actions';
+import { PlanConf } from '../../../../../types/db-types';
 
 import { BackToTop } from './components/back-to-top';
 import { DagFlow } from './components/dag-flow';

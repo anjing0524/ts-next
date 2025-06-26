@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 
 import { ArrowUpIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Button } from '@repo/ui';
+import { cn } from '@repo/ui';
 
 export function BackToTop() {
   const [isVisible, setIsVisible] = useState(false);

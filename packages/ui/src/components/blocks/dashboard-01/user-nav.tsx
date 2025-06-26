@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Avatar, AvatarFallback, AvatarImage } from '../../avatar'; // from packages/ui
-import { Button } from '../../button';
+import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
+import { Button } from '../../ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../dropdown-menu'; // from packages/ui
+} from '../../ui/dropdown-menu';
 import * as LucideIcons from 'lucide-react'; // For icons
 
 // Define a simple user type for props

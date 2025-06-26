@@ -5,16 +5,16 @@ import * as React from 'react';
 import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { useShallow } from 'zustand/react/shallow'; // 添加 shallow 导入
 
-import { useFlowStore, FlowStats } from '@/app/dashboard/flow/store/flow-store';
-import { Badge } from '@/components/ui/badge';
+import { FlowStats, useFlowStore } from '../store/flow-store';
 import {
+  Badge,
   Table as UITable,
+  TableBody,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table';
+} from '@repo/ui';
 
 export function StatsTable() {
   // 使用 shallow 比较优化状态选择，同时获取 currentStage 和 setCurrentStage

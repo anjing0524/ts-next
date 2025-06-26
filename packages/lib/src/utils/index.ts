@@ -15,5 +15,8 @@ export { withErrorHandling } from './error-handler';
 // 时间轮算法 (Time wheel algorithm)
 export { getTimeWheelInstance } from './time-wheel';
 
+// 日志工具 (Logger utilities)
+export { default as logger } from './logger';
+
 // 类型定义 (Type definitions)
 export type { RateLimitConfig, RateLimitResult, TaskOptions } from './types';

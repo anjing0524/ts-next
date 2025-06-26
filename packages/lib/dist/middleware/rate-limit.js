@@ -36,12 +36,14 @@ function generateRateLimitKey(request, options) {
     switch (options.keyType) {
         case 'ip':
             return `rate_limit:ip:${getClientIP(request)}`;
-        case 'client':
+        case 'client': {
             const clientId = extractClientId(request);
             return clientId ? `rate_limit:client:${clientId}` : `rate_limit:ip:${getClientIP(request)}`;
-        case 'user':
+        }
+        case 'user': {
             const userId = extractUserId(request);
             return userId ? `rate_limit:user:${userId}` : `rate_limit:ip:${getClientIP(request)}`;
+        }
         case 'custom':
             return `rate_limit:custom:${getClientIP(request)}`;
         default:

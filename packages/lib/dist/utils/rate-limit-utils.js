@@ -73,7 +73,7 @@ class RateLimitUtils {
             case 'ip':
                 identifier = this.getClientIP(request);
                 break;
-            case 'client':
+            case 'client': {
                 // 从授权头或查询参数中提取客户端ID
                 // Extract client ID from auth header or query params
                 const authHeader = request.headers.get('authorization');
@@ -87,12 +87,14 @@ class RateLimitUtils {
                 const clientIdFromQuery = request.nextUrl.searchParams.get('client_id');
                 identifier = clientIdFromHeader || clientIdFromQuery || this.getClientIP(request);
                 break;
-            case 'user':
+            }
+            case 'user': {
                 // 从JWT或会话中提取用户ID
                 // Extract user ID from JWT or session
                 const userAgent = request.headers.get('user-agent') || 'unknown';
                 identifier = `${this.getClientIP(request)}-${userAgent.slice(0, 50)}`;
                 break;
+            }
             default:
                 identifier = this.getClientIP(request);
         }

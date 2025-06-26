@@ -43,7 +43,7 @@ interface UseAuthReturn extends AuthState {
  * - 提供权限检查方法。
  * - 处理加载和错误状态。
  */
-export function useAuth(): UseAuthReturn {
+function useAuth(): UseAuthReturn {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     accessToken: TokenStorage.getAccessToken(),
