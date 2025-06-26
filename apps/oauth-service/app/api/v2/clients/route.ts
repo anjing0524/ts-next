@@ -57,10 +57,13 @@ const queryClientsSchema = z.object({
  * GET /api/v2/clients - 获取客户端列表
  * GET /api/v2/clients - Get client list
  * 
- * 需要 'oauth:clients:read' 权限
- * Requires 'oauth:clients:read' permission
+ * 需要 'client:list' 权限
+ * Requires 'client:list' permission
  */
-async function getClientsHandler(request: NextRequest, context: AuthContext): Promise<NextResponse> {
+async function getClientsHandler(
+  request: NextRequest,
+  context: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
   // 验证查询参数
   // Validate query parameters
   const url = new URL(request.url);
@@ -105,10 +108,13 @@ async function getClientsHandler(request: NextRequest, context: AuthContext): Pr
  * POST /api/v2/clients - 创建新客户端
  * POST /api/v2/clients - Create new client
  * 
- * 需要 'oauth:clients:create' 权限
- * Requires 'oauth:clients:create' permission
+ * 需要 'client:create' 权限
+ * Requires 'client:create' permission
  */
-async function createClientHandler(request: NextRequest, context: AuthContext): Promise<NextResponse> {
+async function createClientHandler(
+  request: NextRequest,
+  { authContext }: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
   try {
     // 解析请求体
     // Parse request body
@@ -133,7 +139,7 @@ async function createClientHandler(request: NextRequest, context: AuthContext): 
     // 获取审计信息
     // Get audit information
     const auditInfo = {
-      userId: (request as any).user?.id,
+      userId: authContext.user_id,
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
@@ -155,9 +161,9 @@ async function createClientHandler(request: NextRequest, context: AuthContext): 
 // 导出处理函数，使用权限中间件和错误处理包装器
 // Export handler functions with permission middleware and error handling wrapper
 export const GET = withErrorHandling(
-  withAuth(getClientsHandler, { requiredPermissions: ['oauth:clients:read'] })
+  withAuth(getClientsHandler, { requiredPermissions: ['client:list'] })
 );
 
 export const POST = withErrorHandling(
-  withAuth(createClientHandler, { requiredPermissions: ['oauth:clients:create'] })
+  withAuth(createClientHandler, { requiredPermissions: ['client:create'] })
 ); 

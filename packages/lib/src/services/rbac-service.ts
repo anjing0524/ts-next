@@ -7,6 +7,7 @@
  */
 
 import { prisma } from '@repo/database/client';
+import { cache } from '@repo/cache';
 
 /**
  * 用户权限信息
@@ -35,9 +36,18 @@ export interface PermissionCheckResult {
  */
 export class RBACService {
   /**
-   * 获取用户的完整权限信息
+   * 获取用户的完整权限信息 (带缓存)
    */
   static async getUserPermissions(userId: string): Promise<UserPermissions | null> {
+    const cacheKey = `user-permissions:${userId}`;
+    const cachedPermissions = await cache.get<UserPermissions>(cacheKey);
+
+    if (cachedPermissions) {
+      console.log(`[RBAC] Cache hit for user ${userId}`);
+      return cachedPermissions;
+    }
+
+    console.log(`[RBAC] Cache miss for user ${userId}, fetching from DB...`);
     const user = await prisma.user.findUnique({
       where: { id: userId, isActive: true },
       include: {
@@ -72,7 +82,7 @@ export class RBACService {
       });
     });
 
-    return {
+    const result: UserPermissions = {
       userId: user.id,
       roles,
       permissions: Array.from(permissionSet),
@@ -81,5 +91,20 @@ export class RBACService {
         department: user.department || undefined,
       }
     };
+
+    // 缓存60秒
+    await cache.set(cacheKey, result, 60);
+    return result;
+  }
+
+  /**
+   * 检查用户是否拥有特定权限
+   */
+  static async checkPermission(userId: string, permissionName: string): Promise<boolean> {
+    const userPermissions = await this.getUserPermissions(userId);
+    if (!userPermissions) {
+      return false;
+    }
+    return userPermissions.permissions.includes(permissionName);
   }
 } 

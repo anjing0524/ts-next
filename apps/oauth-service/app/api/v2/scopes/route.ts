@@ -38,37 +38,13 @@ const MAX_PAGE_SIZE = 100;
 
 
 /**
- * @swagger
- * /api/v2/scopes:
- *   get:
- *     summary: 列出所有可用权限范围 (OAuth Scope管理)
- *     description: 获取系统中所有已定义的OAuth权限范围 (scopes)。需要 'scopes:list' 权限。
- *     tags: [OAuth Scopes API]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: page
- *         in: query
- *         description: 页码。
- *         schema: { type: integer, default: 1 }
- *       - name: limit
- *         in: query
- *         description: 每页数量。
- *         schema: { type: integer, default: 10 }
- *       - name: name
- *         in: query
- *         description: 按名称筛选 (模糊匹配)。
- *         schema: { type: string }
- *       - name: isActive
- *         in: query
- *         description: 按激活状态筛选。
- *         schema: { type: boolean }
- *     responses:
- *       200: { description: "成功获取权限范围列表。" } # Schema defined in previous subtask
- *       401: { description: "未经授权。" }
- *       403: { description: "禁止访问。" }
+ * GET /api/v2/scopes - 列出所有可用权限范围 (OAuth Scope管理)
+ * 需要 'scope:list' 权限。
  */
-async function listScopesHandler(request: NextRequest, context: AuthContext) {
+async function listScopesHandler(
+  request: NextRequest,
+  context: { authContext: AuthContext; params: any }
+) {
   const { searchParams } = new URL(request.url);
   const queryParams: Record<string, string | undefined> = {};
   searchParams.forEach((value, key) => { queryParams[key] = value; });
@@ -107,44 +83,15 @@ async function listScopesHandler(request: NextRequest, context: AuthContext) {
     return NextResponse.json({ message: "Error listing scopes." }, { status: 500 });
   }
 }
-export const GET = withErrorHandling(
-  withAuth(listScopesHandler, { requiredPermissions: ['scopes:list'] })
-);
-
 
 /**
- * @swagger
- * /api/v2/scopes:
- *   post:
- *     summary: 创建新的权限范围 (OAuth Scope管理)
- *     description: 在系统中定义一个新的OAuth权限范围。需要 'scopes:create' 权限。
- *     tags: [OAuth Scopes API]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ScopeCreatePayload'
- *     responses:
- *       201: { description: "权限范围已成功创建。" } # Schema defined in previous subtask
- *       400: { description: "无效请求，例如名称已存在或格式错误。" }
- *       401: { description: "未经授权。" }
- *       403: { description: "禁止访问。" }
- *       409: { description: "名称冲突。" }
- * components:
- *   schemas:
- *     ScopeCreatePayload:
- *       type: object
- *       required: [name]
- *       properties:
- *         name: { type: string, description: "范围名称 (e.g. order:read)", example: "product:manage" }
- *         description: { type: string, description: "范围描述", example: "允许管理产品信息", nullable: true }
- *         isPublic: { type: boolean, description: "是否公开范围", default: false }
- *         isActive: { type: boolean, description: "是否激活", default: true }
+ * POST /api/v2/scopes - 创建新的权限范围 (OAuth Scope管理)
+ * 需要 'scope:create' 权限。
  */
-async function createScopeHandler(request: NextRequest, context: AuthContext) {
+async function createScopeHandler(
+  request: NextRequest,
+  context: { authContext: AuthContext; params: any }
+) {
   let payload;
   try {
     payload = await request.json();
@@ -182,6 +129,11 @@ async function createScopeHandler(request: NextRequest, context: AuthContext) {
     return NextResponse.json({ message: "Error creating scope." }, { status: 500 });
   }
 }
+
+export const GET = withErrorHandling(
+  withAuth(listScopesHandler, { requiredPermissions: ['scope:list'] })
+);
+
 export const POST = withErrorHandling(
-  withAuth(createScopeHandler, { requiredPermissions: ['scopes:create'] })
+  withAuth(createScopeHandler, { requiredPermissions: ['scope:create'] })
 );

@@ -8,7 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { OAuthClient as Client, User as PrismaUser } from '@prisma/client';
 import * as jose from 'jose';
 import { prisma } from '@repo/database/client';
-import { PermissionService } from '../services';
+import { PermissionService, RBACService } from '../services';
 
 // 实例化真实权限服务 (Instantiate actual PermissionService)
 const permissionServiceInstance = new PermissionService(prisma);
@@ -217,9 +217,24 @@ export async function authenticateBearer(
   // 步骤 8: 验证必需的权限
   // Step 8: Validate required permissions
   if (options.requiredPermissions && options.requiredPermissions.length > 0) {
-    const hasRequiredPermissions = options.requiredPermissions.every(permission => 
-      permissions.includes(permission)
+    const userPermissions = await RBACService.getUserPermissions(userId);
+    if (!userPermissions) {
+      return {
+        success: false,
+        response: NextResponse.json(
+          {
+            error: 'access_denied',
+            error_description: 'User not found or has no permissions.',
+          },
+          { status: 403 }
+        ),
+      };
+    }
+
+    const hasRequiredPermissions = options.requiredPermissions.every(permission =>
+      userPermissions.permissions.includes(permission)
     );
+
     if (!hasRequiredPermissions) {
       return {
         success: false,
@@ -287,35 +302,47 @@ export async function authenticateBearer(
 }
 
 /**
- * 认证中间件包装器
- * Authentication middleware wrapper
- * 
- * @param handler - 处理函数
- * @param options - 认证选项
- * @returns 包装后的中间件函数
+ * 包装一个 API 路由处理器，为其添加 Bearer Token 认证和权限检查。
+ * Wraps an API route handler to add Bearer Token authentication and permission checks.
+ * 支持 Next.js 动态路由 (Dynamic Routes)。
+ * Supports Next.js Dynamic Routes.
+ *
+ * @param handler - 要包装的 API 处理器。它将接收 `request`, `authContext`, 和 `routeContext`。
+ *                  The API handler to wrap. It will receive `request`, `authContext`, and `routeContext`.
+ * @param options - 认证选项，如 `requiredPermissions`。
+ *                  Authentication options, like `requiredPermissions`.
+ * @returns 一个新的 API 路由处理器，该处理器会先执行认证，然后调用原始处理器。
+ *          A new API route handler that first performs authentication and then calls the original handler.
  */
-export function withAuth(
-  handler: (request: NextRequest, context: AuthContext) => Promise<NextResponse>,
+export function withAuth<T extends { params?: any }>(
+  handler: (
+    request: NextRequest,
+    context: { authContext: AuthContext; params: T['params'] }
+  ) => Promise<NextResponse>,
   options: AuthOptions = {}
 ) {
-  return async function authMiddleware(request: NextRequest): Promise<NextResponse> {
-    const authResult = await authenticateBearer(request, options);
+  return async function authMiddleware(
+    request: NextRequest,
+    routeContext?: T
+  ): Promise<NextResponse> {
+    const {
+      success,
+      context: authContext,
+      response,
+    } = await authenticateBearer(request, options);
 
-    if (!authResult.success) {
-      return authResult.response || NextResponse.json(
-        { error: 'authentication_failed', error_description: 'Authentication failed' },
-        { status: 401 }
-      );
+    if (!success || !authContext) {
+      return response || new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (!authResult.context) {
-      return NextResponse.json(
-        { error: 'authentication_failed', error_description: 'Authentication context missing' },
-        { status: 500 }
-      );
-    }
+    // 将认证上下文和路由参数合并到一个对象中传递给处理器
+    // Combine auth context and route params into a single object for the handler
+    const combinedContext = {
+      authContext,
+      params: routeContext?.params,
+    };
 
-    return handler(request, authResult.context);
+    return handler(request, combinedContext);
   };
 }
 

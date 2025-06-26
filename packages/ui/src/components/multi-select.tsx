@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 
 import { Check, ChevronsUpDown, X, CheckSquare, Trash2 } from 'lucide-react';
 
-import { Badge } from './badge';
-import { Button } from './button';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 import {
   Command,
   CommandEmpty,
@@ -14,11 +14,11 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from './command';
-import { Label } from './label';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
-import { ScrollArea } from './scroll-area';
-import { cn } from '../utils';
+} from './ui/command';
+import { Label } from './ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { ScrollArea } from './ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface MultiSelectProps {
   label: string;

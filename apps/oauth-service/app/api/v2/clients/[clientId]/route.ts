@@ -15,7 +15,10 @@ import { ClientType } from '@prisma/client';
 import { ClientService } from '@/lib/services/client-service';
 import { withErrorHandling, ApiResponse } from '@repo/lib';
 import { withAuth, type AuthContext } from '@repo/lib/middleware';
-import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/errors';
+
+interface RouteParams {
+  clientId: string;
+}
 
 /**
  * 客户端更新请求Schema
@@ -42,20 +45,15 @@ const updateClientSchema = z.object({
 
 /**
  * GET /api/v2/clients/[clientId] - 获取客户端详情
- * GET /api/v2/clients/[clientId] - Get client details
- * 
- * 需要 'oauth:clients:read' 权限
- * Requires 'oauth:clients:read' permission
+ * 需要 'client:read' 权限
  */
 async function getClientHandler(
   request: NextRequest,
-  { params }: { params: { clientId: string } }
+  { params }: { authContext: AuthContext; params: RouteParams }
 ): Promise<NextResponse> {
   const { clientId } = params;
 
   try {
-    // 获取客户端信息
-    // Get client information
     const client = await ClientService.getClientById(clientId);
     
     if (!client) {
@@ -68,8 +66,6 @@ async function getClientHandler(
       }, { status: 404 });
     }
 
-    // 隐藏敏感信息
-    // Hide sensitive information
     const { clientSecret, ...safeClient } = client;
 
     return NextResponse.json<ApiResponse<typeof safeClient>>({
@@ -78,30 +74,23 @@ async function getClientHandler(
       message: '客户端信息获取成功',
     }, { status: 200 });
   } catch (error) {
-    throw error; // 由错误处理包装器处理
+    throw error;
   }
 }
 
 /**
  * PUT /api/v2/clients/[clientId] - 更新客户端信息
- * PUT /api/v2/clients/[clientId] - Update client information
- * 
- * 需要 'oauth:clients:update' 权限
- * Requires 'oauth:clients:update' permission
+ * 需要 'client:update' 权限
  */
 async function updateClientHandler(
   request: NextRequest,
-  { params }: { params: { clientId: string } }
+  { authContext, params }: { authContext: AuthContext; params: RouteParams }
 ): Promise<NextResponse> {
   const { clientId } = params;
 
   try {
-    // 解析请求体
-    // Parse request body
     const body = await request.json();
     
-    // 验证请求数据
-    // Validate request data
     const validationResult = updateClientSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json<ApiResponse<never>>({
@@ -116,20 +105,14 @@ async function updateClientHandler(
 
     const updateParams = validationResult.data;
 
-    // 获取审计信息
-    // Get audit information
     const auditInfo = {
-      userId: (request as any).user?.id,
+      userId: authContext.user_id,
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
 
-    // 更新客户端
-    // Update client
     const updatedClient = await ClientService.updateClient(clientId, updateParams, auditInfo);
 
-    // 隐藏敏感信息
-    // Hide sensitive information
     const { clientSecret, ...safeClient } = updatedClient;
 
     return NextResponse.json<ApiResponse<typeof safeClient>>({
@@ -138,34 +121,27 @@ async function updateClientHandler(
       message: '客户端更新成功',
     }, { status: 200 });
   } catch (error) {
-    throw error; // 由错误处理包装器处理
+    throw error;
   }
 }
 
 /**
  * DELETE /api/v2/clients/[clientId] - 删除客户端
- * DELETE /api/v2/clients/[clientId] - Delete client
- * 
- * 需要 'oauth:clients:delete' 权限
- * Requires 'oauth:clients:delete' permission
+ * 需要 'client:delete' 权限
  */
 async function deleteClientHandler(
   request: NextRequest,
-  { params }: { params: { clientId: string } }
+  { authContext, params }: { authContext: AuthContext; params: RouteParams }
 ): Promise<NextResponse> {
   const { clientId } = params;
 
   try {
-    // 获取审计信息
-    // Get audit information
     const auditInfo = {
-      userId: (request as any).user?.id,
+      userId: authContext.user_id,
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     };
 
-    // 删除客户端
-    // Delete client
     await ClientService.deleteClient(clientId, auditInfo);
 
     return NextResponse.json<ApiResponse<null>>({
@@ -174,35 +150,19 @@ async function deleteClientHandler(
       message: '客户端删除成功',
     }, { status: 200 });
   } catch (error) {
-    throw error; // 由错误处理包装器处理
+    throw error;
   }
 }
 
 // 导出处理函数，使用权限中间件和错误处理包装器
-// Export handler functions with permission middleware and error handling wrapper
 export const GET = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const clientId = pathSegments[pathSegments.length - 1] || '';
-    return getClientHandler(request, { params: { clientId } });
-  }, { requiredPermissions: ['oauth:clients:read'] })
+  withAuth(getClientHandler, { requiredPermissions: ['client:read'] })
 );
 
 export const PUT = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const clientId = pathSegments[pathSegments.length - 1] || '';
-    return updateClientHandler(request, { params: { clientId } });
-  }, { requiredPermissions: ['oauth:clients:update'] })
+  withAuth(updateClientHandler, { requiredPermissions: ['client:update'] })
 );
 
 export const DELETE = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const clientId = pathSegments[pathSegments.length - 1] || '';
-    return deleteClientHandler(request, { params: { clientId } });
-  }, { requiredPermissions: ['oauth:clients:delete'] })
+  withAuth(deleteClientHandler, { requiredPermissions: ['client:delete'] })
 ); 

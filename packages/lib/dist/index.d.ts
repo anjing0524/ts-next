@@ -12,6 +12,5 @@ export * from './middleware';
 export declare const LIB_VERSION = "1.0.0";
 export * from './types';
 export * from './errors';
-export * from './cache';
 export { prisma } from '@repo/database';
 //# sourceMappingURL=index.d.ts.map

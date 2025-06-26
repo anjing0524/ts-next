@@ -88,7 +88,10 @@ const CreatePermissionSchema = z.object({
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含权限列表和分页信息的 JSON 响应。
  */
-async function listPermissionsHandler(req: NextRequest, context: AuthContext): Promise<NextResponse> {
+async function listPermissionsHandler(
+  req: NextRequest,
+  context: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
   const { searchParams } = new URL(req.url); // 解析查询参数。
 
   // 分页参数处理。
@@ -152,8 +155,11 @@ async function listPermissionsHandler(req: NextRequest, context: AuthContext): P
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含新创建的完整权限信息或错误信息的 JSON 响应。
  */
-async function createPermissionHandler(req: NextRequest, context: AuthContext): Promise<NextResponse> {
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+async function createPermissionHandler(
+  req: NextRequest,
+  { authContext }: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
+  const performingAdminId = authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -162,7 +168,7 @@ async function createPermissionHandler(req: NextRequest, context: AuthContext): 
     body = await req.json(); // 解析请求体。
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_CREATE_FAILURE_INVALID_JSON',
           success: false,
         ipAddress,
@@ -177,7 +183,7 @@ async function createPermissionHandler(req: NextRequest, context: AuthContext): 
   const validationResult = CreatePermissionSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_CREATE_FAILURE_VALIDATION',
           success: false,
         ipAddress,
@@ -199,7 +205,7 @@ async function createPermissionHandler(req: NextRequest, context: AuthContext): 
     const existingPermission = await prisma.permission.findUnique({ where: { name } });
     if (existingPermission) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'PERMISSION_CREATE_FAILURE_CONFLICT',
           resource: `Permission:${existingPermission.id}`,
           success: false,
@@ -247,7 +253,7 @@ async function createPermissionHandler(req: NextRequest, context: AuthContext): 
     });
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_CREATE_SUCCESS',
           resource: `Permission:${createdPermission.id}`,
           success: true,
@@ -303,8 +309,8 @@ async function createPermissionHandler(req: NextRequest, context: AuthContext): 
 
 // 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
 export const GET = withErrorHandling(
-  withAuth(listPermissionsHandler, { requiredPermissions: ['permissions:list'] })
+  withAuth(listPermissionsHandler, { requiredPermissions: ['permission:list'] })
 );
 export const POST = withErrorHandling(
-  withAuth(createPermissionHandler, { requiredPermissions: ['permissions:create'] })
+  withAuth(createPermissionHandler, { requiredPermissions: ['permission:create'] })
 );

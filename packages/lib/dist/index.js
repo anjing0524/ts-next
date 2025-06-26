@@ -36,7 +36,7 @@ __exportStar(require("./middleware"), exports);
 exports.LIB_VERSION = '1.0.0';
 __exportStar(require("./types"), exports); // Exports from ./src/types.ts (barrel for ./src/types/*)
 __exportStar(require("./errors"), exports); // Exports from ./src/errors.ts
-__exportStar(require("./cache"), exports); // Exports from ./src/cache.ts
+// export * from './cache';       // Exports from ./src/cache.ts
 // Re-export prisma from database package
 var database_1 = require("@repo/database");
 Object.defineProperty(exports, "prisma", { enumerable: true, get: function () { return database_1.prisma; } });

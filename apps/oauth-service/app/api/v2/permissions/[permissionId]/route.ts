@@ -1,7 +1,7 @@
 // 文件路径: app/api/v2/permissions/[permissionId]/route.ts
 // 描述: 此文件处理针对特定权限定义 (由 permissionId 标识) 的 API 请求，
 // 包括获取权限详情 (GET), 更新权限信息 (PUT), 以及删除权限 (DELETE)。
-// 使用 `requirePermission` 中间件进行访问控制。
+// 使用 `withAuth` 中间件进行访问控制。
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database'; // Prisma ORM 客户端。
@@ -12,10 +12,8 @@ import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
 // 定义路由上下文接口，用于从动态路由参数中获取 permissionId。
-interface RouteContext {
-  params: {
-    permissionId: string; // 目标权限的ID。
-  };
+interface RouteParams {
+  permissionId: string;
 }
 
 // --- Zod Schema 定义 ---
@@ -65,9 +63,12 @@ const UpdatePermissionSchema = z.object({
  * @param context RouteContext - 包含从URL路径中提取的 permissionId。
  * @returns NextResponse - 包含权限信息或错误信息的 JSON 响应。
  */
-async function getPermissionByIdHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const { permissionId } = context.params; // 从上下文中获取 permissionId。
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+async function getPermissionByIdHandler(
+  req: NextRequest,
+  { authContext, params }: { authContext: AuthContext; params: RouteParams }
+): Promise<NextResponse> {
+  const { permissionId } = params;
+  const performingAdminId = authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -85,7 +86,7 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
 
     if (!permission) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'PERMISSION_READ_FAILURE_NOT_FOUND',
           resource: `Permission:${permissionId}`,
           ipAddress,
@@ -98,7 +99,7 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_READ_SUCCESS',
         resource: `Permission:${permissionId}`,
         ipAddress,
@@ -114,7 +115,7 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
   } catch (error: any) {
     console.error(`获取权限 ${permissionId} 详情失败 (Failed to fetch permission details for ID ${permissionId}):`, error);
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_READ_FAILURE_DB_ERROR',
         resource: `Permission:${permissionId}`,
         ipAddress,
@@ -138,9 +139,12 @@ async function getPermissionByIdHandler(req: NextRequest, context: RouteContext)
  * @param context RouteContext - 包含 permissionId。
  * @returns NextResponse - 包含更新后的完整权限信息或错误信息的 JSON 响应。
  */
-async function updatePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+async function updatePermissionHandler(
+  req: NextRequest,
+  { authContext, params }: { authContext: AuthContext; params: RouteParams }
+): Promise<NextResponse> {
+  const { permissionId } = params;
+  const performingAdminId = authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -149,7 +153,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     body = await req.json(); // 解析请求体。
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_UPDATE_FAILURE_INVALID_JSON',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -164,7 +168,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
   const validationResult = UpdatePermissionSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_UPDATE_FAILURE_VALIDATION',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -183,7 +187,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
 
   if (Object.keys(updateData).length === 0) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_UPDATE_FAILURE_EMPTY_BODY',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -198,7 +202,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     const existingPermission = await prisma.permission.findUnique({ where: { id: permissionId } });
     if (!existingPermission) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'PERMISSION_UPDATE_FAILURE_NOT_FOUND',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -211,7 +215,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
 
     if ((updateData as any).name || (updateData as any).type) {
         await AuthorizationUtils.logAuditEvent({
-            userId: performingAdmin?.id,
+            userId: performingAdminId,
             action: 'PERMISSION_UPDATE_FAILURE_IMMUTABLE_FIELDS',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -274,7 +278,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     });
     // 返回更新后的完整权限信息。
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_UPDATE_SUCCESS',
           resource: `Permission:${permissionId}`,
           success: true,
@@ -301,7 +305,7 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: actionCode,
           success: false,
         ipAddress,
@@ -327,18 +331,21 @@ async function updatePermissionHandler(req: NextRequest, context: RouteContext):
  * @param context RouteContext - 包含 permissionId。
  * @returns NextResponse - 成功时返回 204 No Content，或错误信息的 JSON 响应。
  */
-async function deletePermissionHandler(req: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const { permissionId } = context.params; // 目标权限ID。
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+async function deletePermissionHandler(
+  req: NextRequest,
+  { authContext, params }: { authContext: AuthContext; params: RouteParams }
+): Promise<NextResponse> {
+  const { permissionId } = params;
+  const performingAdminId = authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
   try {
     // 步骤 1: 检查权限定义是否存在。
-    const permission = await prisma.permission.findUnique({ where: { id: permissionId } });
+    const permission = await prisma.permission.findUnique({ where: { id: permissionId }, include: { rolePermissions: true } });
     if (!permission) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'PERMISSION_DELETE_FAILURE_NOT_FOUND',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -346,14 +353,14 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
           userAgent,
           errorMessage: 'Permission definition not found to delete.'
       });
-      return NextResponse.json({ message: '权限定义未找到，无法删除 (Permission definition not found, cannot delete)' }, { status: 404 });
+      return NextResponse.json({ message: '权限定义未找到 (Permission definition not found)' }, { status: 404 });
     }
 
     // 步骤 2: 检查此权限是否仍被任何角色分配。
-    const rolesWithPermissionCount = await prisma.rolePermission.count({ where: { permissionId: permissionId } });
+    const rolesWithPermissionCount = permission.rolePermissions.length;
     if (rolesWithPermissionCount > 0) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'PERMISSION_DELETE_FAILURE_IN_USE',
           resource: `Permission:${permissionId}`,
           success: false,
@@ -362,31 +369,31 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
           errorMessage: `Permission "${permission.name}" is still in use by ${rolesWithPermissionCount} roles.`,
           metadata: { permissionName: permission.name, rolesCount: rolesWithPermissionCount }
       });
-      return NextResponse.json({ message: `权限 "${permission.name}" 仍被 ${rolesWithPermissionCount} 个角色使用，无法删除 (Permission "${permission.name}" is still in use by ${rolesWithPermissionCount} roles and cannot be deleted)` }, { status: 409 }); // 409 Conflict
+      return NextResponse.json({ message: `此权限仍被 ${rolesWithPermissionCount} 个角色使用，无法删除 (This permission is still in use by ${rolesWithPermissionCount} roles and cannot be deleted)` }, { status: 409 }); // 409 Conflict
     }
 
     // 步骤 3: 使用数据库事务来原子性地删除权限基础记录及其关联的特定类型权限记录。
     await prisma.$transaction(async (tx) => {
       // 3a. 根据权限类型删除对应的特定类型详情记录。
       if (permission.type === PermissionType.API) {
-        await tx.apiPermission.deleteMany({ where: { permissionId } }); // 使用 deleteMany 以防万一 permissionId 不是主键或唯一键 (虽然通常是)
+        await tx.apiPermission.delete({ where: { permissionId } }); // 使用 deleteMany 以防万一 permissionId 不是主键或唯一键 (虽然通常是)
       } else if (permission.type === PermissionType.MENU) {
-        await tx.menuPermission.deleteMany({ where: { permissionId } });
+        await tx.menuPermission.delete({ where: { permissionId } });
       } else if (permission.type === PermissionType.DATA) {
-        await tx.dataPermission.deleteMany({ where: { permissionId } });
+        await tx.dataPermission.delete({ where: { permissionId } });
       }
       // 3b. 删除权限基础记录。
       await tx.permission.delete({ where: { id: permissionId } });
     });
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'PERMISSION_DELETE_SUCCESS',
           resource: `Permission:${permissionId}`,
           success: true,
         ipAddress,
         userAgent,
-        metadata: { deletedPermissionId: permissionId, permissionName: permission.name }
+        metadata: { deletedPermissionName: permission.name }
     });
     // 返回 HTTP 204 No Content 表示成功删除且无内容返回。
     return new NextResponse(null, { status: 204 });
@@ -403,7 +410,7 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: actionCode,
           success: false,
         ipAddress,
@@ -417,26 +424,11 @@ async function deletePermissionHandler(req: NextRequest, context: RouteContext):
 
 // 使用 `withAuth` 中间件包装处理函数，并导出为相应的 HTTP 方法。
 export const GET = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const permissionId = pathSegments[pathSegments.length - 1] || '';
-    return getPermissionByIdHandler(request, { params: { permissionId } });
-  }, { requiredPermissions: ['permissions:read'] })
+  withAuth(getPermissionByIdHandler, { requiredPermissions: ['permission:read'] })
 );
 export const PUT = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const permissionId = pathSegments[pathSegments.length - 1] || '';
-    return updatePermissionHandler(request, { params: { permissionId } });
-  }, { requiredPermissions: ['permissions:update'] })
+  withAuth(updatePermissionHandler, { requiredPermissions: ['permission:update'] })
 );
 export const DELETE = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/');
-    const permissionId = pathSegments[pathSegments.length - 1] || '';
-    return deletePermissionHandler(request, { params: { permissionId } });
-  }, { requiredPermissions: ['permissions:delete'] })
+  withAuth(deletePermissionHandler, { requiredPermissions: ['permission:delete'] })
 );

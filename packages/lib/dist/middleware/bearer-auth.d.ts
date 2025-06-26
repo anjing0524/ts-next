@@ -56,14 +56,24 @@ export declare function authenticateBearer(request: NextRequest, options?: AuthO
     response?: NextResponse;
 }>;
 /**
- * 认证中间件包装器
- * Authentication middleware wrapper
+ * 包装一个 API 路由处理器，为其添加 Bearer Token 认证和权限检查。
+ * Wraps an API route handler to add Bearer Token authentication and permission checks.
+ * 支持 Next.js 动态路由 (Dynamic Routes)。
+ * Supports Next.js Dynamic Routes.
  *
- * @param handler - 处理函数
- * @param options - 认证选项
- * @returns 包装后的中间件函数
+ * @param handler - 要包装的 API 处理器。它将接收 `request`, `authContext`, 和 `routeContext`。
+ *                  The API handler to wrap. It will receive `request`, `authContext`, and `routeContext`.
+ * @param options - 认证选项，如 `requiredPermissions`。
+ *                  Authentication options, like `requiredPermissions`.
+ * @returns 一个新的 API 路由处理器，该处理器会先执行认证，然后调用原始处理器。
+ *          A new API route handler that first performs authentication and then calls the original handler.
  */
-export declare function withAuth(handler: (request: NextRequest, context: AuthContext) => Promise<NextResponse>, options?: AuthOptions): (request: NextRequest) => Promise<NextResponse>;
+export declare function withAuth<T extends {
+    params?: any;
+}>(handler: (request: NextRequest, context: {
+    authContext: AuthContext;
+    params: T['params'];
+}) => Promise<NextResponse>, options?: AuthOptions): (request: NextRequest, routeContext?: T) => Promise<NextResponse>;
 /**
  * 权限检查中间件
  * Permission check middleware

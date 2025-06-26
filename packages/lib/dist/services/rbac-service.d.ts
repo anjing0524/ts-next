@@ -30,8 +30,12 @@ export interface PermissionCheckResult {
  */
 export declare class RBACService {
     /**
-     * 获取用户的完整权限信息
+     * 获取用户的完整权限信息 (带缓存)
      */
     static getUserPermissions(userId: string): Promise<UserPermissions | null>;
+    /**
+     * 检查用户是否拥有特定权限
+     */
+    static checkPermission(userId: string, permissionName: string): Promise<boolean>;
 }
 //# sourceMappingURL=rbac-service.d.ts.map

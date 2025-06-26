@@ -26,7 +26,7 @@ export const LIB_VERSION = '1.0.0';
 
 export * from './types';       // Exports from ./src/types.ts (barrel for ./src/types/*)
 export * from './errors';      // Exports from ./src/errors.ts
-export * from './cache';       // Exports from ./src/cache.ts
+// export * from './cache';       // Exports from ./src/cache.ts
 
 // Re-export prisma from database package
 export { prisma } from '@repo/database';

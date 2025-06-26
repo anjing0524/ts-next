@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger';
-import { cacheManager, CacheInterface } from '../cache';
+import { cacheManager, CacheInterface } from '@repo/cache';
 
 // 定义批量权限检查请求的结构类型
 // Define a type for the structure of permission requests in checkBatchPermissions

@@ -41,7 +41,10 @@ const CreateRoleSchema = z.object({
  * @param req AuthenticatedRequest - 经过认证的请求对象，包含用户信息。
  * @returns NextResponse - 包含角色列表和分页信息的 JSON 响应。
  */
-async function listRolesHandler(req: NextRequest, context: { authContext: AuthContext }): Promise<NextResponse> {
+async function listRolesHandler(
+  req: NextRequest,
+  context: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
   const { searchParams } = new URL(req.url);
 
   const page = parseInt(searchParams.get('page') || '1', 10);
@@ -109,8 +112,11 @@ async function listRolesHandler(req: NextRequest, context: { authContext: AuthCo
  * @param req AuthenticatedRequest - 经过认证的请求对象。
  * @returns NextResponse - 包含新创建的角色信息或错误信息的 JSON 响应。
  */
-async function createRoleHandler(req: NextRequest, context: { authContext: AuthContext }): Promise<NextResponse> {
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
+async function createRoleHandler(
+  req: NextRequest,
+  { authContext }: { authContext: AuthContext; params: any }
+): Promise<NextResponse> {
+  const performingAdminId = authContext.user_id;
   const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
 
@@ -119,7 +125,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
     body = await req.json();
   } catch (e: any) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'ROLE_CREATE_FAILURE_INVALID_JSON',
           success: false,
         ipAddress,
@@ -133,7 +139,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
   const validationResult = CreateRoleSchema.safeParse(body);
   if (!validationResult.success) {
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'ROLE_CREATE_FAILURE_VALIDATION',
           success: false,
         ipAddress,
@@ -154,7 +160,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole) {
       await AuthorizationUtils.logAuditEvent({
-          userId: performingAdmin?.id,
+          userId: performingAdminId,
           action: 'ROLE_CREATE_FAILURE_CONFLICT',
           resource: `Role:${existingRole.id}`,
           success: false,
@@ -175,7 +181,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
       if (foundPermissions.length !== permissionIds.length) {
         const notFoundIds = permissionIds.filter(id => !foundPermissions.some(p => p.id === id));
         await AuthorizationUtils.logAuditEvent({
-            userId: performingAdmin?.id,
+            userId: performingAdminId,
             action: 'ROLE_CREATE_FAILURE_INVALID_PERMISSIONS',
           success: false,
             ipAddress,
@@ -230,7 +236,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
     };
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: 'ROLE_CREATE_SUCCESS',
           resource: `Role:${newRoleWithPermissions.id}`,
           success: true,
@@ -256,7 +262,7 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
     }
 
     await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
+        userId: performingAdminId,
         action: actionCode,
           success: false,
         ipAddress,
@@ -272,13 +278,11 @@ async function createRoleHandler(req: NextRequest, context: { authContext: AuthC
   }
 }
 
+// 使用 withAuth 和 withErrorHandling 包装处理器
 export const GET = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    return listRolesHandler(request, { authContext });
-  }, { requiredPermissions: ['roles:list'] })
+  withAuth(listRolesHandler, { requiredPermissions: ['role:list'] })
 );
+
 export const POST = withErrorHandling(
-  withAuth(async (request: NextRequest, authContext: AuthContext) => {
-    return createRoleHandler(request, { authContext });
-  }, { requiredPermissions: ['roles:create'] })
+  withAuth(createRoleHandler, { requiredPermissions: ['role:create'] })
 );
