@@ -17,20 +17,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useFlowStore } from '../store/flow-store';
 import { TaskStateDetailType } from '../types/type';
 import { getTaskDetails } from '../../../actions/flow-actions';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@repo/ui';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@repo/ui';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@repo/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@repo/ui';
 
 import { TASK_STATE_MAP } from '../cons';
 import { TaskStateDetail } from './task-state-detail';
@@ -481,7 +469,7 @@ export function TaskDetailsDialog() {
                         const row = rows[virtualRow.index];
                         return (
                           <TableBodyRow
-                            key={row.id}
+                            key={row?.id}
                             row={row}
                             virtualRow={virtualRow}
                             rowVirtualizer={rowVirtualizer}

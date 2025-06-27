@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@repo/ui';
 import { LogOut, UserCircle, Settings, Menu as MenuIcon } from 'lucide-react'; // MenuIcon for mobile
-import { useAuth } from '@/hooks/useAuth'; // Placeholder auth hook
+import useAuth from '@/hooks/useAuth'; // Placeholder auth hook
 // import { Sheet, SheetContent, SheetTrigger } from '@repo/ui'; // For mobile sidebar
 // import AdminSidebar from './sidebar'; // To embed sidebar in sheet for mobile
 

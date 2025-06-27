@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
+import useAuth from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import {
   Card,
@@ -68,9 +68,9 @@ function DashboardContent() {
     setIsLoadingStats(true);
     try {
       const [usersRes, rolesRes, clientsRes] = await Promise.all([
-        adminApi.getUsers({ limit: 1, page: 1 }),
-        adminApi.getRoles({ limit: 1, page: 1 }),
-        adminApi.getClients({ limit: 1, page: 1 }),
+        adminApi.getUsers({ limit: 1, offset: 0 }),
+        adminApi.getRoles({ limit: 1, offset: 0 }),
+        adminApi.getClients({ limit: 1, offset: 0 }),
       ]);
       setUserCount(usersRes.meta.totalItems);
       setRoleCount(rolesRes.meta.totalItems);
@@ -91,7 +91,7 @@ function DashboardContent() {
     try {
       const response: PaginatedResponse<AuditLog> = await adminApi.getAuditLogs({
         limit: 7,
-        page: 1,
+        offset: 0,
         sort: 'timestamp:desc',
       });
       setRecentAuditLogs(response.data);
@@ -113,7 +113,7 @@ function DashboardContent() {
     { href: '/admin/system/roles', label: '角色管理', icon: Shield },
     { href: '/admin/system/clients', label: '客户端管理', icon: Key },
     { href: '/admin/audit', label: '审计日志', icon: FileText },
-    { href: '/admin/system/permissions', label: '权限列表', icon: ShieldCheck },
+    { href: '/admin/system/permissions', label: '权限列表', icon: Shield },
   ];
 
   return (

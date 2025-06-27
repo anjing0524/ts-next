@@ -3,7 +3,7 @@ import '@xyflow/react/dist/style.css';
 import { Suspense } from 'react';
 
 import { getAllPlanConf, handleSearch } from '../../actions/flow-actions';
-import { PlanConf } from '../../../../../types/db-types';
+import { PlanConf } from '../../../types/db-types';
 
 import { BackToTop } from './components/back-to-top';
 import { DagFlow } from './components/dag-flow';

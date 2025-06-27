@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 
 import { FlowStage } from '../(dashboard)/flow/store/flow-store';
 import { mysqlPool } from '@repo/database';
-import { PlanConf, PlanState, TaskState } from '../../../../types/db-types';
+import { PlanConf, PlanState, TaskState } from '@/types/db-types';
 import { logger } from '@repo/lib/utils';
 
 import { TaskConfState, TaskStateDetailType } from '../(dashboard)/flow/types/type';
@@ -607,7 +607,7 @@ export async function stopPlan(
       return { success: false, message: '指定的计划执行不存在', state: -1 };
     }
 
-    const planState = (runningPlan as PlanState[])[0].plan_state;
+    const planState = (runningPlan as PlanState[])[0]?.plan_state;
     if (planState && !['R', 'P', 'A', 'S'].includes(planState)) {
       logger.warn(`停止计划失败: 计划 ${planId} 不在运行中，当前状态: ${planState}`);
       return { success: false, message: '只能停止运行中的计划', state: 1 }; // 状态码改为1，表示不在执行状态

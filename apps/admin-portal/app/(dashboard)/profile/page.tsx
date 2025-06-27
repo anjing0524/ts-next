@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import useAuth from '@/hooks/useAuth';
 import { adminApi, authApi } from '@/lib/api'; // Assuming authApi might have password change
 import {
   Card,

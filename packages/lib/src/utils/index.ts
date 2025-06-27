@@ -18,5 +18,8 @@ export { getTimeWheelInstance } from './time-wheel';
 // 日志工具 (Logger utilities)
 export { default as logger } from './logger';
 
+// 浏览器PKCE工具 (Browser PKCE utilities)
+export * from './browser-pkce-utils';
+
 // 类型定义 (Type definitions)
 export type { RateLimitConfig, RateLimitResult, TaskOptions } from './types';

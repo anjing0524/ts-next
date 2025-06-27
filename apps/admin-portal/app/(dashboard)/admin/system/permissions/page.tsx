@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
+import useAuth from '@/hooks/useAuth';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { DataTable, type ColumnDef } from '@repo/ui';
 import { Input, Button, toast, Badge } from '@repo/ui';

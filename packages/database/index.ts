@@ -9,4 +9,3 @@ export {
   getPool,
   dbConfig,
 } from './mysql-client';
-export * from './mysql-client';

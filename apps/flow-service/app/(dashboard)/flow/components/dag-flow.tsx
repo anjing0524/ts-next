@@ -37,13 +37,13 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
       if (!dependencyGraph[edge.source]) {
         dependencyGraph[edge.source] = [];
       }
-      dependencyGraph[edge.source].push(edge.target);
+      dependencyGraph[edge.source]!.push(edge.target);
 
       // 确保目标节点存在于入度记录中
       if (incomingEdges[edge.target] === undefined) {
         incomingEdges[edge.target] = 0;
       }
-      incomingEdges[edge.target]++;
+      incomingEdges[edge.target]!++;
     }
   });
 
@@ -60,7 +60,7 @@ const calculateNodePositions = (nodes: Node[], edges: Edge[]) => {
     currentLayer.forEach((nodeId) => {
       // 遍历当前节点的所有目标节点
       dependencyGraph[nodeId]?.forEach((targetId) => {
-        incomingEdges[targetId]--;
+        incomingEdges[targetId]!--;
         // 当目标节点的入度为0时，将其加入下一层
         if (incomingEdges[targetId] === 0) {
           nextLayer.push(targetId);

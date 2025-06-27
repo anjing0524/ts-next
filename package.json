@@ -21,11 +21,18 @@
     "prisma:migrate": "turbo prisma:migrate",
     "e2e": "turbo e2e",
     "e2e:ui": "turbo e2e:ui",
-    "e2e:report": "turbo e2e:report"
+    "e2e:report": "turbo e2e:report",
+    "e2e:integration": "./scripts/run-e2e-tests.sh",
+    "test:integration": "npx playwright test",
+    "test:integration:ui": "npx playwright test --ui",
+    "test:integration:debug": "npx playwright test --debug"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",
     "@commitlint/config-conventional": "^19.7.1",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.1.0",
+    "@playwright/test": "^1.53.1",
     "@repo/eslint-config": "workspace:*",
     "@repo/jest-config": "workspace:*",
     "@repo/prettier-config": "workspace:*",
@@ -34,8 +41,6 @@
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^9.21.0",
-    "@eslint/eslintrc": "^3.1.0",
-    "@eslint/js": "^9.1.0",
     "glob": "^11.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",

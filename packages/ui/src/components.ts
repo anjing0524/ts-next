@@ -24,12 +24,13 @@ export * from './components/ui/skeleton';
 export * from './components/ui/switch';
 export * from './components/ui/table';
 export * from './components/ui/tabs';
+export * from './components/ui/textarea';
 export * from './components/ui/tooltip';
 export * from './components/ui/use-toast';
 export * from './components/ui/drawer';
 
 // 新迁移的组件 (Newly migrated components)
-// export * from './components/data-table/data-table'; // 文件不存在，暂时注释
+export * from './components/data-table/data-table';
 export * from './components/data-table/table-pagination';
 export * from './components/data-table/context-menu-provider';
 export * from './components/data-table/types';

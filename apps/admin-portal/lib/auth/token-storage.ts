@@ -17,13 +17,15 @@ export class TokenStorage {
    * @param refreshToken - (可选) 要存储的 Refresh Token。
    */
   static setTokens(accessToken: string, refreshToken?: string): void {
+    if (typeof window === 'undefined') return; // 服务器端跳过
+
     // 存储 Access Token 到 Cookie
     // 在生产环境中，建议将 Secure 属性设置为 true，HttpOnly 也应考虑设置
     // SameSite=Lax 有助于防止 CSRF 攻击
     document.cookie = `${this.ACCESS_TOKEN_KEY}=${accessToken}; path=/; SameSite=Lax;`;
 
     // 如果提供了 Refresh Token，则将其存储到 sessionStorage
-    if (refreshToken) {
+    if (refreshToken && typeof Storage !== 'undefined') {
       sessionStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
     }
   }
@@ -33,6 +35,8 @@ export class TokenStorage {
    * @returns Access Token 字符串，如果未找到则返回 null。
    */
   static getAccessToken(): string | null {
+    if (typeof window === 'undefined') return null; // 服务器端返回null
+
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
@@ -48,6 +52,7 @@ export class TokenStorage {
    * @returns Refresh Token 字符串，如果未找到则返回 null。
    */
   static getRefreshToken(): string | null {
+    if (typeof window === 'undefined' || typeof Storage === 'undefined') return null; // 服务器端返回null
     return sessionStorage.getItem(this.REFRESH_TOKEN_KEY);
   }
 
@@ -56,9 +61,13 @@ export class TokenStorage {
    * 将 Access Token Cookie 设置为过期，并从 sessionStorage 中移除 Refresh Token。
    */
   static clearTokens(): void {
+    if (typeof window === 'undefined') return; // 服务器端跳过
+
     // 清除 Access Token Cookie
     document.cookie = `${this.ACCESS_TOKEN_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;`;
     // 从 sessionStorage 中移除 Refresh Token
-    sessionStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    if (typeof Storage !== 'undefined') {
+      sessionStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    }
   }
 }

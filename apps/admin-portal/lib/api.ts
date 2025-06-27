@@ -11,6 +11,30 @@ const getAuthHeaders = (contentType: string = 'application/json') => {
   return headers;
 };
 
+// 分页参数适配器：将 offset/limit 转换为 page/pageSize
+const adaptOffsetToPage = (offset: number = 0, limit: number = 10) => {
+  const page = Math.floor(offset / limit) + 1;
+  const pageSize = limit;
+  return { page, pageSize };
+};
+
+// 响应格式适配器：将后端的 pagination 格式转换为前端期望的 meta 格式
+const adaptPaginationToMeta = (response: any) => {
+  if (response && response.pagination) {
+    return {
+      data: response.data,
+      meta: {
+        totalItems: response.pagination.totalItems,
+        itemCount: response.data ? response.data.length : 0,
+        itemsPerPage: response.pagination.pageSize,
+        totalPages: response.pagination.totalPages,
+        currentPage: response.pagination.page,
+      },
+    };
+  }
+  return response;
+};
+
 // Unified response handler
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -117,15 +141,21 @@ export const authApi = {
 export const adminApi = {
   // User Management
   async getUsers(params?: { offset?: number; limit?: number; search?: string }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
 
     const response = await fetch(`/api/v2/users?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
   async getUserById(userId: string) {
     const response = await fetch(`/api/v2/users/${userId}`, { headers: getAuthHeaders() });
@@ -175,14 +205,21 @@ export const adminApi = {
 
   // Role Management
   async getRoles(params?: { offset?: number; limit?: number; search?: string }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
+
     const response = await fetch(`/api/v2/roles?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
   async getRoleById(roleId: string) {
     const response = await fetch(`/api/v2/roles/${roleId}`, { headers: getAuthHeaders() });
@@ -240,27 +277,41 @@ export const adminApi = {
 
   // Permission Management
   async getPermissions(params?: { offset?: number; limit?: number; search?: string }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
+
     const response = await fetch(`/api/v2/permissions?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
   // ... other permission CRUDs
 
   // OAuth Client Management
   async getClients(params?: { offset?: number; limit?: number; search?: string }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
+
     const response = await fetch(`/api/v2/clients?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
   async getClientById(id: string) {
     // id here is the internal DB ID, not client_id
@@ -309,14 +360,21 @@ export const adminApi = {
 
   // OAuth Scope Management
   async getScopes(params?: { offset?: number; limit?: number; search?: string }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
+
     const response = await fetch(`/api/v2/scopes?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
   // ... other scope CRUDs
 
@@ -331,9 +389,12 @@ export const adminApi = {
     endDate?: string;
     sort?: string;
   }) {
+    // 转换分页参数：从 offset/limit 到 page/pageSize
+    const { page, pageSize } = adaptOffsetToPage(params?.offset, params?.limit);
+
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    searchParams.set('page', String(page));
+    searchParams.set('pageSize', String(pageSize));
     if (params?.search) searchParams.set('search', params.search);
     if (params?.action) searchParams.set('action', params.action);
     if (params?.status) searchParams.set('status', params.status);
@@ -341,17 +402,32 @@ export const adminApi = {
     if (params?.endDate) searchParams.set('endDate', params.endDate);
     if (params?.sort) searchParams.set('sort', params.sort);
 
-    // if (params?.filter) { // Example for a generic filter object
-    //   Object.entries(params.filter).forEach(([key, value]) => {
-    //     if (value !== null && value !== undefined) {
-    //       searchParams.set(key, String(value));
-    //     }
-    //   });
-    // }
-
     const response = await fetch(`/api/v2/audit-logs?${searchParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const data = await handleResponse(response);
+
+    // 转换响应格式：从 pagination 到 meta
+    return adaptPaginationToMeta(data);
   },
 };
+
+/**
+ * 获取完整的URL
+ * Get full URL for given path
+ */
+export function getFullUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${path}`;
+  }
+  // Server-side fallback
+  return `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}${path}`;
+}
+
+/**
+ * 获取OAuth重定向URI
+ * Get OAuth redirect URI
+ */
+export function getOAuthRedirectUri(): string {
+  return getFullUrl('/auth/callback');
+}

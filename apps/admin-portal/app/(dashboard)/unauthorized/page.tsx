@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation'; // To read query parameters
+import { Suspense } from 'react';
 
-export default function UnauthorizedPage() {
+function UnauthorizedContent() {
   const searchParams = useSearchParams();
   const attemptedPath = searchParams.get('attempted_path');
   const requiredPermission = searchParams.get('required_permission');
@@ -68,5 +69,19 @@ export default function UnauthorizedPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function UnauthorizedPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ fontFamily: 'Arial, sans-serif', textAlign: 'center', padding: '50px' }}>
+          <p>Loading...</p>
+        </div>
+      }
+    >
+      <UnauthorizedContent />
+    </Suspense>
   );
 }

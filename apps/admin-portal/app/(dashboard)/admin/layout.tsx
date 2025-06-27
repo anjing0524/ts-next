@@ -2,8 +2,8 @@
 'use client'; // This layout now needs to be a Client Component for hooks and state
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { SiteHeader, AppSidebar, MenuItem, Drawer, DrawerContent, cn, useMobile } from '@repo/ui';
-import { useAuth } from '@/hooks/useAuth'; // 用户认证 Hook
+import { SiteHeader, AppSidebar, Drawer, DrawerContent, cn, useMobile } from '@repo/ui';
+import useAuth from '@/hooks/useAuth'; // 用户认证 Hook
 
 /**
  * 后台管理界面的主布局 (Main Layout for the Admin Dashboard Area)
@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/useAuth'; // 用户认证 Hook
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useMobile(); // Hook to detect mobile viewport
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
   const { user, isLoading: isUserLoading, logout } = useAuth(); // Auth hook
 
   // Fetch menu items on component mount (client-side)
@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
         const data = await res.json();
-        setMenuItems(data as MenuItem[]);
+        setMenuItems(data as any[]);
       } catch (error) {
         console.error('Error fetching menu items:', error);
         setMenuItems([]); // Set to empty on error
@@ -84,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {isMobile ? (
           <Drawer open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             {/* DrawerTrigger is part of SiteHeader's mobile button */}
-            <DrawerContent side="left" className="p-0 w-72 bg-card dark:bg-card">
+            <DrawerContent className="p-0 w-72 bg-card dark:bg-card">
               {' '}
               {/* Use bg-card for drawer content consistency */}
               <Suspense fallback={sidebarLoadingFallback}>

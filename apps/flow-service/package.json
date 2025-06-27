@@ -38,6 +38,7 @@
     "@repo/next-config": "workspace:*",
     "@repo/tailwind-config": "workspace:*",
     "@repo/jest-config": "workspace:*",
+    "@repo/database": "workspace:*",
     "typescript": "^5",
     "@types/react": "^19.1.6",
     "@types/node": "^20.19.1",

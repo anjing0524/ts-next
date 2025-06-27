@@ -3,11 +3,12 @@
 import { useEffect } from 'react'; // Removed useState as it's managed by the hook
 import { DataTable } from '@repo/ui';
 import { columns } from './columns';
-import { useAuth } from '@/hooks/useAuth'; // Ensure useAuth is imported
+import useAuth from '@/hooks/useAuth'; // 修复为默认导入
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { Button, Input } from '@repo/ui';
 import type { User } from '@/types/admin-entities';
 import { usePaginatedResource } from '@/hooks/usePaginatedResource';
+import { adminApi } from '@/lib/api'; // 添加缺失的adminApi导入
 import { PlusCircle, RefreshCw } from 'lucide-react';
 
 const REQUIRED_PERMISSIONS = ['menu:system:user:view', 'users:list'];

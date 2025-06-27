@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 import {
   Button,
@@ -12,7 +13,7 @@ import {
   CardTitle,
 } from '@repo/ui';
 
-export default function ConsentPage() {
+function ConsentContent() {
   const searchParams = useSearchParams();
 
   const clientName = searchParams.get('client_name');
@@ -124,5 +125,19 @@ export default function ConsentPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function ConsentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <p>Loading...</p>
+        </div>
+      }
+    >
+      <ConsentContent />
+    </Suspense>
   );
 }
