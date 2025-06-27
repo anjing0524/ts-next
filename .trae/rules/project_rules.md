@@ -34,3 +34,4 @@
 34. 组件文件：使用描述性名称 + 类型后缀
 35. https://google.github.io/styleguide/jsguide.html
 36. 错误提示请保持中文或者提取到I18N
+37. 不要输出复杂的思考过程，请注重结果

@@ -1,4 +1,5 @@
 import { TokenStorage } from './auth/token-storage'; // Corrected import path
+import type { Role } from '@/types/admin-entities';
 
 // Helper function to construct authorization headers
 const getAuthHeaders = (contentType: string = 'application/json') => {
@@ -221,7 +222,7 @@ export const adminApi = {
     // 转换响应格式：从 pagination 到 meta
     return adaptPaginationToMeta(data);
   },
-  async getRoleById(roleId: string) {
+  async getRoleById(roleId: string): Promise<Role> {
     const response = await fetch(`/api/v2/roles/${roleId}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
@@ -350,7 +351,7 @@ export const adminApi = {
     return response.status === 204 ? Promise.resolve() : response.json();
   },
   async rotateClientSecret(id: string) {
-    const response = await fetch(`/api/v2/clients/${id}/rotate-secret`, {
+    const response = await fetch(`/api/v2/clients/${id}/secret`, {
       // Assuming this endpoint
       method: 'POST',
       headers: getAuthHeaders(),

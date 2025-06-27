@@ -89,11 +89,11 @@ function PermissionsPageContent() {
         <Input
           placeholder="按权限名称或描述搜索..."
           value={searchTerm}
-          onChange={handleSearchTermChange}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onChange={handleSearchInputChange}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit()}
           className="flex-grow"
         />
-        <Button onClick={handleSearch}>搜索</Button>
+        <Button onClick={handleSearchSubmit}>搜索</Button>
       </div>
 
       <DataTable

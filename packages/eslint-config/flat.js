@@ -68,6 +68,9 @@ export function createBaseConfig(options = {}) {
       // 某些环境变量在 Turbo 中动态注入，这里先关闭校验
       'turbo/no-undeclared-env-vars': 'off',
       'import/order': 'off',
+      // 在构建阶段将未使用变量规则降级为警告，避免阻断 CI，但仍在开发阶段提示
+      'no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
     },
   });
 

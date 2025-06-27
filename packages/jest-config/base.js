@@ -35,6 +35,13 @@ module.exports = {
     '**/?(*.)+(spec|test).{js,ts}',
   ],
   
+  // 忽略 Playwright e2e 目录，避免 Jest 误执行
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/e2e/',
+    '/e2e/',
+  ],
+  
   // 测试环境变量
   testEnvironmentOptions: {
     NODE_ENV: 'test',
@@ -48,4 +55,15 @@ module.exports = {
   // 模块文件扩展名
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'mjs'],
   extensionsToTreatAsEsm: ['.ts', '.tsx', '.mts'],
+  
+  // 忽略生成目录及编译产物，防止 Haste 冲突
+  modulePathIgnorePatterns: [
+    '/\\.next/',
+    '/wasm-cal\/pkg/',
+    '/public\/wasm-cal/',
+    '/dist/',
+  ],
+  
+  // 当包内无任何测试文件时也通过，便于渐进式提升覆盖率
+  passWithNoTests: true,
 }; 

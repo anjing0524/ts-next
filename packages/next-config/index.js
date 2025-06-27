@@ -13,9 +13,6 @@ function withNextConfig(config = {}) {
     // 实验性功能
     experimental: {
       optimizePackageImports: ["@repo/ui"],
-      turbotrace: {
-        logLevel: "error",
-      },
     },
     
     // 合并用户自定义配置

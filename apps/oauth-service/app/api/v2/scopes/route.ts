@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { prisma } from '@repo/database';
 import { withAuth, type AuthContext } from '@repo/lib/middleware';
 import { withErrorHandling } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/apiResponse';
 import { Prisma } from '@prisma/client';
 
 // Zod Schema for creating a new scope
@@ -62,7 +63,7 @@ async function listScopesHandler(
   const validationResult = scopeListQuerySchema.safeParse(queryParams);
   if (!validationResult.success) {
     return NextResponse.json(
-      { error: 'Validation failed', issues: validationResult.error.issues },
+      errorResponse(`Validation failed: ${validationResult.error.issues.map(i => i.message).join(', ')}`, 400),
       { status: 400 }
     );
   }
@@ -82,18 +83,18 @@ async function listScopesHandler(
     });
     const totalScopes = await prisma.scope.count({ where: whereClause });
 
-    return NextResponse.json({
-      data: scopes,
+    return NextResponse.json(successResponse({
+      scopes,
       pagination: {
         page,
         pageSize: limit,
         totalItems: totalScopes,
         totalPages: Math.ceil(totalScopes / limit),
       },
-    });
+    }, 200, 'Scopes列表获取成功'));
   } catch (error) {
     console.error('Failed to list scopes:', error);
-    return NextResponse.json({ message: 'Error listing scopes.' }, { status: 500 });
+    return NextResponse.json(errorResponse('Error listing scopes.', 500), { status: 500 });
   }
 }
 
@@ -110,7 +111,7 @@ async function createScopeHandler(
     payload = await request.json();
   } catch (error) {
     return NextResponse.json(
-      { error: 'Invalid request body', message: 'Failed to parse JSON body.' },
+      errorResponse('Failed to parse JSON body.', 400),
       { status: 400 }
     );
   }
@@ -118,7 +119,7 @@ async function createScopeHandler(
   const validationResult = scopeCreateSchema.safeParse(payload);
   if (!validationResult.success) {
     return NextResponse.json(
-      { error: 'Validation failed', issues: validationResult.error.issues },
+      errorResponse(`Validation failed: ${validationResult.error.issues.map(i => i.message).join(', ')}`, 400),
       { status: 400 }
     );
   }
@@ -129,7 +130,7 @@ async function createScopeHandler(
     const existingScope = await prisma.scope.findUnique({ where: { name } });
     if (existingScope) {
       return NextResponse.json(
-        { message: `Scope name "${name}" already exists.` },
+        errorResponse(`Scope name "${name}" already exists.`, 409),
         { status: 409 }
       );
     }
@@ -142,16 +143,16 @@ async function createScopeHandler(
         isActive,
       },
     });
-    return NextResponse.json(newScope, { status: 201 });
+    return NextResponse.json(successResponse(newScope, 201, 'Scope创建成功'), { status: 201 });
   } catch (error: any) {
     console.error('Failed to create scope:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json(
-        { message: `Scope name "${name}" already exists (race condition).` },
+        errorResponse(`Scope name "${name}" already exists (race condition).`, 409),
         { status: 409 }
       );
     }
-    return NextResponse.json({ message: 'Error creating scope.' }, { status: 500 });
+    return NextResponse.json(errorResponse('Error creating scope.', 500), { status: 500 });
   }
 }
 

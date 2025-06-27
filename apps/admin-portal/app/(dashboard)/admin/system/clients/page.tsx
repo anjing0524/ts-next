@@ -189,7 +189,7 @@ function ClientsPageContent() {
       });
       return;
     }
-    setIsLoading(true);
+    setIsDialogLoading(true);
     const payload = {
       ...clientFormData,
       redirectUris: stringToArray(clientFormData.redirectUris),
@@ -221,13 +221,13 @@ function ClientsPageContent() {
         description: err.message || (currentClient ? '更新客户端失败。' : '创建客户端失败。'),
       });
     } finally {
-      setIsLoading(false);
+      setIsDialogLoading(false);
     }
   };
 
   const handleDeleteClient = async () => {
     if (!currentClient) return;
-    setIsLoading(true);
+    setIsDialogLoading(true);
     try {
       await adminApi.deleteClient(currentClient.id);
       toast({ title: '成功', description: '客户端已删除。' });
@@ -240,12 +240,12 @@ function ClientsPageContent() {
         description: err.message || '删除客户端失败。',
       });
     } finally {
-      setIsLoading(false);
+      setIsDialogLoading(false);
     }
   };
 
   const handleRotateSecret = async (client: Client) => {
-    setIsLoading(true);
+    setIsDialogLoading(true);
     try {
       const response = await adminApi.rotateClientSecret(client.id);
       if (response.clientSecret) {
@@ -263,7 +263,7 @@ function ClientsPageContent() {
         description: err.message || '更新密钥失败。',
       });
     } finally {
-      setIsLoading(false);
+      setIsDialogLoading(false);
     }
   };
 
@@ -505,8 +505,8 @@ function ClientsPageContent() {
             <Button variant="outline" onClick={() => setIsFormDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleSubmitForm} disabled={isLoading}>
-              {isLoading ? '处理中...' : currentClient ? '保存更改' : '创建客户端'}
+            <Button onClick={handleSubmitForm} disabled={isDialogLoading}>
+              {isDialogLoading ? '处理中...' : currentClient ? '保存更改' : '创建客户端'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -519,15 +519,15 @@ function ClientsPageContent() {
             <DialogTitle>确认删除客户端</DialogTitle>
           </DialogHeader>
           <DialogDescription>
-            您确定要删除客户端 “{currentClient?.clientName}” (ID: {currentClient?.clientId})
+            您确定要删除客户端 {currentClient?.clientName} (ID: {currentClient?.clientId})
             吗？此操作无法撤销。
           </DialogDescription>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               取消
             </Button>
-            <Button variant="destructive" onClick={handleDeleteClient} disabled={isLoading}>
-              {isLoading ? '删除中...' : '确认删除'}
+            <Button variant="destructive" onClick={handleDeleteClient} disabled={isDialogLoading}>
+              {isDialogLoading ? '删除中...' : '确认删除'}
             </Button>
           </DialogFooter>
         </DialogContent>

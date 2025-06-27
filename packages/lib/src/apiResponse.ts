@@ -1,9 +1,11 @@
 export interface ApiResponse<T> {
-  code: number; // HTTP status code
-  message: string;
-  data: T | null; // Data can be null, especially for errors
-  timestamp: string;
-  requestId: string;
+  code?: number;
+  message?: string;
+  data?: T | null;
+  timestamp?: string;
+  requestId?: string;
+  success?: boolean;
+  error?: unknown;
 }
 
 import { nanoid } from 'nanoid';
@@ -30,12 +32,13 @@ export function successResponse<T>(
 export function errorResponse(
   message: string,
   statusCode: number,
+  errors?: string,
   customRequestId?: string
-): ApiResponse<null> {
+): ApiResponse<String> {
   return {
     code: statusCode,
     message,
-    data: null,
+    data: errors,
     timestamp: new Date().toISOString(),
     requestId: customRequestId || generateRequestId(),
   };

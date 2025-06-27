@@ -480,7 +480,7 @@ function RolesPageContent() {
             <DialogTitle>确认删除角色</DialogTitle>
           </DialogHeader>
           <DialogDescription>
-            您确定要删除角色 “{currentRole?.name}” 吗？此操作无法撤销。
+            您确定要删除角色 " {currentRole?.name} " 吗？此操作无法撤销。
           </DialogDescription>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
@@ -499,7 +499,7 @@ function RolesPageContent() {
 // --- Main Export with PermissionGuard ---
 export default function GuardedRolesPage() {
   return (
-    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS_VIEW}>
+    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS_VIEW} type="some">
       <RolesPageContent />
     </PermissionGuard>
   );

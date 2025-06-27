@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TokenStorage } from '@/lib/auth/token-storage';
-import { BrowserPKCEUtils } from '@repo/lib/utils';
+import { BrowserPKCEUtils } from '@repo/lib/browser';
 
 // 前端安全的OAuth配置
 const OAuthConfig = {
@@ -252,6 +252,36 @@ export function useAuth() {
     try {
       setAuthState((prev) => ({ ...prev, isLoading: true }));
 
+      // 调用 OAuth 令牌撤销端点，优先撤销刷新令牌
+      const accessToken = TokenStorage.getAccessToken();
+      const refreshToken = TokenStorage.getRefreshToken();
+
+      try {
+        const revokeBody = new URLSearchParams();
+        if (refreshToken) {
+          revokeBody.append('token', refreshToken);
+          revokeBody.append('token_type_hint', 'refresh_token');
+        } else if (accessToken) {
+          revokeBody.append('token', accessToken);
+          revokeBody.append('token_type_hint', 'access_token');
+        }
+
+        if (revokeBody.has('token')) {
+          revokeBody.append('client_id', OAuthConfig.getClientConfig().clientId);
+
+          await fetch(OAuthConfig.getRevokeUrl(), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: revokeBody,
+          });
+        }
+      } catch (e) {
+        // 撤销失败不阻塞登出流程，仅记录日志
+        console.warn('Token revoke request failed', e);
+      }
+
       // 清理本地存储的令牌
       TokenStorage.clearTokens();
 
@@ -279,6 +309,22 @@ export function useAuth() {
     }
   }, [router]);
 
+  /**
+   * 检查当前用户是否拥有指定权限
+   * Check whether current user has a given permission string
+   * @param {string} permission - 权限标识如 'admin:read'
+   * @returns {boolean}
+   */
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      if (!authState.user || !Array.isArray((authState.user as any).permissions)) {
+        return false;
+      }
+      return (authState.user as any).permissions.includes(permission);
+    },
+    [authState.user]
+  );
+
   return {
     // 状态
     ...authState,
@@ -289,6 +335,9 @@ export function useAuth() {
     checkAuth,
     refreshToken,
     fetchUserInfo,
+
+    // 权限工具
+    hasPermission,
   };
 }
 

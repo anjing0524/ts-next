@@ -3,13 +3,7 @@ const withNextConfig = require('@repo/next-config');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  eslint: {
-    ignoreDuringBuilds: true, // 暂时忽略ESLint错误以专注于编译问题
-  },
-  typescript: {
-    ignoreBuildErrors: true, // 暂时忽略TypeScript错误以专注于build成功
-  },
-  
+  // 保持默认 ESLint 与 TypeScript 严格检查
   // 添加webpack配置以正确解析路径别名
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // 确保路径别名正确解析

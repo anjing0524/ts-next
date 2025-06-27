@@ -6,7 +6,7 @@ import type { PaginatedResponse } from '@/types/admin-entities';
 
 // 定义API函数的类型签名
 // P now extends an object that expects offset and limit
-type ApiListFunction<T, P extends { offset: number; limit: number; [key: string]: any }> = (
+type ApiListFunction<T, P extends { limit: number; offset?: number; page?: number; [key: string]: any }> = (
   params: P
 ) => Promise<PaginatedResponse<T>>;
 
@@ -19,7 +19,7 @@ interface UsePaginatedResourceOptions<P> {
 
 interface UsePaginatedResourceReturn<
   T,
-  P extends { offset: number; limit: number; [key: string]: any },
+  P extends { limit: number; offset?: number; page?: number; [key: string]: any },
 > {
   data: T[];
   isLoading: boolean;
@@ -27,14 +27,20 @@ interface UsePaginatedResourceReturn<
   offset: number;
   limit: number;
   totalItems: number;
+  /** 当前页（从1开始） */
+  page: number;
+  /** 总页数 */
+  totalPages: number;
   canLoadMore: boolean; // True if offset + data.length < totalItems
   searchTerm: string;
   searchParams: Omit<P, 'offset' | 'limit'>;
   setOffset: (offset: number) => void; // Direct offset control if needed, e.g. for virtual scrolling
   setLimit: (limit: number) => void; // Resets offset to 0
+  setPage: (page: number) => void;
   setSearchTerm: (term: string) => void;
   setSearchParams: (params: Omit<P, 'offset' | 'limit'>) => void;
   applyFiltersAndReset: () => void; // Applies current searchTerm & searchParams, resets offset to 0
+  applyFilters: () => void;
   loadMore: () => void; // Increments offset to load next set of items, appends to data
   refreshData: () => void; // Fetches data for current offset and filters, replacing current data
 }
@@ -48,7 +54,7 @@ const DEFAULT_LIMIT = 10;
  */
 export function usePaginatedResource<
   T,
-  P extends { offset: number; limit: number; search?: string; [key: string]: any },
+  P extends { limit: number; offset?: number; page?: number; search?: string; [key: string]: any },
 >(
   apiListFunction: ApiListFunction<T, P>,
   options?: UsePaginatedResourceOptions<P>
@@ -67,6 +73,10 @@ export function usePaginatedResource<
   const [offset, setOffset] = useState(initialOffset);
   const [limit, setLimitState] = useState(initialLimit); // Renamed to avoid conflict with outer scope limit
   const [totalItems, setTotalItems] = useState(0);
+
+  // 由 offset 与 limit 计算当前页与总页数
+  const page = Math.floor(offset / limit) + 1;
+  const totalPages = Math.ceil(totalItems / (limit || 1));
 
   const [searchTerm, setSearchTerm] = useState(initialSearchParams?.search || '');
   const [searchParams, setSearchParamsState] =
@@ -126,6 +136,11 @@ export function usePaginatedResource<
     // Fetch data will be triggered by offset change in useEffect
   };
 
+  const handleSetPage = (pageNumber: number) => {
+    const validPage = pageNumber > 0 ? pageNumber : 1;
+    setOffset((validPage - 1) * limit);
+  };
+
   const handleSetSearchTerm = (term: string) => {
     setSearchTerm(term);
   };
@@ -147,6 +162,8 @@ export function usePaginatedResource<
       setOffset(0); // This will trigger useEffect
     }
   };
+
+  const applyFilters = applyFiltersAndReset;
 
   const loadMore = () => {
     if (canLoadMore && !isLoading) {
@@ -205,14 +222,18 @@ export function usePaginatedResource<
     offset,
     limit,
     totalItems,
+    page,
+    totalPages,
     canLoadMore,
     searchTerm,
     searchParams,
     setOffset: handleSetOffset,
     setLimit: handleSetLimit,
+    setPage: handleSetPage,
     setSearchTerm: handleSetSearchTerm,
     setSearchParams: handleSetSearchParams,
     applyFiltersAndReset,
+    applyFilters,
     loadMore,
     refreshData,
   };

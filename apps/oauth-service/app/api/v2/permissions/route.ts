@@ -8,6 +8,7 @@ import { prisma } from '@repo/database'; // Prisma ORM 客户端。
 import { Prisma, PermissionType, HttpMethod } from '@prisma/client'; // Prisma 生成的类型，包括枚举。
 import { withAuth, type AuthContext } from '@repo/lib/middleware'; // 引入权限控制中间件。
 import { withErrorHandling } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/apiResponse';
 import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
 import { z } from 'zod'; // Zod 库，用于数据验证。
 
@@ -163,20 +164,20 @@ async function listPermissionsHandler(
     const totalPermissions = await prisma.permission.count({ where });
 
     // 返回包含权限数据和分页信息的 JSON 响应。
-    return NextResponse.json({
-      data: permissions,
+    return NextResponse.json(successResponse({
+      permissions,
       pagination: {
         page,
         pageSize,
         totalItems: totalPermissions,
         totalPages: Math.ceil(totalPermissions / pageSize),
       },
-    });
+    }, 200, '获取权限列表成功'));
   } catch (error) {
     // 错误处理。
     console.error('列出权限失败 (Failed to list permissions):', error);
     return NextResponse.json(
-      { message: '获取权限列表时发生错误 (An error occurred while retrieving permissions list)' },
+      errorResponse('获取权限列表时发生错误 (An error occurred while retrieving permissions list)', 500),
       { status: 500 }
     );
   }
@@ -213,7 +214,7 @@ async function createPermissionHandler(
       metadata: { error: e.message },
     });
     return NextResponse.json(
-      { message: '无效的JSON请求体 (Invalid JSON request body)' },
+      errorResponse('无效的JSON请求体 (Invalid JSON request body)', 400),
       { status: 400 }
     );
   }
@@ -231,10 +232,10 @@ async function createPermissionHandler(
       metadata: { issues: validationResult.error.format(), receivedBody: body },
     });
     return NextResponse.json(
-      {
-        message: '创建权限的输入数据验证失败 (Permission creation input validation failed)',
-        errors: validationResult.error.format(),
-      },
+      errorResponse(
+        `创建权限的输入数据验证失败: ${validationResult.error.issues.map(i => i.message).join(', ')}`,
+        400
+      ),
       { status: 400 }
     );
   }
@@ -268,7 +269,7 @@ async function createPermissionHandler(
         metadata: { name },
       });
       return NextResponse.json(
-        { message: `权限名称 "${name}" 已存在 (Permission name "${name}" already exists)` },
+        errorResponse(`权限名称 "${name}" 已存在 (Permission name "${name}" already exists)`, 409),
         { status: 409 }
       );
     }
@@ -337,7 +338,7 @@ async function createPermissionHandler(
       },
     });
     // 返回新创建的完整权限信息，HTTP状态码为 201 Created。
-    return NextResponse.json(fullNewPermission, { status: 201 });
+    return NextResponse.json(successResponse(fullNewPermission, 201, '权限创建成功'), { status: 201 });
   } catch (error: any) {
     console.error('创建权限失败 (Failed to create permission):', error);
     let errorMessage = 'An unexpected server error occurred during permission creation';
@@ -374,7 +375,7 @@ async function createPermissionHandler(
         errorCode: (error as any).code,
       },
     });
-    return NextResponse.json({ message: errorMessage }, { status: httpStatus });
+    return NextResponse.json(errorResponse(errorMessage, httpStatus), { status: httpStatus });
   }
 }
 

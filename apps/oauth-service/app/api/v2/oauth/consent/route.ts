@@ -4,23 +4,19 @@
 // Description: This file implements the backend logic for the OAuth 2.0 Consent Page.
 // (For detailed responsibilities, see original comments - preserved below)
 
-import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { User, OAuthClient as Client } from '@prisma/client';
 import { AuthorizationUtils, ScopeUtils } from '@repo/lib/auth';
-import { requirePermission } from '@repo/lib/middleware';
+import { NextRequest, NextResponse } from 'next/server';
 
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
-import { withErrorHandling } from '@repo/lib/utils/error-handler';
-import { ApiResponse } from '@repo/lib/types/api';
 import {
+  ConfigurationError,
   OAuth2Error,
   OAuth2ErrorCode,
-  ValidationError,
   ResourceNotFoundError,
-  ConfigurationError,
-  BaseError,
 } from '@repo/lib/errors';
+import { ApiResponse } from '@repo/lib/types/api';
+import { withErrorHandling } from '@repo/lib/utils/error-handler';
 
 // 同意表单提交的目标 URL 路径
 // Target URL path for consent form submission

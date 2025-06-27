@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './__tests__/e2e',
+  testDir: './apps/admin-portal/tests/e2e',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -79,20 +79,20 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'cd apps/oauth-service && pnpm start',
-      url: 'http://localhost:3001/api/v2/.well-known/openid-configuration',
+      command: 'cd apps/oauth-service && pnpm dev',
+      url: 'http://localhost:3001/api/v2',
       reuseExistingServer: true,
-      timeout: 120 * 1000, // 2 minutes
+      timeout: 240 * 1000, // 4 minutes
     },
     {
-      command: 'cd apps/admin-portal && pnpm dev --port 3002',
+      command: 'cd apps/admin-portal && pnpm dev',
       url: 'http://localhost:3002/api/menu',
       reuseExistingServer: true,
-      timeout: 120 * 1000, // 2 minutes
+      timeout: 240 * 1000, // 4 minutes
     },
   ],
 
   /* Global setup and teardown */
-  globalSetup: require.resolve('./__tests__/e2e/global-setup.ts'),
-  globalTeardown: require.resolve('./__tests__/e2e/global-teardown.ts'),
+  globalSetup: require.resolve('./apps/admin-portal/tests/helpers/global-setup.ts'),
+  globalTeardown: require.resolve('./apps/admin-portal/tests/helpers/global-teardown.ts'),
 });

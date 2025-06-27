@@ -16,11 +16,11 @@ function successResponse(data, statusCode = 200, message = 'Operation successful
         requestId: customRequestId || generateRequestId(),
     };
 }
-function errorResponse(message, statusCode, customRequestId) {
+function errorResponse(message, statusCode, errors, customRequestId) {
     return {
         code: statusCode,
         message,
-        data: null,
+        data: errors,
         timestamp: new Date().toISOString(),
         requestId: customRequestId || generateRequestId(),
     };

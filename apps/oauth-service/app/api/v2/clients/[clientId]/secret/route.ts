@@ -11,9 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ClientService } from '@/lib/services/client-service';
-import { withErrorHandling } from '@repo/lib';
+import { withErrorHandling , ApiResponse } from '@repo/lib';
 import { withAuth, type AuthContext } from '@repo/lib/middleware';
-import { ApiResponse } from '@repo/lib';
 
 /**
  * POST /api/v2/clients/[clientId]/secret - 轮换客户端密钥
