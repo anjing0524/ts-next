@@ -85,3 +85,9 @@ lib/generated/prisma/
 # other
 .continue
 public/
+
+test-results
+
+.trae
+.cursor
+pingora-proxy/target/*
