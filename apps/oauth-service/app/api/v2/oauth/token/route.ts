@@ -28,7 +28,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
 import { AuthorizationUtils, JWTUtils, ScopeUtils, type RefreshTokenPayload } from '@repo/lib/auth';
 import { OAuth2Error, OAuth2ErrorCode, TokenError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
-import { withErrorHandling } from '@repo/lib/utils'; // 导入错误处理高阶函数 (Import error handling HOF)
+import { withErrorHandling } from '@repo/lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
 import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
 
@@ -56,7 +56,7 @@ async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
 
   // --- 步骤 1: 客户端认证 ---
   // --- Step 1: Client Authentication ---
-  // ClientAuthUtils.authenticateClient 现在会抛出错误而不是返回错误对象
+  // ClientAuthUtils.authenticateClient 现在会抛出错误而不是返���错误对象
   // ClientAuthUtils.authenticateClient will now throw an error instead of returning an error object
   const client = await ClientAuthUtils.authenticateClient(req, formData);
   // 如果上一步没有抛出错误，则客户端已成功认证 (If the previous step didn't throw, client is authenticated)
@@ -167,26 +167,26 @@ async function handleAuthorizationCodeGrant(
 
   const grantedScopesArray = ScopeUtils.parseScopes(validatedAuthCode.scope ?? '');
 
-  const accessTokenString = await JWTUtils.createAccessToken({
+  const accessTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
     user_id: validatedAuthCode.userId,
     scope: validatedAuthCode.scope,
     permissions: userPermissions,
-    // exp 由 JWTUtils.createAccessToken 内部处理默认值或基于 client.accessTokenTtl (exp is handled internally by JWTUtils.createAccessToken with default or client.accessTokenTtl)
+    // exp 由 JWTUtils.generateToken 内部处理默认值或基于 client.accessTokenTtl (exp is handled internally by JWTUtils.generateToken with default or client.accessTokenTtl)
   });
-  const refreshTokenString = await JWTUtils.createRefreshToken({
+  const refreshTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
     user_id: validatedAuthCode.userId,
     scope: validatedAuthCode.scope,
     token_type: 'refresh_token',
-    // exp 由 JWTUtils.createRefreshToken 内部处理默认值或基于 client.refreshTokenTtl (exp is handled internally by JWTUtils.createRefreshToken with default or client.refreshTokenTtl)
+    // exp 由 JWTUtils.generateToken 内部处理默认值或基于 client.refreshTokenTtl (exp is handled internally by JWTUtils.generateToken with default or client.refreshTokenTtl)
   });
 
   let idTokenString: string | undefined = undefined;
   if (grantedScopesArray.includes('openid') && user) {
     // TODO: 传递 nonce (如果已在 authorizationCodeFlow 中存储和返回)
     // TODO: Pass nonce (if stored and returned in authorizationCodeFlow)
-    idTokenString = await JWTUtils.createIdToken({
+    idTokenString = await JWTUtils.generateToken({
       sub: user.id,
       aud: client.clientId,
       name: user.displayName || user.username || undefined,
@@ -238,26 +238,9 @@ async function handleAuthorizationCodeGrant(
       details: JSON.stringify({
         grantType: 'authorization_code',
         scope: validatedAuthCode.scope,
-        accessTokenJti: (
-          await JWTUtils.decodeTokenPayload(
-            accessTokenString,
-            process.env.JWT_ACCESS_TOKEN_SECRET || ''
-          )
-        ).jti, // Requires secret & decode ability
-        refreshTokenJti: (
-          await JWTUtils.decodeTokenPayload(
-            refreshTokenString,
-            process.env.JWT_REFRESH_TOKEN_SECRET || ''
-          )
-        ).jti, // Requires secret & decode ability
-        idTokenJti: idTokenString
-          ? (
-              await JWTUtils.decodeTokenPayload(
-                idTokenString,
-                client.clientSecret || process.env.ID_TOKEN_SECRET || ''
-              )
-            ).jti
-          : undefined, // Requires secret & decode
+        accessTokenJti: JWTUtils.decodeTokenPayload(accessTokenString).jti, // Requires secret & decode ability
+        refreshTokenJti: JWTUtils.decodeTokenPayload(refreshTokenString).jti, // Requires secret & decode ability
+        idTokenJti: idTokenString ? JWTUtils.decodeTokenPayload(idTokenString).jti : undefined, // Requires secret & decode
       }),
     });
   } catch (dbError: any) {
@@ -545,7 +528,7 @@ async function handleRefreshTokenGrant(
 
   const userPermissions = await AuthorizationUtils.getUserPermissions(storedRefreshToken.userId);
 
-  const newAccessTokenString = await JWTUtils.createAccessToken({
+  const newAccessTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
     user_id: storedRefreshToken.userId,
     scope: finalGrantedScopeString,
@@ -554,7 +537,7 @@ async function handleRefreshTokenGrant(
 
   let newIdTokenString: string | undefined = undefined;
   if (finalGrantedScopesArray.includes('openid') && storedRefreshToken.user) {
-    newIdTokenString = await JWTUtils.createIdToken({
+    newIdTokenString = await JWTUtils.generateToken({
       sub: storedRefreshToken.user.id,
       aud: client.clientId,
       name: storedRefreshToken.user.displayName || storedRefreshToken.user.username || undefined,
@@ -567,7 +550,7 @@ async function handleRefreshTokenGrant(
     : 30;
 
   // 实现刷新令牌轮换 (Implement Refresh Token Rotation)
-  const newRefreshTokenString = await JWTUtils.createRefreshToken({
+  const newRefreshTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
     user_id: storedRefreshToken.userId,
     scope: finalGrantedScopeString,
@@ -615,18 +598,8 @@ async function handleRefreshTokenGrant(
       success: true,
       metadata: {
         old_refresh_token_id: storedRefreshToken.id,
-        new_refresh_token_jti: (
-          await JWTUtils.decodeTokenPayload(
-            newRefreshTokenString,
-            process.env.JWT_REFRESH_TOKEN_SECRET || ''
-          )
-        ).jti, // Assuming decode for JTI
-        new_access_token_jti: (
-          await JWTUtils.decodeTokenPayload(
-            newAccessTokenString,
-            process.env.JWT_ACCESS_TOKEN_SECRET || ''
-          )
-        ).jti, // Assuming decode for JTI
+        new_refresh_token_jti: JWTUtils.decodeTokenPayload(newRefreshTokenString).jti, // Assuming decode for JTI
+        new_access_token_jti: JWTUtils.decodeTokenPayload(newAccessTokenString).jti, // Assuming decode for JTI
         granted_scope: finalGrantedScopeString,
       },
     });
@@ -785,7 +758,7 @@ async function handleClientCredentialsGrant(
     // If both requested scope and client's configured scopes are empty, finalGrantedScopeString will be undefined or empty string
   }
 
-  const accessTokenString = await JWTUtils.createAccessToken({
+  const accessTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
     scope: finalGrantedScopeString, // 保持原样，JWTUtils应该处理undefined
     permissions: [], // 客户端凭证令牌通常不包含用户权限 (Client credentials tokens usually don't contain user permissions)
@@ -818,12 +791,7 @@ async function handleClientCredentialsGrant(
         grantType: 'client_credentials',
         scope: finalGrantedScopeString,
         // Assuming JWTUtils.decodeTokenPayload can get JTI. Requires secret.
-        accessTokenJti: (
-          await JWTUtils.decodeTokenPayload(
-            accessTokenString,
-            process.env.JWT_ACCESS_TOKEN_SECRET || ''
-          )
-        ).jti,
+        accessTokenJti: JWTUtils.decodeTokenPayload(accessTokenString).jti,
       }),
     });
   } catch (dbError: any) {

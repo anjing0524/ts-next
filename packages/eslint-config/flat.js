@@ -85,6 +85,7 @@ export function createBaseConfig(options = {}) {
 export function createNextConfig(options = {}) {
   return createBaseConfig({
     extends: ['next/core-web-vitals', 'next/typescript', 'prettier'],
+    includeImportPlugin: false, // Next.js 配置已包含 import 插件
     ...options,
   });
 }

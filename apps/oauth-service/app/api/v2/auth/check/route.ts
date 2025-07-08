@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { valid, payload, error: tokenError } = await JWTUtils.verifyAccessToken(token);
+  const { valid, payload, error: tokenError } = await JWTUtils.verifyToken(token);
   if (!valid || !payload) {
     return NextResponse.json(
       { error: 'invalid_token', message: `Invalid or expired token. ${tokenError || ''}`.trim() },
@@ -103,14 +103,14 @@ export async function POST(req: NextRequest) {
   let requestBody;
   try {
     requestBody = await req.json();
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: 'invalid_request', message: 'Invalid JSON request body.' },
       { status: 400 }
     );
   }
 
-  const { permission, context } = requestBody; // context 当前未使用，但为未来扩展保留 (context is currently unused but reserved for future extension)
+  const { permission } = requestBody; // context 当前未使用，但为未来扩展保留 (context is currently unused but reserved for future extension)
 
   if (!permission || typeof permission !== 'string') {
     return NextResponse.json(

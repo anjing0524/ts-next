@@ -1,7 +1,9 @@
 'use client';
 
+import { useAuth } from '@repo/ui/hooks';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { PermissionGuard } from '@repo/ui';
 
 import {
   Button,
@@ -128,16 +130,17 @@ function ConsentContent() {
   );
 }
 
-export default function ConsentPage() {
+export default function GuardedConsentPage() {
+  const { user, isLoading } = useAuth();
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-          <p>Loading...</p>
-        </div>
-      }
+    <PermissionGuard
+      requiredPermission="oauth:consent"
+      user={user}
+      isLoading={isLoading}
     >
-      <ConsentContent />
-    </Suspense>
+      <Suspense fallback={<div>Loading...</div>}>
+        <ConsentContent />
+      </Suspense>
+    </PermissionGuard>
   );
 }

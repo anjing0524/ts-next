@@ -7,7 +7,7 @@
  * API错误对象结构 (API Error Object Structure)
  * 用于在API响应中标准化错误信息 (Used to standardize error information in API responses)
  */
-export interface ApiError {
+interface ApiError {
     /**
      * 错误代码 (Error code)
      * 通常是一个简短的、程序可读的字符串，用于标识特定的错误类型。
@@ -39,7 +39,7 @@ export interface ApiError {
  * 这是一个通用的API响应结构，用于标准化所有API的返回格式。
  * (This is a generic API response structure used to standardize the return format of all APIs.)
  */
-export interface ApiResponse<T = any> {
+interface ApiResponse<T = any> {
     /**
      * 表示操作是否成功 (Indicates if the operation was successful)
      * `true` 表示操作成功完成，`false` 表示操作失败。
@@ -73,11 +73,12 @@ export interface ApiResponse<T = any> {
  * (This interface defines a response structure containing only error information. To unify response formats, it's recommended to use `ApiResponse<T>`,
  * where `T` can be `never` (if no data is returned on error), and `success` is set to `false`.)
  */
-export interface ApiErrorResponse {
+interface ApiErrorResponse {
     /**
      * 包含错误详细信息的对象。
      * (Object containing detailed error information.)
      */
     error: ApiError;
 }
-//# sourceMappingURL=api.d.ts.map
+
+export type { ApiError, ApiErrorResponse, ApiResponse };

@@ -19,13 +19,12 @@ import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@repo/lib/auth';
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
-import { withErrorHandling } from '@repo/lib/utils';
+import { withErrorHandling } from '@repo/lib/utils/error-handler';
 import {
   OAuth2Error,
   OAuth2ErrorCode,
   ValidationError,
   ConfigurationError,
-  BaseError,
 } from '@repo/lib/errors';
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)

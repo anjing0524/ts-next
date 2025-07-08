@@ -7,8 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { withErrorHandling } from '@/lib/utils/error-handler';
 import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
-import { ScopeUtils, JWTUtils } from '@repo/lib/auth';
-import * as jose from 'jose';
+import { JWTUtils } from '@repo/lib/auth';
 import {
   introspectTokenRequestSchema,
   IntrospectResponseActive,
@@ -167,7 +166,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
   // --- 令牌验证逻辑 --- (Token Validation Logic)
   // 尝试作为访问令牌处理 (Attempt to process as an Access Token)
   if (token_type_hint === 'access_token' || !token_type_hint) {
-    const atVerification = await JWTUtils.verifyAccessToken(token);
+    const atVerification = await JWTUtils.verifyToken(token);
     if (atVerification.valid && atVerification.payload) {
       const payload = atVerification.payload;
       if (payload.jti) {
@@ -215,7 +214,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
   // 如果未被识别为活动的访问令牌，或者提示是 refresh_token
   // If not identified as an active access token, or if hint was refresh_token
   if (!activeResponsePayload && (token_type_hint === 'refresh_token' || !token_type_hint)) {
-    const rtVerification = await JWTUtils.verifyRefreshToken(token);
+    const rtVerification = await JWTUtils.verifyToken(token);
     if (rtVerification.valid && rtVerification.payload) {
       const payload = rtVerification.payload;
       if (payload.jti) {

@@ -1,133 +1,84 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { adminApi } from '@/lib/api';
-import useAuth from '@/hooks/useAuth';
-import { PermissionGuard } from '@/components/auth/permission-guard';
-import { DataTable, type ColumnDef } from '@repo/ui';
-import { Input, Button, toast, Badge } from '@repo/ui';
-import type { Permission, PaginatedResponse } from '@/types/admin-entities'; // 引入共享类型
+import { usePermissionManagement } from '@/features/permissions/hooks/use-permission-management';
+import { useAuth } from '@repo/ui/hooks';
+import { PermissionGuard } from '@repo/ui';
+import { DataTable, type ColumnDef, Input, Button, Badge } from '@repo/ui';
+import type { Permission } from '@/features/permissions/domain/permission';
 
-// --- 页面状态和常量 ---
-const INITIAL_PAGE_LIMIT = 15; // Permissions list might be longer
 const REQUIRED_PERMISSIONS_VIEW = ['menu:system:permission:view', 'permissions:list'];
 
-import { usePaginatedResource } from '@/hooks/usePaginatedResource'; // Import the hook
-
-// --- 权限管理页面核心内容 ---
 function PermissionsPageContent() {
   const {
-    data: permissions,
+    permissions,
+    meta,
     isLoading,
+    isFetching,
     error,
     page,
-    limit,
-    totalItems,
-    totalPages,
-    searchTerm,
     setPage,
+    limit,
     setLimit,
+    searchTerm,
     setSearchTerm,
-    applyFilters,
-    // refreshData: fetchPermissions, // Not typically needed for a read-only list unless manual refresh button
-  } = usePaginatedResource<Permission, { page: number; limit: number; search?: string }>(
-    adminApi.getPermissions,
-    { initialLimit: INITIAL_PAGE_LIMIT }
-  );
+    handleSearchSubmit,
+  } = usePermissionManagement();
 
-  const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-  };
+  const columns: ColumnDef<Permission>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Permission Name',
+      cell: ({ row }) => <Badge variant="secondary">{row.original.name}</Badge>,
+    },
+    { accessorKey: 'description', header: 'Description' },
+    {
+      accessorKey: 'resource',
+      header: 'Resource',
+      cell: ({ row }) => row.original.resource || <span className="text-muted-foreground">N/A</span>,
+    },
+  ];
 
-  const handleSearchSubmit = () => {
-    applyFilters();
-  };
-
-  // --- DataTable Columns ---
-  const columns = useMemo<ColumnDef<Permission>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: '权限名称',
-        cell: ({ row }) => <Badge variant="secondary">{row.original.name}</Badge>,
-      },
-      { accessorKey: 'description', header: '描述' },
-      {
-        accessorKey: 'group',
-        header: '分组',
-        cell: ({ row }) => row.original.group || <span className="text-muted-foreground">N/A</span>,
-      },
-      // No actions column usually, as permissions are typically system-defined
-      // {
-      //   id: 'actions',
-      //   header: '操作',
-      //   cell: ({ row }) => (
-      //     <div className="space-x-2">
-      //       {/* Placeholder for any potential future actions */}
-      //     </div>
-      //   ),
-      // },
-    ],
-    []
-  );
-
-  if (isLoading && !permissions.length && page === 1) {
-    return <div className="p-6 text-center">加载权限数据中...</div>;
-  }
-  if (error && !permissions.length) {
-    return <div className="p-6 text-red-600 text-center">错误: {error}</div>;
-  }
+  if (isLoading) return <div>Loading permissions...</div>;
+  if (error) return <div>Error loading permissions: {error.message}</div>;
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6 space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">系统权限管理</h1>
-        <p className="text-muted-foreground mt-1">查看系统中所有已定义的权限及其描述。</p>
+    <div className="container mx-auto py-8">
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold">System Permissions</h1>
+        <p className="text-muted-foreground mt-1">View all defined permissions in the system.</p>
       </header>
 
-      <div className="flex items-center gap-2 p-4 border rounded-lg shadow-sm">
+      <div className="flex items-center gap-2 mb-4">
         <Input
-          placeholder="按权限名称或描述搜索..."
+          placeholder="Search by name or description..."
           value={searchTerm}
-          onChange={handleSearchInputChange}
+          onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit()}
           className="flex-grow"
         />
-        <Button onClick={handleSearchSubmit}>搜索</Button>
+        <Button onClick={handleSearchSubmit} disabled={isFetching}>
+          Search
+        </Button>
       </div>
 
       <DataTable
-        columns={columns}
+        columns={columns as ColumnDef<any, any>[]}
         data={permissions}
-        isLoading={isLoading && permissions.length > 0}
-        pageCount={totalPages}
-        pageIndex={page - 1}
+        isLoading={isFetching}
+        pageCount={meta?.totalPages ?? 0}
+        pageIndex={meta ? meta.currentPage - 1 : 0}
         pageSize={limit}
         onPageChange={(newPageIndex) => setPage(newPageIndex + 1)}
-        onPageSizeChange={(newPageSize) => {
-          setLimit(newPageSize);
-          setPage(1);
-        }}
+        onPageSizeChange={setLimit}
       />
-      {(totalItems > 0 || page > 1) && !isLoading && !error && (
-        <div className="flex items-center justify-between mt-4 py-2 border-t">
-          <span className="text-sm text-muted-foreground">
-            第 {page} / {totalPages} 页 (共 {totalItems} 条记录)
-          </span>
-          {/* Pagination buttons could be part of DataTable or separate */}
-        </div>
-      )}
-      {permissions.length === 0 && !isLoading && !error && (
-        <div className="text-center py-10 text-muted-foreground">没有找到权限。</div>
-      )}
     </div>
   );
 }
 
-// --- Main Export with PermissionGuard ---
 export default function GuardedPermissionsPage() {
+  const { user, isLoading } = useAuth();
   return (
-    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS_VIEW}>
+    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS_VIEW} user={user} isLoading={isLoading}>
       <PermissionsPageContent />
     </PermissionGuard>
   );

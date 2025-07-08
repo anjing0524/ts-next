@@ -24,7 +24,7 @@ function throttle<T extends (...args: any[]) => any>(
 }
 
 export default function Main() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow'; // 使用环境变量
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
   // Canvas引用
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -125,7 +125,7 @@ export default function Main() {
           // 处理鼠标离开事件的结果
           if (data.needsRedraw) {
             // 如果需要重绘，可以在这里执行任何必要的UI更新
-            // 例如，可以重置拖动状态
+            // 例如��可以重置拖动状态
             setIsDragging(false);
           }
         },
@@ -188,13 +188,13 @@ export default function Main() {
 
     // 在客户端设置 wasmPath
     if (typeof window !== 'undefined') {
-      wasmPath = `${window.location.origin}${basePath}/wasm-cal/kline_processor_bg.wasm`;
+      wasmPath = `${window.location.origin}/wasm-cal/kline_processor_bg.wasm`;
     }
 
     const fetchAndDraw = async () => {
       try {
         // 获取数据
-        const response = await fetch(`${basePath}/api/kline`, {
+        const response = await fetch(`/api/kline`, {
           method: 'POST',
           signal: controller.signal,
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -255,7 +255,7 @@ export default function Main() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [setupWorkerMessageHandler, updatePerformanceMetrics, basePath]);
+  }, [setupWorkerMessageHandler, updatePerformanceMetrics]);
 
   // 使用useCallback优化鼠标移动事件处理函数，移除防抖以提高响应速度
   const handleMouseMove = useCallback(

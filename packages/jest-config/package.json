@@ -6,7 +6,7 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
-    "./base": "./base.js",
+    "./base": "./base.cjs",
     "./next": "./next.js"
   },
   "dependencies": {

@@ -4,12 +4,12 @@
 // Description: OAuth 2.0 / OpenID Connect UserInfo Endpoint (OIDC Core 1.0)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
 import { withErrorHandling } from '@repo/lib/utils/error-handler';
 // authenticateBearer 已移至 @repo/lib/middleware
-import { OAuth2Error, OAuth2ErrorCode, BaseError } from '@repo/lib/errors';
+import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/errors';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
+import { getUserProfileData } from '@/lib/user-utils';
 
 /**
  * @swagger
@@ -130,14 +130,9 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
     );
   }
 
-  // --- 步骤3: 获取用户信息 ---
-  // --- Step 3: Retrieve User Information ---
-  const userData = await prisma.user.findUnique({
-    where: {
-      id: userId,
-      isActive: true, // 只返回活跃用户的信息
-    },
-  });
+  // --- 步骤3: 获取用户信息 (使用getUserProfileData) ---
+  // --- Step 3: Retrieve User Information (using getUserProfileData) ---
+  const userData = await getUserProfileData(userId);
 
   if (!userData) {
     throw new OAuth2Error(
@@ -167,7 +162,7 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
     userInfo.preferred_username = userData.username || undefined;
     userInfo.picture = userData.avatar || undefined;
     userInfo.updated_at = userData.updatedAt
-      ? Math.floor(userData.updatedAt.getTime() / 1000)
+      ? Math.floor(new Date(userData.updatedAt).getTime() / 1000)
       : undefined;
 
     // 扩展字段 (如果用户模型支持)

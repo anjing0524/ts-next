@@ -13,9 +13,6 @@
 // 应用特定的服务 (Application-specific services)
 export { ClientService } from './services/client-service';
 
-// 应用特定的类型定义 (Application-specific type definitions)
-export * from './auth/types';
-
 // 注意：共享功能请直接从 @repo/lib 导入
 // Note: For shared functionality, import directly from @repo/lib
 // 例如：import { JWTUtils, ScopeUtils, PKCEUtils } from '@repo/lib';

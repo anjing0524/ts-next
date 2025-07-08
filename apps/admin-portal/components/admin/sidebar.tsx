@@ -5,8 +5,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart, Briefcase, FileText, Home, Key, Settings, Shield, Users } from 'lucide-react';
-import useAuth from '@/hooks/useAuth'; // Placeholder auth hook
-import { cn } from '@/lib/utils'; // For conditional class names
+import { useAuth } from '@repo/ui'; // Placeholder auth hook
+import { cn } from '@repo/ui'; // 使用 UI 包提供的 cn 工具函数
 import { ScrollArea, Button, buttonVariants } from '@repo/ui';
 
 /**

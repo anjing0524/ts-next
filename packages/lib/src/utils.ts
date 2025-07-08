@@ -10,7 +10,7 @@ export * from './utils/logger';
 export * from './utils/error-handler';
 
 // === 时间轮工具 (Time Wheel Utils) ===
-export * from './utils/time-wheel';
+export * from './utils';
 
 // === MySQL 客户端工具 (MySQL Client Utils) ===
 // mysql-client已迁移到@repo/database包

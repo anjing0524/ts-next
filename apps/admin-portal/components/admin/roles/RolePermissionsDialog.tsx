@@ -13,7 +13,7 @@ import {
   Label,
   toast,
 } from '@repo/ui';
-import type { Permission, Role } from '@/types/admin-entities';
+import type { Permission, Role } from '@/types/auth';
 
 interface RolePermissionsDialogProps {
   isOpen: boolean;
@@ -64,12 +64,14 @@ export function RolePermissionsDialog({
   }, [allPermissions]);
 
   useEffect(() => {
-    if (role && role.permissions) {
-      // If role.permissions (Permission objects) are provided, map them to their IDs
-      setSelectedPermissionIds(role.permissions.map((p) => p.id));
-    } else if (role && (role as any).permissionIds) {
-      // Fallback if only permissionIds are directly on the role object (less ideal)
-      setSelectedPermissionIds((role as any).permissionIds);
+    if (role && (role as any).permissionIds) {
+      // This is a fallback if permission IDs are passed directly
+      setSelectedPermissionIds(Array.from(new Set((role as any).permissionIds || [])));
+    } else if (role) {
+      // If only the role is provided, fetch its permissions
+      // This part should ideally be handled by a query hook
+      // For now, we'll just initialize as empty and let the user select.
+      setSelectedPermissionIds([]);
     } else if (isOpen) {
       // When opening for a new role or role without permissions
       setSelectedPermissionIds([]);

@@ -1,31 +1,32 @@
+import { lazy, Suspense } from 'react';
+import type { MenuItem, IconName } from './types';
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation'; // For highlighting active links
-import * as LucideIcons from 'lucide-react'; // Import all icons
+import { usePathname } from 'next/navigation';
+import * as LucideIcons from 'lucide-react';
+import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { cn } from '../../../lib/utils';
 import { Button } from '../../ui/button';
 import { ScrollArea } from '../../ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
-import type { MenuItem } from '../../../types'; // Import MenuItem type
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   menuItems?: MenuItem[];
-  logo?: React.ReactNode; // Optional prop for a logo area
-  headerText?: string; // Optional prop for the header text like "Dashboard Menu"
-  onItemClick?: () => void; // Callback for when a nav item is clicked (especially for mobile drawer)
+  logo?: React.ReactNode;
+  headerText?: string;
+  onItemClick?: () => void;
 }
 
-// Helper to render dynamic icons
-const DynamicIcon = ({
-  name,
-  ...props
-}: { name: keyof typeof LucideIcons } & LucideIcons.LucideProps) => {
-  const IconComponent = LucideIcons[name] as React.ComponentType<LucideIcons.LucideProps>;
-  if (!IconComponent) {
-    // Fallback or default icon if name is invalid
-    return <LucideIcons.CircleHelp {...props} />;
-  }
-  return <IconComponent {...props} />;
+const fallback = <div style={{ width: 24, height: 24 }} />;
+
+const DynamicIcon = ({ name, ...props }: { name: IconName } & LucideIcons.LucideProps) => {
+  const LucideIcon = lazy(dynamicIconImports[name]);
+
+  return (
+    <Suspense fallback={fallback}>
+      <LucideIcon {...props} />
+    </Suspense>
+  );
 };
 
 export function AppSidebar({

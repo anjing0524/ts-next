@@ -8,7 +8,7 @@
 /**
  * 用户权限信息
  */
-export interface UserPermissions {
+interface UserPermissions {
     userId: string;
     roles: string[];
     permissions: string[];
@@ -20,7 +20,7 @@ export interface UserPermissions {
 /**
  * 权限验证结果
  */
-export interface PermissionCheckResult {
+interface PermissionCheckResult {
     hasPermission: boolean;
     reason?: string;
     context?: Record<string, any>;
@@ -28,7 +28,7 @@ export interface PermissionCheckResult {
 /**
  * RBAC权限管理服务
  */
-export declare class RBACService {
+declare class RBACService {
     /**
      * 获取用户的完整权限信息 (带缓存)
      */
@@ -38,4 +38,5 @@ export declare class RBACService {
      */
     static checkPermission(userId: string, permissionName: string): Promise<boolean>;
 }
-//# sourceMappingURL=rbac-service.d.ts.map
+
+export { type PermissionCheckResult, RBACService, type UserPermissions };

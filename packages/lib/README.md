@@ -50,9 +50,52 @@
 
 - **位置**: `src/auth/password-utils.ts`
 - **作用**: 密码处理工具
-- **主要方法**:
+- **��要方法**:
   - `hashPassword()` - 密码哈希
   - `verifyPassword()` - 密码验证
+
+### 🛡️ 安全最佳实践 (Security Best Practices)
+
+本部分概述了项目中实现的关键安全功能和最佳实践。
+
+#### 密码安全 (Password Security)
+
+- **位置**: `src/auth/password-utils.ts`
+- **描述**: 提供强大的密码处理功能，遵循行业标准。
+- **主要功能**:
+  - `PasswordComplexitySchema`: 使用 `zod` 定义和强制执行密码复杂度规则（长度、字符类别）。
+  - `generateSecurePassword()`: 生成符合复杂度要求的加密安全密码。
+  - `checkPasswordHistory()`: 防止密码重用，检查新密码是否在近期使用过。
+  - `SALT_ROUNDS`: 使用 `bcrypt` 并配置适当的盐轮数（10）来哈希密码，有效抵抗暴力破解。
+
+#### 密钥管理与JWT验证 (Key Management & JWT Validation)
+
+- **JWT客户端验证器**:
+  - **位置**: `src/auth/jwt-client-verifier.ts`
+  - **描述**: 提供一个客户端安全的JWT验证器，通过JWKS (JSON Web Key Set) URL 动态获取公钥，用于验证令牌签名。
+  - **主要方法**: `createVerifier()` - 创建一个可重用的验证器实例。
+- **密钥服务**:
+  - **位置**: `src/services/key-service.ts`
+  - **描述**: 负责生成和管理用于JWT签名的RSA密钥对。在生产环境中，这些密钥���通过安全的方式（如环境变量或密钥管理器）提供。
+  - **主要方法**: `getKeyPair()` - 获取公钥和私钥。
+
+#### 速率限制 (Rate Limiting)
+
+- **位置**: `src/middleware/rate-limit.ts`
+- **描述**: 提供灵活的速率限制中间件，以防止暴力攻击和资源滥用。
+- **主要功能**:
+  - 支持基于IP、客户端ID或用户ID的速率限制。
+  - `withRateLimit()`: 一个高阶函数，可轻松为任何API路由添加速率限制。
+  - `withOAuthRateLimit()`, `withIPRateLimit()`, `withUserRateLimit()`: 为常见场景提供的预配置速率限制器。
+
+#### 分布式追踪 (Distributed Tracing)
+
+- **位置**: `src/utils/tracing.ts`
+- **描述**: 支持分布式系统的可观测性，通过生成和传播追踪ID来关联跨服务的请求。
+- **主要功能**:
+  - `generateTraceId()`: 生成符合B3传播规范的追踪ID。
+  - `getTraceHeaders()`: 创建用于HTTP请求的追踪头部。
+  - `extractTraceId()`: 从传入请求中提取追踪ID。
 
 ### 🛠️ 工具模块 (Utils Module)
 

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+
 interface PermissionCheckRequest {
     id?: string;
     name: string;
@@ -9,7 +10,7 @@ interface BatchPermissionCheckResult {
     reasonCode?: 'PERMISSION_GRANTED' | 'PERMISSION_DENIED' | 'NO_PERMISSIONS' | 'INVALID_REQUEST_FORMAT';
     message?: string;
 }
-export declare class PermissionService {
+declare class PermissionService {
     private prisma;
     private cache;
     constructor(prisma: PrismaClient);
@@ -69,5 +70,5 @@ export declare class PermissionService {
      */
     checkBatchPermissions(userId: string, requests: PermissionCheckRequest[]): Promise<BatchPermissionCheckResult[]>;
 }
-export {};
-//# sourceMappingURL=permission-service.d.ts.map
+
+export { PermissionService };

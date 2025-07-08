@@ -5,13 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3004 --turbopack",
     "build": "next build",
-    "start": "next start -p 3004",
-    "lint": "next lint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "start": "next start -p 3004"
   },
   "dependencies": {
     "next": "^15.3.2",

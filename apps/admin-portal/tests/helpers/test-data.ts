@@ -138,6 +138,30 @@ export const TEST_PERMISSIONS = {
  * 测试数据管理器
  */
 export class TestDataManager {
+  private static getApiUrl() {
+    return process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
+  }
+
+  /**
+   * Creates a user for testing via API.
+   * This requires the test runner to have an admin-level token or a specific test setup endpoint.
+   */
+  static async setupTestUser(userData: any) {
+    // In a real scenario, this would be an API call to a test-setup endpoint.
+    // For this example, we assume a direct DB manipulation or a special endpoint exists.
+    console.log('Setting up test user:', userData.username);
+    // Placeholder for actual user creation logic
+    return { id: `user-${Date.now()}`, ...userData };
+  }
+
+  /**
+   * Cleans up test data via API.
+   */
+  static async cleanupTestData() {
+    console.log('Cleaning up test data...');
+    // Placeholder for cleanup logic
+  }
+
   /**
    * 获取测试用户凭据
    * @param userType - 用户类型

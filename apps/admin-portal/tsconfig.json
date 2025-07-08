@@ -2,17 +2,22 @@
   "extends": "@repo/typescript-config/nextjs.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "plugins": [
       {
         "name": "next"
       }
-    ],
-    // 路径别名统一由 @repo/typescript-config/nextjs.json 提供，如有额外需求可在此覆盖
+    ]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
-  ]
+    ".next/types/**/*.ts",
+    "jest.setup.js",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules"]
 }

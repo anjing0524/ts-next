@@ -1,0 +1,41 @@
+server:
+  listen_address: 0.0.0.0
+  listen_port: 8080
+  worker_threads: 8
+  graceful_shutdown: true
+  graceful_timeout_seconds: 30
+jwt:
+  jwks_url: "https://example.com/.well-known/jwks.json"
+  audience: "your-audience"
+  issuer: "your-issuer"
+monitoring:
+  enabled: true
+  listen_port: 9090
+  metrics_path: "/metrics"
+upstreams:
+- name: api-backend
+  host: 127.0.0.1
+  port: 3000
+  path_prefix: /api
+  health_check_path: /health
+  timeout_seconds: 30
+  tls_enabled: false
+- name: web-backend
+  host: 127.0.0.1
+  port: 4000
+  path_prefix: /
+  health_check_path: null
+  timeout_seconds: 30
+  tls_enabled: false
+tls:
+  enabled: false
+  listen_port: 8443
+  cert_path: /etc/ssl/certs/server.crt
+  key_path: /etc/ssl/private/server.key
+  http2_enabled: true
+  http3_enabled: false
+performance:
+  zero_copy_enabled: true
+  memory_pool_enabled: true
+  compression_enabled: false
+  cache_enabled: false

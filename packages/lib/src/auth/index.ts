@@ -11,6 +11,7 @@ export { JWTUtils } from './jwt-utils';
 export { PKCEUtils } from './pkce-utils';
 export { ScopeUtils } from './scope-utils';
 export { AuthorizationUtils } from './authorization-utils';
+export { getUserIdFromRequest } from './jwt-utils';
 
 // 密码工具函数 (Password utility functions)
 export * from './password-utils';

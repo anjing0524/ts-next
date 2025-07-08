@@ -2,7 +2,7 @@
  * 服务模块类型定义
  * Service module type definitions
  */
-export interface UserPermissions {
+interface UserPermissions {
     userId: string;
     roles: string[];
     permissions: string[];
@@ -11,9 +11,10 @@ export interface UserPermissions {
         department?: string;
     };
 }
-export interface PermissionCheckResult {
+interface PermissionCheckResult {
     hasPermission: boolean;
     reason?: string;
     context?: Record<string, any>;
 }
-//# sourceMappingURL=types.d.ts.map
+
+export type { PermissionCheckResult, UserPermissions };

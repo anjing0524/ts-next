@@ -11,7 +11,7 @@ import { withErrorHandling } from '@/lib/utils/error-handler';
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
 import { ApiResponse } from '@repo/lib/types/api';
-import { OAuth2Error, OAuth2ErrorCode, BaseError, ValidationError } from '@/lib/errors';
+import { OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
 
 /**
  * @swagger

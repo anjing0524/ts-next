@@ -28,6 +28,7 @@ export * from './components/ui/textarea';
 export * from './components/ui/tooltip';
 export * from './components/ui/use-toast';
 export * from './components/ui/drawer';
+export * from './components/ui/avatar';
 
 // 新迁移的组件 (Newly migrated components)
 export * from './components/data-table/data-table';
@@ -44,3 +45,4 @@ export * from './components/blocks/dashboard-01/app-sidebar'; // This exports Ap
 export * from './components/blocks/dashboard-01/site-header';
 export * from './components/blocks/dashboard-01/nav-main';
 export * from './components/blocks/dashboard-01/user-nav';
+export * from './components/auth/permission-guard';

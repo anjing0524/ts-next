@@ -382,7 +382,7 @@ async function submitConsentDecisionHandlerInternal(request: NextRequest): Promi
   let registeredRedirectUris: string[] = [];
   try {
     registeredRedirectUris = JSON.parse(client.redirectUris as string);
-  } catch (e) {
+  } catch {
     /* ignore */
   }
   if (!AuthorizationUtils.validateRedirectUri(redirectUri, registeredRedirectUris)) {

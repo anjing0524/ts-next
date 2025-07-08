@@ -1,13 +1,4 @@
-export interface ApiResponse<T> {
-  code?: number;
-  message?: string;
-  data?: T | null;
-  timestamp?: string;
-  requestId?: string;
-  success?: boolean;
-  error?: unknown;
-}
-
+import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 
 export function generateRequestId(): string {
@@ -18,28 +9,42 @@ export function successResponse<T>(
   data: T,
   statusCode: number = 200,
   message: string = 'Operation successful',
-  customRequestId?: string
-): ApiResponse<T> {
-  return {
-    code: statusCode,
-    message,
-    data,
-    timestamp: new Date().toISOString(),
-    requestId: customRequestId || generateRequestId(),
-  };
+  meta?: {
+    totalItems?: number;
+    itemCount?: number;
+    itemsPerPage?: number;
+    totalPages?: number;
+    currentPage?: number;
+  }
+): NextResponse {
+  return NextResponse.json(
+    {
+      success: true,
+      message,
+      data,
+      meta,
+    },
+    { status: statusCode }
+  );
 }
 
-export function errorResponse(
-  message: string,
-  statusCode: number,
-  errors?: string,
-  customRequestId?: string
-): ApiResponse<String> {
-  return {
-    code: statusCode,
-    message,
-    data: errors,
-    timestamp: new Date().toISOString(),
-    requestId: customRequestId || generateRequestId(),
-  };
+export function errorResponse({
+  message,
+  statusCode = 500,
+  details,
+}: {
+  message: string;
+  statusCode?: number;
+  details?: any;
+}): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        message,
+        details,
+      },
+    },
+    { status: statusCode }
+  );
 }

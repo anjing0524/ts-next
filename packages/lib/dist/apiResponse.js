@@ -1,27 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateRequestId = generateRequestId;
-exports.successResponse = successResponse;
-exports.errorResponse = errorResponse;
-const nanoid_1 = require("nanoid");
-function generateRequestId() {
-    return (0, nanoid_1.nanoid)();
-}
-function successResponse(data, statusCode = 200, message = 'Operation successful', customRequestId) {
-    return {
-        code: statusCode,
-        message,
-        data,
-        timestamp: new Date().toISOString(),
-        requestId: customRequestId || generateRequestId(),
-    };
-}
-function errorResponse(message, statusCode, errors, customRequestId) {
-    return {
-        code: statusCode,
-        message,
-        data: errors,
-        timestamp: new Date().toISOString(),
-        requestId: customRequestId || generateRequestId(),
-    };
-}
+import {
+  errorResponse,
+  generateRequestId,
+  successResponse
+} from "./chunk-T754J6SC.js";
+export {
+  errorResponse,
+  generateRequestId,
+  successResponse
+};
+//# sourceMappingURL=apiResponse.js.map

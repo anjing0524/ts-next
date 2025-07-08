@@ -1,139 +1,55 @@
-// app/api/v2/roles/[roleId]/permissions/[permissionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { withAuth, type AuthContext } from '@repo/lib/middleware';
-import { withErrorHandling } from '@repo/lib';
-import { AuthorizationUtils } from '@repo/lib/auth'; // For Audit Logging
+import { successResponse, errorResponse } from '@repo/lib';
 
-interface RouteContext {
-  params: {
-    roleId: string; // 角色的ID (ID of the role)
-    permissionId: string; // 要移除的权限的ID (ID of the permission to remove)
-  };
+/**
+ * DELETE /api/v2/roles/[roleId]/permissions/[permissionId] - 从角色中移除单个权限
+ * 权限: 'roles:permissions:remove' (需要添加到 permission-map.ts)
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ roleId: string; permissionId: string }> }
+): Promise<NextResponse> {
+  try {
+    const { roleId, permissionId } = await params;
+
+    await prisma.rolePermission.delete({
+      where: {
+        roleId_permissionId: {
+          roleId: roleId,
+          permissionId: permissionId,
+        },
+      },
+    });
+
+    return successResponse(null, 204);
+  } catch (error) {
+    console.error(`从角色中移除权限失败:`, error);
+    return errorResponse({ message: '服务器内部错误' });
+  }
 }
 
 /**
- * 从特定角色移除单个权限 (Remove a single permission from a specific role)
- * Permission: roles:permissions:remove
+ * PUT /api/v2/roles/[roleId]/permissions/[permissionId] - 为角色添加单个权限
+ * 权限: 'roles:permissions:assign' (需要添加到 permission-map.ts)
  */
-async function removePermissionFromRoleHandler(
+export async function PUT(
   req: NextRequest,
-  context: RouteContext & { authContext: AuthContext }
-) {
-  const { roleId, permissionId } = context.params;
-  const performingAdmin = undefined as any; // TODO: 从认证中间件获取用户信息
-  const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
-  const userAgent = req.headers.get('user-agent') || undefined;
-
-  console.log(
-    `管理员 ${performingAdmin?.id} 正在从角色 ${roleId} 移除权限 ${permissionId}。(Admin ${performingAdmin?.id} removing permission ${permissionId} from role ${roleId}.)`
-  );
-
+  { params }: { params: Promise<{ roleId: string; permissionId: string }> }
+): Promise<NextResponse> {
   try {
-    const role = await prisma.role.findUnique({ where: { id: roleId } });
-    if (!role) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
-        action: 'ROLE_PERMISSION_REMOVE_FAILURE_ROLE_NOT_FOUND',
-        resource: `Role:${roleId}`,
-        success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: 'Role not found when attempting to remove permission.',
-        metadata: { permissionIdToRemove: permissionId },
-      });
-      return NextResponse.json({ message: '角色未找到 (Role not found)' }, { status: 404 });
-    }
-    const permission = await prisma.permission.findUnique({ where: { id: permissionId } });
-    if (!permission) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
-        action: 'ROLE_PERMISSION_REMOVE_FAILURE_PERMISSION_NOT_FOUND',
-        resource: `Permission:${permissionId}`,
-        success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: 'Permission not found when attempting to remove from role.',
-        metadata: { roleId: roleId },
-      });
-      return NextResponse.json({ message: '权限未找到 (Permission not found)' }, { status: 404 });
-    }
+    const { roleId, permissionId } = await params;
 
-    const deleteResult = await prisma.rolePermission.deleteMany({
-      where: {
+    await prisma.rolePermission.create({
+      data: {
         roleId: roleId,
         permissionId: permissionId,
       },
     });
 
-    if (deleteResult.count === 0) {
-      await AuthorizationUtils.logAuditEvent({
-        userId: performingAdmin?.id,
-        action: 'ROLE_PERMISSION_REMOVE_FAILURE_NOT_ASSIGNED',
-        resource: `RolePermission:${roleId}_${permissionId}`,
-        success: false, // Or 'INFO' if such status exists, as it's not a system error but a client one.
-        ipAddress,
-        userAgent,
-        errorMessage: 'Permission was not assigned to this role or already removed.',
-        metadata: { roleName: role.name, permissionName: permission.name },
-      });
-      return NextResponse.json(
-        {
-          message:
-            '权限未分配给此角色或已移除 (Permission not assigned to this role or already removed)',
-        },
-        { status: 404 }
-      );
-    }
-
-    await AuthorizationUtils.logAuditEvent({
-      userId: performingAdmin?.id,
-      action: 'ROLE_PERMISSION_REMOVE_SUCCESS',
-      resource: `RolePermission:${roleId}_${permissionId}`, // Composite ID or similar for join table change
-      success: true,
-      ipAddress,
-      userAgent,
-      metadata: {
-        roleName: role.name,
-        removedPermissionName: permission.name,
-        roleId,
-        permissionId,
-      },
-    });
-    return new NextResponse(null, { status: 204 }); // No Content
-  } catch (error: any) {
-    console.error(
-      `从角色 ${roleId} 移除权限 ${permissionId} 失败 (Failed to remove permission ${permissionId} from role ${roleId}):`,
-      error
-    );
-    await AuthorizationUtils.logAuditEvent({
-      userId: performingAdmin?.id,
-      action: 'ROLE_PERMISSION_REMOVE_FAILURE_DB_ERROR',
-      resource: `RolePermission:${roleId}_${permissionId}`,
-      success: false,
-      ipAddress,
-      userAgent,
-      errorMessage: `Failed to remove permission ${permissionId} from role ${roleId}.`,
-      metadata: { error: error.message },
-    });
-    return NextResponse.json(
-      { message: '移除角色权限失败 (Failed to remove role permission)' },
-      { status: 500 }
-    );
+    return successResponse({ message: '权限添加成功' }, 201);
+  } catch (error) {
+    console.error(`为角色添加权限失败:`, error);
+    return errorResponse({ message: '服务器内部错误' });
   }
 }
-
-export const DELETE = withErrorHandling(
-  withAuth(
-    async (
-      request: NextRequest,
-      context: { authContext: AuthContext; params: { roleId: string; permissionId: string } }
-    ) => {
-      return removePermissionFromRoleHandler(request, {
-        params: context.params,
-        authContext: context.authContext,
-      });
-    },
-    { requiredPermissions: ['roles:permissions:remove'] }
-  )
-) as any;

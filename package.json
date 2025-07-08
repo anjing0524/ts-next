@@ -12,7 +12,7 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "type-check": "turbo type-check",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format": "turbo format",
     "commit": "cz",
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
@@ -22,10 +22,9 @@
     "e2e": "turbo e2e",
     "e2e:ui": "turbo e2e:ui",
     "e2e:report": "turbo e2e:report",
-    "e2e:integration": "./scripts/run-e2e-tests.sh",
-    "test:integration": "npx playwright test",
-    "test:integration:ui": "npx playwright test --ui",
-    "test:integration:debug": "npx playwright test --debug"
+    "start:e2e": "pnpm turbo run dev --parallel --filter=admin-portal --filter=oauth-service",
+    "test:e2e:admin": "start-server-and-test 'pnpm turbo dev --parallel --filter=admin-portal --filter=oauth-service' http://localhost:3002 'pnpm --filter=admin-portal test:e2e'",
+    "test:e2e:ci": "pnpm turbo build --filter=admin-portal --filter=oauth-service && start-server-and-test 'pnpm turbo start --parallel --filter=admin-portal --filter=oauth-service' http://localhost:3002 'pnpm --filter=admin-portal test:e2e:integration'"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",
@@ -40,6 +39,7 @@
     "@types/node": "^20.19.1",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
+    "esbuild-plugin-preserve-directives": "^0.0.11",
     "eslint": "^9.21.0",
     "glob": "^11.0.3",
     "husky": "^9.1.7",
@@ -47,6 +47,7 @@
     "lint-staged": "^15.4.3",
     "next": "^15.3.2",
     "prettier": "^3.5.3",
+    "start-server-and-test": "^2.0.12",
     "turbo": "^2.5.4",
     "typescript": "^5.8.2"
   },

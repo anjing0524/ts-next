@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
+import { errorResponse, successResponse } from '@repo/lib';
 import { AuthContext } from '@repo/lib/middleware';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { successResponse, errorResponse } from '@repo/lib/apiResponse';
 
 // 定义请求体校验
 const profileSchema = z.object({
@@ -22,12 +22,12 @@ async function handler(request: NextRequest, context: { authContext: AuthContext
     const json = await request.json();
     const parsed = profileSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(errorResponse('参数校验失败', 400), { status: 400 });
+      return errorResponse({ message: '参数校验失败', statusCode: 400 });
     }
 
     const userId = context.authContext.user_id;
     if (!userId) {
-      return NextResponse.json(errorResponse('未找到用户上下文', 401), { status: 401 });
+      return errorResponse({ message: '未找到用户上下文', statusCode: 401 });
     }
 
     const updated = await prisma.user.update({
@@ -44,10 +44,10 @@ async function handler(request: NextRequest, context: { authContext: AuthContext
       },
     });
 
-    return NextResponse.json(successResponse(updated), { status: 200 });
+    return successResponse(updated);
   } catch (e) {
     console.error('Update profile error', e);
-    return NextResponse.json(errorResponse('服务器内部错误', 500), { status: 500 });
+    return errorResponse({ message: '服务器内部错误', statusCode: 500 });
   }
 }
 
@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest, context: { params: any }) {
   });
 
   if (!authResult.success || !authResult.context) {
-    return authResult.response ?? NextResponse.json(errorResponse('未授权', 401), { status: 401 });
+    return authResult.response ?? errorResponse({ message: '未授权', statusCode: 401 });
   }
 
   return handler(request, { authContext: authResult.context, params: context.params });

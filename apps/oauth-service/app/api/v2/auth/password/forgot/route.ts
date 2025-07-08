@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   let requestBody;
   try {
     requestBody = await req.json();
-  } catch (error) {
+  } catch {
     // 虽然我们通常返回通用成功响应，但无效的JSON是一个客户端错误，可以明确指出
     // (Although we usually return a generic success response, invalid JSON is a client error that can be pointed out)
     return NextResponse.json(

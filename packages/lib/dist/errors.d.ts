@@ -1,3 +1,5 @@
+import { ApiResponse } from './types/api.js';
+
 /**
  * @fileoverview 定义了认证授权系统中使用的自定义错误类。
  * (Defines custom error classes used in the authentication and authorization system.)
@@ -5,14 +7,14 @@
  * @since 1.0.0
  * @see docs/工具函数规范.md Section 5.1
  */
-import { ApiResponse } from './types/api';
+
 /**
  * @enum {string}
  * OAuth 2.0 错误代码枚举 (OAuth 2.0 Error Code Enumeration)
  * 这些错误代码遵循 RFC 6749 (OAuth 2.0) 和 RFC 6750 (Bearer Token Usage) 中定义的标准。
  * (These error codes follow the standards defined in RFC 6749 (OAuth 2.0) and RFC 6750 (Bearer Token Usage).)
  */
-export declare enum OAuth2ErrorCode {
+declare enum OAuth2ErrorCode {
     /**
      * 请求无效 (Invalid Request)
      * 请求缺少必需的参数、包含不支持的参数值（授权类型除外）、重复参数、
@@ -97,7 +99,7 @@ export declare enum OAuth2ErrorCode {
  * 所有自定义错误的基类，提供了标准化的错误处理方式。
  * (Base class for all custom errors, providing a standardized way of handling errors.)
  */
-export declare abstract class BaseError extends Error {
+declare abstract class BaseError extends Error {
     /** HTTP状态码 (HTTP status code) */
     readonly status: number;
     /** 错误代码 (Error code) */
@@ -133,7 +135,7 @@ export declare abstract class BaseError extends Error {
  * 表示请求的资源不存在。
  * (Indicates that the requested resource does not exist.)
  */
-export declare class ResourceNotFoundError extends BaseError {
+declare class ResourceNotFoundError extends BaseError {
     constructor(message?: string, code?: string, context?: Record<string, any>);
 }
 /**
@@ -141,7 +143,7 @@ export declare class ResourceNotFoundError extends BaseError {
  * 表示输入数据验证失败。
  * (Indicates that input data validation failed.)
  */
-export declare class ValidationError extends BaseError {
+declare class ValidationError extends BaseError {
     constructor(message?: string, context?: Record<string, any>, code?: string);
 }
 /**
@@ -149,7 +151,7 @@ export declare class ValidationError extends BaseError {
  * 表示用户认证失败（例如，无效的凭据、缺失令牌）。
  * (Indicates user authentication failure (e.g., invalid credentials, missing token).)
  */
-export declare class AuthenticationError extends BaseError {
+declare class AuthenticationError extends BaseError {
     constructor(message?: string, context?: Record<string, any>, code?: string);
 }
 /**
@@ -157,7 +159,7 @@ export declare class AuthenticationError extends BaseError {
  * 表示用户已认证但无权访问所请求的资源。
  * (Indicates that the user is authenticated but not authorized to access the requested resource.)
  */
-export declare class AuthorizationError extends BaseError {
+declare class AuthorizationError extends BaseError {
     constructor(message?: string, context?: Record<string, any>, code?: string);
 }
 /**
@@ -165,7 +167,7 @@ export declare class AuthorizationError extends BaseError {
  * 用于更细致地区分与令牌操作相关的错误。
  * (Used for more granular distinction of errors related to token operations.)
  */
-export declare abstract class TokenError extends BaseError {
+declare abstract class TokenError extends BaseError {
     constructor(message: string, status?: number, code?: string, context?: Record<string, any>);
 }
 /**
@@ -173,7 +175,7 @@ export declare abstract class TokenError extends BaseError {
  * 表示在尝试创建令牌（如JWT）时发生错误。
  * (Indicates an error occurred while trying to create a token (e.g., JWT).)
  */
-export declare class TokenGenerationError extends TokenError {
+declare class TokenGenerationError extends TokenError {
     constructor(message?: string, context?: Record<string, any>);
 }
 /**
@@ -181,7 +183,7 @@ export declare class TokenGenerationError extends TokenError {
  * 表示提供的令牌无效（例如，签名错误、格式错误）。
  * (Indicates that a provided token is invalid (e.g., signature error, malformed).)
  */
-export declare class TokenValidationError extends TokenError {
+declare class TokenValidationError extends TokenError {
     constructor(message?: string, context?: Record<string, any>, code?: string);
 }
 /**
@@ -189,7 +191,7 @@ export declare class TokenValidationError extends TokenError {
  * 表示提供的令牌已过其有效期。
  * (Indicates that a provided token has passed its expiration time.)
  */
-export declare class TokenExpiredError extends TokenValidationError {
+declare class TokenExpiredError extends TokenValidationError {
     constructor(message?: string, context?: Record<string, any>);
 }
 /**
@@ -197,7 +199,7 @@ export declare class TokenExpiredError extends TokenValidationError {
  * 表示在尝试撤销令牌时发生错误，或者令牌已被撤销。
  * (Indicates an error occurred while trying to revoke a token, or the token was already revoked.)
  */
-export declare class TokenRevocationError extends TokenError {
+declare class TokenRevocationError extends TokenError {
     constructor(message?: string, context?: Record<string, any>);
 }
 /**
@@ -205,7 +207,7 @@ export declare class TokenRevocationError extends TokenError {
  * 表示在执行加密或解密操作（如哈希、签名验证）时发生错误。
  * (Indicates an error occurred during cryptographic operations (e.g., hashing, signature verification).)
  */
-export declare class CryptoError extends BaseError {
+declare class CryptoError extends BaseError {
     constructor(message?: string, context?: Record<string, any>);
 }
 /**
@@ -213,7 +215,7 @@ export declare class CryptoError extends BaseError {
  * 表示系统配置存在问题（例如，缺少必要的环境变量）。
  * (Indicates a problem with system configuration (e.g., missing essential environment variables).)
  */
-export declare class ConfigurationError extends BaseError {
+declare class ConfigurationError extends BaseError {
     constructor(message?: string, context?: Record<string, any>);
 }
 /**
@@ -221,7 +223,7 @@ export declare class ConfigurationError extends BaseError {
  * 用于表示符合 OAuth 2.0 规范中定义的错误。
  * (Used to represent errors defined in the OAuth 2.0 specification.)
  */
-export declare class OAuth2Error extends BaseError {
+declare class OAuth2Error extends BaseError {
     /** OAuth 2.0 标准错误代码 (OAuth 2.0 standard error code) */
     readonly oauth2ErrorCode: OAuth2ErrorCode;
     /** (可选) 错误URI，指向包含更多错误信息的页面 (Optional error URI, pointing to a page with more error information) */
@@ -255,4 +257,5 @@ export declare class OAuth2Error extends BaseError {
      */
     toApiResponse(): ApiResponse<never>;
 }
-//# sourceMappingURL=errors.d.ts.map
+
+export { AuthenticationError, AuthorizationError, BaseError, ConfigurationError, CryptoError, OAuth2Error, OAuth2ErrorCode, ResourceNotFoundError, TokenError, TokenExpiredError, TokenGenerationError, TokenRevocationError, TokenValidationError, ValidationError };

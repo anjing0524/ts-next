@@ -1,10 +1,10 @@
+// This file needs to be refactored to not use email.
+// For now, we will comment out the parts that use email.
 'use client';
 
-import { ColumnDef } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
-
+import { type ColumnDef } from '@tanstack/react-table';
+import { MoreHorizontal } from 'lucide-react';
 import {
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -13,44 +13,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@repo/ui';
+import type { User } from '@/types/auth';
 
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  isActive: boolean;
-  lastLogin: string;
-  createdAt: string;
-}
-
-export const columns: ColumnDef<User>[] = [
+export const columns = (
+  openEditDialog: (user: User) => void,
+  openDeleteDialog: (user: User) => void
+): ColumnDef<User>[] => [
   {
     accessorKey: 'username',
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Username
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: 'Username',
   },
   {
-    accessorKey: 'email',
-    header: 'Email',
+    accessorKey: 'displayName',
+    header: 'Display Name',
   },
+  // {
+  //   accessorKey: 'email',
+  //   header: 'Email',
+  // },
   {
     accessorKey: 'isActive',
     header: 'Status',
-    cell: ({ row }) => {
-      const isActive = row.getValue('isActive');
-      return (
-        <Badge variant={isActive ? 'default' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>
-      );
-    },
+    cell: ({ row }) => (row.getValue('isActive') ? 'Active' : 'Inactive'),
   },
   {
     accessorKey: 'lastLogin',
@@ -61,18 +45,9 @@ export const columns: ColumnDef<User>[] = [
     },
   },
   {
-    accessorKey: 'createdAt',
-    header: 'Created At',
-    cell: ({ row }) => {
-      const date = new Date(row.getValue('createdAt'));
-      return date.toLocaleString();
-    },
-  },
-  {
     id: 'actions',
     cell: ({ row }) => {
       const user = row.original;
-
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -87,12 +62,14 @@ export const columns: ColumnDef<User>[] = [
               Copy user ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View user details</DropdownMenuItem>
-            <DropdownMenuItem>Edit user</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-600">Delete user</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openEditDialog(user)}>Edit user</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
+              Delete user
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
     },
   },
 ];
+

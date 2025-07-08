@@ -2,8 +2,9 @@
 'use client'; // This layout now needs to be a Client Component for hooks and state
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { SiteHeader, AppSidebar, Drawer, DrawerContent, cn, useMobile } from '@repo/ui';
-import useAuth from '@/hooks/useAuth'; // 用户认证 Hook
+import { useRouter } from 'next/navigation';
+import { SiteHeader, AppSidebar, Drawer, DrawerContent, cn } from '@repo/ui';
+import { useAuth, useMobile } from '@repo/ui/hooks'; // 用户认证 Hook
 
 /**
  * 后台管理界面的主布局 (Main Layout for the Admin Dashboard Area)
@@ -15,6 +16,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const { user, isLoading: isUserLoading, logout } = useAuth(); // Auth hook
+  const router = useRouter();
+
+  console.log('AdminLayout: isLoading:', isUserLoading, 'user:', !!user);
+
+  useEffect(() => {
+    console.log('AdminLayout useEffect: isLoading:', isUserLoading, 'user:', !!user);
+    if (!isUserLoading && !user) {
+      console.log('AdminLayout: Redirecting to /login');
+      router.push('/login');
+    }
+  }, [isUserLoading, user, router]);
 
   // Fetch menu items on component mount (client-side)
   useEffect(() => {

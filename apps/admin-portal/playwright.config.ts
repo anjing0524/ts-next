@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   // 测试目录
-  testDir: './tests/e2e',
+  testDir: './__tests__/e2e',
 
   // 测试文件匹配模式
   testMatch: '**/*.{test,spec}.{js,ts}',
@@ -22,16 +22,14 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   // 测试报告配置
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }],
-  ],
+  reporter: process.env.CI
+    ? [['html', { outputFolder: 'playwright-report' }], ['list']]
+    : 'list',
 
   // 全局测试设置
   use: {
     // 基础URL
-    baseURL: 'http://localhost:3002',
+    baseURL: 'http://localhost:3002/datamgr_flow',
 
     // 浏览器设置
     headless: !!process.env.CI,
@@ -60,57 +58,35 @@ export default defineConfig({
       name: 'Desktop Chrome',
       use: { ...devices['Desktop Chrome'] },
     },
-
-    // Firefox桌面端
-    {
-      name: 'Desktop Firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    // Safari桌面端（仅Mac）
-    ...(process.platform === 'darwin'
-      ? [
-          {
-            name: 'Desktop Safari',
-            use: { ...devices['Desktop Safari'] },
-          },
-        ]
-      : []),
-
-    // 移动端Chrome
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
   ],
 
   // 开发服务器配置
-  webServer: [
-    {
-      // admin-portal服务
-      command: 'pnpm dev',
-      port: 3002,
-      env: {
-        NODE_ENV: 'test',
-        NEXT_PUBLIC_OAUTH_SERVICE_URL: 'http://localhost:3001/datamgr_flow',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-    {
-      // oauth-service服务（如果需要）
-      command: 'cd ../oauth-service && pnpm dev',
-      port: 3001,
-      env: {
-        NODE_ENV: 'test',
-        DATABASE_URL: 'file:./test.db',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-  ],
+  // webServer: [
+  //   {
+  //     // admin-portal服务
+  //     command: 'pnpm dev',
+  //     port: 3002,
+  //     env: {
+  //       NODE_ENV: 'test',
+  //       NEXT_PUBLIC_OAUTH_SERVICE_URL: 'http://localhost:3001/datamgr_flow',
+  //     },
+  //     reuseExistingServer: !process.env.CI,
+  //     stdout: 'pipe',
+  //     stderr: 'pipe',
+  //   },
+  //   {
+  //     // oauth-service服务（如果需要）
+  //     command: 'cd ../oauth-service && pnpm dev',
+  //     port: 3001,
+  //     env: {
+  //       NODE_ENV: 'test',
+  //       DATABASE_URL: 'file:./test.db',
+  //     },
+  //     reuseExistingServer: !process.env.CI,
+  //     stdout: 'pipe',
+  //     stderr: 'pipe',
+  //   },
+  // ],
 
   // 测试输出目录
   outputDir: 'test-results/',
@@ -121,6 +97,6 @@ export default defineConfig({
   },
 
   // 全局设置
-  globalSetup: require.resolve('./tests/helpers/global-setup.ts'),
-  globalTeardown: require.resolve('./tests/helpers/global-teardown.ts'),
+  // globalSetup: require.resolve('./tests/helpers/global-setup.ts'),
+  // globalTeardown: require.resolve('./tests/helpers/global-teardown.ts'),
 });

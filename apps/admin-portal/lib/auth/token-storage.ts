@@ -8,7 +8,7 @@
  * sessionStorage 用于 Refresh Token，生命周期与会话绑定。
  */
 export class TokenStorage {
-  private static readonly ACCESS_TOKEN_KEY = 'auth_token'; // Access Token 的 Cookie 名称
+  private static readonly ACCESS_TOKEN_KEY = 'access_token'; // Access Token 的 Cookie 名称
   private static readonly REFRESH_TOKEN_KEY = 'refresh_token'; // Refresh Token 在 sessionStorage 中的键名
 
   /**
@@ -41,7 +41,7 @@ export class TokenStorage {
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split('=');
       if (name === this.ACCESS_TOKEN_KEY) {
-        return value;
+        return value ?? null;
       }
     }
     return null;

@@ -1,75 +1,149 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { DataTable } from '@repo/ui';
-import { Badge } from '@repo/ui';
-import { adminApi } from '@/lib/api';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { adminApi } from '../../../../../lib/api';
+import { useAuth } from '@repo/ui/hooks';
+import { PermissionGuard } from '@repo/ui';
+import {
+  DataTable,
+  Badge,
+  Input,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  ScrollArea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@repo/ui';
+import type { AuditLog } from '@/types/auth';
+import { format } from 'date-fns';
 
-interface AuditLog {
-  id: string;
-  userId: string;
+type ColumnDef<T> = {
+  accessorKey?: keyof T | string;
+  header: string;
+  id?: string;
+  cell?: ({ row }: { row: { original: T } }) => React.ReactNode;
+};
+
+type AuditLogFilters = {
+  search: string;
   action: string;
-  resource: string;
-  timestamp: string;
-  ipAddress: string;
-  userAgent: string;
-  details?: Record<string, any>;
-}
+  status: '' | 'SUCCESS' | 'FAILURE';
+  startDate: string;
+  endDate: string;
+};
 
-export default function AuditLogPage() {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const REQUIRED_PERMISSIONS = ['menu:system:audit:view', 'audit:list'];
 
-  useEffect(() => {
-    const fetchAuditLogs = async () => {
-      try {
-        const response = await adminApi.getAuditLogs();
-        setLogs(response.data);
-      } catch (err) {
-        setError('Failed to load audit logs');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+function AuditLogsPage() {
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [filters, setFilters] = useState<AuditLogFilters>({
+    search: '',
+    action: '',
+    status: '',
+    startDate: '',
+    endDate: '',
+  });
+  const [appliedFilters, setAppliedFilters] = useState(filters);
 
-    fetchAuditLogs();
-  }, []);
+  const queryParams = useMemo(() => ({ page, limit, ...appliedFilters }), [page, limit, appliedFilters]);
 
-  const columns = [
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ['auditLogs', queryParams],
+    queryFn: () => adminApi.getAuditLogs({
+      ...queryParams,
+      startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
+      endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,
+    }),
+    placeholderData: (prev) => prev,
+  });
+
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  const columns: ColumnDef<AuditLog>[] = [
     {
       accessorKey: 'timestamp',
-      header: '时间戳',
+      header: 'Timestamp',
+      cell: ({ row }) => format(new Date(row.original.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+    },
+    { accessorKey: 'userId', header: 'User ID' },
+    { accessorKey: 'action', header: 'Action' },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.status === 'SUCCESS' ? 'success' : 'destructive'}>
+          {row.original.status}
+        </Badge>
+      ),
     },
     {
-      accessorKey: 'userId',
-      header: '用户ID',
-    },
-    {
-      accessorKey: 'action',
-      header: '操作',
-    },
-    {
-      accessorKey: 'resource',
-      header: '资源',
-    },
-    {
-      accessorKey: 'ipAddress',
-      header: 'IP地址',
-    },
-    {
-      accessorKey: 'userAgent',
-      header: '用户代理',
+      id: 'details',
+      header: 'Details',
+      cell: ({ row }) => (
+        <Button variant="outline" size="sm" onClick={() => setSelectedLog(row.original)}>
+          View
+        </Button>
+      ),
     },
   ];
 
-  if (isLoading) return <div>加载中...</div>;
-  if (error) return <div>错误: {error}</div>;
+  const handleApplyFilters = () => {
+    setPage(1);
+    setAppliedFilters(filters);
+  };
+
+  if (isLoading) return <div>Loading audit logs...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  const logs = data?.data ?? [];
+  const meta = data?.meta;
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-4">审计日志</h1>
-      <DataTable columns={columns} data={logs} />
+    <div className="container mx-auto py-10 space-y-4">
+      <h1 className="text-2xl font-bold">Audit Logs</h1>
+      <div className="flex flex-wrap gap-2 items-end">
+        {/* Filter inputs */}
+      </div>
+      <DataTable
+        columns={columns as ColumnDef<any>[]}
+        data={logs}
+        isLoading={isFetching}
+        pageCount={meta?.totalPages ?? 0}
+        pagination={{
+          pageIndex: meta ? meta.currentPage - 1 : 0,
+          pageSize: limit,
+        }}
+        onPaginationChange={(updater) => {
+          if (typeof updater === 'function') {
+            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            setPage(newPagination.pageIndex + 1);
+            setLimit(newPagination.pageSize);
+          } else {
+            setPage(updater.pageIndex + 1);
+            setLimit(updater.pageSize);
+          }
+        }}
+        manualPagination
+      />
+      {/* Dialog for details */}
     </div>
+  );
+}
+
+export default function GuardedAuditLogsPage() {
+  const { user, isLoading } = useAuth();
+  return (
+    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS} user={user} isLoading={isLoading}>
+      <AuditLogsPage />
+    </PermissionGuard>
   );
 }

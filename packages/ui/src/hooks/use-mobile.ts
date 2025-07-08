@@ -1,16 +1,28 @@
-import * as React from 'react';
+'use client';
 
-export function useMobile(query: string = '(max-width: 768px)') {
-  const [isMobile, setIsMobile] = React.useState(false);
+import { useState, useEffect } from 'react';
 
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    setIsMobile(mediaQuery.matches);
+const MOBILE_BREAKPOINT = 768; // Common breakpoint for mobile (md in Tailwind)
 
-    const handler = () => setIsMobile(mediaQuery.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [query]);
+export function useMobile(breakpoint: number = MOBILE_BREAKPOINT): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Initial check
+    const checkDevice = () => {
+      setIsMobile(window.innerWidth < breakpoint);
+    };
+    
+    checkDevice();
+
+    // Listen for window resize
+    window.addEventListener('resize', checkDevice);
+
+    // Cleanup listener
+    return () => {
+      window.removeEventListener('resize', checkDevice);
+    };
+  }, [breakpoint]);
 
   return isMobile;
 }

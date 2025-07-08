@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@repo/ui/hooks';
 import { useState } from 'react';
 
 import { z } from 'zod';
@@ -15,7 +16,8 @@ import {
   Input,
   Label,
 } from '@repo/ui';
-import { adminApi } from '@/lib/api';
+import { adminApi } from '../../../../lib/api';
+import { PermissionGuard } from '@repo/ui';
 
 // Zod schema for client registration (matches backend)
 const clientRegisterSchema = z.object({
@@ -42,7 +44,20 @@ const clientRegisterSchema = z.object({
   jwksUri: z.string().url({ message: 'JWKS URI must be a valid URL' }).optional().or(z.literal('')),
 });
 
-export default function ClientRegisterPage() {
+export default function GuardedClientRegisterPage() {
+  const { user, isLoading } = useAuth();
+  return (
+    <PermissionGuard
+      requiredPermission="clients:create"
+      user={user}
+      isLoading={isLoading}
+    >
+      <ClientRegisterPage />
+    </PermissionGuard>
+  );
+}
+
+function ClientRegisterPage() {
   const [name, setName] = useState('');
   const [redirectUris, setRedirectUris] = useState('');
   const [jwksUri, setJwksUri] = useState(''); // 1. Update State

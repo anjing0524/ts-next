@@ -206,12 +206,11 @@ export async function grantClientCredentialsToken(
   const expiresInString = `${expiresInSeconds}s`;
 
   try {
-    const token = await JWTUtils.createAccessToken({
+    const token = await JWTUtils.generateToken({
       client_id: client.clientId,
       scope: finalScopes.join(' '),
       permissions: [],
-      exp: expiresInString,
-    });
+    }, { expiresIn: expiresInString });
     return token;
   } catch (error: any) {
     console.error(`Failed to generate token for client "${client.clientId}":`, error);

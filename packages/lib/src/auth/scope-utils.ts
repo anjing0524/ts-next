@@ -85,13 +85,8 @@ export function validateScopes(
  */
 export function validateScopes(
   requestedScopes: string[],
-  allowedScopesOrClient:
-    | string[]
-    | OAuthClient
-    | { allowedScopes?: string; clientScopes?: string; scopes?: string }
-):
-  | { valid: boolean; invalidScopes: string[]; error_description?: string }
-  | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
+  allowedScopesOrClient: string[] | OAuthClient | { allowedScopes?: string; clientScopes?: string; scopes?: string }
+): { valid: boolean; invalidScopes: string[]; error_description?: string } | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
   if (requestedScopes.length === 0) {
     return { valid: true, invalidScopes: [] };
   }
@@ -119,7 +114,7 @@ export function validateScopes(
           // Prisma 返回的可能是 string | JsonValue，这里强制为 string
           clientAllowedScopes = JSON.parse(client.allowedScopes as string);
           if (!Array.isArray(clientAllowedScopes)) clientAllowedScopes = [];
-        } catch (e) {
+        } catch (e: any) {
           console.error('Failed to parse client.allowedScopes for client ID:', client.id, e);
           clientAllowedScopes = [];
         }
@@ -137,7 +132,7 @@ export function validateScopes(
       }
 
       try {
-        const { prisma } = await import('@repo/database');
+        const { prisma } = await import('@repo/database/client');
         const validDbScopes = await prisma.scope.findMany({
           where: {
             name: { in: requestedScopes },
@@ -157,7 +152,7 @@ export function validateScopes(
               ? `Requested scope(s) not found in system: ${invalidAgainstDb.join(', ')}`
               : undefined,
         };
-      } catch (error) {
+      } catch (error: any) {
         console.warn(
           'Database validation not available, falling back to client-only validation' + error
         );
@@ -185,7 +180,7 @@ export function validateScopes(
               ? scopeString
               : [];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error parsing client scopes:', error);
       return {
         valid: false,

@@ -1,80 +1,41 @@
-// /api/v2/scopes
-// 描述: 管理OAuth权限范围 (Scopes) - 创建和列表。
-// (Manages OAuth Scopes - Create and List.)
-
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@repo/database';
-import { withAuth, type AuthContext } from '@repo/lib/middleware';
-import { withErrorHandling } from '@repo/lib';
-import { successResponse, errorResponse } from '@repo/lib/apiResponse';
+import { successResponse, errorResponse } from '@repo/lib';
 import { Prisma } from '@prisma/client';
 
-// Zod Schema for creating a new scope
-// 创建新权限范围的Zod Schema
 const scopeCreateSchema = z.object({
-  name: z
-    .string()
-    .min(3, 'Scope name must be at least 3 characters long / 范围名称至少需要3个字符')
-    .max(100, 'Scope name must be at most 100 characters long / 范围名称长度不超过100字符')
-    .regex(
-      /^[a-zA-Z0-9_:-]+$/,
-      'Scope name can only contain alphanumeric characters, underscores, colons, and hyphens / 范围名称只能包含字母数字、下划线、冒号和连字符'
-    ),
-  description: z
-    .string()
-    .max(500, 'Description must be at most 500 characters long / 描述长度不超过500字符')
-    .optional()
-    .nullable(),
-  isPublic: z.boolean().default(false).optional(), // 公开客户端通常只能请求公开范围 (Public clients can usually only request public scopes)
+  name: z.string().min(3).max(100).regex(/^[a-zA-Z0-9_:-]+$/),
+  description: z.string().max(500).optional().nullable(),
+  isPublic: z.boolean().default(false).optional(),
   isActive: z.boolean().default(true).optional(),
 });
 
-// Zod Schema for listing scopes (query parameters)
-// 列出权限范围的Zod Schema (查询参数)
 const scopeListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
-  name: z.string().optional(), // Filter by name (contains)
-  isActive: z.preprocess((val) => {
-    if (val === 'true') return true;
-    if (val === 'false') return false;
-    return undefined;
-  }, z.boolean().optional()),
+  name: z.string().optional(),
+  isActive: z.preprocess((val) => val === 'true' || undefined, z.boolean().optional()),
 });
 
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 100;
-
-/**
- * GET /api/v2/scopes - 列出所有可用权限范围 (OAuth Scope管理)
- * 需要 'scope:list' 权限。
- */
-async function listScopesHandler(
-  request: NextRequest,
-  context: { authContext: AuthContext; params: any }
-) {
-  const { searchParams } = new URL(request.url);
-  const queryParams: Record<string, string | undefined> = {};
-  searchParams.forEach((value, key) => {
-    queryParams[key] = value;
-  });
-
-  const validationResult = scopeListQuerySchema.safeParse(queryParams);
-  if (!validationResult.success) {
-    return NextResponse.json(
-      errorResponse(`Validation failed: ${validationResult.error.issues.map(i => i.message).join(', ')}`, 400),
-      { status: 400 }
-    );
-  }
-
-  const { page, limit, name, isActive } = validationResult.data;
-
-  const whereClause: Prisma.ScopeWhereInput = {};
-  if (name) whereClause.name = { contains: name };
-  if (isActive !== undefined) whereClause.isActive = isActive;
-
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    const queryParams = Object.fromEntries(request.nextUrl.searchParams.entries());
+    const validationResult = scopeListQuerySchema.safeParse(queryParams);
+
+    if (!validationResult.success) {
+      return errorResponse({
+        message: '查询参数验证失败',
+        statusCode: 400,
+        details: validationResult.error.flatten(),
+      });
+    }
+
+    const { page, limit, name, isActive } = validationResult.data;
+    const whereClause: Prisma.ScopeWhereInput = {};
+    if (name) whereClause.name = { contains: name };
+    if (isActive !== undefined) whereClause.isActive = isActive;
+
     const scopes = await prisma.scope.findMany({
       where: whereClause,
       orderBy: { name: 'asc' },
@@ -83,83 +44,47 @@ async function listScopesHandler(
     });
     const totalScopes = await prisma.scope.count({ where: whereClause });
 
-    return NextResponse.json(successResponse({
-      scopes,
+    return successResponse({
+      items: scopes,
       pagination: {
         page,
         pageSize: limit,
         totalItems: totalScopes,
         totalPages: Math.ceil(totalScopes / limit),
       },
-    }, 200, 'Scopes列表获取成功'));
+    });
   } catch (error) {
-    console.error('Failed to list scopes:', error);
-    return NextResponse.json(errorResponse('Error listing scopes.', 500), { status: 500 });
+    console.error('列出范围失败:', error);
+    return errorResponse({ message: '服务器内部错误' });
   }
 }
 
-/**
- * POST /api/v2/scopes - 创建新的权限范围 (OAuth Scope管理)
- * 需要 'scope:create' 权限。
- */
-async function createScopeHandler(
-  request: NextRequest,
-  context: { authContext: AuthContext; params: any }
-) {
-  let payload;
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    payload = await request.json();
-  } catch (error) {
-    return NextResponse.json(
-      errorResponse('Failed to parse JSON body.', 400),
-      { status: 400 }
-    );
-  }
+    const payload = await request.json();
+    const validationResult = scopeCreateSchema.safeParse(payload);
 
-  const validationResult = scopeCreateSchema.safeParse(payload);
-  if (!validationResult.success) {
-    return NextResponse.json(
-      errorResponse(`Validation failed: ${validationResult.error.issues.map(i => i.message).join(', ')}`, 400),
-      { status: 400 }
-    );
-  }
+    if (!validationResult.success) {
+      return errorResponse({
+        message: '创建范围验证失败',
+        statusCode: 400,
+        details: validationResult.error.flatten(),
+      });
+    }
 
-  const { name, description, isPublic, isActive } = validationResult.data;
+    const { name, ...scopeData } = validationResult.data;
 
-  try {
     const existingScope = await prisma.scope.findUnique({ where: { name } });
     if (existingScope) {
-      return NextResponse.json(
-        errorResponse(`Scope name "${name}" already exists.`, 409),
-        { status: 409 }
-      );
+      return errorResponse({ message: `范围名称 "${name}" 已存在`, statusCode: 409 });
     }
 
     const newScope = await prisma.scope.create({
-      data: {
-        name,
-        description,
-        isPublic,
-        isActive,
-      },
+      data: { name, ...scopeData },
     });
-    return NextResponse.json(successResponse(newScope, 201, 'Scope创建成功'), { status: 201 });
-  } catch (error: any) {
-    console.error('Failed to create scope:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json(
-        errorResponse(`Scope name "${name}" already exists (race condition).`, 409),
-        { status: 409 }
-      );
-    }
-    return NextResponse.json(errorResponse('Error creating scope.', 500), { status: 500 });
+    return successResponse(newScope, 201);
+  } catch (error) {
+    console.error('创建范围失败:', error);
+    return errorResponse({ message: '服务器内部错误' });
   }
 }
-
-export const GET = withErrorHandling(
-  withAuth(listScopesHandler, { requiredPermissions: ['scope:list'] })
-) as any;
-
-export const POST = withErrorHandling(
-  withAuth(createScopeHandler, { requiredPermissions: ['scope:create'] })
-) as any;

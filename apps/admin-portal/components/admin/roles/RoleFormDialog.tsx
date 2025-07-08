@@ -13,7 +13,7 @@ import {
   Label,
   Textarea,
 } from '@repo/ui';
-import type { Role, RoleFormData } from '@/types/admin-entities';
+import type { Role, RoleFormData } from '@/types/auth';
 
 interface RoleFormDialogProps {
   isOpen: boolean;
@@ -33,6 +33,7 @@ export function RoleFormDialog({
   const [formData, setFormData] = useState<RoleFormData>({
     name: '',
     description: '',
+    permissions: [],
   });
 
   useEffect(() => {
@@ -40,10 +41,11 @@ export function RoleFormDialog({
       setFormData({
         name: role.name || '',
         description: role.description || '',
+        permissions: [], // Permissions are managed in a separate dialog, so we don't pre-fill them here.
       });
     } else {
       // Reset for create mode
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', description: '', permissions: [] });
     }
   }, [role, isOpen]); // Rely on isOpen to reset form when dialog re-opens for create
 

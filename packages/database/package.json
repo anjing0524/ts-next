@@ -8,11 +8,11 @@
     "./client": "./client.ts"
   },
   "scripts": {
+    "build": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "format": "prettier --write \"**/*.{ts,js,json,md}\""
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^6.0.1",

@@ -1,74 +1,66 @@
 import { NextResponse } from 'next/server';
-import type { MenuItem } from '@repo/ui/types'; // Import from shared types
+import { cookies } from 'next/headers';
+import { JWTUtils } from '@repo/lib/auth'; // Corrected import
+import { adminApi } from '@/lib/api'; // Corrected import
 
-// Mock menu data
-// Note: The MenuItem type from @repo/ui/types uses `keyof typeof LucideIcons` for icon.
-// This API route should ensure icon names are valid LucideIcon names.
-const menuItems: MenuItem[] = [
-  {
-    id: 'dashboard',
-    title: '仪表盘', // Dashboard
-    href: '/admin',
-    icon: 'Home', // Example Lucide icon name
-  },
-  {
-    id: 'users',
-    title: '用户管理', // User Management
-    href: '/admin/users',
-    icon: 'Users',
-    children: [
-      {
-        id: 'users-list',
-        title: '用户列表', // User List
-        href: '/admin/users',
-        icon: 'List',
-      },
-      {
-        id: 'users-roles',
-        title: '角色权限', // Roles & Permissions
-        href: '/admin/users/roles',
-        icon: 'ShieldCheck',
-      },
-    ],
-  },
-  {
-    id: 'system',
-    title: '系统设置', // System Settings
-    href: '/admin/system',
-    icon: 'Settings',
-    children: [
-      {
-        id: 'system-general',
-        title: '常规设置', // General Settings
-        href: '/admin/system/general',
-        icon: 'SlidersHorizontal',
-      },
-      {
-        id: 'system-audit',
-        title: '审计日志', // Audit Log
-        href: '/admin/audit', // Corrected from /admin/system/audit to match existing file structure
-        icon: 'ScrollText',
-      },
-    ],
-  },
-  {
-    id: 'clients',
-    title: 'OAuth客户端', // OAuth Clients
-    href: '/admin/clients',
-    icon: 'AppWindow',
-  },
-  {
-    id: 'profile',
-    title: '个人资料', // Profile
-    href: '/profile', // Assuming /profile is a valid top-level dashboard page
-    icon: 'UserCircle',
-  },
-];
+// Helper function to filter menu items based on user permissions
+function filterMenuItems(menuItems: any[], userPermissions: string[]): any[] {
+  return menuItems
+    .filter((item) => {
+      // If item has no specific permissions, it's visible by default
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      // Check if user has any of the required permissions for this item
+      return item.permissions.some((perm: string) => userPermissions.includes(perm));
+    })
+    .map((item) => {
+      // Recursively filter children
+      if (item.children && item.children.length > 0) {
+        return {
+          ...item,
+          children: filterMenuItems(item.children, userPermissions),
+        };
+      }
+      return item;
+    })
+    .filter((item) => {
+      // Remove parent items if all their children were filtered out
+      return !item.children || item.children.length > 0 || item.path !== '#';
+    })
+    .sort((a, b) => a.order - b.order); // Sort by order
+}
 
 export async function GET() {
-  // In a real application, you would fetch this data based on user roles/permissions.
-  // For now, we return mock data.
-  // Simulate a delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return NextResponse.json(menuItems);
+  try {
+    const token = (await cookies()).get('access_token')?.value;
+
+    if (!token) {
+      // If no token, return only public menu items or an empty array
+      // For now, we fetch all menus and filter by empty permissions
+      const allMenus = await adminApi.getMenus();
+      return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
+    }
+
+    // Verify token and get user permissions
+    const verificationResult = await JWTUtils.verifyToken(token); // Corrected function call
+    if (!verificationResult.valid || !verificationResult.payload?.sub) { // Check for valid payload and user ID (sub)
+      const allMenus = await adminApi.getMenus();
+      return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
+    }
+
+    // Fetch user's actual permissions from the backend
+    // This is crucial for dynamic, real-time permission checks
+    const userPermissions = verificationResult.payload.permissions as string[] || [];
+
+    const allMenus = await adminApi.getMenus();
+    const filtered = filterMenuItems(allMenus, userPermissions);
+    return NextResponse.json(filtered, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching menu items:', error);
+    // In case of any error, return a safe, minimal menu
+    const allMenus = await adminApi.getMenus();
+    return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
+  }
 }
+

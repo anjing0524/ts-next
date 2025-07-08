@@ -10,6 +10,8 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type VisibilityState,
+  type PaginationState,
+  type OnChangeFn,
 } from '@tanstack/react-table';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { DataTablePagination } from './table-pagination';
@@ -19,29 +21,21 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   className?: string;
   isLoading?: boolean;
-  pageCount?: number;
-  pageIndex?: number;
-  pageSize?: number;
-  onPageChange?: (pageIndex: number) => void;
-  onPageSizeChange?: (pageSize: number) => void;
-  manualPagination?: boolean;
+  pageCount: number;
+  pagination: PaginationState;
+  onPaginationChange: OnChangeFn<PaginationState>;
+  manualPagination: true;
 }
 
-/**
- * 完整的数据表格组件，基于TanStack React Table
- * Complete data table component based on TanStack React Table
- */
 export function DataTable<TData, TValue>({
   columns,
   data,
   className,
   isLoading = false,
-  pageCount: controlledPageCount,
-  pageIndex: controlledPageIndex,
-  pageSize: controlledPageSize,
-  onPageChange,
-  onPageSizeChange,
-  manualPagination = false,
+  pageCount,
+  pagination,
+  onPaginationChange,
+  manualPagination,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -51,45 +45,24 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    manualPagination,
-    pageCount: controlledPageCount,
+    pageCount,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-      ...(manualPagination && {
-        pagination: {
-          pageIndex: controlledPageIndex || 0,
-          pageSize: controlledPageSize || 10,
-        },
-      }),
+      pagination,
     },
+    onPaginationChange,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    manualPagination,
   });
-
-  const handlePageChange = (pageIndex: number) => {
-    if (onPageChange) {
-      onPageChange(pageIndex);
-    } else {
-      table.setPageIndex(pageIndex);
-    }
-  };
-
-  const handlePageSizeChange = (pageSize: number) => {
-    if (onPageSizeChange) {
-      onPageSizeChange(pageSize);
-    } else {
-      table.setPageSize(pageSize);
-    }
-  };
 
   return (
     <div className={className}>
@@ -143,21 +116,10 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      {/* 分页组件 */}
-      <DataTablePagination
-        pageIndex={
-          manualPagination ? controlledPageIndex || 0 : table.getState().pagination.pageIndex
-        }
-        pageSize={
-          manualPagination ? controlledPageSize || 10 : table.getState().pagination.pageSize
-        }
-        pageCount={manualPagination ? controlledPageCount || 0 : table.getPageCount()}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-      />
+      <DataTablePagination table={table} />
     </div>
   );
 }
 
-// 导出TanStack React Table的ColumnDef类型以保持兼容性
 export type { ColumnDef } from '@tanstack/react-table';
+

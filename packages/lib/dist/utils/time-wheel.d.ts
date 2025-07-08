@@ -69,6 +69,6 @@ declare class TimeWheel {
  * 获取时间轮实例
  * Get time wheel instance
  */
-export declare function getTimeWheelInstance(): TimeWheel;
-export default TimeWheel;
-//# sourceMappingURL=time-wheel.d.ts.map
+declare function getTimeWheelInstance(): TimeWheel;
+
+export { TimeWheel as default, getTimeWheelInstance };

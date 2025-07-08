@@ -120,7 +120,7 @@ export class PermissionService {
         // Check if the user-role assignment is expired
         const isExpired = userRole.expiresAt && userRole.expiresAt.getTime() <= Date.now();
         if (!isExpired) {
-          userRole.role.rolePermissions.forEach((rolePermission) => {
+          userRole.role.rolePermissions.forEach((rolePermission: { permission: { isActive: any; name: any; }; }) => {
             // 确保权限对象存在、活动且有名称
             // Ensure permission object exists, is active, and has a name
             if (

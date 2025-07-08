@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
+
 /**
  * 速率限制结果接口 - 定义限流检查的返回值
  * Rate limit result interface - defines the return value of rate limit checks
  */
-export interface RateLimitResult {
+interface RateLimitResult {
     /** 是否允许请求 (Whether the request is allowed) */
     allowed: boolean;
     /** 剩余请求数 (Remaining requests) */
@@ -19,7 +20,7 @@ export interface RateLimitResult {
  * 速率限制配置接口 - 定义限流参数
  * Rate limit configuration interface - defines rate limiting parameters
  */
-export interface RateLimitConfig {
+interface RateLimitConfig {
     /** 最大请求数 (Maximum requests) */
     maxRequests: number;
     /** 时间窗口（毫秒） (Time window in milliseconds) */
@@ -37,7 +38,7 @@ export interface RateLimitConfig {
  * 速率限制工具类 - 提供基于内存的滑动窗口限流功能
  * Rate limiting utility class - provides in-memory sliding window rate limiting
  */
-export declare class RateLimitUtils {
+declare class RateLimitUtils {
     private static store;
     private static cleanupInterval;
     /**
@@ -95,7 +96,7 @@ export declare class RateLimitUtils {
  * 预配置的默认限流器
  * Pre-configured default rate limiter
  */
-export declare const defaultRateLimiter: {
+declare const defaultRateLimiter: {
     maxRequests: number;
     windowMs: number;
     keyType: "ip";
@@ -104,7 +105,7 @@ export declare const defaultRateLimiter: {
  * 创建一个简单的限流检查函数
  * Creates a simple rate limiting check function
  */
-export declare function createRateLimit({ maxRequests, windowMs, }: {
+declare function createRateLimit({ maxRequests, windowMs, }: {
     maxRequests: number;
     windowMs: number;
 }): (key: string) => RateLimitResult;
@@ -112,5 +113,6 @@ export declare function createRateLimit({ maxRequests, windowMs, }: {
  * 创建一个请求级别的限流中间件函数
  * Creates a request-level rate limiting middleware function
  */
-export declare function createRequestRateLimit(config: RateLimitConfig): (request: NextRequest) => RateLimitResult;
-//# sourceMappingURL=rate-limit-utils.d.ts.map
+declare function createRequestRateLimit(config: RateLimitConfig): (request: NextRequest) => RateLimitResult;
+
+export { type RateLimitConfig, type RateLimitResult, RateLimitUtils, createRateLimit, createRequestRateLimit, defaultRateLimiter };

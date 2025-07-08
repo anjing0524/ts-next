@@ -22,7 +22,6 @@ export * from './utils';
 export * from './errors';
 
 // API响应工具 (API response utilities)
-export type { ApiResponse } from './apiResponse';
 
 // API响应工具函数
 export { successResponse, errorResponse, generateRequestId } from './apiResponse';

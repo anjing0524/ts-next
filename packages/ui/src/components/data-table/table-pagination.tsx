@@ -16,8 +16,7 @@ interface DataTablePaginationProps {
 
 // 修改分页组件，解决图标遮挡和文本换行问题
 export function DataTablePagination({
-  pageIndex,
-  pageSize,
+  
   pageCount,
   pageSizeOptions = [10, 20, 30, 40, 50],
   onPageChange,

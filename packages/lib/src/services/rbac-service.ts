@@ -72,12 +72,12 @@ export class RBACService {
     }
 
     // 收集所有角色
-    const roles = user.userRoles.map((ur) => ur.role.name);
+    const roles = user.userRoles.map((ur: { role: { name: any; }; }) => ur.role.name);
 
     // 收集所有权限（去重）
     const permissionSet = new Set<string>();
-    user.userRoles.forEach((userRole) => {
-      userRole.role.rolePermissions.forEach((rolePermission) => {
+    user.userRoles.forEach((userRole: { role: { rolePermissions: any[]; }; }) => {
+      userRole.role.rolePermissions.forEach((rolePermission: { permission: { name: any; }; }) => {
         permissionSet.add(rolePermission.permission.name);
       });
     });

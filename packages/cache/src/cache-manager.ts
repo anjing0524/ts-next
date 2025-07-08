@@ -10,10 +10,14 @@ import logger from './logger';
 
 // 缓存接口定义
 export interface CacheInterface {
+  // eslint-disable-next-line no-unused-vars
   get<T = any>(key: string): Promise<T | null>;
+  // eslint-disable-next-line no-unused-vars
   set(key: string, value: any, ttl?: number): Promise<void>;
+  // eslint-disable-next-line no-unused-vars
   del(key: string): Promise<void>;
   clear(): Promise<void>;
+  // eslint-disable-next-line no-unused-vars
   exists(key: string): Promise<boolean>;
 }
 
