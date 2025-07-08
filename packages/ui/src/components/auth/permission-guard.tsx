@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react'; // For loading spinner
 
 // The user object shape expected by this component.
 // Applications using this component must provide a user object that matches this shape.
-interface GuardUser {
+export interface GuardUser {
   permissions?: string[];
 }
 

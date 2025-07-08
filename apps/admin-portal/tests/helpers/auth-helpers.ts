@@ -16,6 +16,7 @@ export class AuthHelpers {
     await page.goto('/login');
     
     // Wait for the main login button to be visible, which is more reliable
+    await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 15000 });
     const loginButton = page.locator('[data-testid="login-oauth-button"]');
     await expect(loginButton).toBeVisible({ timeout: 15000 });
     await loginButton.click();

@@ -29,7 +29,7 @@ export default defineConfig({
   // 全局测试设置
   use: {
     // 基础URL
-    baseURL: 'http://localhost:3002/datamgr_flow',
+    baseURL: 'http://localhost:3002',
 
     // 浏览器设置
     headless: !!process.env.CI,

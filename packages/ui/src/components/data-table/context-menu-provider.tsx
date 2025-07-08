@@ -3,26 +3,27 @@
 import { Copy, Filter, Download, Clipboard, ArrowUpDown, Settings } from 'lucide-react';
 import { Menu, Item, Separator, Submenu } from 'react-contexify';
 import 'react-contexify/ReactContexify.css';
+import { type Column } from '@tanstack/react-table';
 
 export const MENU_ID = 'data-table-context-menu';
 
-interface ContextMenuProviderProps {
-  onCopyRow: (row: unknown) => void;
+interface ContextMenuProviderProps<TData> {
+  onCopyRow: (row: TData) => void;
   onCopyCell: (value: unknown) => void;
-  onFilterByValue?: (column: string, value: unknown, type?: string) => void;
+  onFilterByValue?: (column: Column<TData, unknown>, value: unknown, type?: string) => void;
   onExportData?: () => void;
   onResetFilters?: () => void;
   onColumnSettings?: () => void;
 }
 
-export function ContextMenuProvider({
+export function ContextMenuProvider<TData>({
   onCopyRow,
   onCopyCell,
   onFilterByValue,
   onExportData,
   onResetFilters,
   onColumnSettings,
-}: ContextMenuProviderProps) {
+}: ContextMenuProviderProps<TData>) {
   return (
     <Menu id={MENU_ID} animation={false}>
       <Item onClick={({ props }) => onCopyRow(props.row)}>

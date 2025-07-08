@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { DataTable, Button } from '@repo/ui';
+import { DataTable, Button, ColumnDef } from '@repo/ui';
 import { PlusCircle } from 'lucide-react';
 import { useAuth } from '@repo/ui';
 import { useClientManagement } from '../hooks/use-client-management';
 import type { Client } from '@/types/auth';
 
-const columns = (openEditModal: (client: Client) => void, openDeleteModal: (client: Client) => void, rotateSecret: (clientId: string) => void) => [
-  { accessorKey: 'clientName', header: 'Client Name' },
+const columns = (openEditModal: (client: Client) => void, openDeleteModal: (client: Client) => void, rotateSecret: (clientId: string) => void): ColumnDef<Client>[] => [
+  { accessorKey: 'name', header: 'Client Name' },
   { accessorKey: 'clientId', header: 'Client ID' },
   {
     id: 'actions',
-    cell: ({ row }: { row: { original: Client } }) => (
+    cell: ({ row }) => (
       <div className="space-x-2">
         <Button variant="outline" size="sm" onClick={() => rotateSecret(row.original.id)}>Rotate Secret</Button>
         <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>Edit</Button>
@@ -34,6 +34,10 @@ export const ClientManagementView = () => {
     openEditModal,
     openDeleteConfirm,
     rotateSecret,
+    page,
+    setPage,
+    limit,
+    setLimit,
   } = useClientManagement();
 
   const clientColumns = useMemo(() => columns(openEditModal, openDeleteConfirm, rotateSecret), [openEditModal, openDeleteConfirm, rotateSecret]);
@@ -57,6 +61,20 @@ export const ClientManagementView = () => {
         data={clients}
         isLoading={isFetching}
         pageCount={meta?.totalPages ?? 0}
+        pagination={{
+          pageIndex: meta ? meta.currentPage - 1 : 0,
+          pageSize: limit,
+        }}
+        onPaginationChange={(updater) => {
+          if (typeof updater === 'function') {
+            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            setPage(newPagination.pageIndex + 1);
+            setLimit(newPagination.pageSize);
+          } else {
+            setPage(updater.pageIndex + 1);
+            setLimit(updater.pageSize);
+          }
+        }}
       />
     </div>
   );

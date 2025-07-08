@@ -62,14 +62,24 @@ function PermissionsPageContent() {
       </div>
 
       <DataTable
-        columns={columns as ColumnDef<any, any>[]}
+        columns={columns}
         data={permissions}
         isLoading={isFetching}
         pageCount={meta?.totalPages ?? 0}
-        pageIndex={meta ? meta.currentPage - 1 : 0}
-        pageSize={limit}
-        onPageChange={(newPageIndex) => setPage(newPageIndex + 1)}
-        onPageSizeChange={setLimit}
+        pagination={{
+          pageIndex: meta ? meta.currentPage - 1 : 0,
+          pageSize: limit,
+        }}
+        onPaginationChange={(updater) => {
+          if (typeof updater === 'function') {
+            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            setPage(newPagination.pageIndex + 1);
+            setLimit(newPagination.pageSize);
+          } else {
+            setPage(updater.pageIndex + 1);
+            setLimit(updater.pageSize);
+          }
+        }}
       />
     </div>
   );

@@ -227,17 +227,6 @@ impl GoldenSignalsMonitor {
         self.error_tracker.record(is_error);
         
         debug!("记录黄金信号: 延迟={latency_ms}ms, 错误={is_error}");
-
-        // 更新 Prometheus Gauge
-        if let Some(collector) = crate::metrics::get_metrics() {
-            let percentiles = self.latency_tracker.get_percentiles();
-            let p50 = *percentiles.get("p50").unwrap_or(&0.0);
-            let p95 = *percentiles.get("p95").unwrap_or(&0.0);
-            let p99 = *percentiles.get("p99").unwrap_or(&0.0);
-            let qps = self.traffic_tracker.get_qps();
-            let error_rate = self.error_tracker.get_error_rate();
-            collector.update_golden_signals(p50, p95, p99, qps, error_rate);
-        }
     }
     
     /// 增加活跃连接数

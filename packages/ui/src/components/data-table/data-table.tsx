@@ -1,103 +1,132 @@
-import React, { useState } from 'react';
+'use client';
+
+import React from 'react';
 import {
   flexRender,
   getCoreRowModel,
-  useReactTable,
   getSortedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  useReactTable,
   type ColumnDef,
-  type SortingState,
-  type ColumnFiltersState,
-  type VisibilityState,
-  type PaginationState,
-  type OnChangeFn,
 } from '@tanstack/react-table';
+import { useContextMenu } from 'react-contexify';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { DataTablePagination } from './table-pagination';
-
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-  className?: string;
-  isLoading?: boolean;
-  pageCount: number;
-  pagination: PaginationState;
-  onPaginationChange: OnChangeFn<PaginationState>;
-  manualPagination: true;
-}
+import { DataTableToolbar } from './data-table-toolbar';
+import { type DataTableProps } from './types';
+import { ContextMenuProvider, MENU_ID } from './context-menu-provider';
 
 export function DataTable<TData, TValue>({
   columns,
   data,
-  className,
-  isLoading = false,
   pageCount,
   pagination,
   onPaginationChange,
-  manualPagination,
+  sorting,
+  onSortingChange,
+  columnFilters,
+  onColumnFiltersChange,
+  columnVisibility,
+  onColumnVisibilityChange,
+  rowSelection,
+  onRowSelectionChange,
+  className,
+  isLoading = false,
+  pageSizeOptions,
+  onCopyRow,
+  onCopyCell,
+  onFilterByValue,
+  onExportData,
+  onResetFilters,
+  onColumnSettings,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
+  const { show } = useContextMenu({
+    id: MENU_ID,
+  });
 
   const table = useReactTable({
     data,
     columns,
     pageCount,
     state: {
+      pagination,
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
     },
     onPaginationChange,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onSortingChange,
+    onColumnFiltersChange,
+    onColumnVisibilityChange,
+    onRowSelectionChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    manualPagination,
+    getPaginationRowModel: getPaginationRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
   });
+
+  const handleCopyRow = onCopyRow ?? ((row: TData) => navigator.clipboard.writeText(JSON.stringify(row, null, 2)));
+  const handleCopyCell = onCopyCell ?? ((value: unknown) => navigator.clipboard.writeText(String(value)));
 
   return (
     <div className={className}>
+      <DataTableToolbar table={table} />
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} style={{ width: `${header.getSize()}px` }}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody
+            onContextMenu={(e) => {
+              // This is a generic context menu for the body, can be customized
+            }}
+          >
             {isLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  加载中... (Loading...)
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                  加载中...
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  onContextMenu={(e) => show({ event: e, props: { row: row.original } })}
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      onContextMenu={(e) =>
+                        show({
+                          event: e,
+                          props: {
+                            row: row.original,
+                            cellValue: cell.getValue(),
+                            column: cell.column,
+                          },
+                        })
+                      }
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -105,18 +134,23 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  暂无数据 (No data available)
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                  暂无数据
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination table={table} />
+      <DataTablePagination table={table} pageSizeOptions={pageSizeOptions} />
+      <ContextMenuProvider
+        onCopyRow={handleCopyRow}
+        onCopyCell={handleCopyCell}
+        onFilterByValue={onFilterByValue}
+        onExportData={onExportData}
+        onResetFilters={onResetFilters}
+        onColumnSettings={onColumnSettings}
+      />
     </div>
   );
 }

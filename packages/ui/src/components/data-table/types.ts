@@ -1,55 +1,122 @@
-import { Cell, ColumnDef, Header, HeaderGroup, Row } from '@tanstack/react-table';
+import {
+  Column,
+  ColumnDef,
+  ColumnFiltersState,
+  OnChangeFn,
+  PaginationState,
+  RowSelectionState,
+  SortingState,
+  VisibilityState,
+} from '@tanstack/react-table';
 
-export interface DataTableProps<TData> {
+export interface DataTableProps<TData, TValue> {
+  /**
+   * The columns definition for the table.
+   */
+  columns: ColumnDef<TData, TValue>[];
+
+  /**
+   * The data for the table.
+   */
   data: TData[];
-  columns: ColumnDef<TData>[];
-  pageSize?: number;
-  defaultPageSize?: number;
+
+  /**
+   * The number of pages in the table.
+   */
+  pageCount: number;
+
+  /**
+   * The pagination state of the table.
+   */
+  pagination: PaginationState;
+
+  /**
+   * Callback for when the pagination state changes.
+   */
+  onPaginationChange: OnChangeFn<PaginationState>;
+
+  /**
+   * The sorting state of the table.
+   */
+  sorting?: SortingState;
+
+  /**
+   * Callback for when the sorting state changes.
+   */
+  onSortingChange?: OnChangeFn<SortingState>;
+
+  /**
+   * The column filters state of the table.
+   */
+  columnFilters?: ColumnFiltersState;
+
+  /**
+   * Callback for when the column filters state changes.
+   */
+  onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
+
+  /**
+   * The column visibility state of the table.
+   */
+  columnVisibility?: VisibilityState;
+
+  /**
+   * Callback for when the column visibility state changes.
+   */
+  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
+
+  /**
+   * The row selection state of the table.
+   */
+  rowSelection?: RowSelectionState;
+
+  /**
+   * Callback for when the row selection state changes.
+   */
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+
+  /**
+   * The class name for the container element.
+   */
+  className?: string;
+
+  /**
+   * Whether the table is in a loading state.
+   */
+  isLoading?: boolean;
+
+  /**
+   * Options for page size selection.
+   */
   pageSizeOptions?: number[];
-  onPageChange?: (page: number) => void;
-  onPageSizeChange?: (pageSize: number) => void;
-  onSortChange?: (sortBy: { id: string; desc: boolean }[]) => void;
-  onColumnOrderChange?: (columnOrder: string[]) => void;
-  enableColumnDragging?: boolean;
-  enableVirtualization?: boolean;
-  rowHeight?: number;
-  containerHeight?: number;
-}
 
-export interface TableHeaderCellProps<TData, TValue = unknown> {
-  header: Header<TData, TValue>;
-  enableDragging?: boolean;
-}
+  /**
+   * Callback for copying a row.
+   */
+  onCopyRow?: (row: TData) => void;
 
-export interface DataTableCellProps<TData, TValue = unknown> {
-  cell: Cell<TData, TValue>;
-}
+  /**
+   * Callback for copying a cell's value.
+   */
+  onCopyCell?: (value: unknown) => void;
 
-export interface DataTableHeaderProps<TData> {
-  headerGroup: HeaderGroup<TData>;
-  enableColumnDragging?: boolean;
-  columnOrder: string[];
-}
+  /**
+   * Callback for filtering by a specific value.
+   */
+  onFilterByValue?: (column: Column<TData, unknown>, value: unknown, type?: string) => void;
 
-export interface DataTableCellProps<TData, TValue> {
-  cell: Cell<TData, TValue>;
-}
+  /**
+   * Callback for exporting data.
+   */
+  onExportData?: () => void;
 
-// 在 DataTableBodyProps 接口中添加 headerRef
-export interface DataTableBodyProps<TData> {
-  rows: Row<TData>[];
-  rowHeight?: number;
-  containerHeight?: number;
-  enableVirtualization?: boolean;
-  columnOrder?: string[];
-  headerRef?: React.RefObject<HTMLDivElement | null>; // 添加这一行
-}
+  /**
+   * Callback for resetting filters.
+   */
+  onResetFilters?: () => void;
 
-export interface PaginationState {
-  pageIndex: number;
-  pageSize: number;
-}
-
-export interface ColumnOrderState {
-  columnOrder: string[];
+  /**
+   * Callback for opening column settings.
+   */
+  onColumnSettings?: () => void;
 }

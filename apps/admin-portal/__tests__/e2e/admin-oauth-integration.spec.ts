@@ -1,19 +1,21 @@
 import { test, expect, Page } from '@playwright/test';
 
 const ADMIN_PORTAL_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002';
-const OAUTH_SERVICE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
+const OAUTH_SERVICE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001/datamgr_flow';
 
 test.describe('Admin Portal OAuth Integration', () => {
 
   test('should redirect unauthenticated user to login page', async ({ page }) => {
     await page.goto(`${ADMIN_PORTAL_URL}/admin`);
     await page.waitForURL(`${ADMIN_PORTAL_URL}/login**`);
+    await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 10000 });
     await expect(page.locator('[data-testid="login-oauth-button"]')).toBeVisible();
   });
 
   test('should allow a user to log in, see the dashboard, and log out', async ({ page }) => {
     // 1. Start login flow
     await page.goto(`${ADMIN_PORTAL_URL}/login`);
+    await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 10000 });
     await page.locator('[data-testid="login-oauth-button"]').click();
 
     // 2. Handle login and consent on oauth-service
@@ -40,6 +42,7 @@ test.describe('Admin Portal OAuth Integration', () => {
 
     // 5. Verify successful logout
     await page.waitForURL(`${ADMIN_PORTAL_URL}/login**`);
+    await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 10000 });
     await expect(page.locator('[data-testid="login-oauth-button"]')).toBeVisible();
   });
 });

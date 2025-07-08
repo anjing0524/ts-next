@@ -70,7 +70,6 @@ export function UserManagementView() {
         pageCount={usersMeta?.totalPages ?? 0}
         pagination={pagination}
         onPaginationChange={setPagination}
-        manualPagination
         isLoading={areUsersLoading}
       />
 

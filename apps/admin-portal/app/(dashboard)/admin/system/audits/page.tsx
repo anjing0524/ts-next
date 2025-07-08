@@ -132,7 +132,6 @@ function AuditLogsPage() {
             setLimit(updater.pageSize);
           }
         }}
-        manualPagination
       />
       {/* Dialog for details */}
     </div>

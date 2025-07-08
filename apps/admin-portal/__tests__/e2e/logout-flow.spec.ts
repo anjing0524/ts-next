@@ -20,6 +20,7 @@ test.describe('Logout Flow E2E Test', () => {
 
     // 3. 验证是否重定向到登录页
     await page.waitForURL('**/login', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 10000 });
     await expect(page.locator('[data-testid="login-oauth-button"]')).toBeVisible();
 
     // 4. 验证本地Token是否被清除
