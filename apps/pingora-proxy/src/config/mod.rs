@@ -1,94 +1,63 @@
-//! 配置模块，适配 default.yaml 结构
-//! 支持 server、upstreams、tls、performance 等嵌套字段
-
 use serde::Deserialize;
-use ::config::{Config, ConfigError, File, Environment};
-use std::env;
+use std::fs;
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct ServerConfig {
-    pub listen_address: String,
-    pub listen_port: u16,
-    pub worker_threads: Option<usize>,
-    pub graceful_shutdown: Option<bool>,
-    pub graceful_timeout_seconds: Option<u64>,
+#[derive(Debug, Clone, Deserialize)]
+pub struct Settings {
+    pub services: Vec<ServiceConfig>,
 }
 
-
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct UpstreamConfig {
+#[derive(Debug, Clone, Deserialize)]
+pub struct ServiceConfig {
     pub name: String,
-    pub host: String,
-    pub port: u16,
-    pub path_prefix: String,
-    pub health_check_path: Option<String>,
-    pub timeout_seconds: Option<u16>,
-    pub tls_enabled: Option<bool>,
+    pub bind_address: String,
+    pub upstreams: Vec<String>,
+    #[serde(default)]
+    pub tls: bool,
+    #[serde(default)]
+    pub health_check: HealthCheckConfig,
 }
 
-impl UpstreamConfig {
-    /// 获取上游地址
-    pub fn addrs(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+#[derive(Debug, Clone, Deserialize)]
+pub struct HealthCheckConfig {
+    #[serde(default = "default_health_check_timeout_ms")]
+    pub timeout_ms: u64,
+    #[serde(default = "default_health_check_frequency_secs")]
+    pub frequency_secs: u64,
+}
+
+fn default_health_check_timeout_ms() -> u64 {
+    500
+}
+
+fn default_health_check_frequency_secs() -> u64 {
+    5
+}
+
+impl Default for HealthCheckConfig {
+    fn default() -> Self {
+        Self {
+            timeout_ms: default_health_check_timeout_ms(),
+            frequency_secs: default_health_check_frequency_secs(),
+        }
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct TlsConfig {
-    pub enabled: bool,
-    pub listen_port: Option<u16>,
-    pub cert_path: Option<String>,
-    pub key_path: Option<String>,
-    pub http2_enabled: Option<bool>,
-    pub http3_enabled: Option<bool>,
-}
+impl Settings {
+    pub fn from_file(path: &str) -> Result<Self, anyhow::Error> {
+        let content = fs::read_to_string(path)?;
+        let settings: Settings = serde_yaml::from_str(&content)?;
+        Ok(settings)
+    }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct PerformanceConfig {
-    pub zero_copy_enabled: Option<bool>,
-    pub memory_pool_enabled: Option<bool>,
-    pub compression_enabled: Option<bool>,
-    pub cache_enabled: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct JwtConfig {
-    pub jwks_url: String,
-    pub audience: String,
-    pub issuer: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct MonitoringConfig {
-    pub enabled: Option<bool>,
-    pub listen_port: Option<u16>,
-    pub metrics_path: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ProxyConfig {
-    pub server: ServerConfig,
-    pub jwt: JwtConfig,
-    pub upstreams: Vec<UpstreamConfig>,
-    pub tls: Option<TlsConfig>,
-    pub performance: Option<PerformanceConfig>,
-    pub monitoring: Option<MonitoringConfig>,
-}
-
-impl ProxyConfig {
-    /// 加载配置，优先级：环境变量 > {env}.yaml > default.yaml
-    pub fn from_env_and_file() -> Result<Self, ConfigError> {
-        let env = env::var("RUN_ENV").unwrap_or_else(|_| "development".into());
-
-        let s = Config::builder()
-            .add_source(File::with_name("config/default.yaml").required(true))
-            .add_source(File::with_name(&format!("config/{}.yaml", env)).required(false))
-            .add_source(Environment::with_prefix("PINGORA").separator("__"))
-            .build()?;
-        
-        s.try_deserialize()
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        for service in &self.services {
+            if service.upstreams.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Service '{}' has no defined upstreams.",
+                    service.name
+                ));
+            }
+        }
+        Ok(())
     }
 }
-
- 

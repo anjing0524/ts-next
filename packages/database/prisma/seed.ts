@@ -816,7 +816,7 @@ async function main() {
     },
   ];
   for (const scopeData of scopesToSeed) {
-    await prisma.scope.upsert({
+    const createdScope = await prisma.scope.upsert({
       where: { name: scopeData.name },
       update: {
         description: scopeData.description,
@@ -825,16 +825,102 @@ async function main() {
       },
       create: scopeData,
     });
+    
+    // 为admin:full_access scope关联所有权限
+    if (scopeData.name === 'admin:full_access') {
+      for (const permission of Object.values(seededPermissions)) {
+        await prisma.scopePermission.upsert({
+          where: { 
+            scopeId_permissionId: { 
+              scopeId: createdScope.id, 
+              permissionId: permission.id 
+            } 
+          },
+          update: {},
+          create: {
+            scopeId: createdScope.id,
+            permissionId: permission.id,
+          },
+        });
+      }
+      console.log(`Scope '${scopeData.name}' 已关联所有权限`);
+    }
+    
+    // 为其他scope关联对应的权限
+    if (scopeData.name === 'order:read') {
+      const orderReadPermission = seededPermissions['order:read'];
+      if (orderReadPermission) {
+        await prisma.scopePermission.upsert({
+          where: { 
+            scopeId_permissionId: { 
+              scopeId: createdScope.id, 
+              permissionId: orderReadPermission.id 
+            } 
+          },
+          update: {},
+          create: {
+            scopeId: createdScope.id,
+            permissionId: orderReadPermission.id,
+          },
+        });
+      }
+    }
+    
+    if (scopeData.name === 'order:create') {
+      const orderCreatePermission = seededPermissions['order:create'];
+      if (orderCreatePermission) {
+        await prisma.scopePermission.upsert({
+          where: { 
+            scopeId_permissionId: { 
+              scopeId: createdScope.id, 
+              permissionId: orderCreatePermission.id 
+            } 
+          },
+          update: {},
+          create: {
+            scopeId: createdScope.id,
+            permissionId: orderCreatePermission.id,
+          },
+        });
+      }
+    }
+    
+    if (scopeData.name === 'product:read') {
+      const productReadPermission = seededPermissions['product:read'];
+      if (productReadPermission) {
+        await prisma.scopePermission.upsert({
+          where: { 
+            scopeId_permissionId: { 
+              scopeId: createdScope.id, 
+              permissionId: productReadPermission.id 
+            } 
+          },
+          update: {},
+          create: {
+            scopeId: createdScope.id,
+            permissionId: productReadPermission.id,
+          },
+        });
+      }
+    }
   }
-  console.log('Scopes 填充完成。'); // Scopes seeded.
+  console.log('Scopes 和 Scope-Permission 关联填充完成。'); // Scopes and scope-permission relationships seeded.
 
   // 5.2 Seed Additional Test Users (保留现有测试用户)
   console.log('正在填充其他测试用户...'); // Seeding additional test users...
   const generalPassword = 'password';
   const hashedGeneralPassword = await bcrypt.hash(generalPassword, SALT_ROUNDS);
   const userRole = seededRoles['USER']; // Get the 'USER' role
+  const userAdminRole = seededRoles['USER_ADMIN']; // Get the 'USER_ADMIN' role
 
   const usersToSeed = [
+    {
+      username: 'useradmin',
+      firstName: '用户',
+      lastName: '管理员',
+      isActive: true,
+      mustChangePassword: false,
+    },
     {
       username: 'testuser',
       firstName: '普通',
@@ -891,6 +977,16 @@ async function main() {
       });
       console.log(`角色 '${userRole.name}' 已分配给用户 '${createdUser.username}'`);
     }
+
+    // Assign 'USER_ADMIN' role to 'useradmin'
+    if (userAdminRole && createdUser.username === 'useradmin') {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: createdUser.id, roleId: userAdminRole.id } },
+        update: {},
+        create: { userId: createdUser.id, roleId: userAdminRole.id },
+      });
+      console.log(`角色 '${userAdminRole.name}' 已分配给用户 '${createdUser.username}'`);
+    }
   }
   console.log('其他测试用户填充完成。'); // Additional test users seeded.
 
@@ -899,16 +995,9 @@ async function main() {
   const adminClientSecretRaw = 'authcenteradminclientsecret'; // CHANGE THIS IN PRODUCTION
   const hashedAdminClientSecret = await bcrypt.hash(adminClientSecretRaw, SALT_ROUNDS);
 
-  // Collect all permission names for the admin client's allowed scopes
-  // This is a simplified approach; in a real scenario, you might pick specific admin scopes.
-  const allPermissionNamesForAdminClient = Object.keys(seededPermissions);
-  const adminClientAllowedScopes = [
-    'openid',
-    'profile',
-    'offline_access',
-    'admin:full_access',
-    ...allPermissionNamesForAdminClient,
-  ].join(' ');
+  // Collect scope names that exist in the Scope table
+  const existingScopeNames = ['openid', 'profile', 'offline_access', 'admin:full_access'];
+  const adminClientAllowedScopes = JSON.stringify(existingScopeNames);
 
   await prisma.oAuthClient.upsert({
     where: { clientId: 'auth-center-admin-client' },
@@ -924,6 +1013,8 @@ async function main() {
       description: '用于认证中心管理后台UI的OAuth客户端。', // OAuth client for the Auth Center Admin UI.
       clientType: 'CONFIDENTIAL',
       redirectUris: JSON.stringify([
+        'http://localhost:3002/auth/callback',
+        'http://localhost:3002/api/auth/callback/credentials',
         'http://localhost:3000/callback',
         'http://localhost:8000/callback',
         'https://admin.auth.example.com/callback',
@@ -959,7 +1050,7 @@ async function main() {
       ]),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
       responseTypes: JSON.stringify(['code']),
-      allowedScopes: 'openid profile order:read product:read',
+      allowedScopes: JSON.stringify(['openid', 'profile', 'order:read', 'product:read']),
       requirePkce: true,
       requireConsent: true,
       isActive: true,
@@ -990,7 +1081,7 @@ async function main() {
       ]),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
       responseTypes: JSON.stringify(['code']),
-      allowedScopes: 'openid profile order:read order:create product:read offline_access',
+      allowedScopes: JSON.stringify(['openid', 'profile', 'order:read', 'order:create', 'product:read', 'offline_access']),
       requirePkce: true,
       requireConsent: true,
       isActive: true,

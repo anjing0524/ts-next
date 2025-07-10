@@ -1,48 +1,60 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/browser';
 
-// 1. Specify protected and public routes
-const protectedRoutes = ['/admin', '/profile']; // Add any other protected routes
-const publicRoutes = ['/login', '/auth/callback', '/api/v2/health'];
+// 定义路由配置
+const protectedRoutes = ['/admin', '/profile', '/oauth/consent'];
+const authRoutes = ['/login', '/auth/callback'];
+const publicRoutes = ['/health', '/api'];
 
-export function middleware(request: NextRequest) {
+/**
+ * 中间件函数 - 处理路由保护和认证
+ */
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const accessToken = request.cookies.get('access_token')?.value;
 
-  // Redirect root path to /admin if authenticated, otherwise to /login
-  if (pathname === '/') {
-    const targetUrl = accessToken ? '/admin' : '/login';
-    const absoluteURL = new URL(targetUrl, request.nextUrl.origin);
-    return NextResponse.redirect(absoluteURL.toString());
+  // 跳过静态资源和API路由
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api')) {
+    return NextResponse.next();
   }
 
-  // 2. Check if the user is trying to access a protected route
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
+  // 检查是否为受保护路由
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
-  if (isProtectedRoute && !accessToken) {
-    // 3. Redirect to login page if not authenticated
-    const absoluteURL = new URL('/login', request.nextUrl.origin);
-    return NextResponse.redirect(absoluteURL.toString());
+  // 如果是受保护路由，检查认证状态
+  if (isProtectedRoute) {
+    const token = request.cookies.get('access_token')?.value;
+    
+    if (!token) {
+      // 重定向到登录页面
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
-  // 4. If the user is authenticated and tries to access login, redirect to dashboard
-  if (accessToken && pathname.startsWith('/login')) {
-    const absoluteURL = new URL('/admin', request.nextUrl.origin);
-    return NextResponse.redirect(absoluteURL.toString());
+  // 如果是认证路由且已登录，重定向到管理后台
+  if (isAuthRoute && pathname !== '/auth/callback') {
+    const token = request.cookies.get('access_token')?.value;
+    
+    if (token) {
+      const adminUrl = new URL('/admin', request.url);
+      return NextResponse.redirect(adminUrl);
+    }
   }
 
   return NextResponse.next();
 }
 
-// See "Matching Paths" below to learn more
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * 匹配所有路径，除了：
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

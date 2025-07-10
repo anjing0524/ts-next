@@ -92,7 +92,7 @@ function ClientRegisterPage() {
       setApiResponse({
         type: 'success',
         message: result.message || 'Client registered successfully!',
-        data: { clientId: result.clientId, clientSecret: result.clientSecret },
+        data: { clientId: result.clientId ?? '', clientSecret: result.clientSecret ?? '' },
       });
       // Optionally clear form: setName(''); setRedirectUris('');
     } catch (error) {

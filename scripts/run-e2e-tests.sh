@@ -47,26 +47,26 @@ pnpm install
 
 # 构建项目
 echo "🔨 构建OAuth服务..."
-cd apps/oauth-service
+cd ../apps/oauth-service
 pnpm build
-cd ../..
+cd ../../
 
 echo "🔨 构建Admin Portal..."
-cd apps/admin-portal  
+cd ../apps/admin-portal  
 pnpm build
-cd ../..
+cd ../../
 
 # 启动OAuth服务
 echo "🌐 启动OAuth服务 (端口3001)..."
-cd apps/oauth-service
+cd ../apps/oauth-service
 pnpm start &
 OAUTH_PID=$!
-cd ../..
+cd ../../
 
 # 等待OAuth服务启动
 echo "⏳ 等待OAuth服务启动..."
 for i in {1..30}; do
-    if curl -s http://localhost:3001/api/v2/.well-known/openid-configuration > /dev/null; then
+    if curl -s http://localhost:3001/api/v2/health > /dev/null; then
         echo -e "${GREEN}✅ OAuth服务已启动${NC}"
         break
     fi
@@ -79,15 +79,15 @@ done
 
 # 启动Admin Portal
 echo "🌐 启动Admin Portal (端口3002)..."
-cd apps/admin-portal
+cd ../apps/admin-portal
 pnpm dev --port 3002 &
 ADMIN_PID=$!
-cd ../..
+cd ../../
 
 # 等待Admin Portal启动
 echo "⏳ 等待Admin Portal启动..."
 for i in {1..30}; do
-    if curl -s http://localhost:3002/api/menu > /dev/null; then
+    if curl -s http://localhost:3002/health > /dev/null; then
         echo -e "${GREEN}✅ Admin Portal已启动${NC}"
         break
     fi
@@ -102,14 +102,14 @@ done
 echo "🏥 运行服务健康检查..."
 
 # 检查OAuth服务健康
-OAUTH_HEALTH=$(curl -s -w "%{http_code}" http://localhost:3001/api/v2/.well-known/openid-configuration -o /dev/null)
+OAUTH_HEALTH=$(curl -s -w "%{http_code}" http://localhost:3001/api/v2/health -o /dev/null)
 if [ "$OAUTH_HEALTH" != "200" ]; then
     echo -e "${RED}❌ OAuth服务健康检查失败 (HTTP $OAUTH_HEALTH)${NC}"
     exit 1
 fi
 
 # 检查Admin Portal健康
-ADMIN_HEALTH=$(curl -s -w "%{http_code}" http://localhost:3002/api/menu -o /dev/null)
+ADMIN_HEALTH=$(curl -s -w "%{http_code}" http://localhost:3002/health -o /dev/null)
 if [ "$ADMIN_HEALTH" != "200" ]; then
     echo -e "${RED}❌ Admin Portal健康检查失败 (HTTP $ADMIN_HEALTH)${NC}"
     exit 1

@@ -33,7 +33,7 @@ export class OAuthConfig {
    * @returns OAuth服务的基础URL
    */
   static getServiceUrl(): string {
-    return process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001/datamgr_flow';
+    return process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
   }
 
   /**
@@ -123,7 +123,7 @@ export class OAuthConfig {
  * 默认配置常量
  */
 export const DEFAULT_OAUTH_CONFIG = {
-  SERVICE_URL: 'http://localhost:3001/datamgr_flow',
+  SERVICE_URL: 'http://localhost:3001',
   CLIENT_ID: 'auth-center-admin-client',
   CLIENT_SECRET: 'authcenteradminclientsecret',
   REDIRECT_URI: 'http://localhost:3002/auth/callback',

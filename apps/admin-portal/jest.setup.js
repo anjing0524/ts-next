@@ -29,7 +29,8 @@ jest.mock('next/navigation', () => ({
 
 // Mock environment variables
 process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:3000';
-process.env.NEXT_PUBLIC_BASE_PATH = '/datamgr_flow';
+// process.env.NEXT_PUBLIC_BASE_PATH = '';
+process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL = 'http://localhost:3001';
 
 // Setup global mocks
 global.ResizeObserver = jest.fn().mockImplementation(() => ({

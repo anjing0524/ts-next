@@ -4,7 +4,6 @@
  * @since 1.0.0
  */
 
-import Redis from 'ioredis';
 import { LRUCache } from 'lru-cache';
 import logger from './logger';
 
@@ -21,11 +20,16 @@ export interface CacheInterface {
   exists(key: string): Promise<boolean>;
 }
 
-// Redis缓存实现
-class RedisCache implements CacheInterface {
-  private client: Redis;
+// 检查是否在Edge Runtime环境中
+function isEdgeRuntime(): boolean {
+  return typeof process !== 'undefined' && process.env.NEXT_RUNTIME === 'edge';
+}
 
-  constructor(client: Redis) {
+// Redis缓存实现（仅在Node.js环境中使用）
+class RedisCache implements CacheInterface {
+  private client: any; // 使用any类型避免Edge Runtime中的导入问题
+
+  constructor(client: any) {
     this.client = client;
   }
 
@@ -119,7 +123,7 @@ class LRUCacheAdapter implements CacheInterface {
 export class CacheManager {
   private static instance: CacheManager;
   private cache!: CacheInterface; // 使用 definite assignment assertion
-  private redisClient?: Redis;
+  private redisClient?: any; // 使用any类型避免Edge Runtime中的导入问题
 
   private constructor() {
     this.initializeCache();
@@ -133,16 +137,25 @@ export class CacheManager {
   }
 
   private initializeCache(): void {
+    // 在Edge Runtime环境中，强制使用LRU缓存
+    if (isEdgeRuntime()) {
+      logger.info('Edge Runtime detected, using LRU cache only');
+      this.fallbackToLRU();
+      return;
+    }
+
     const redisUrl = process.env.REDIS_URL;
 
     if (redisUrl) {
       try {
+        // 动态导入Redis，避免在Edge Runtime中加载
+        const Redis = require('ioredis');
         this.redisClient = new Redis(redisUrl, {
           maxRetriesPerRequest: 3,
           lazyConnect: true,
         });
 
-        this.redisClient.on('error', (error) => {
+        this.redisClient.on('error', (error: any) => {
           logger.error('Redis connection error:', error);
           this.fallbackToLRU();
         });
@@ -176,7 +189,7 @@ export class CacheManager {
   }
 
   // 获取Redis客户端（如果可用）
-  getRedisClient(): Redis | undefined {
+  getRedisClient(): any | undefined {
     return this.redisClient;
   }
 

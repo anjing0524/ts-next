@@ -1,62 +1,57 @@
 {
   "name": "@repo/lib",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
+  "version": "1.0.0",
+  "description": "Shared library for the monorepo",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./services": "./src/services/index.ts",
-    "./utils": "./src/utils/index.ts",
-    "./client": "./src/client.ts",
-    "./browser": "./src/browser.ts",
-    "./api-routes": "./src/api-routes.ts",
-    "./auth": "./src/auth/index.ts",
-    "./auth/jwt-client-verifier": "./src/auth/jwt-client-verifier.ts",
-    "./middleware": "./src/middleware/index.ts",
-    "./services/*": "./src/services/*.ts",
-    "./utils/*": "./src/utils/*.ts",
-    "./api": "./src/apiResponse.ts",
-    "./errors": "./src/errors.ts",
-    "./types/*": "./src/types/*.ts"
+    ".": {
+      "browser": "./src/browser/index.ts",
+      "node": "./src/node/index.ts",
+      "default": "./src/browser/index.ts"
+    },
+    "./node": {
+      "node": "./src/node/index.ts",
+      "default": "./src/node/index.ts"
+    },
+    "./browser": {
+      "browser": "./src/browser/index.ts",
+      "default": "./src/browser/index.ts"
+    }
   },
-  "scripts": {},
-  "sideEffects": false,
-  "peerDependencies": {
-    "next": "^15.0.0",
-    "react": "^19.0.0"
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.10.1",
     "@repo/cache": "workspace:*",
     "@repo/database": "workspace:*",
-    "bcrypt": "^6.0.0",
-    "bcryptjs": "^2.4.3",
-    "jose": "^5.10.0",
+    "@repo/ui": "workspace:*",
+    "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
-    "nanoid": "^5.0.4",
-    "uuid": "^11.1.0",
+    "jose": "^5.2.3",
+    "bcryptjs": "^2.4.3",
+    "bcrypt": "^6.0.0",
+    "nanoid": "^5.0.0",
+    "uuid": "^11.0.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "zod": "^3.25.1"
+    "zod": "^3.25.1",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
-    "@repo/prettier-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.4.3",
     "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^2.4.6",
-    "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/uuid": "^10.0.0",
-    "eslint": "^9",
-    "jest": "^30.0.0",
-    "next": "^15.3.4",
-    "react": "^19.1.0",
-    "ts-jest": "^29.4.0",
-    "typescript": "^5"
+    "@types/uuid": "^10.0.0"
   },
-  "prettier": "@repo/prettier-config"
+  "peerDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
 }

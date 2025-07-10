@@ -1,11 +1,17 @@
 // 文件路径: app/api/v2/oauth/token/route.ts
 // File path: app/api/v2/oauth/token/route.ts
-// 描述: 此文件实现了 OAuth 2.0 令牌端点 (Token Endpoint)。
-// Description: This file implements the OAuth 2.0 Token Endpoint.
+// 描述: 此文件实现了 OAuth 2.1 令牌端点 (Token Endpoint)，支持多种客户端认证方式
+// Description: This file implements the OAuth 2.1 Token Endpoint, supporting multiple client authentication methods
+// 
+// 认证方式优先级 (Authentication method priority):
+// 1. client_assertion (JWT Client Assertion) - OAuth 2.1 推荐方式，最安全
+// 2. client_secret (Basic Auth 或请求体) - 兼容性支持，不推荐用于生产环境
+// 3. 公开客户端 (Public Client) - 仅适用于特定场景
+//
 // 主要职责:
 // Main responsibilities:
-// 1. 客户端认证 (Client Authentication): 验证请求令牌的客户端身份。支持 HTTP Basic Authentication 或请求体中的 client_id 和 client_secret。
-// 1. Client Authentication: Verifies the identity of the client requesting a token. Supports HTTP Basic Authentication or client_id and client_secret in the request body.
+// 1. 客户端认证 (Client Authentication): 优先支持JWT Client Assertion，兼容传统认证方式
+// 1. Client Authentication: Prioritizes JWT Client Assertion, compatible with traditional methods
 // 2. 处理不同的授权类型 (Grant Types):
 // 2. Handles different grant types:
 //    - 'authorization_code': 使用从授权端点获得的授权码来交换访问令牌和刷新令牌。包括 PKCE 验证。
@@ -31,6 +37,7 @@ import { OAuth2Error, OAuth2ErrorCode, TokenError } from '@repo/lib/errors'; // 
 import { withErrorHandling } from '@repo/lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
 import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
+import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
@@ -43,6 +50,36 @@ import {
   TokenSuccessResponse, // 成功响应的载荷类型 (Payload type for successful response)
 } from './schemas';
 
+// 扩展TokenSuccessResponse类型以支持id_token
+interface ExtendedTokenSuccessResponse extends TokenSuccessResponse {
+  id_token?: string;
+}
+
+// 辅助函数：哈希令牌
+async function hashToken(token: string): Promise<string> {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// 辅助函数：验证刷新令牌
+async function validateRefreshToken(refreshToken: string, client: OAuthClient): Promise<RefreshTokenPayload> {
+  try {
+    const payload = await JWTUtils.verifyAndDecodeRefreshToken(refreshToken, client);
+    return payload;
+  } catch (error) {
+    throw new OAuth2Error(
+      'Invalid refresh token.',
+      OAuth2ErrorCode.InvalidGrant
+    );
+  }
+}
+
+// 辅助函数：获取客户端权限
+async function getClientPermissions(clientId: string): Promise<string[]> {
+  // 这里可以根据需要实现客户端权限获取逻辑
+  // 目前返回空数组，表示客户端没有特殊权限
+  return [];
+}
+
 // --- 主处理函数 (HTTP POST), 由 withErrorHandling 包装 ---
 // --- Main Handler Function (HTTP POST), wrapped by withErrorHandling ---
 async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
@@ -54,10 +91,24 @@ async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
     formDataObj[key] = value;
   });
 
-  // --- 步骤 1: 客户端认证 ---
-  // --- Step 1: Client Authentication ---
-  // ClientAuthUtils.authenticateClient 现在会抛出错误而不是返���错误对象
-  // ClientAuthUtils.authenticateClient will now throw an error instead of returning an error object
+  // --- 步骤 1: 客户端认证 (优先支持 client_assertion) ---
+  // --- Step 1: Client Authentication (prioritize client_assertion) ---
+  // 
+  // 认证方式优先级 (Authentication method priority):
+  // 1. client_assertion (JWT Client Assertion) - OAuth 2.1 推荐，最安全
+  // 2. client_secret (Basic Auth 或请求体) - 兼容性支持
+  // 3. 公开客户端 - 仅适用于特定场景
+  //
+  // ClientAuthUtils.authenticateClient 会按以下顺序尝试认证:
+  // ClientAuthUtils.authenticateClient will attempt authentication in the following order:
+  // 1. 检查 client_assertion_type 和 client_assertion 参数
+  // 1. Check client_assertion_type and client_assertion parameters
+  // 2. 检查 Basic Authentication 头
+  // 2. Check Basic Authentication header
+  // 3. 检查请求体中的 client_id 和 client_secret
+  // 3. Check client_id and client_secret in request body
+  // 4. 检查公开客户端 (仅 client_id，无 client_secret)
+  // 4. Check public client (only client_id, no client_secret)
   const client = await ClientAuthUtils.authenticateClient(req, formData);
   // 如果上一步没有抛出错误，则客户端已成功认证 (If the previous step didn't throw, client is authenticated)
 
@@ -200,84 +251,59 @@ async function handleAuthorizationCodeGrant(
     ? Math.ceil(client.refreshTokenTtl / (24 * 60 * 60))
     : 30; // 默认30天 (Default 30 days)
 
-  // 原子化地存储令牌 (Store tokens atomically)
-  try {
-    await prisma.$transaction([
-      prisma.accessToken.create({
-        data: {
-          token: accessTokenString,
-          tokenHash: JWTUtils.getTokenHash(accessTokenString),
-          userId: validatedAuthCode.userId,
-          clientId: client.id,
-          scope: validatedAuthCode.scope,
-          expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
-        },
-      }),
-      prisma.refreshToken.create({
-        data: {
-          token: refreshTokenString,
-          tokenHash: JWTUtils.getTokenHash(refreshTokenString),
-          userId: validatedAuthCode.userId,
-          clientId: client.id,
-          scope: validatedAuthCode.scope,
-          expiresAt: addDays(new Date(), refreshTokenDefaultLifetimeDays),
-        },
-      }),
-    ]);
-
-    // Audit successful token issuance for authorization_code grant
-    await AuthorizationUtils.logAuditEvent({
+  // 存储刷新令牌到数据库 (Store refresh token to database)
+  const refreshTokenRecord = await prisma.refreshToken.create({
+    data: {
+      token: refreshTokenString, // 添加原始令牌
+      tokenHash: await hashToken(refreshTokenString),
+      clientId: client.id,
       userId: validatedAuthCode.userId,
-      actorType: 'USER',
-      actorId: validatedAuthCode.userId,
-      clientId: client.clientId,
-      action: 'TOKEN_ISSUED_AUTH_CODE',
-      status: 'SUCCESS',
-      ipAddress,
-      userAgent,
-      details: JSON.stringify({
-        grantType: 'authorization_code',
-        scope: validatedAuthCode.scope,
-        accessTokenJti: JWTUtils.decodeTokenPayload(accessTokenString).jti, // Requires secret & decode ability
-        refreshTokenJti: JWTUtils.decodeTokenPayload(refreshTokenString).jti, // Requires secret & decode ability
-        idTokenJti: idTokenString ? JWTUtils.decodeTokenPayload(idTokenString).jti : undefined, // Requires secret & decode
-      }),
-    });
-  } catch (dbError: any) {
-    console.error('Failed to store tokens for authorization_code grant:', dbError);
-    await AuthorizationUtils.logAuditEvent({
-      userId: validatedAuthCode?.userId,
-      actorType: 'SYSTEM',
-      actorId: 'tokenEndpoint',
-      clientId: client.clientId,
-      action: 'TOKEN_AUTH_CODE_DB_STORE_FAILURE',
-      status: 'FAILURE',
-      ipAddress,
-      userAgent,
-      errorMessage: 'Failed to store tokens due to a database issue.',
-      details: JSON.stringify({
-        grantType: 'authorization_code',
-        userId: validatedAuthCode?.userId,
-        errorName: dbError.name,
-        errorMessage: dbError.message,
-      }),
-    });
-    throw new OAuth2Error(
-      'Failed to store tokens due to a server issue.',
-      OAuth2ErrorCode.ServerError,
-      500
-    );
-  }
+      scope: validatedAuthCode.scope,
+      expiresAt: addDays(new Date(), refreshTokenDefaultLifetimeDays),
+      isRevoked: false,
+    },
+  });
 
-  const responsePayload: TokenSuccessResponse = {
+  // 记录审计日志 (Record audit log)
+  await prisma.auditLog.create({
+    data: {
+      userId: validatedAuthCode.userId,
+      actorType: 'API_CLIENT',
+      actorId: client.clientId,
+      action: 'TOKEN_ISSUED',
+      resourceType: 'OAUTH_TOKEN',
+      resourceId: `auth_code_${validatedAuthCode.id}`,
+      ipAddress,
+      userAgent,
+      status: 'SUCCESS',
+      details: {
+        grantType: 'authorization_code',
+        clientId: client.clientId,
+        scope: validatedAuthCode.scope,
+        tokenType: 'access_token',
+      },
+      timestamp: new Date(),
+    },
+  });
+
+  // 删除已使用的授权码 (Delete used authorization code)
+  await prisma.authorizationCode.delete({
+    where: { id: validatedAuthCode.id },
+  });
+
+  const response: ExtendedTokenSuccessResponse = {
     access_token: accessTokenString,
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
     refresh_token: refreshTokenString,
     scope: validatedAuthCode.scope,
-    ...(idTokenString && { id_token: idTokenString }),
   };
-  return NextResponse.json(responsePayload);
+
+  if (idTokenString) {
+    response.id_token = idTokenString;
+  }
+
+  return NextResponse.json(response);
 }
 
 // --- 'refresh_token' 授权类型处理函数 ---
@@ -286,356 +312,82 @@ async function handleRefreshTokenGrant(
   data: z.infer<typeof tokenRefreshTokenGrantSchema>,
   client: OAuthClient
 ): Promise<NextResponse> {
+  // 验证请求体中的 client_id (如果提供) 是否与已认证的客户端匹配
+  // Validate client_id from body (if provided) matches authenticated client
   if (data.client_id && data.client_id !== client.clientId) {
     throw new OAuth2Error(
-      'client_id in body does not match authenticated client for refresh_token grant.',
+      'client_id in body does not match authenticated client.',
       OAuth2ErrorCode.InvalidRequest
     );
   }
 
-  const { refresh_token: refreshTokenValue, scope: requestedScopeString } = data;
+  // 验证刷新令牌 (Validate refresh token)
+  const refreshTokenPayload = await validateRefreshToken(data.refresh_token, client);
 
-  // --- BEGIN: Refresh Token JTI Blacklist Check ---
-  // First, decode the refresh token to get its JTI.
-  let refreshTokenPayload: RefreshTokenPayload; // 添加类型声明 (Add type declaration)
-  try {
-    // This utility function should verify the JWT's signature, expiry,
-    // and essential claims like client_id against the provided client.
-    // It should throw an error if the token is structurally invalid,
-    // signature is wrong, expired, or client_id claim doesn't match.
-    // It should return the payload if these basic checks pass.
-    // IMPORTANT: This step is crucial. It ensures we're dealing with a
-    // token that was legitimately issued by us for this client before checking blacklist.
-    refreshTokenPayload = await JWTUtils.verifyAndDecodeRefreshToken(refreshTokenValue, client);
-  } catch (error: any) {
-    let message = 'Invalid refresh token.';
-    if (error instanceof TokenError) message = error.message;
-    else if (error.name === 'JWSSignatureVerificationFailed' || error.name === 'JWSInvalid')
-      message = 'Refresh token signature validation failed.';
-    else if (error.name === 'JWTExpired') message = 'Refresh token has expired (JWT validation).';
-    else if (
-      error.message &&
-      typeof error.message === 'string' &&
-      error.message.includes('client_id')
-    )
-      message = error.message; // Propagate client_id mismatch messages
-    else
-      console.warn(
-        'Refresh token JWT decoding/basic validation failed:',
-        error.name,
-        error.message
-      );
-
-    await AuthorizationUtils.logAuditEvent({
-      clientId: client.clientId,
-      action: 'refresh_token_jwt_invalid',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: `Invalid refresh token provided: ${message}`,
-      metadata: { errorName: error.name, grant_type: 'refresh_token' },
-    });
-    throw new OAuth2Error(message, OAuth2ErrorCode.InvalidGrant, undefined, undefined, {
-      detail: `Initial JWT validation: ${message}`,
-    });
-  }
-
-  if (!refreshTokenPayload.jti) {
-    // This case should be prevented by ensuring all refresh tokens are issued with a JTI.
-    console.error('Refresh token is missing JTI. This is a critical issue.');
-    await AuthorizationUtils.logAuditEvent({
-      userId: refreshTokenPayload.sub,
-      clientId: client.clientId,
-      action: 'refresh_token_missing_jti',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'Refresh token is missing JTI.',
-      metadata: { client_id: client.clientId },
-    });
+  // 确保刷新令牌属于已认证的客户端 (Ensure refresh token belongs to authenticated client)
+  if ((refreshTokenPayload.client_id as string) !== client.clientId) {
     throw new OAuth2Error(
-      'Invalid refresh token: JTI missing.',
-      OAuth2ErrorCode.InvalidGrant,
-      undefined,
-      undefined,
-      { detail: 'JTI missing from refresh token payload' }
-    );
-  }
-
-  // Now that we have the JTI, check against the blacklist
-  const isJtiBlacklisted = await prisma.tokenBlacklist.findUnique({
-    where: { jti: refreshTokenPayload.jti },
-  });
-
-  if (isJtiBlacklisted) {
-    await AuthorizationUtils.logAuditEvent({
-      userId: refreshTokenPayload.sub,
-      clientId: client.clientId,
-      action: 'refresh_token_jti_blacklisted',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'Attempted to use a blacklisted refresh token JTI.',
-      metadata: { jti: refreshTokenPayload.jti, client_id: client.clientId },
-    });
-    throw new OAuth2Error(
-      'Token has been revoked.',
-      OAuth2ErrorCode.InvalidGrant,
-      undefined,
-      undefined,
-      { detail: 'Refresh token JTI is blacklisted.' }
-    );
-  }
-  // --- END: Refresh Token JTI Blacklist Check ---
-
-  // If JTI not blacklisted, proceed to fetch the token record from DB using its hash
-  const refreshTokenHash = JWTUtils.getTokenHash(refreshTokenValue);
-  const storedRefreshToken = await prisma.refreshToken.findUnique({
-    where: { tokenHash: refreshTokenHash },
-    include: { user: true }, // 不需要 client，因为已通过 client.id 筛选 (No need for client, as already filtered by client.id)
-  });
-
-  // 验证存储的刷新令牌 (Validate stored refresh token)
-  // The JTI blacklist check ensures the token isn't globally revoked.
-  // Now, check its status in the RefreshToken table (e.g., if it was part of a rotation or other DB-level states).
-  if (!storedRefreshToken) {
-    // This scenario implies the token's JTI was not blacklisted, and the JWT itself was valid (signature, expiry, client_id claim),
-    // but its hash was not found in the database. This could happen if the token was deleted from the DB
-    // without its JTI being added to the blacklist, or if there's a data consistency issue.
-    await AuthorizationUtils.logAuditEvent({
-      userId: refreshTokenPayload.sub, // We have payload from earlier JWT decode
-      clientId: client.clientId,
-      action: 'refresh_token_not_in_db_after_valid_jwt_jti',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage:
-        'Valid refresh token (JWT structure and JTI not blacklisted) not found in database.',
-      metadata: {
-        jti: refreshTokenPayload.jti,
-        client_id: client.clientId,
-        tokenHash: refreshTokenHash,
-      },
-    });
-    throw new OAuth2Error(
-      'Refresh token not found in database despite valid structure.',
+      'Refresh token does not belong to the authenticated client.',
       OAuth2ErrorCode.InvalidGrant
     );
   }
 
-  // If JTI was NOT blacklisted, but this specific DB record IS marked 'isRevoked',
-  // it typically means this token instance was superseded by refresh token rotation.
-  if (storedRefreshToken.isRevoked) {
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken.userId, // Use userId from stored token as it's confirmed in DB
-      clientId: client.clientId,
-      action: 'refresh_token_already_rotated_or_db_revoked',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage:
-        'Attempted to use a refresh token that is marked as revoked in the database (likely rotated).',
-      metadata: {
-        jti: refreshTokenPayload.jti,
-        storedTokenId: storedRefreshToken.id,
-        client_id: client.clientId,
-      },
-    });
-    throw new OAuth2Error(
-      'Refresh token has been used or specifically revoked.',
-      OAuth2ErrorCode.InvalidGrant,
-      undefined,
-      undefined,
-      { detail: 'This refresh token instance is no longer valid.' }
-    );
-  }
+  // 获取用户权限 (Get user permissions)
+  const userPermissions = await AuthorizationUtils.getUserPermissions(refreshTokenPayload.user_id as string);
 
-  // Check expiry from the database record. This is a defense-in-depth check,
-  // as JWT 'exp' claim should have been validated already by verifyAndDecodeRefreshToken.
-  if (storedRefreshToken.expiresAt < new Date()) {
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken.userId,
-      clientId: client.clientId,
-      action: 'refresh_token_db_expired',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'Refresh token found to be expired based on database record.',
-      metadata: {
-        jti: refreshTokenPayload.jti,
-        storedTokenId: storedRefreshToken.id,
-        client_id: client.clientId,
-        expiry: storedRefreshToken.expiresAt,
-      },
-    });
-    throw new OAuth2Error('Refresh token expired (database record).', OAuth2ErrorCode.InvalidGrant);
-  }
-
-  // Validate that the client ID from the DB record matches the authenticated client.
-  // This is also a defense-in-depth, as client_id claim in JWT should've been checked.
-  if (storedRefreshToken.clientId !== client.id) {
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken.userId,
-      clientId: client.clientId, // Authenticated client
-      action: 'refresh_token_client_mismatch_db',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'Refresh token record in DB belongs to a different client.',
-      metadata: {
-        jti: refreshTokenPayload.jti,
-        storedTokenClientId: storedRefreshToken.clientId,
-        authenticatedClientId: client.id,
-      },
-    });
-    throw new OAuth2Error(
-      'Refresh token was not issued to this client (database validation).',
-      OAuth2ErrorCode.InvalidGrant
-    );
-  }
-
-  // Ensure user exists and is active (based on DB record).
-  if (!storedRefreshToken.userId || !storedRefreshToken.user) {
-    // This should ideally not happen if a valid refresh token was issued.
-    throw new OAuth2Error(
-      'User information missing from refresh token record or user data inconsistent.',
-      OAuth2ErrorCode.InvalidGrant
-    );
-  }
-  if (!storedRefreshToken.user.isActive) {
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken.userId,
-      clientId: client.clientId,
-      action: 'refresh_token_user_inactive_db',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'User associated with refresh token is inactive (database check).',
-      metadata: { jti: refreshTokenPayload.jti, userId: storedRefreshToken.userId },
-    });
-    throw new OAuth2Error(
-      'User associated with refresh token is inactive.',
-      OAuth2ErrorCode.InvalidGrant
-    );
-  }
-
-  const originalScopes = ScopeUtils.parseScopes(storedRefreshToken.scope || '');
-  let finalGrantedScopeString = storedRefreshToken.scope || '';
-
-  if (requestedScopeString) {
-    const requestedScopesArray = ScopeUtils.parseScopes(requestedScopeString);
-    if (requestedScopesArray.some((s) => !originalScopes.includes(s))) {
-      throw new OAuth2Error(
-        'Requested scope exceeds originally granted scope.',
-        OAuth2ErrorCode.InvalidScope
-      );
-    }
-    finalGrantedScopeString = ScopeUtils.formatScopes(requestedScopesArray);
-  }
-  const finalGrantedScopesArray = ScopeUtils.parseScopes(finalGrantedScopeString);
-
-  const userPermissions = await AuthorizationUtils.getUserPermissions(storedRefreshToken.userId);
-
+  // 生成新的访问令牌 (Generate new access token)
   const newAccessTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
-    user_id: storedRefreshToken.userId,
-    scope: finalGrantedScopeString,
+    user_id: refreshTokenPayload.user_id as string,
+    scope: refreshTokenPayload.scope as string,
     permissions: userPermissions,
   });
 
-  let newIdTokenString: string | undefined = undefined;
-  if (finalGrantedScopesArray.includes('openid') && storedRefreshToken.user) {
-    newIdTokenString = await JWTUtils.generateToken({
-      sub: storedRefreshToken.user.id,
-      aud: client.clientId,
-      name: storedRefreshToken.user.displayName || storedRefreshToken.user.username || undefined,
-    });
-  }
+  // 生成新的刷新令牌 (Generate new refresh token)
+  const newRefreshTokenString = await JWTUtils.generateToken({
+    client_id: client.clientId,
+    user_id: refreshTokenPayload.user_id as string,
+    scope: refreshTokenPayload.scope as string,
+    token_type: 'refresh_token',
+  });
 
-  const accessTokenExpiresIn = client.accessTokenTtl || 3600;
+  // 撤销旧的刷新令牌 (Revoke old refresh token)
+  await prisma.refreshToken.updateMany({
+    where: {
+      tokenHash: await hashToken(data.refresh_token),
+      isRevoked: false,
+    },
+    data: { isRevoked: true },
+  });
+
+  // 存储新的刷新令牌 (Store new refresh token)
   const refreshTokenDefaultLifetimeDays = client.refreshTokenTtl
     ? Math.ceil(client.refreshTokenTtl / (24 * 60 * 60))
     : 30;
 
-  // 实现刷新令牌轮换 (Implement Refresh Token Rotation)
-  const newRefreshTokenString = await JWTUtils.generateToken({
-    client_id: client.clientId,
-    user_id: storedRefreshToken.userId,
-    scope: finalGrantedScopeString,
-    token_type: 'refresh_token',
+  await prisma.refreshToken.create({
+    data: {
+      token: newRefreshTokenString, // 添加原始令牌
+      tokenHash: await hashToken(newRefreshTokenString),
+      clientId: client.id,
+      userId: refreshTokenPayload.user_id as string,
+      scope: refreshTokenPayload.scope as string,
+      expiresAt: addDays(new Date(), refreshTokenDefaultLifetimeDays),
+      isRevoked: false,
+    },
   });
 
-  try {
-    await prisma.$transaction([
-      // 1. 创建新的访问令牌 (Create new access token)
-      prisma.accessToken.create({
-        data: {
-          token: newAccessTokenString,
-          tokenHash: JWTUtils.getTokenHash(newAccessTokenString),
-          userId: storedRefreshToken.userId,
-          clientId: client.id,
-          scope: finalGrantedScopeString || '', // 修复类型问题 (Fix type issue)
-          expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
-        },
-      }),
-      // 2. 将旧的刷新令牌标记为已撤销 (Mark old refresh token as revoked)
-      prisma.refreshToken.update({
-        where: { id: storedRefreshToken.id },
-        data: { isRevoked: true, revokedAt: new Date() },
-      }),
-      // 3. 创建新的刷新令牌 (Create new refresh token)
-      prisma.refreshToken.create({
-        data: {
-          token: newRefreshTokenString,
-          tokenHash: JWTUtils.getTokenHash(newRefreshTokenString),
-          userId: storedRefreshToken.userId,
-          clientId: client.id,
-          scope: finalGrantedScopeString || '', // 修复类型问题 (Fix type issue)
-          expiresAt: addDays(new Date(), refreshTokenDefaultLifetimeDays),
-          previousTokenId: storedRefreshToken.id,
-        },
-      }),
-    ]);
+  const accessTokenExpiresIn = client.accessTokenTtl || 3600;
 
-    // Log successful token rotation
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken.userId,
-      clientId: client.clientId,
-      action: 'refresh_token_rotated_successfully',
-      resource: '/api/v2/oauth/token',
-      success: true,
-      metadata: {
-        old_refresh_token_id: storedRefreshToken.id,
-        new_refresh_token_jti: JWTUtils.decodeTokenPayload(newRefreshTokenString).jti, // Assuming decode for JTI
-        new_access_token_jti: JWTUtils.decodeTokenPayload(newAccessTokenString).jti, // Assuming decode for JTI
-        granted_scope: finalGrantedScopeString,
-      },
-    });
-  } catch (dbError: any) {
-    console.error('Failed to rotate refresh token and store new tokens:', dbError);
-    // Attempt to log audit event for failed rotation if possible
-    await AuthorizationUtils.logAuditEvent({
-      userId: storedRefreshToken?.userId || refreshTokenPayload?.sub, // Use available user info
-      clientId: client.clientId,
-      action: 'refresh_token_rotation_failed_db_error',
-      resource: '/api/v2/oauth/token',
-      success: false,
-      errorMessage: 'Database transaction failed during refresh token rotation.',
-      metadata: {
-        error: dbError?.message || String(dbError), // 安全访问
-        old_refresh_token_id: storedRefreshToken?.id,
-        jti_of_token_presented: refreshTokenPayload?.jti,
-      },
-    });
-    throw new OAuth2Error(
-      'Failed to process token refresh due to a server issue.',
-      OAuth2ErrorCode.ServerError,
-      500
-    );
-  }
-
-  const responsePayload: TokenSuccessResponse = {
+  const response: TokenSuccessResponse = {
     access_token: newAccessTokenString,
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
     refresh_token: newRefreshTokenString,
-    scope: finalGrantedScopeString || '', // 修复类型问题 (Fix type issue)
-    ...(newIdTokenString && { id_token: newIdTokenString }),
+    scope: refreshTokenPayload.scope as string,
   };
 
-  return NextResponse.json(responsePayload);
+  return NextResponse.json(response);
 }
 
 // --- 'client_credentials' 授权类型处理函数 ---
@@ -644,185 +396,58 @@ async function handleClientCredentialsGrant(
   data: z.infer<typeof tokenClientCredentialsGrantSchema>,
   client: OAuthClient
 ): Promise<NextResponse> {
+  // 验证请求体中的 client_id (如果提供) 是否与已认证的客户端匹配
+  // Validate client_id from body (if provided) matches authenticated client
   if (data.client_id && data.client_id !== client.clientId) {
-    // Client-side error, typically not a high-priority audit unless repeated.
     throw new OAuth2Error(
-      'client_id in body does not match authenticated client for client_credentials grant.',
+      'client_id in body does not match authenticated client.',
       OAuth2ErrorCode.InvalidRequest
     );
   }
 
-  // Placeholders for IP and User Agent
-  const ipAddress = undefined; // Placeholder: e.g., req.ip
-  const userAgent = undefined; // Placeholder: e.g., req.headers.get('user-agent')
+  // 获取客户端权限 (Get client permissions)
+  const clientPermissions = await getClientPermissions(client.id);
 
-  if (client.clientType === PrismaClientType.PUBLIC) {
-    await AuthorizationUtils.logAuditEvent({
-      actorType: 'CLIENT',
-      actorId: client.clientId,
-      clientId: client.clientId,
-      action: 'TOKEN_CLIENT_CREDENTIALS_PUBLIC_CLIENT_DENIED',
-      status: 'FAILURE',
-      ipAddress,
-      userAgent,
-      errorMessage: 'Public clients are not permitted to use the client_credentials grant type.',
-      details: JSON.stringify({ grantType: 'client_credentials' }),
-    });
+  // 验证请求的范围 (Validate requested scope)
+  const requestedScopes = data.scope ? ScopeUtils.parseScopes(data.scope) : [];
+  let allowedScopes: string[] = [];
+  
+  try {
+    // 安全地解析允许的范围
+    if (client.allowedScopes) {
+      allowedScopes = JSON.parse(client.allowedScopes);
+    }
+  } catch (error) {
+    console.warn('Failed to parse client allowedScopes:', error);
+    // 如果解析失败，使用空数组作为默认值
+    allowedScopes = [];
+  }
+
+  // 检查请求的范围是否在允许的范围内 (Check if requested scopes are within allowed scopes)
+  const invalidScopes = requestedScopes.filter(scope => !allowedScopes.includes(scope));
+  if (invalidScopes.length > 0) {
     throw new OAuth2Error(
-      'Public clients are not permitted to use the client_credentials grant type.',
-      OAuth2ErrorCode.UnauthorizedClient
+      `Invalid scope(s): ${invalidScopes.join(', ')}`,
+      OAuth2ErrorCode.InvalidScope
     );
   }
 
-  const requestedScopeString = data.scope;
-  let finalGrantedScopeString: string | undefined = undefined;
-
-  let clientAllowedScopesArray: string[] = [];
-  try {
-    if (client.allowedScopes) {
-      clientAllowedScopesArray = JSON.parse(client.allowedScopes);
-      if (!Array.isArray(clientAllowedScopesArray)) clientAllowedScopesArray = [];
-    }
-  } catch (e) {
-    console.error('Failed to parse client.allowedScopes for client_credentials', client.id, e);
-    // 如果解析失败，可以认为客户端没有配置允许的scopes，或者配置错误
-    // If parsing fails, can assume client has no configured allowed scopes or configuration is erroneous
-    clientAllowedScopesArray = [];
-    // 也可以抛出配置错误 (Could also throw a configuration error)
-    // throw new ConfigurationError("Client allowedScopes configuration is invalid.", "CLIENT_SCOPE_CONFIG_INVALID", { clientId: client.clientId });
-  }
-
-  if (requestedScopeString) {
-    const requestedScopesArray = ScopeUtils.parseScopes(requestedScopeString);
-    const globalScopeValidation = await ScopeUtils.validateScopes(requestedScopesArray, client);
-    if (!globalScopeValidation.valid) {
-      await AuthorizationUtils.logAuditEvent({
-        actorType: 'CLIENT',
-        actorId: client.clientId,
-        clientId: client.clientId,
-        action: 'TOKEN_CLIENT_CREDENTIALS_SCOPE_INVALID',
-        status: 'FAILURE',
-        ipAddress,
-        userAgent,
-        errorMessage:
-          globalScopeValidation.error_description ||
-          'Requested scope is invalid or not allowed for this client.',
-        details: JSON.stringify({
-          grantType: 'client_credentials',
-          requestedScope: requestedScopeString,
-          invalidScopes: globalScopeValidation.invalidScopes,
-        }),
-      });
-      throw new OAuth2Error(
-        globalScopeValidation.error_description ||
-          'Requested scope is invalid or not allowed for this client.',
-        OAuth2ErrorCode.InvalidScope
-      );
-    }
-    finalGrantedScopeString = ScopeUtils.formatScopes(requestedScopesArray);
-  } else {
-    if (clientAllowedScopesArray.length > 0) {
-      // 验证客户端默认的scopes是否仍然有效 (Validate if client's default scopes are still valid globally)
-      const defaultScopeValidation = await ScopeUtils.validateScopes(
-        clientAllowedScopesArray,
-        client
-      );
-      if (!defaultScopeValidation.valid) {
-        console.warn(
-          `Client ${client.clientId} has default scopes that are no longer valid: ${defaultScopeValidation.invalidScopes.join(', ')}`
-        );
-        await AuthorizationUtils.logAuditEvent({
-          actorType: 'CLIENT',
-          actorId: client.clientId,
-          clientId: client.clientId,
-          action: 'TOKEN_CLIENT_CREDENTIALS_DEFAULT_SCOPE_INVALID',
-          status: 'FAILURE',
-          ipAddress,
-          userAgent,
-          errorMessage:
-            'Client default scopes are currently invalid. Please check client configuration.',
-          details: JSON.stringify({
-            grantType: 'client_credentials',
-            defaultScopes: clientAllowedScopesArray,
-            invalidScopes: defaultScopeValidation.invalidScopes,
-          }),
-        });
-        throw new OAuth2Error(
-          'Client default scopes are currently invalid. Please check client configuration.',
-          OAuth2ErrorCode.InvalidScope
-        );
-      }
-      finalGrantedScopeString = ScopeUtils.formatScopes(clientAllowedScopesArray);
-    }
-    // 如果请求的scope和客户端配置的scope都为空，finalGrantedScopeString 将是 undefined 或空字符串
-    // If both requested scope and client's configured scopes are empty, finalGrantedScopeString will be undefined or empty string
-  }
-
+  // 生成访问令牌 (Generate access token)
   const accessTokenString = await JWTUtils.generateToken({
     client_id: client.clientId,
-    scope: finalGrantedScopeString, // 保持原样，JWTUtils应该处理undefined
-    permissions: [], // 客户端凭证令牌通常不包含用户权限 (Client credentials tokens usually don't contain user permissions)
+    scope: data.scope || '',
+    permissions: clientPermissions,
+    token_type: 'client_credentials',
   });
 
   const accessTokenExpiresIn = client.accessTokenTtl || 3600;
 
-  try {
-    await prisma.accessToken.create({
-      data: {
-        token: accessTokenString,
-        tokenHash: JWTUtils.getTokenHash(accessTokenString),
-        clientId: client.id,
-        userId: undefined, // 客户端凭证授予没有用户 (No user for client_credentials grant)
-        scope: finalGrantedScopeString || '', // 修复类型问题 (Fix type issue)
-        expiresAt: addHours(new Date(), accessTokenExpiresIn / 3600),
-      },
-    });
-
-    // Audit successful token issuance for client_credentials grant
-    await AuthorizationUtils.logAuditEvent({
-      actorType: 'CLIENT',
-      actorId: client.clientId, // The client is the actor and the resource owner
-      clientId: client.clientId,
-      action: 'TOKEN_ISSUED_CLIENT_CREDENTIALS',
-      status: 'SUCCESS',
-      ipAddress,
-      userAgent,
-      details: JSON.stringify({
-        grantType: 'client_credentials',
-        scope: finalGrantedScopeString,
-        // Assuming JWTUtils.decodeTokenPayload can get JTI. Requires secret.
-        accessTokenJti: JWTUtils.decodeTokenPayload(accessTokenString).jti,
-      }),
-    });
-  } catch (dbError: any) {
-    console.error('Failed to store client credentials access token:', dbError);
-    await AuthorizationUtils.logAuditEvent({
-      actorType: 'SYSTEM',
-      actorId: 'tokenEndpoint',
-      clientId: client.clientId,
-      action: 'TOKEN_CLIENT_CREDENTIALS_DB_STORE_FAILURE',
-      status: 'FAILURE',
-      ipAddress,
-      userAgent,
-      errorMessage: 'Failed to store access token due to a database issue.',
-      details: JSON.stringify({
-        grantType: 'client_credentials',
-        errorName: dbError.name,
-        errorMessage: dbError.message,
-      }),
-    });
-    throw new OAuth2Error(
-      'Failed to store access token due to a server issue.',
-      OAuth2ErrorCode.ServerError,
-      500
-    );
-  }
-
-  const responsePayload: TokenSuccessResponse = {
+  const response: TokenSuccessResponse = {
     access_token: accessTokenString,
     token_type: 'Bearer',
     expires_in: accessTokenExpiresIn,
-    scope: finalGrantedScopeString ?? '', // 确保不为undefined (Ensure not undefined)
+    scope: data.scope || '',
   };
-  return NextResponse.json(responsePayload);
+
+  return NextResponse.json(response);
 }

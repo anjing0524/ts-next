@@ -14,7 +14,7 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: ['list'],
+  reporter: [['list']],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -45,6 +45,6 @@ export default defineConfig({
   /* No webServer configuration needed as services are started manually */
 
   /* Global setup and teardown */
-  globalSetup: require.resolve('./apps/admin-portal/tests/helpers/global-setup.ts'),
-  globalTeardown: require.resolve('./apps/admin-portal/tests/helpers/global-teardown.ts'),
+  // globalSetup: require.resolve('./apps/admin-portal/tests/helpers/global-setup.ts'),
+  // globalTeardown: require.resolve('./apps/admin-portal/tests/helpers/global-teardown.ts'),
 });

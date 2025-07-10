@@ -62,7 +62,7 @@ model OAuthClient {
   redirectUris            String // JSON字符串数组，存储允许重定向的URI列表
   grantTypes              String // JSON字符串数组，存储此客户端允许的授权类型 (例如：["authorization_code", "client_credentials", "refresh_token"])
   responseTypes           String // JSON字符串数组，存储此客户端允许的响应类型 (例如：["code", "token"])
-  allowedScopes           String // JSON字符串数组，存储此客户端允许请求的权限范围
+  allowedScopes           String // JSON字符串数组，存储此客户端允许请求的权限范围 (例如: ["openid", "profile", "user:read"])
   name                    String // 客户端应用的名称
   description             String? // 客户端应用的描述
   clientType              ClientType @default(PUBLIC) // 客户端类型: PUBLIC (例如单页应用) 或 CONFIDENTIAL (例如后端服务)
@@ -227,6 +227,7 @@ model Permission {
 
   // 关联关系
   rolePermissions RolePermission[] // 包含此权限的角色列表
+  scopePermissions ScopePermission[] // 包含此权限的Scope列表
 
   // 类型化资源关联 (一对一，一个Permission记录对应一个特定类型的权限详情)
   apiPermission  ApiPermission? // 如果 type = API, 则关联到ApiPermission详情
@@ -460,10 +461,25 @@ model Scope {
   createdAt   DateTime @default(now()) // Scope创建时间
   updatedAt   DateTime @updatedAt // Scope最后更新时间
 
-  // 可选: 如果需要将Scope限制到特定客户端，可以添加一个 ClientScope 的多对多关联表
-  // clientScopes ClientScope[]
+  // 关联关系 - 一个Scope可以对应多个Permission
+  scopePermissions ScopePermission[] // 此Scope包含的权限列表
 
   @@map("scopes") // 数据库表映射名称
+}
+
+// Scope与Permission的关联表 (多对多关系)
+model ScopePermission {
+  scopeId      String // 关联的Scope ID
+  permissionId String // 关联的Permission ID
+
+  // 关联关系
+  scope      Scope      @relation(fields: [scopeId], references: [id], onDelete: Cascade) // 关联Scope
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade) // 关联Permission
+
+  assignedAt DateTime @default(now()) // 权限分配给Scope的时间
+
+  @@id([scopeId, permissionId]) // 使用Scope ID和Permission ID作为复合主键
+  @@map("scope_permissions") // 数据库表映射名称
 }
 
 // ================================

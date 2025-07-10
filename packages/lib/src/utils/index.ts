@@ -19,7 +19,8 @@ export { default as TimeWheel, getTimeWheelInstance } from './time-wheel';
 export { default as logger } from './logger';
 
 // 浏览器PKCE工具 (Browser PKCE utilities)
-export * from './browser-pkce-utils';
+export { BrowserPKCEUtils } from './browser-pkce-utils';
+// 只导出浏览器工具
 
 // 其他工具 (Miscellaneous utilities)
 export { exclude, excludePassword } from './misc';

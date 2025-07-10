@@ -1,0 +1,933 @@
+{
+  "config": {
+    "configFile": "/Users/liushuo/code/ts-next-template/apps/admin-portal/playwright.config.ts",
+    "rootDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 4
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "Desktop Chrome",
+        "name": "Desktop Chrome",
+        "testDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.{test,spec}.{js,ts}"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.53.2",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "oauth2.1-flow.spec.ts",
+      "file": "oauth2.1-flow.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "OAuth2.1 完整流程 E2E 测试",
+          "file": "oauth2.1-flow.spec.ts",
+          "line": 31,
+          "column": 6,
+          "specs": [
+            {
+              "title": "TC-001: 完整OAuth2.1授权码+PKCE登录流程",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 16323,
+                      "error": {
+                        "message": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n",
+                        "stack": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:48:38",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 38,
+                          "line": 48
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 46 |\u001b[39m     \n \u001b[90m 47 |\u001b[39m     \u001b[90m// 验证登录页面元素\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 48 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m))\u001b[33m.\u001b[39mtoContainText(\u001b[32m'登录'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 49 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'input[name=\"email\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 50 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'input[name=\"password\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 51 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'button[type=\"submit\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 38,
+                            "line": 48
+                          },
+                          "message": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\n\n\u001b[0m \u001b[90m 46 |\u001b[39m     \n \u001b[90m 47 |\u001b[39m     \u001b[90m// 验证登录页面元素\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 48 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m))\u001b[33m.\u001b[39mtoContainText(\u001b[32m'登录'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 49 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'input[name=\"email\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 50 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'input[name=\"password\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 51 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'button[type=\"submit\"]'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:48:38\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试完整OAuth2.1登录流程...\n"
+                        },
+                        {
+                          "text": "步骤1: 访问登录页面\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:17.805Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流-6f2f6--001-完整OAuth2-1授权码-PKCE登录流程-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流-6f2f6--001-完整OAuth2-1授权码-PKCE登录流程-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流-6f2f6--001-完整OAuth2-1授权码-PKCE登录流程-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流-6f2f6--001-完整OAuth2-1授权码-PKCE登录流程-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 38,
+                        "line": 48
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-5c2d8e8b140adae7c252",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 39,
+              "column": 7
+            },
+            {
+              "title": "TC-002: 受保护页面访问权限验证",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 39359,
+                      "error": {
+                        "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+                        "stack": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:91:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 16,
+                          "line": 91
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 89 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 90 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 91 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 92 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 93 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 94 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 16,
+                            "line": 91
+                          },
+                          "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n\n\u001b[0m \u001b[90m 89 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 90 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 91 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 92 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 93 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 94 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:91:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试受保护页面访问权限...\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:17.872Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-002-受保护页面访问权限验证-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-002-受保护页面访问权限验证-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-002-受保护页面访问权限验证-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-002-受保护页面访问权限验证-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 16,
+                        "line": 91
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-7ab3e3338647ba3c5d77",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 86,
+              "column": 7
+            },
+            {
+              "title": "TC-003: 菜单动态渲染和导航测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 35928,
+                      "error": {
+                        "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+                        "stack": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:131:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 16,
+                          "line": 131
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 129 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 130 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 131 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 132 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 133 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 134 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 16,
+                            "line": 131
+                          },
+                          "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n\n\u001b[0m \u001b[90m 129 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 130 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 131 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 132 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 133 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 134 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:131:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试菜单动态渲染...\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:17.668Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-003-菜单动态渲染和导航测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-003-菜单动态渲染和导航测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-003-菜单动态渲染和导航测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-003-菜单动态渲染和导航测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 16,
+                        "line": 131
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-15a3680177121ac5f02b",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 126,
+              "column": 7
+            },
+            {
+              "title": "TC-004: 未授权访问重定向测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 16302,
+                      "error": {
+                        "message": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n",
+                        "stack": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:175:38",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 38,
+                          "line": 175
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 173 |\u001b[39m     \n \u001b[90m 174 |\u001b[39m     \u001b[90m// 验证登录页面显示\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m))\u001b[33m.\u001b[39mtoContainText(\u001b[32m'登录'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m     \n \u001b[90m 177 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'✅ 未授权访问重定向测试通过'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 178 |\u001b[39m   })\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 38,
+                            "line": 175
+                          },
+                          "message": "Error: \u001b[31mTimed out 10000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nLocator: locator('h1')\nExpected string: \u001b[32m\"登录\"\u001b[39m\nReceived: <element(s) not found>\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('h1')\u001b[22m\n\n\n\u001b[0m \u001b[90m 173 |\u001b[39m     \n \u001b[90m 174 |\u001b[39m     \u001b[90m// 验证登录页面显示\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 175 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mlocator(\u001b[32m'h1'\u001b[39m))\u001b[33m.\u001b[39mtoContainText(\u001b[32m'登录'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                      \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 176 |\u001b[39m     \n \u001b[90m 177 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'✅ 未授权访问重定向测试通过'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 178 |\u001b[39m   })\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:175:38\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试未授权访问重定向...\n"
+                        },
+                        {
+                          "text": "直接访问受保护页面\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:17.579Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-004-未授权访问重定向测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-004-未授权访问重定向测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-004-未授权访问重定向测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-004-未授权访问重定向测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 38,
+                        "line": 175
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-9e819bf663188a94ea9b",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 164,
+              "column": 7
+            },
+            {
+              "title": "TC-005: 登录失败处理测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 36149,
+                      "error": {
+                        "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+                        "stack": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:188:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 16,
+                          "line": 188
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 186 |\u001b[39m     \u001b[90m// 使用无效凭据登录\u001b[39m\n \u001b[90m 187 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'使用无效凭据登录'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 188 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'invalid@example.com'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 189 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'wrongpassword'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 190 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 191 |\u001b[39m     \u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 16,
+                            "line": 188
+                          },
+                          "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n\n\u001b[0m \u001b[90m 186 |\u001b[39m     \u001b[90m// 使用无效凭据登录\u001b[39m\n \u001b[90m 187 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'使用无效凭据登录'\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 188 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'invalid@example.com'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 189 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'wrongpassword'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 190 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 191 |\u001b[39m     \u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:188:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试登录失败处理...\n"
+                        },
+                        {
+                          "text": "使用无效凭据登录\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:37.377Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-005-登录失败处理测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-005-登录失败处理测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-005-登录失败处理测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-005-登录失败处理测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 16,
+                        "line": 188
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-c548c20ac0e082fce5b1",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 180,
+              "column": 7
+            },
+            {
+              "title": "TC-006: 会话超时和重新登录测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 36678,
+                      "error": {
+                        "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+                        "stack": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:203:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 16,
+                          "line": 203
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 201 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 202 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 203 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 204 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 205 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 206 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 16,
+                            "line": 203
+                          },
+                          "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n\n\u001b[0m \u001b[90m 201 |\u001b[39m     \u001b[90m// 先完成登录流程\u001b[39m\n \u001b[90m 202 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 203 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 204 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 205 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 206 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:203:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试会话超时和重新登录...\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:37.439Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-006-会话超时和重新登录测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-006-会话超时和重新登录测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-006-会话超时和重新登录测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-006-会话超时和重新登录测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 16,
+                        "line": 203
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-9d6f71665fffbccbbddb",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 198,
+              "column": 7
+            },
+            {
+              "title": "TC-007: API权限验证测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 1952,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m401\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:250:36",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 36,
+                          "line": 250
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 248 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 249 |\u001b[39m     \n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 250 |\u001b[39m     expect(tokenResponse\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m200\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 251 |\u001b[39m     \u001b[36mconst\u001b[39m tokenData \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m tokenResponse\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 252 |\u001b[39m     expect(tokenData\u001b[33m.\u001b[39maccess_token)\u001b[33m.\u001b[39mtoBeDefined()\u001b[33m;\u001b[39m\n \u001b[90m 253 |\u001b[39m     \u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 36,
+                            "line": 250
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m401\u001b[39m\n\n\u001b[0m \u001b[90m 248 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 249 |\u001b[39m     \n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 250 |\u001b[39m     expect(tokenResponse\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m200\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                    \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 251 |\u001b[39m     \u001b[36mconst\u001b[39m tokenData \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m tokenResponse\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 252 |\u001b[39m     expect(tokenData\u001b[33m.\u001b[39maccess_token)\u001b[33m.\u001b[39mtoBeDefined()\u001b[33m;\u001b[39m\n \u001b[90m 253 |\u001b[39m     \u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:250:36\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始测试API权限验证...\n"
+                        },
+                        {
+                          "text": "获取访问令牌\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:50:57.275Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-007-API权限验证测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-007-API权限验证测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-007-API权限验证测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 36,
+                        "line": 250
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-bc08d2a54b6643877717",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 234,
+              "column": 7
+            },
+            {
+              "title": "TC-008: 性能和安全测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 2805,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"nosniff\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"nosniff\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:318:47",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 47,
+                          "line": 318
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 316 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试安全头部'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 317 |\u001b[39m     \u001b[36mconst\u001b[39m headers \u001b[33m=\u001b[39m response\u001b[33m.\u001b[39mheaders()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 318 |\u001b[39m     expect(headers[\u001b[32m'x-content-type-options'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'nosniff'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 319 |\u001b[39m     expect(headers[\u001b[32m'x-frame-options'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'DENY'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m     expect(headers[\u001b[32m'x-xss-protection'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'1; mode=block'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 321 |\u001b[39m     \u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 47,
+                            "line": 318
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"nosniff\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n\u001b[0m \u001b[90m 316 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试安全头部'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 317 |\u001b[39m     \u001b[36mconst\u001b[39m headers \u001b[33m=\u001b[39m response\u001b[33m.\u001b[39mheaders()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 318 |\u001b[39m     expect(headers[\u001b[32m'x-content-type-options'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'nosniff'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 319 |\u001b[39m     expect(headers[\u001b[32m'x-frame-options'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'DENY'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 320 |\u001b[39m     expect(headers[\u001b[32m'x-xss-protection'\u001b[39m])\u001b[33m.\u001b[39mtoBe(\u001b[32m'1; mode=block'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 321 |\u001b[39m     \u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:318:47\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始性能和安全测试...\n"
+                        },
+                        {
+                          "text": "测试页面加载性能\n"
+                        },
+                        {
+                          "text": "测试API响应性能\n"
+                        },
+                        {
+                          "text": "测试安全头部\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:51:01.713Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-008-性能和安全测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-008-性能和安全测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-008-性能和安全测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-008-性能和安全测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 47,
+                        "line": 318
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-7099b734a73ac8613002",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 293,
+              "column": 7
+            },
+            {
+              "title": "TC-009: 错误页面和异常处理测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 2033,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m500\u001b[39m\nReceived: \u001b[31m404\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m500\u001b[39m\nReceived: \u001b[31m404\u001b[39m\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:336:42",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 42,
+                          "line": 336
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 334 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试服务器错误处理'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 335 |\u001b[39m     \u001b[36mconst\u001b[39m serverErrorResponse \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mrequest\u001b[33m.\u001b[39m\u001b[36mget\u001b[39m(\u001b[32m`${ADMIN_PORTAL_URL}/api/error-test`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 336 |\u001b[39m     expect(serverErrorResponse\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 337 |\u001b[39m     \n \u001b[90m 338 |\u001b[39m     \u001b[90m// 测试网络错误处理\u001b[39m\n \u001b[90m 339 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试网络错误处理'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 42,
+                            "line": 336
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m500\u001b[39m\nReceived: \u001b[31m404\u001b[39m\n\n\u001b[0m \u001b[90m 334 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试服务器错误处理'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 335 |\u001b[39m     \u001b[36mconst\u001b[39m serverErrorResponse \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mrequest\u001b[33m.\u001b[39m\u001b[36mget\u001b[39m(\u001b[32m`${ADMIN_PORTAL_URL}/api/error-test`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 336 |\u001b[39m     expect(serverErrorResponse\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 337 |\u001b[39m     \n \u001b[90m 338 |\u001b[39m     \u001b[90m// 测试网络错误处理\u001b[39m\n \u001b[90m 339 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'测试网络错误处理'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:336:42\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始错误页面和异常处理测试...\n"
+                        },
+                        {
+                          "text": "测试404页面\n"
+                        },
+                        {
+                          "text": "测试服务器错误处理\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:51:02.215Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-009-错误页面和异常处理测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-009-错误页面和异常处理测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-009-错误页面和异常处理测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 42,
+                        "line": 336
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-1e5a9840e2d654c8a65d",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 325,
+              "column": 7
+            },
+            {
+              "title": "TC-010: 完整用户操作流程测试",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 33537,
+                      "error": {
+                        "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+                        "stack": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:356:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                          "column": 16,
+                          "line": 356
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 354 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'步骤1: 登录系统'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 355 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 356 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 357 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 358 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 359 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                            "column": 16,
+                            "line": 356
+                          },
+                          "message": "TimeoutError: page.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n\n\n\u001b[0m \u001b[90m 354 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'步骤1: 登录系统'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 355 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m`${ADMIN_PORTAL_URL}/login`\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 356 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"email\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39memail)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 357 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mfill(\u001b[32m'input[name=\"password\"]'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_USER\u001b[39m\u001b[33m.\u001b[39mpassword)\u001b[33m;\u001b[39m\n \u001b[90m 358 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mclick(\u001b[32m'button[type=\"submit\"]'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 359 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[32m`${OAUTH_SERVICE_URL}/**`\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts:356:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "开始完整用户操作流程测试...\n"
+                        },
+                        {
+                          "text": "步骤1: 登录系统\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-07-10T07:51:07.052Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-010-完整用户操作流程测试-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-010-完整用户操作流程测试-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-010-完整用户操作流程测试-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/oauth2.1-flow-OAuth2-1-完整流程-E2E-测试-TC-010-完整用户操作流程测试-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/oauth2.1-flow.spec.ts",
+                        "column": 16,
+                        "line": 356
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "61473d7d4f7fe6452c94-bda512461652230230a0",
+              "file": "oauth2.1-flow.spec.ts",
+              "line": 350,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-07-10T07:50:15.700Z",
+    "duration": 86215.745,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 10,
+    "flaky": 0
+  }
+}

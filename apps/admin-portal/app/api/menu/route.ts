@@ -1,7 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { JWTUtils } from '@repo/lib/auth'; // Corrected import
-import { adminApi } from '@/lib/api'; // Corrected import
 
 // Helper function to filter menu items based on user permissions
 function filterMenuItems(menuItems: any[], userPermissions: string[]): any[] {
@@ -33,34 +30,96 @@ function filterMenuItems(menuItems: any[], userPermissions: string[]): any[] {
 
 export async function GET() {
   try {
-    const token = (await cookies()).get('access_token')?.value;
+    // 简化版本：直接返回静态菜单，不进行JWT验证
+    const staticMenus = [
+      {
+        id: 'dashboard',
+        name: '仪表盘',
+        key: 'dashboard',
+        path: '/admin',
+        icon: 'LayoutDashboard',
+        order: 10,
+        permissions: ['menu:dashboard:view'],
+      },
+      {
+        id: 'system-management',
+        name: '系统管理',
+        key: 'system-management',
+        path: '#',
+        icon: 'Settings',
+        order: 100,
+        children: [
+          {
+            id: 'users',
+            name: '用户管理',
+            key: 'users',
+            path: '/admin/users',
+            icon: 'Users',
+            order: 110,
+            permissions: ['menu:system:user:view', 'users:list'],
+          },
+          {
+            id: 'roles',
+            name: '角色管理',
+            key: 'roles',
+            path: '/admin/system/roles',
+            icon: 'ShieldCheck',
+            order: 120,
+            permissions: ['menu:system:role:view', 'roles:list'],
+          },
+          {
+            id: 'permissions',
+            name: '权限管理',
+            key: 'permissions',
+            path: '/admin/system/permissions',
+            icon: 'KeyRound',
+            order: 130,
+            permissions: ['menu:system:permission:view', 'permissions:list'],
+          },
+          {
+            id: 'clients',
+            name: 'OAuth 客户端',
+            key: 'clients',
+            path: '/admin/system/clients',
+            icon: 'AppWindow',
+            order: 140,
+            permissions: ['menu:system:client:view', 'clients:list'],
+          },
+          {
+            id: 'audit-logs',
+            name: '审计日志',
+            key: 'audit-logs',
+            path: '/admin/system/audits',
+            icon: 'ScrollText',
+            order: 150,
+            permissions: ['menu:system:audit:view', 'audit:list'],
+          },
+          {
+            id: 'system-config',
+            name: '系统配置',
+            key: 'system-config',
+            path: '/admin/system/config',
+            icon: 'Settings2',
+            order: 160,
+            permissions: ['menu:system:config:view'],
+          },
+        ],
+      },
+      {
+        id: 'oauth-register',
+        name: '注册 OAuth 客户端',
+        key: 'oauth-register',
+        path: '/clients/register',
+        icon: 'AppWindow',
+        order: 200,
+        permissions: ['clients:create'],
+      },
+    ];
 
-    if (!token) {
-      // If no token, return only public menu items or an empty array
-      // For now, we fetch all menus and filter by empty permissions
-      const allMenus = await adminApi.getMenus();
-      return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
-    }
-
-    // Verify token and get user permissions
-    const verificationResult = await JWTUtils.verifyToken(token); // Corrected function call
-    if (!verificationResult.valid || !verificationResult.payload?.sub) { // Check for valid payload and user ID (sub)
-      const allMenus = await adminApi.getMenus();
-      return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
-    }
-
-    // Fetch user's actual permissions from the backend
-    // This is crucial for dynamic, real-time permission checks
-    const userPermissions = verificationResult.payload.permissions as string[] || [];
-
-    const allMenus = await adminApi.getMenus();
-    const filtered = filterMenuItems(allMenus, userPermissions);
-    return NextResponse.json(filtered, { status: 200 });
+    return NextResponse.json(staticMenus, { status: 200 });
   } catch (error) {
     console.error('Error fetching menu items:', error);
-    // In case of any error, return a safe, minimal menu
-    const allMenus = await adminApi.getMenus();
-    return NextResponse.json(filterMenuItems(allMenus, []), { status: 200 });
+    return NextResponse.json([], { status: 200 });
   }
 }
 

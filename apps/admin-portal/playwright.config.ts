@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   // 测试目录
-  testDir: './__tests__/e2e',
+  testDir: './tests/e2e',
 
   // 测试文件匹配模式
   testMatch: '**/*.{test,spec}.{js,ts}',
@@ -22,9 +22,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   // 测试报告配置
-  reporter: process.env.CI
-    ? [['html', { outputFolder: 'playwright-report' }], ['list']]
-    : 'list',
+  reporter: [['json', { outputFile: 'test-results.json' }]],
 
   // 全局测试设置
   use: {

@@ -45,7 +45,7 @@ async function checkServices() {
   // 使用统一配置获取服务URL
   const adminPortalUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002';
   const oauthServiceUrl =
-    process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001/datamgr_flow';
+    process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
 
   const services = [
     { name: 'admin-portal', url: `${adminPortalUrl}/api/menu` },
@@ -94,7 +94,7 @@ async function initializeTestDatabase() {
 async function setupAuthCookies(context: any) {
   console.log('🍪 获取并设置认证cookie...');
   const oauthServiceUrl =
-    process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001/datamgr_flow';
+    process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
 
   try {
     // 模拟登录请求以获取认证cookie
@@ -153,7 +153,7 @@ async function setupAuthCookies(context: any) {
 async function warmupApplication(page: any) {
   try {
     // 访问登录页面预热应用
-    await page.goto('http://localhost:3002/datamgr_flow/login', { timeout: 30000 });
+    await page.goto('http://localhost:3002/login', { timeout: 30000 });
     console.log('🔥 应用预热完成');
   } catch (error) {
     console.warn('⚠️  应用预热失败:', error instanceof Error ? error.message : String(error));

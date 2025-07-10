@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@repo/ui';
 import type { AuditLog } from '@/types/auth';
+import type { AuditLogsResponse } from '../../../../../lib/api';
 import { format } from 'date-fns';
 
 type ColumnDef<T> = {
@@ -56,7 +57,7 @@ function AuditLogsPage() {
 
   const queryParams = useMemo(() => ({ page, limit, ...appliedFilters }), [page, limit, appliedFilters]);
 
-  const { data, isLoading, error, isFetching } = useQuery({
+  const { data, isLoading, error, isFetching } = useQuery<AuditLogsResponse>({
     queryKey: ['auditLogs', queryParams],
     queryFn: () => adminApi.getAuditLogs({
       ...queryParams,

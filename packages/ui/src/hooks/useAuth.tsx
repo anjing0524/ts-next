@@ -17,10 +17,10 @@ export interface AuthTokens {
 }
 
 export interface AuthProviderInterface {
-  fetchUser(): Promise<AuthUser>;
+  fetchUser(): Promise<AuthUser | null>;
   login(username?: string): Promise<void>;
   logout(): Promise<void>;
-  handleCallback(code: string, state: string | null): Promise<AuthUser>;
+  handleCallback(code: string, state: string | null): Promise<AuthUser | null>;
 }
 
 // --- Auth Context ---
@@ -54,7 +54,7 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const currentUser = await authService.fetchUser();
-      setUser(currentUser);
+      setUser(currentUser ?? null);
     } catch (e) {
       setUser(null); // Not authenticated
     } finally {
@@ -91,7 +91,7 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     setIsLoading(true);
     try {
       const loggedInUser = await authService.handleCallback(code, state);
-      setUser(loggedInUser);
+      setUser(loggedInUser ?? null);
     } catch (err: any) {
       setError(err.message);
       setUser(null);
