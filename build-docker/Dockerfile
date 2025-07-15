@@ -46,7 +46,6 @@ COPY lib ./lib
 COPY public ./public
 COPY types ./types
 COPY utils ./utils
-COPY generated ./generated
 
 # 优化构建过程
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -88,7 +87,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/generated ./generated
+# COPY --from=builder --chown=nextjs:nodejs /app/generated ./generated
 
 # 确保非特权用户可以访问所需文件
 RUN chown -R nextjs:nodejs /app && \
