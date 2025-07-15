@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 import { z } from 'zod';
 
 const updatePermissionSchema = z.object({

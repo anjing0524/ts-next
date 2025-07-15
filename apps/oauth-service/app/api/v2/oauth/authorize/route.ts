@@ -15,17 +15,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
 import { prisma } from '@repo/database';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils, AuthorizationUtils } from '@repo/lib/auth';
+import { PKCEUtils, ScopeUtils, AuthorizationUtils, withErrorHandling, OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
-import { withErrorHandling } from '@repo/lib/utils/error-handler';
-import {
-  OAuth2Error,
-  OAuth2ErrorCode,
-  ValidationError,
-  ConfigurationError,
-} from '@repo/lib/errors';
+import { ValidationError, ConfigurationError } from '@repo/lib/node';
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';

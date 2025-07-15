@@ -4,86 +4,13 @@
 // Description: OAuth 2.0 / OpenID Connect UserInfo Endpoint (OIDC Core 1.0)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@repo/lib/utils/error-handler';
+import { withErrorHandling } from '@repo/lib/node';
 // authenticateBearer 已移至 @repo/lib/middleware
-import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/errors';
+import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
-import { ApiResponse } from '@repo/lib/types/api';
+// import { ApiResponse } from '@repo/lib/types';
+type ApiResponse<T> = any;
 import { getUserProfileData } from '@/lib/user-utils';
-
-/**
- * @swagger
- * /api/v2/oauth/userinfo:
- *   get:
- *     summary: OpenID Connect UserInfo端点 (OIDC Core 1.0)
- *     description: |
- *       返回已认证用户的用户信息。此端点受OAuth 2.0访问令牌保护。
- *       Returns user information for the authenticated user. This endpoint is protected by OAuth 2.0 Access Token.
- *
- *       **认证要求**:
- *       - 必须在Authorization头中提供有效的Bearer访问令牌
- *       - 访问令牌必须包含'openid'范围才能访问此端点
- *       - 令牌必须通过Jose库的JWT验证
- *
- *       **返回的用户信息**:
- *       基于访问令牌中的scope声明返回相应的用户信息声明。
- *     tags:
- *       - OAuth V2
- *       - OpenID Connect
- *     security:
- *       - BearerAuth: ['openid']
- *     produces:
- *       - application/json
- *     responses:
- *       '200':
- *         description: 成功返回用户信息 (Successfully returns user information)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseUserInfo'
- *       '401':
- *         description: 访问令牌无效或缺失 (Access token is invalid or missing)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseError'
- *       '403':
- *         description: 访问令牌没有足够的权限(缺少openid scope) (Access token lacks sufficient permissions (missing openid scope))
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseError'
- *       '404':
- *         description: 用户不存在 (User does not exist)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseError'
- *       '500':
- *         description: 服务器内部错误 (Internal server error)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseError'
- * components:
- *   schemas:
- *     ApiResponseUserInfo:
- *       allOf:
- *         - $ref: '#/components/schemas/ApiResponseBase'
- *         - type: object
- *           properties:
- *             data:
- *               $ref: '#/components/schemas/UserInfoResponse'
- *             message:
- *               type: string
- *               example: "User information retrieved successfully."
- *   securitySchemes:
- *     BearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *       description: OAuth 2.0 访问令牌 (OAuth 2.0 Access Token)
- */
 
 /**
  * UserInfo端点内部处理函数

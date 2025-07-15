@@ -32,9 +32,7 @@ import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Pr
 import { NextRequest, NextResponse } from 'next/server';
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
-import { AuthorizationUtils, JWTUtils, ScopeUtils, type RefreshTokenPayload } from '@repo/lib/auth';
-import { OAuth2Error, OAuth2ErrorCode, TokenError } from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
-import { withErrorHandling } from '@repo/lib/utils/error-handler'; // 导入错误处理高阶函数 (Import error handling HOF)
+import { AuthorizationUtils, JWTUtils, ScopeUtils, OAuth2Error, OAuth2ErrorCode, TokenError, withErrorHandling, RefreshTokenPayload } from '@repo/lib/node';
 import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)

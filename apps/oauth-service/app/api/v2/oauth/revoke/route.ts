@@ -5,12 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { JWTUtils, AuthorizationUtils } from '@repo/lib/auth';
+import { JWTUtils, AuthorizationUtils } from '@repo/lib/node';
 import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
 import { withErrorHandling } from '@/lib/utils/error-handler';
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
-import { ApiResponse } from '@repo/lib/types/api';
+import { ApiResponse } from '@repo/lib/node';
 import { OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
 
 /**

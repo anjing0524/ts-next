@@ -15,14 +15,14 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.1",
-    "prisma": "^6.0.1",
+    "@prisma/client": "^6.11.1",
     "dotenv": "^16.4.5",
-    "mysql2": "^3.11.5"
+    "mysql2": "^3.14.2",
+    "prisma": "^6.11.1"
   },
   "devDependencies": {
     "@repo/prettier-config": "workspace:*",
-    "tsx": "^4.0.0"
+    "tsx": "^4.20.3"
   },
   "prettier": "@repo/prettier-config"
 }

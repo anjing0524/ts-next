@@ -28,8 +28,8 @@ export enum UserStatus {
 /**
  * 用于用户管理列表的分页响应数据结构
  */
-export interface PaginatedUsersResponse {
-  data: User[];
+export interface PaginatedResponse<T> {
+  data: T[];
   meta: {
     totalItems: number;
     itemCount: number;

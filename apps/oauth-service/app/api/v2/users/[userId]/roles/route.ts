@@ -3,8 +3,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@repo/database';
-import { errorResponse, successResponse } from '@repo/lib';
-import { AuthorizationUtils } from '@repo/lib/auth';
+import { successResponse, errorResponse } from '@repo/lib/node';
+import { AuthorizationUtils } from '@repo/lib/node';
 
 const updateUserRolesSchema = z.object({
   roleIds: z.array(z.string().cuid()).min(1, 'At least one role ID must be provided.'),

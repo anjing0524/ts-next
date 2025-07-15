@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 import { prisma } from '@repo/database';
 import { Prisma } from '@prisma/client';
 import z from 'zod';

@@ -23,7 +23,12 @@ export const useProfileQuery = () => {
 export const useUpdateProfileMutation = () => {
   const queryClient = useQueryClient();
   return useMutation<User, Error, Partial<User>>({
-    mutationFn: (profileData) => adminApi.updateUserProfile(profileData),
+    mutationFn: async (profileData) => {
+      // 只传递 displayName，且保证为 string
+      await adminApi.updateUserProfile({ displayName: profileData.displayName ?? '' });
+      // 更新后重新获取最新用户信息，保证类型为 User
+      return authApi.fetchUserProfile();
+    },
     onSuccess: (data) => {
       // 更新成功后，使个人资料的查询缓存失效，以便重新获取最新数据
       queryClient.invalidateQueries({ queryKey: profileKeys.detail() });
@@ -37,8 +42,10 @@ export const useUpdateProfileMutation = () => {
  * 更新用户密码的 React Query Mutation Hook
  */
 export const useUpdatePasswordMutation = () => {
-  return useMutation<void, Error, { oldPassword?: string; newPassword?: string }>({
-    mutationFn: (passwordData) => adminApi.updatePassword(passwordData),
+  return useMutation<void, Error, { currentPassword: string; newPassword: string }>({
+    mutationFn: async (passwordData) => {
+      await adminApi.updatePassword(passwordData);
+    },
     // 成功后可以添加一些逻辑，例如提示用户密码修改成功
   });
 };

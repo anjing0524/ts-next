@@ -1,6 +1,6 @@
 import { prisma } from '@repo/database';
-import { errorResponse, successResponse } from '@repo/lib';
-import { AuthContext } from '@repo/lib/middleware';
+import { successResponse, errorResponse } from '@repo/lib/node';
+import { AuthContext } from '@repo/lib/node';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
@@ -53,7 +53,7 @@ async function handler(request: NextRequest, context: { authContext: AuthContext
 
 export async function PUT(request: NextRequest, context: { params: any }) {
   // 调用通用认证方法
-  const { authenticateBearer } = await import('@repo/lib/middleware');
+  const { authenticateBearer } = await import('@repo/lib/node');
   const authResult = await authenticateBearer(request, {
     requireUserContext: true,
   });

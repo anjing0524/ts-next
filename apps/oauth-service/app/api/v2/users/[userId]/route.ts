@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 import { prisma } from '@repo/database';
 import { z } from 'zod';
-import { getUserDetails } from '@repo/lib/services';
-
-import { excludePassword } from '@repo/lib/utils';
+import { getUserDetails, excludePassword } from '@repo/lib/node';
 
 const updateUserSchema = z.object({
   displayName: z.string().max(100).optional(),

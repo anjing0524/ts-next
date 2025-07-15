@@ -27,10 +27,6 @@ export const columns = (
     accessorKey: 'displayName',
     header: 'Display Name',
   },
-  // {
-  //   accessorKey: 'email',
-  //   header: 'Email',
-  // },
   {
     accessorKey: 'isActive',
     header: 'Status',

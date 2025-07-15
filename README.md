@@ -7,10 +7,10 @@
 本项目采用 Monorepo 架构，代码库中包含多个相互独立又可共享代码的应用（apps）和包（packages）。
 
 - **`apps/`**: 存放各个独立的应用服务。
-  - **`admin-portal`**: 管理后台前端，基于 Next.js 和 antd，提供系统管理、用户管理、权限控制等功能。
-  - **`flow-service`**: 可视化流程编排服务，基于 Next.js 和 antd，提供流程设计、执行、监控等功能。
+  - **`admin-portal`**: 管理后台前端，基于 Next.js 和 shadcn/ui，提供系统管理、用户管理、权限控制等功能。
+  - **`flow-service`**: 可视化流程编排服务，基于 Next.js 和 shadcn/ui，提供流程设计、执行、监控等功能。
   - **`kline-service`**: K线图服务，基于 Next.js 和 WebAssembly，提供高性能的 K 线图展示和数据分析功能。
-  - **`oauth-service`**: OAuth 2.0 认证服务，基于 Next.js 和 antd，提供用户认证、授权、令牌管理等功能。
+  - **`oauth-service`**: OAuth 2.0 认证服务，基于 Next.js 和 shadcn/ui，提供用户认证、授权、令牌管理等功能。
   - **`pingora-proxy`**: 基于 Pingora 的高性能反向代理服务，负责流量转发、负载均衡、安全防护等。
   - **`test-service`**: 用于测试和演示的服务。
 - **`packages/`**: 存放共享的模块和配置。
@@ -23,11 +23,11 @@
   - **`prettier-config`**: 共享的 Prettier 配置。
   - **`tailwind-config`**: 共享的 Tailwind CSS 配置。
   - **`typescript-config`**: 共享的 TypeScript 配置。
-  - **`ui`**: 共享的 UI 组件库，基于 antd。
+  - **`ui`**: 共享的 UI 组件库，基于 shadcn/ui。
 
 ## 技术栈
 
-- **前端**: Next.js, React, TypeScript, Tailwind CSS, antd
+- **前端**: Next.js, React, TypeScript, Tailwind CSS, shadcn/ui
 - **后端**: Next.js, Pingora, Rust
 - **数据库**: SQLite, Prisma
 - **测试**: Jest, Playwright

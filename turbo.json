@@ -3,13 +3,52 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["NODE_ENV", "NEXT_PUBLIC_*"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**",
+        ".next/standalone/**"
+      ],
+      "env": [
+        "NODE_ENV",
+        "NEXT_PUBLIC_*",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true,
-      "outputs": []
+      "outputs": [],
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID"
+      ]
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"],

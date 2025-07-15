@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@repo/database';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 import { Prisma } from '@prisma/client';
 
 const scopeCreateSchema = z.object({

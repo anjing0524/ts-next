@@ -18,6 +18,16 @@
     "./browser": {
       "browser": "./src/browser/index.ts",
       "default": "./src/browser/index.ts"
+    },
+    "./middleware": {
+      "node": "./src/middleware/index.ts",
+      "default": "./src/middleware/index.ts"
+    },
+    "./api-routes": {
+      "default": "./src/api-routes.ts"
+    },
+    "./OAuthConfig": {
+      "default": "./src/config/oauth-config.ts"
     }
   },
   "files": [

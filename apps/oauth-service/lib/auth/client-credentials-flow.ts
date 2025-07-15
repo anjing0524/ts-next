@@ -15,14 +15,14 @@
  */
 import { prisma } from '@repo/database';
 import bcrypt from 'bcrypt';
-import { JWTUtils } from '@repo/lib/auth'; // 导入 JWTUtils 用于令牌生成 (Import JWTUtils for token generation)
+import { JWTUtils, OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
 import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
 import {
   AuthenticationError,
   ValidationError,
   CryptoError,
   TokenGenerationError,
-} from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
+} from '@repo/lib/node'; // 导入自定义错误类 (Import custom error classes)
 
 // AuthenticatedClient 接口定义了客户端认证成功后需要暴露的基本信息。
 // The AuthenticatedClient interface defines the basic information to be exposed after successful client authentication.

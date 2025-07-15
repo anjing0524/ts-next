@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { checkPoolHealth } from '@repo/database';
-import logger from '@/lib/utils/logger';
+import { logger } from '@repo/lib/node';
 
 export async function GET() {
   try {

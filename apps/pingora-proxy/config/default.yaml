@@ -1,8 +1,7 @@
 services:
-  - name: "kline-service"
+  - name: "admin-portal"
     bind_address: "0.0.0.0:6188"
     upstreams:
-      - "127.0.0.1:3001"
       - "127.0.0.1:3002"
     tls: false
     health_check:
@@ -11,10 +10,5 @@ services:
   - name: "oauth-service"
     bind_address: "0.0.0.0:6189"
     upstreams:
-      - "127.0.0.1:4001"
-      - "127.0.0.1:4002"
-    # For TLS to work correctly with SNI (Server Name Indication),
-    # it is recommended to use hostnames instead of IP addresses for upstreams
-    # and set tls to true.
+      - "127.0.0.1:3001"
     tls: false
-    # Health check config is optional and will use defaults if omitted.

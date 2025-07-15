@@ -25,7 +25,7 @@ import {
   CryptoError,
   TokenValidationError,
   TokenExpiredError,
-} from '@repo/lib/errors'; // 导入自定义错误类 (Import custom error classes)
+} from '@repo/lib/node'; // 导入自定义错误类 (Import custom error classes)
 import { AuthorizationCode as PrismaAuthorizationCode, Prisma } from '@prisma/client'; // Prisma 类型 (Prisma type)
 
 // 授权码数据接口，定义了授权码对象的基本结构

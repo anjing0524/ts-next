@@ -5,7 +5,7 @@ import {
   User,
   CreateUserInput,
   UpdateUserInput,
-  PaginatedUsersResponse,
+  PaginatedResponse,
 } from './domain/user';
 import { UserService } from './application/user.service';
 import { UserRepository } from './infrastructure/user.repository';
@@ -49,7 +49,7 @@ export const userQueryKeys = {
 
 // 增强的用户列表查询
 export const useUsersQuery = (params: UsersQueryVariables = {}) => {
-  return useQuery<PaginatedUsersResponse, Error>({
+  return useQuery<PaginatedResponse<User>, Error>({
     queryKey: userQueryKeys.list(params),
     queryFn: () => userService.getUsers(params),
     placeholderData: (previousData) => previousData,
@@ -70,18 +70,12 @@ export const useUserQuery = (userId: string | null) => {
 
 // 用户统计查询 - 暂时使用现有API的统计功能
 export const useUserStatsQuery = () => {
-  return useQuery<any, Error>({ // Changed to any as return type is not fully defined yet
+  return useQuery<any, Error>({
     queryKey: userQueryKeys.stats(),
     queryFn: async () => {
       // 使用现有的API获取统计数据
-      const statsSummary = await adminApi.getStatsSummary(); // Still using adminApi directly for stats
-      return {
-        totalUsers: statsSummary.totalUsers || 0,
-        activeUsers: statsSummary.activeUsers || 0,
-        inactiveUsers: statsSummary.inactiveUsers || 0,
-        usersCreatedThisMonth: statsSummary.usersCreatedThisMonth || 0,
-        usersCreatedLastMonth: statsSummary.usersCreatedLastMonth || 0,
-      };
+      const statsSummary = await adminApi.getStatsSummary();
+      return statsSummary;
     },
     staleTime: 5 * 60 * 1000, // 统计数据5分钟内保持新鲜
     refetchInterval: 5 * 60 * 1000, // 每5分钟自动刷新
@@ -98,7 +92,7 @@ export const useSearchUsersQuery = (
 ) => {
   const { enabled = true } = options;
   
-  return useQuery<PaginatedUsersResponse, Error>({ // Changed return type to PaginatedUsersResponse
+  return useQuery<PaginatedResponse<User>, Error>({
     queryKey: userQueryKeys.list({ search: searchTerm, limit: 20 }),
     queryFn: () => userService.getUsers({ search: searchTerm, limit: 20 }), // Using userService.getUsers
     enabled: enabled && searchTerm.length >= 2, // 至少2个字符才搜索

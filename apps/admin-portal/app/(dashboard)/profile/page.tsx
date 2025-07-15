@@ -92,13 +92,6 @@ export default function ProfilePage() {
                 <p className="text-sm text-red-600">{profileForm.formState.errors.displayName.message}</p>
               )}
             </div>
-            {/* <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...profileForm.register('email')} />
-              {profileForm.formState.errors.email && (
-                <p className="text-sm text-red-600">{profileForm.formState.errors.email.message}</p>
-              )}
-            </div> */}
             <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Profile'}</Button>
           </form>
         </CardContent>

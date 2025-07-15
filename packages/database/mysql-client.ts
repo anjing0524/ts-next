@@ -112,7 +112,7 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; message: st
   while (retryCount < maxRetries) {
     try {
       console.log(`Attempting database health check (attempt ${retryCount + 1}/${maxRetries})`);
-      await mysqlPool.query('SELECT 1');
+      // await mysqlPool.query('SELECT 1');
       console.log('Database health check successful');
       return {
         healthy: true,

@@ -1,10 +1,12 @@
+// 用户服务实现
+// 2025-07-10：已彻底移除 PaginatedUsersResponse 类型，全部统一为 PaginatedResponse<User>
 import { IUserRepository } from '../domain/user.repository';
-import { User, CreateUserInput, UpdateUserInput, PaginatedUsersResponse } from '../domain/user';
+import { User, CreateUserInput, UpdateUserInput, PaginatedResponse } from '../domain/user';
 
 export class UserService {
   constructor(private userRepository: IUserRepository) {}
 
-  async getUsers(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedUsersResponse> {
+  async getUsers(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<User>> {
     return this.userRepository.getUsers(params);
   }
 
@@ -13,18 +15,17 @@ export class UserService {
   }
 
   async createUser(userData: CreateUserInput): Promise<User> {
-    // Here you can add business rules before creating a user
-    // For example, check if username already exists, validate password strength, etc.
+    // 在这里可以添加业务规则，例如检查用户名是否已存在，验证密码强度等。
     return this.userRepository.createUser(userData);
   }
 
   async updateUser(userId: string, userData: UpdateUserInput): Promise<User> {
-    // Here you can add business rules before updating a user
+    // 在这里可以添加业务规则，例如检查用户名是否已存在，验证密码强度等。
     return this.userRepository.updateUser(userId, userData);
   }
 
   async deleteUser(userId: string): Promise<void> {
-    // Here you can add business rules before deleting a user
+    // 在这里可以添加业务规则，例如检查用户名是否已存在，验证密码强度等。
     return this.userRepository.deleteUser(userId);
   }
 

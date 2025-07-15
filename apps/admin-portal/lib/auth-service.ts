@@ -3,13 +3,13 @@ import { adminApi, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
 import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@repo/lib/browser';
 
-// OAuth配置
+// OAuth配置 - 使用相对路径，通过pingora-proxy路由
 const OAuthConfig = {
-  clientId: 'auth-center-admin-client',
-  redirectUri: 'http://localhost:3000/auth/callback',
-  authorizationEndpoint: 'http://localhost:3001/api/v2/oauth/authorize',
-  tokenEndpoint: 'http://localhost:3001/api/v2/oauth/token',
-  scope: 'openid profile email admin:full_access offline_access',
+  clientId: 'admin-portal-client',
+  redirectUri: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+  authorizationEndpoint: '/api/v2/oauth/authorize',
+  tokenEndpoint: '/api/v2/oauth/token',
+  scope: 'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
 };
 
 export const authService: AuthProviderInterface = {
@@ -22,7 +22,7 @@ export const authService: AuthProviderInterface = {
     if (!accessToken) {
       return null;
     }
-    return adminApi.getUserById('me');
+    return adminApi.getUserById('me') as Promise<AuthUser | null>;
   },
 
   async login(): Promise<void> {
@@ -33,18 +33,33 @@ export const authService: AuthProviderInterface = {
     sessionStorage.setItem('oauth_code_verifier', codeVerifier);
     sessionStorage.setItem('oauth_state', state);
 
-    const params = new URLSearchParams({
-      client_id: OAuthConfig.clientId,
-      redirect_uri: OAuthConfig.redirectUri,
-      response_type: 'code',
-      scope: OAuthConfig.scope,
-      state: state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-    });
+    // 检查是否有从oauth-service重定向过来的原始参数
+    const originalParams = sessionStorage.getItem('oauth_original_params');
+    let targetUrl = OAuthConfig.authorizationEndpoint;
+    
+    if (originalParams) {
+      // 如果有原始oauth参数，直接重定向回oauth-service继续流程
+      sessionStorage.removeItem('oauth_original_params');
+      const params = new URLSearchParams(originalParams);
+      params.set('code_challenge', codeChallenge);
+      params.set('code_challenge_method', 'S256');
+      params.set('state', state);
+      targetUrl += `?${params.toString()}`;
+    } else {
+      // 正常admin-portal登录流程
+      const params = new URLSearchParams({
+        client_id: OAuthConfig.clientId,
+        redirect_uri: OAuthConfig.redirectUri,
+        response_type: 'code',
+        scope: OAuthConfig.scope,
+        state: state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+      });
+      targetUrl += `?${params.toString()}`;
+    }
 
-    const authUrl = `${OAuthConfig.authorizationEndpoint}?${params.toString()}`;
-    window.location.href = authUrl;
+    window.location.href = targetUrl;
   },
 
   async logout(): Promise<void> {

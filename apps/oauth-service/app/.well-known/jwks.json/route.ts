@@ -4,8 +4,7 @@
 // Description: This file implements the JWKS (JSON Web Key Set) endpoint for providing JWT public key information
 
 import { NextResponse } from 'next/server';
-import { JWTUtils } from '@repo/lib/auth';
-import { withErrorHandling } from '@repo/lib/utils/error-handler';
+import { JWTUtils, withErrorHandling } from '@repo/lib/node';
 
 /**
  * JWKS端点处理函数

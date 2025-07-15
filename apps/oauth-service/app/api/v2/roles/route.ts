@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { Prisma } from '@prisma/client';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 import { z } from 'zod';
 
 const DEFAULT_PAGE_SIZE = 10;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { successResponse, errorResponse } from '@repo/lib';
+import { successResponse, errorResponse } from '@repo/lib/node';
 
 /**
  * DELETE /api/v2/roles/[roleId]/permissions/[permissionId] - 从角色中移除单个权限

@@ -47,7 +47,7 @@ async function authenticatedRequest<T>(
 
 // 认证API
 export const authApi = {
-  async exchangeCodeForToken(code: string, codeVerifier: string) {
+  async exchangeCodeForToken(code: string, codeVerifier: string): Promise<import('@repo/ui').AuthTokens> {
     return apiRequest('/oauth/token', {
       method: 'POST',
       headers: {
@@ -85,7 +85,7 @@ export const authApi = {
   },
 
   async fetchUserProfile(): Promise<DomainUser> {
-    return authenticatedRequest('/admin/users/me');
+    return authenticatedRequest('/users/me');
   },
 };
 
@@ -102,14 +102,17 @@ export type PaginatedResponse<T> = {
 
 export type AuditLogsResponse = PaginatedResponse<any>;
 
+// 导出基础请求函数，供页面等直接调用
+export { apiRequest };
+
 // 管理API
 export const adminApi = {
-  async getUserById(userId: string) {
-    return authenticatedRequest(`/admin/users/${userId}`);
+  async getUserById(userId: string): Promise<import('@repo/ui').AuthUser | null> {
+    return authenticatedRequest(`/users/${userId}`);
   },
 
   async getMenus() {
-    return authenticatedRequest('/admin/menus');
+    return authenticatedRequest('/menu');
   },
 
   async getAuditLogs(params?: {
@@ -135,7 +138,7 @@ export const adminApi = {
     if (params?.search) searchParams.set('search', params.search);
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/audits${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/audit-logs${queryString ? `?${queryString}` : ''}`;
     return authenticatedRequest(endpoint);
   },
 
@@ -152,7 +155,7 @@ export const adminApi = {
     if (params?.role) searchParams.set('role', params.role);
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/users${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/users${queryString ? `?${queryString}` : ''}`;
     return authenticatedRequest(endpoint);
   },
 
@@ -167,7 +170,7 @@ export const adminApi = {
     if (params?.search) searchParams.set('search', params.search);
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/roles${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/roles${queryString ? `?${queryString}` : ''}`;
     return authenticatedRequest(endpoint);
   },
 
@@ -182,7 +185,7 @@ export const adminApi = {
     if (params?.search) searchParams.set('search', params.search);
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/permissions${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/permissions${queryString ? `?${queryString}` : ''}`;
     return authenticatedRequest(endpoint);
   },
 
@@ -197,8 +200,43 @@ export const adminApi = {
     if (params?.search) searchParams.set('search', params.search);
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/clients${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/clients${queryString ? `?${queryString}` : ''}`;
     return authenticatedRequest(endpoint);
+  },
+
+  // 新增：根据ID获取客户端
+  async getClientById(clientId: string): Promise<OAuthClient> {
+    return authenticatedRequest(`/clients/${clientId}`);
+  },
+
+  // 新增：创建客户端
+  async createClient(clientData: any): Promise<OAuthClient> {
+    return authenticatedRequest('/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData),
+    });
+  },
+
+  // 新增：更新客户端
+  async updateClient(clientId: string, clientData: any): Promise<OAuthClient> {
+    return authenticatedRequest(`/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData),
+    });
+  },
+
+  // 新增：删除客户端
+  async deleteClient(clientId: string): Promise<void> {
+    await authenticatedRequest(`/clients/${clientId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // 新增：轮换客户端密钥
+  async rotateClientSecret(clientId: string): Promise<{ clientSecret: string }> {
+    return authenticatedRequest(`/clients/${clientId}/secret`, {
+      method: 'POST',
+    });
   },
 
   async registerClient(clientData: {
@@ -206,7 +244,7 @@ export const adminApi = {
     redirectUris: string;
     jwksUri?: string;
   }): Promise<{ message: string; clientId?: string; clientSecret?: string }> {
-    return authenticatedRequest('/admin/clients', {
+    return authenticatedRequest('/clients', {
       method: 'POST',
       body: JSON.stringify(clientData),
     });
@@ -215,7 +253,7 @@ export const adminApi = {
   async updateUserProfile(profileData: {
     displayName: string;
   }): Promise<{ message: string }> {
-    return authenticatedRequest('/admin/users/me/profile', {
+    return authenticatedRequest('/users/me/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
@@ -225,7 +263,7 @@ export const adminApi = {
     currentPassword: string;
     newPassword: string;
   }): Promise<{ message: string }> {
-    return authenticatedRequest('/admin/users/me/password', {
+    return authenticatedRequest('/users/me/password', {
       method: 'PUT',
       body: JSON.stringify(passwordData),
     });
@@ -239,7 +277,7 @@ export const adminApi = {
     mustChangePassword: boolean;
     roleIds: string[];
   }): Promise<{ message: string }> {
-    return authenticatedRequest('/admin/users', {
+    return authenticatedRequest('/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -254,9 +292,81 @@ export const adminApi = {
     isActive: boolean;
     mustChangePassword: boolean;
   }): Promise<{ message: string }> {
-    return authenticatedRequest(`/admin/users/${userId}`, {
+    return authenticatedRequest(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
+    });
+  },
+
+  // 新增：获取仪表盘统计数据
+  async getStatsSummary(): Promise<import('../features/dashboard/queries').DashboardStats> {
+    return authenticatedRequest('/stats/summary');
+  },
+
+  async getRoleById(roleId: string) {
+    return authenticatedRequest(`/roles/${roleId}`);
+  },
+
+  async createRole(roleData: any) {
+    return authenticatedRequest('/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData),
+    });
+  },
+
+  async updateRole(roleId: string, roleData: any) {
+    return authenticatedRequest(`/roles/${roleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(roleData),
+    });
+  },
+
+  async deleteRole(roleId: string) {
+    return authenticatedRequest(`/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async updateRolePermissions(roleId: string, permissionIds: string[]) {
+    return authenticatedRequest(`/roles/${roleId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permissionIds }),
+    });
+  },
+
+  // 新增：获取系统配置
+  async getSystemConfig(): Promise<any> {
+    // 获取系统配置，返回 SystemConfig 对象
+    return authenticatedRequest('/system/config');
+  },
+
+  // 新增：更新系统配置
+  async updateSystemConfig(configData: any): Promise<any> {
+    // 更新系统配置，返回更新后的 SystemConfig 对象
+    return authenticatedRequest('/system/config', {
+      method: 'PUT',
+      body: JSON.stringify(configData),
+    });
+  },
+
+  // 新增：删除用户
+  async deleteUser(userId: string): Promise<void> {
+    // 删除指定用户
+    return authenticatedRequest(`/users/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async submitConsent(decision: 'allow' | 'deny', consentParams: URLSearchParams): Promise<any> {
+    return authenticatedRequest(`/oauth/consent`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            decision,
+            ...Object.fromEntries(consentParams),
+        }),
     });
   },
 };

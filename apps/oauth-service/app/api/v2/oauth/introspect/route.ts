@@ -3,107 +3,21 @@
 // 描述: OAuth 2.0 令牌内省端点 (RFC 7662)
 // Description: OAuth 2.0 Token Introspection Endpoint (RFC 7662)
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
-import { withErrorHandling } from '@/lib/utils/error-handler';
 import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
-import { JWTUtils } from '@repo/lib/auth';
+import { ConfigurationError, OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
+import { withErrorHandling } from '@/lib/utils/error-handler';
+import { prisma } from '@repo/database';
+import { JWTUtils } from '@repo/lib/node';
+import { NextRequest, NextResponse } from 'next/server';
 import {
-  introspectTokenRequestSchema,
   IntrospectResponseActive,
   IntrospectResponseInactive,
   introspectResponseActiveSchema,
+  introspectTokenRequestSchema,
 } from './schemas';
-import { ApiResponse } from '@repo/lib/types/api';
-import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from '@/lib/errors';
+// import { ApiResponse } from '@repo/lib/types';
+type ApiResponse<T> = /*unresolved*/ any;
 
-/**
- * @swagger
- * /api/v2/oauth/introspect:
- *   post:
- *     summary: OAuth 2.0 令牌内省 (Token Introspection) - RFC 7662
- *     description: |
- *       验证令牌的有效性并返回其元数据。此端点受客户端凭证保护。
- *       Validates a token and returns its metadata. This endpoint is protected by client credentials.
- *     tags: [OAuth V2]
- *     consumes: [application/x-www-form-urlencoded]
- *     produces: [application/json]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             $ref: '#/components/schemas/IntrospectTokenRequest'
- *     responses:
- *       '200':
- *         description: 令牌内省响应。active为true表示令牌有效，active为false表示令牌无效。
- *                      (Token introspection response. active:true indicates a valid token, active:false indicates an invalid token.)
- *         content:
- *           application/json:
- *             schema:
- *               oneOf: # 表示响应可以是活动令牌或非活动令牌的 ApiResponse 结构
- *                 - $ref: '#/components/schemas/ApiResponseIntrospectionActive'
- *                 - $ref: '#/components/schemas/ApiResponseIntrospectionInactive'
- *       '400':
- *         description: 无效请求。 (Invalid request.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '401':
- *         description: 客户端认证失败。 (Client authentication failed.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '415':
- *         description: 不支持的媒体类型。 (Unsupported Media Type.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '500':
- *         description: 服务器内部错误。 (Internal server error.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- * components:
- *   schemas:
- *     IntrospectTokenRequest: # 已在 schemas.ts 中定义，此处为文档目的 (Defined in schemas.ts, here for documentation)
- *       type: object
- *       required: [token]
- *       properties:
- *         token: { type: string }
- *         token_type_hint: { type: string, enum: [access_token, refresh_token] }
- *         client_id: { type: string }
- *         # client_secret: { type: string } // client_secret is not part of RFC7662 request body if using Basic Auth
- *     IntrospectResponseActiveData: # 'data' field for active token
- *       type: object
- *       required: [active, client_id, sub, iss, aud, exp, iat] # JTI is often optional
- *       properties:
- *         active: { type: boolean, enum: [true] }
- *         scope: { type: string, nullable: true }
- *         client_id: { type: string }
- *         username: { type: string, nullable: true }
- *         sub: { type: string }
- *         aud: { type: string, description: "可以是字符串或字符串数组 (Can be string or array of strings)" }
- *         iss: { type: string }
- *         exp: { type: number, format: int64 }
- *         iat: { type: number, format: int64 }
- *         jti: { type: string, nullable: true }
- *         token_type: { type: string, nullable: true } # e.g. Bearer for AT, or 'refresh_token'
- *         user_id: { type: string, nullable: true }
- *         permissions: { type: array, items: { type: string }, nullable: true }
- *     IntrospectResponseInactiveData: # 'data' field for inactive token
- *       type: object
- *       required: [active]
- *       properties:
- *         active: { type: boolean, enum: [false] }
- *     ApiResponseIntrospectionActive:
- *       allOf:
- *         - $ref: '#/components/schemas/ApiResponseBase'
- *         - type: object
- *           properties:
- *             data: { $ref: '#/components/schemas/IntrospectResponseActiveData' }
- *             message: { type: string, example: "Token is active." }
- *     ApiResponseIntrospectionInactive:
- *       allOf:
- *         - $ref: '#/components/schemas/ApiResponseBase'
- *         - type: object
- *           properties:
- *             data: { $ref: '#/components/schemas/IntrospectResponseInactiveData' }
- *             message: { type: string, example: "Token is not active." }
- *     # ApiResponseBase, ApiError, ApiResponseError 已在其他地方定义 (Defined elsewhere)
- */
 // 令牌内省端点处理函数 (内部逻辑)
 // Token introspection endpoint handler function (internal logic)
 async function introspectionHandlerInternal(request: NextRequest): Promise<NextResponse> {
@@ -305,6 +219,3 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
 
 // 使用 withErrorHandling 包装处理函数 (Wrap the handler with withErrorHandling)
 export const POST = withErrorHandling(introspectionHandlerInternal);
-
-// 文件结束 (End Of File)
-// EOF

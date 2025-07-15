@@ -1,5 +1,5 @@
 import { Page, expect } from '@playwright/test';
-import { OAuthConfig } from '@repo/lib';
+import { OAuthConfig } from '@repo/lib/OAuthConfig';
 
 /**
  * 认证测试辅助函数

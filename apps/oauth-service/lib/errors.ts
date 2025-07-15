@@ -17,4 +17,4 @@ export {
   TokenRevocationError,
   CryptoError,
   ConfigurationError,
-} from '@repo/lib/errors';
+} from '@repo/lib/node';
