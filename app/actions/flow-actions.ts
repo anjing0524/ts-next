@@ -245,10 +245,12 @@ function calculateStats(stage: string, nodesCount: number, stageStates: PlanStat
     success: stageStates.filter((s) => s.plan_state === 'D' || s.plan_state === 'K').length,
     // 失败状态：T, F, Z, C
     failed: stageStates.filter((s) => ['F', 'Z', 'C', 'T'].includes(s.plan_state || '')).length,
-    // 运行中状态：P, A, S, R
-    running: stageStates.filter((s) => ['R', 'P', 'A', 'S'].includes(s.plan_state || '')).length,
-    // 等待中则说明计划配置的有，但是state表里面没有
-    waiting: nodesCount - stageStates.length,
+    // 运行中状态： S, R
+    running: stageStates.filter((s) => ['R', 'S'].includes(s.plan_state || '')).length,
+    // 等待中 P, A,
+    waiting: stageStates.filter((s) => ['P', 'A'].includes(s.plan_state || '')).length,
+    // 微调度则说明计划配置的有，但是state表里面没有
+    not_executed: nodesCount - stageStates.length,
   };
 }
 
@@ -283,13 +285,15 @@ function createNode(
         status = 'error';
         break;
       case 'R':
-      case 'P':
-      case 'A':
       case 'S':
         status = 'running';
         break;
-      default:
+      case 'P':
+      case 'A':
         status = 'waiting';
+        break;
+      default:
+        status = 'not_executed';
         break;
     }
   }

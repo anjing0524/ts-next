@@ -25,7 +25,7 @@ export const dbConfig = {
   keepAliveInitialDelay: 0,
   multipleStatements: true,
   charset: 'utf8mb4',
-  timezone: 'Asia/Shanghai',
+  timezone: '+08:00',
   // debug: process.env.NODE_ENV !== 'production',
 };
 

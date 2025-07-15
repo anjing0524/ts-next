@@ -210,6 +210,9 @@ importers:
       eslint-config-prettier:
         specifier: ^10.0.2
         version: 10.0.2(eslint@9.21.0(jiti@2.4.2))
+      eslint-plugin-react-hooks:
+        specifier: ^5.2.0
+        version: 5.2.0(eslint@9.21.0(jiti@2.4.2))
       husky:
         specifier: ^9.1.7
         version: 9.1.7

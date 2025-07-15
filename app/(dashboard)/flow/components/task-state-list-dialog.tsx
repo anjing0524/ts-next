@@ -126,13 +126,14 @@ FastBadge.displayName = 'FastBadge';
 
 export function TaskDetailsDialog() {
   // 从 store 中获取任务详情对话框状态
-  const { isOpen, redate, planId, planDesc, exeId, closeTaskDetail } = useFlowStore(
+  const { isOpen, redate, planId, planDesc, exeId, closeTaskDetail, execDesc } = useFlowStore(
     useShallow((state) => ({
       isOpen: state.taskDetail.isOpen,
       planId: state.taskDetail.planId,
       planDesc: state.taskDetail.planDesc,
       redate: state.taskDetail.redateTimestamp,
       exeId: state.taskDetail.exeId,
+      execDesc: state.taskDetail.execDesc,
       closeTaskDetail: state.closeTaskDetail,
     }))
   );
@@ -380,10 +381,11 @@ export function TaskDetailsDialog() {
       <Dialog open={isOpen} onOpenChange={(open) => !open && closeTaskDetail()}>
         <DialogContent className="p-0 overflow-hidden w-auto min-w-7xl">
           <DialogHeader className="p-6 pb-0">
-            <DialogTitle>计划任务详情</DialogTitle>
+            <DialogTitle>计划执行详情</DialogTitle>
             <DialogDescription>
               计划ID: {planId} - {planDesc || ''}
             </DialogDescription>
+            <DialogDescription> 计划执行信息：{execDesc || ''}</DialogDescription>
           </DialogHeader>
           <div className="p-6 pt-0 w-full overflow-x-auto">
             {loading ? (

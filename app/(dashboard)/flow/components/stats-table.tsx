@@ -57,7 +57,7 @@ export function StatsTable() {
       {
         id: 'total',
         accessorKey: 'total',
-        header: '总任务数',
+        header: '总计划数',
         size: 100,
       },
       {

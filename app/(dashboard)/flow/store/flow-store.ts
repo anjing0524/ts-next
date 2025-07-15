@@ -25,6 +25,7 @@ interface TaskDetailState {
   planDesc: string | null;
   redateTimestamp: number | null;
   exeId: number;
+  execDesc: string | null;
 }
 
 interface FlowState {
@@ -38,7 +39,13 @@ interface FlowState {
   setCurrentStage: (stage: string) => void;
   setLoading: (loading: boolean) => void;
   setProjects: (projects: string[]) => void;
-  openTaskDetail: (planId: string, planDesc: string | null, redate: Date, exeId: number) => void;
+  openTaskDetail: (
+    planId: string,
+    planDesc: string | null,
+    redate: Date,
+    exeId: number,
+    desc: string
+  ) => void;
   closeTaskDetail: () => void;
 }
 
@@ -55,6 +62,7 @@ export const useFlowStore = create<FlowState>()(
       planDesc: '',
       redateTimestamp: null,
       exeId: 0,
+      execDesc: '',
     },
 
     setStages: (stages) =>
@@ -78,13 +86,14 @@ export const useFlowStore = create<FlowState>()(
         state.projects = projects;
       }),
 
-    openTaskDetail: (planId, planDesc, redate, exeId) =>
+    openTaskDetail: (planId, planDesc, redate, exeId, desc) =>
       set((state) => {
         state.taskDetail.isOpen = true;
         state.taskDetail.planId = planId;
         state.taskDetail.planDesc = planDesc;
         state.taskDetail.redateTimestamp = redate ? redate.getTime() : null;
         state.taskDetail.exeId = exeId;
+        state.taskDetail.execDesc = desc;
       }),
 
     closeTaskDetail: () =>

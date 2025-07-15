@@ -20,6 +20,17 @@ import { useShallow } from 'zustand/react/shallow';
 import { rerunPlan, rerunFailedTasks, stopPlan, handleSearch } from '@/app/actions/flow-actions';
 import { formatToCST } from '@/lib/utils/timezone';
 import { toast } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 export const CustomNode = ({ data, isConnectable }: NodeProps) => {
   // 获取 openTaskDetail 方法和 refreshData 方法
@@ -46,15 +57,21 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
   // 在需要打开任务详情对话框的地方
   const [loading, setLoading] = useState<string | null>(null);
   // 从data中获取更多信息
-  const { plan_id, plan_desc, progress, cost_time, redate, exe_id, status, pid } =
+  const { plan_id, plan_desc, progress, cost_time, redate, exe_id, status, pid, exec_desc } =
     data as unknown as PlanStateWithStatus;
 
   // 使用 useCallback 优化函数，依赖项包括 plan_id, plan_desc, redate, exe_id 和 openTaskDetail
   const handleViewDetails = useCallback(() => {
     if (plan_id && redate && exe_id) {
-      openTaskDetail(plan_id as string, plan_desc, redate as Date, exe_id as number);
+      openTaskDetail(
+        plan_id as string,
+        plan_desc,
+        redate as Date,
+        exe_id as number,
+        exec_desc as string
+      );
     }
-  }, [plan_id, plan_desc, redate, exe_id, openTaskDetail]);
+  }, [plan_id, plan_desc, redate, exe_id, openTaskDetail, exec_desc]);
 
   const handleButtonClick = useCallback((e: React.MouseEvent, callback: () => void) => {
     e.stopPropagation();
@@ -198,11 +215,17 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
       statusColor: 'text-yellow-500',
       bgColor: 'bg-yellow-500',
     },
+    not_executed: {
+      icon: Info,
+      statusText: '未执行',
+      statusColor: 'text-gray-400',
+      bgColor: 'bg-gray-300',
+    },
   };
 
-  // 直接使用 status 字段，如果没有则默认为 waiting
-  const nodeStatus = status || 'waiting';
-  const config = statusConfig[nodeStatus as keyof typeof statusConfig] || statusConfig.waiting;
+  // 直接使用 status 字段，如果没有则默认为 not_executed
+  const nodeStatus = status || 'not_executed';
+  const config = statusConfig[nodeStatus as keyof typeof statusConfig] || statusConfig.not_executed;
   const StatusIcon = config.icon;
 
   // 根据 plan_id 长度动态调整节点宽度
@@ -212,6 +235,22 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
     if (plan_id.length > 15) return 'w-[250px]';
     return 'w-[220px]';
   };
+
+  // 新增：管理弹窗状态
+  const [confirmType, setConfirmType] = useState<null | 'rerun' | 'rerunFailed'>(null);
+
+  // 新增：确认后执行对应操作
+  const handleConfirm = useCallback(
+    (e: React.MouseEvent) => {
+      if (confirmType === 'rerun') {
+        handleRerun(e);
+      } else if (confirmType === 'rerunFailed') {
+        handleRerunFailed(e);
+      }
+      setConfirmType(null);
+    },
+    [confirmType, handleRerun, handleRerunFailed]
+  );
 
   // 根据状态渲染不同的操作按钮
   const renderActionButtons = () => {
@@ -230,20 +269,51 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               <Info className="h-3 w-3" />
               详情
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1 text-blue-600"
-              onClick={handleRerun}
-              disabled={loading !== null}
+            <AlertDialog
+              open={confirmType === 'rerun'}
+              onOpenChange={(open) => !open && setConfirmType(null)}
             >
-              {loading === 'rerun' ? (
-                <Clock className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              重跑计划
-            </Button>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs flex items-center gap-1 text-blue-600"
+                  disabled={loading !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmType('rerun');
+                  }}
+                >
+                  {loading === 'rerun' ? (
+                    <Clock className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  重跑计划
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认重跑计划？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    此操作将重新执行该计划，是否继续？
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={loading !== null}
+                    >
+                      确认
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       case 'error':
@@ -259,34 +329,96 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               <Info className="h-3 w-3" />
               详情
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1 text-blue-600"
-              onClick={handleRerun}
-              disabled={loading !== null}
+            <AlertDialog
+              open={confirmType === 'rerun'}
+              onOpenChange={(open) => !open && setConfirmType(null)}
             >
-              {loading === 'rerun' ? (
-                <Clock className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              重跑计划
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1 text-yellow-600"
-              onClick={handleRerunFailed}
-              disabled={loading !== null}
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs flex items-center gap-1 text-blue-600"
+                  disabled={loading !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmType('rerun');
+                  }}
+                >
+                  {loading === 'rerun' ? (
+                    <Clock className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  重跑计划
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认重跑计划？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    此操作将重新执行该计划，是否继续？
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={loading !== null}
+                    >
+                      确认
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog
+              open={confirmType === 'rerunFailed'}
+              onOpenChange={(open) => !open && setConfirmType(null)}
             >
-              {loading === 'rerunFailed' ? (
-                <Clock className="h-3 w-3 animate-spin" />
-              ) : (
-                <AlertCircle className="h-3 w-3" />
-              )}
-              重跑失败任务
-            </Button>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs flex items-center gap-1 text-yellow-600"
+                  disabled={loading !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmType('rerunFailed');
+                  }}
+                >
+                  {loading === 'rerunFailed' ? (
+                    <Clock className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <AlertCircle className="h-3 w-3" />
+                  )}
+                  重跑失败任务
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认重跑失败任务？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    此操作将仅重跑失败的任务，是否继续？
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={loading !== null}
+                    >
+                      确认
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       case 'running':
@@ -346,12 +478,17 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="font-medium text-sm truncate max-w-[65%]" title={`${plan_id}`}>
-                    {plan_id}
+                  <span
+                    className="font-medium text-sm truncate max-w-[85%]"
+                    title={`${plan_id}（${exe_id}）`}
+                  >
+                    {plan_id}（{exe_id}）
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{plan_id}</p>
+                  <p>
+                    {plan_id}（{exe_id}）
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

@@ -14,8 +14,11 @@ export function formatToCST(
   date: Date | string,
   formatStr: string = 'yyyy-MM-dd HH:mm:ss'
 ): string {
+  console.log(date);
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return formatInTimeZone(dateObj, CST_TIMEZONE, formatStr, { locale: zhCN });
+  const cstStr = formatInTimeZone(dateObj, CST_TIMEZONE, formatStr, { locale: zhCN });
+  console.log('str:' + cstStr);
+  return cstStr;
 }
 
 /**

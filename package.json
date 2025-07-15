@@ -96,6 +96,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.2.0",
     "eslint-config-prettier": "^10.0.2",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -112,5 +113,11 @@
       "path": "cz-conventional-changelog"
     }
   },
-  "packageManager": "pnpm@10.6.2"
+  "packageManager": "pnpm@10.6.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
 }

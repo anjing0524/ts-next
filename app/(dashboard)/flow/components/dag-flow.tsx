@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactFlow, Background, Controls, MiniMap, Node, MarkerType, Edge } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Node, MarkerType, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useMemo } from 'react';
 import { nodeTypes } from './customer-node';
@@ -239,18 +239,18 @@ export function DagFlow() {
                     }}
                   />
                   {/* 小地图 */}
-                  <MiniMap
+                  {/* <MiniMap
                     nodeStrokeWidth={3}
                     zoomable
                     pannable
                     position="top-right"
                     style={{
-                      top: 10,
-                      right: 10,
-                      width: 150,
-                      height: 100,
+                      // top: 10,
+                      // right: 10,
+                      // width: 150,
+                      // height: 100,
                     }}
-                  />
+                  /> */}
                 </ReactFlow>
               </div>
             </div>
