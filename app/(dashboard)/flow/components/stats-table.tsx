@@ -138,6 +138,26 @@ export function StatsTable() {
           );
         },
       },
+      {
+        id: 'not_executed',
+        accessorKey: 'not_executed',
+        header: '未调度',
+        size: 100,
+        cell: ({ row }) => {
+          const value = row.getValue('not_executed') as number;
+          const total = row.getValue('total') as number;
+          const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+
+          return (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-gray-400 text-white">
+                {value}
+              </Badge>
+              <span className="text-xs text-gray-500">{percentage}%</span>
+            </div>
+          );
+        },
+      },
     ],
     []
   );
