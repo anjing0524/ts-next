@@ -36,6 +36,7 @@ import { AuthorizationUtils, JWTUtils, ScopeUtils, OAuth2Error, OAuth2ErrorCode,
 import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
+import { successResponse, errorResponse } from '@repo/lib/node';
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
@@ -301,7 +302,7 @@ async function handleAuthorizationCodeGrant(
     response.id_token = idTokenString;
   }
 
-  return NextResponse.json(response);
+  return successResponse(response, 200, '令牌颁发成功');
 }
 
 // --- 'refresh_token' 授权类型处理函数 ---
@@ -385,7 +386,7 @@ async function handleRefreshTokenGrant(
     scope: refreshTokenPayload.scope as string,
   };
 
-  return NextResponse.json(response);
+  return successResponse(response, 200, '令牌刷新成功');
 }
 
 // --- 'client_credentials' 授权类型处理函数 ---
@@ -447,5 +448,5 @@ async function handleClientCredentialsGrant(
     scope: data.scope || '',
   };
 
-  return NextResponse.json(response);
+  return successResponse(response, 200, '客户端凭证令牌颁发成功');
 }

@@ -5,11 +5,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@repo/lib/node';
+import { successResponse, errorResponse } from '@repo/lib/node';
 // authenticateBearer 已移至 @repo/lib/middleware
 import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
 import { userInfoResponseSchema, UserInfoResponse } from './schemas';
 // import { ApiResponse } from '@repo/lib/types';
-type ApiResponse<T> = any;
 import { getUserProfileData } from '@/lib/user-utils';
 
 /**
@@ -140,20 +140,11 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
 
   // --- 步骤6: 返回成功响应 ---
   // --- Step 6: Return Success Response ---
-  return NextResponse.json<ApiResponse<UserInfoResponse>>(
-    {
-      success: true,
-      data: validationResult.data,
-      message: 'User information retrieved successfully.',
-    },
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate', // 用户信息不应缓存
-        Pragma: 'no-cache',
-      },
-    }
+  // 统一响应结构，严格参数顺序
+  return successResponse(
+    validationResult.data,
+    200,
+    '用户信息获取成功'
   );
 }
 

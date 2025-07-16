@@ -7,16 +7,13 @@ import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
 import { ConfigurationError, OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
 import { withErrorHandling } from '@/lib/utils/error-handler';
 import { prisma } from '@repo/database';
-import { JWTUtils } from '@repo/lib/node';
+import { JWTUtils, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   IntrospectResponseActive,
-  IntrospectResponseInactive,
   introspectResponseActiveSchema,
-  introspectTokenRequestSchema,
+  introspectTokenRequestSchema
 } from './schemas';
-// import { ApiResponse } from '@repo/lib/types';
-type ApiResponse<T> = /*unresolved*/ any;
 
 // 令牌内省端点处理函数 (内部逻辑)
 // Token introspection endpoint handler function (internal logic)
@@ -86,10 +83,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
       if (payload.jti) {
         const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
         if (blacklisted) {
-          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
-            { success: true, data: { active: false }, message: 'Token is blacklisted.' },
-            { status: 200 }
-          );
+          return successResponse({ active: false }, 200, 'Token is blacklisted.');
         }
       }
       const dbAccessToken = await prisma.accessToken.findFirst({
@@ -134,10 +128,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
       if (payload.jti) {
         const blacklisted = await prisma.tokenBlacklist.findUnique({ where: { jti: payload.jti } });
         if (blacklisted) {
-          return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
-            { success: true, data: { active: false }, message: 'Token is blacklisted.' },
-            { status: 200 }
-          );
+          return successResponse({ active: false }, 200, 'Token is blacklisted.');
         }
       }
       const dbRefreshToken = await prisma.refreshToken.findFirst({
@@ -176,22 +167,20 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
       console.warn(
         'Active token introspection, but client_id could not be determined from token payload. Marking inactive.'
       );
-      return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
-        {
-          success: true,
-          data: { active: false },
-          message: 'Token details inconsistent (missing client_id in token).',
-        },
-        { status: 200 }
+      return successResponse(
+        { active: false },
+        200,
+        'Token details inconsistent (missing client_id in token).'
       );
     }
 
     // 使用 Zod 验证构建的活动响应 (Validate constructed active response with Zod)
     const parsedActiveResponse = introspectResponseActiveSchema.safeParse(activeResponsePayload);
     if (parsedActiveResponse.success) {
-      return NextResponse.json<ApiResponse<IntrospectResponseActive>>(
-        { success: true, data: parsedActiveResponse.data, message: 'Token is active.' },
-        { status: 200 }
+      return successResponse(
+        parsedActiveResponse.data,
+        200,
+        'Token is active.'
       );
     } else {
       console.error(
@@ -207,13 +196,10 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
 
   // 如果令牌无效、已过期、已撤销，或通过任何方式都找不到，则返回 active: false
   // If token is invalid, expired, revoked, or not found by any means, return active: false
-  return NextResponse.json<ApiResponse<IntrospectResponseInactive>>(
-    {
-      success: true,
-      data: { active: false },
-      message: 'Token is not active.',
-    },
-    { status: 200 }
+  return successResponse(
+    { active: false },
+    200,
+    'Token is not active.'
   );
 }
 

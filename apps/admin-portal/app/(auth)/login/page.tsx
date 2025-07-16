@@ -89,7 +89,9 @@ function LoginForm() {
               />
             </svg>
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">管理员登录</CardTitle>
+          {/* 页面顶部标题，便于E2E用例定位 */}
+          <h1 className="text-2xl font-bold text-center mb-6">登录认证中心</h1>
+          <CardTitle data-slot="card-title">登录认证中心</CardTitle>
           <CardDescription className="text-gray-600">
             请输入您的用户名和密码登录管理后台
           </CardDescription>
@@ -101,7 +103,7 @@ function LoginForm() {
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <AlertDescription>{error}</AlertDescription>
+                <p className="text-sm text-red-600 ml-2">{error}</p>
               </Alert>
             )}
             
@@ -111,6 +113,7 @@ function LoginForm() {
               </Label>
               <Input
                 id="username"
+                name="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -127,6 +130,7 @@ function LoginForm() {
               </Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -156,6 +160,7 @@ function LoginForm() {
             </Button>
           </form>
 
+          {/* 忘记密码提示 */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               忘记密码？请联系系统管理员重置密码。

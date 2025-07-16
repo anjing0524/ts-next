@@ -160,6 +160,56 @@ http://localhost:8080/kline/*      → kline-service (3003)
 }
 ```
 
+## 5.3. 统一响应工具函数与调用规范
+
+所有服务端API必须统一使用`successResponse`和`errorResponse`工具函数返回响应，禁止直接调用`NextResponse.json`。
+
+### successResponse 用法
+```ts
+successResponse(data, statusCode = 200, message = '操作成功', meta?)
+```
+- data: 主数据内容（必填）
+- statusCode: HTTP状态码（可选，默认200）
+- message: 成功消息（可选，默认“操作成功”）
+- meta: 分页等元信息（可选）
+
+### errorResponse 用法
+```ts
+errorResponse({ message, statusCode = 500, details })
+```
+- message: 错误消息（必填）
+- statusCode: HTTP状态码（可选，默认500）
+- details: 附加错误详情（可选，建议包含业务错误码code）
+
+**示例：**
+```ts
+return successResponse(user, 200, '用户信息获取成功');
+return errorResponse({ message: '认证失败', statusCode: 401, details: { code: 'UNAUTHENTICATED' } });
+```
+
+### 响应结构
+- 成功：
+```json
+{
+  "success": true,
+  "message": "操作成功",
+  "data": { /* ... */ },
+  "meta": { /* ... */ }
+}
+```
+- 失败：
+```json
+{
+  "success": false,
+  "error": {
+    "message": "错误描述",
+    "details": { "code": "ERROR_CODE" }
+  }
+}
+```
+
+> 所有API必须严格遵循上述结构和调用方式，禁止混用参数、禁止自定义结构。团队开发、Code Review、测试均以此为唯一标准。
+
 ## 6. 错误码定义
 
 - **HTTP状态码**: 用于表示请求的通用状态（例如 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 500 Internal Server Error）。

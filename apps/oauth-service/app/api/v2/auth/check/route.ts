@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { JWTUtils } from '@repo/lib/node';
+import { successResponse, errorResponse } from '@repo/lib/node';
 // import { PermissionService } from '@/lib/services/permissionService'; // 理想情况下，权限检查逻辑应位于服务层
 
 // --- 辅助函数 ---
@@ -71,32 +72,36 @@ export async function POST(req: NextRequest) {
   // 1. 认证用户 (Authenticate user)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return NextResponse.json(
-      { error: 'unauthorized', message: 'Missing or invalid Authorization header.' },
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '缺少或无效的Authorization头',
+      statusCode: 401,
+      details: { code: 'unauthorized' },
+    });
   }
   const token = authHeader.substring(7);
   if (!token) {
-    return NextResponse.json(
-      { error: 'unauthorized', message: 'Access token is missing.' },
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '缺少访问令牌',
+      statusCode: 401,
+      details: { code: 'unauthorized' },
+    });
   }
 
   const { valid, payload, error: tokenError } = await JWTUtils.verifyToken(token);
   if (!valid || !payload) {
-    return NextResponse.json(
-      { error: 'invalid_token', message: `Invalid or expired token. ${tokenError || ''}`.trim() },
-      { status: 401 }
-    );
+    return errorResponse({
+      message: `令牌无效或已过期。${tokenError || ''}`.trim(),
+      statusCode: 401,
+      details: { code: 'invalid_token' },
+    });
   }
   const userId = payload.user_id as string | undefined;
   if (!userId) {
-    return NextResponse.json(
-      { error: 'invalid_token_payload', message: 'Invalid token: User ID missing.' },
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '令牌无效：缺少用户ID',
+      statusCode: 401,
+      details: { code: 'invalid_token_payload' },
+    });
   }
 
   // 2. 解析请求体 (Parse request body)
@@ -104,19 +109,21 @@ export async function POST(req: NextRequest) {
   try {
     requestBody = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: 'invalid_request', message: 'Invalid JSON request body.' },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '无效的JSON请求体',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
 
   const { permission } = requestBody; // context 当前未使用，但为未来扩展保留 (context is currently unused but reserved for future extension)
 
   if (!permission || typeof permission !== 'string') {
-    return NextResponse.json(
-      { error: 'invalid_request', message: 'Permission string is required.' },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '必须提供权限字符串',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
 
   try {
@@ -125,13 +132,14 @@ export async function POST(req: NextRequest) {
     const hasPermission = await checkUserPermission(userId, permission);
 
     // 4. 返回响应 (Return response)
-    return NextResponse.json({ allowed: hasPermission }, { status: 200 });
+    return successResponse({ allowed: hasPermission }, 200, '权限检查完成');
   } catch (error: any) {
-    console.error(`Permission check error for user ${userId}, permission ${permission}:`, error);
-    return NextResponse.json(
-      { error: 'server_error', message: 'An unexpected error occurred during permission check.' },
-      { status: 500 }
-    );
+    console.error(`权限检查异常: user ${userId}, permission ${permission}:`, error);
+    return errorResponse({
+      message: '权限检查时发生意外错误',
+      statusCode: 500,
+      details: { code: 'server_error' },
+    });
   }
 }
 

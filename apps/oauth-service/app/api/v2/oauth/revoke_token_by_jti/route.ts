@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { OAuth2ErrorCode } from '@repo/lib/node'; // For error types
+import { successResponse, errorResponse } from '@repo/lib/node';
 
 const ADMIN_API_KEY = process.env.TOKEN_REVOCATION_ADMIN_KEY;
 
 export async function POST(req: NextRequest) {
   // 1. Placeholder Protection
   if (!ADMIN_API_KEY || req.headers.get('X-Admin-API-Key') !== ADMIN_API_KEY) {
-    return NextResponse.json(
-      {
-        error: OAuth2ErrorCode.UnauthorizedClient,
-        error_description: 'Unauthorized: Missing or invalid admin API key.',
-      },
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '未授权：缺少或无效的admin API key',
+      statusCode: 401,
+      details: { code: 'unauthorized' },
+    });
   }
 
   // 2. Parse Request Body
@@ -21,32 +20,29 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: OAuth2ErrorCode.InvalidRequest, error_description: 'Invalid JSON request body.' },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '无效的JSON请求体',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
 
   const { jti, exp, token_type: tokenType } = body;
 
   // 3. Validate Input
   if (!jti || typeof jti !== 'string') {
-    return NextResponse.json(
-      {
-        error: OAuth2ErrorCode.InvalidRequest,
-        error_description: 'Missing or invalid "jti" (JWT ID) in request body.',
-      },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '缺少或无效的jti (JWT ID)',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
   if (!exp || typeof exp !== 'number') {
-    return NextResponse.json(
-      {
-        error: OAuth2ErrorCode.InvalidRequest,
-        error_description: 'Missing or invalid "exp" (expiry timestamp) in request body.',
-      },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '缺少或无效的exp (过期时间戳)',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
 
   const finalTokenType = tokenType === 'refresh' ? 'refresh' : 'access'; // Default to 'access'
@@ -54,13 +50,11 @@ export async function POST(req: NextRequest) {
   // Convert Unix timestamp (seconds) to JavaScript Date object for expiresAt
   const expiresAt = new Date(exp * 1000);
   if (isNaN(expiresAt.getTime())) {
-    return NextResponse.json(
-      {
-        error: OAuth2ErrorCode.InvalidRequest,
-        error_description: 'Invalid "exp" (expiry timestamp) format.',
-      },
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '无效的exp (过期时间戳)格式',
+      statusCode: 400,
+      details: { code: 'invalid_request' },
+    });
   }
 
   // 4. Create Blacklist Entry
@@ -72,14 +66,11 @@ export async function POST(req: NextRequest) {
     if (existingEntry) {
       // JTI already blacklisted. Could return 200 or 204 as it's effectively revoked.
       // Or return a specific message. For now, a 200 with a note.
-      return NextResponse.json(
-        {
-          message: 'JTI already blacklisted.',
-          jti: existingEntry.jti,
-          expiresAt: existingEntry.expiresAt,
-        },
-        { status: 200 } // Changed from 409 to 200 as per common practice for idempotent-like "already done"
-      );
+      return successResponse({
+        message: 'JTI已在黑名单',
+        jti: existingEntry.jti,
+        expiresAt: existingEntry.expiresAt,
+      }, 200, 'JTI已在黑名单');
     }
 
     const newBlacklistEntry = await prisma.tokenBlacklist.create({
@@ -90,15 +81,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
-        message: 'Token JTI successfully blacklisted.',
-        jti: newBlacklistEntry.jti,
-        tokenType: newBlacklistEntry.tokenType,
-        expiresAt: newBlacklistEntry.expiresAt,
-      },
-      { status: 201 } // 201 Created
-    );
+    return successResponse({
+      message: 'Token JTI成功加入黑名单',
+      jti: newBlacklistEntry.jti,
+      tokenType: newBlacklistEntry.tokenType,
+      expiresAt: newBlacklistEntry.expiresAt,
+    }, 201, 'JTI黑名单添加成功');
   } catch (error: any) {
     // Prisma unique constraint violation (P2002) is handled by the findUnique check above.
     // This catch block is for other unexpected errors.
@@ -106,15 +94,17 @@ export async function POST(req: NextRequest) {
     let errorMessage = 'Failed to blacklist JTI due to an unexpected error.';
     if (error.code === 'P2002' && error.meta?.target?.includes('jti')) {
       // This case should ideally be caught by the findUnique check, but as a fallback:
-      errorMessage = 'JTI is already blacklisted.';
-      return NextResponse.json(
-        { error: 'conflict', error_description: errorMessage, jti },
-        { status: 409 }
-      );
+      errorMessage = 'JTI已在黑名单';
+      return errorResponse({
+        message: 'JTI已在黑名单',
+        statusCode: 409,
+        details: { jti },
+      });
     }
-    return NextResponse.json(
-      { error: OAuth2ErrorCode.ServerError, error_description: errorMessage },
-      { status: 500 }
-    );
+    return errorResponse({
+      message: '黑名单操作失败',
+      statusCode: 500,
+      details: { code: 'server_error' },
+    });
   }
 }

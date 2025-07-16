@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Separator, toast } from '@repo/ui';
 import { useAuth } from '@repo/ui/hooks';
 import { adminApi } from '@/lib/api';
+import { PermissionGuard } from '@repo/ui';
 
 const profileSchema = z.object({
   displayName: z.string().min(1, 'Display name is required'),
@@ -22,6 +23,9 @@ const passwordSchema = z.object({
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 需要的权限，参考设计文档和API
+  const REQUIRED_PERMISSIONS = ['profile:view'];
 
   const profileForm = useForm({
     resolver: zodResolver(profileSchema),
@@ -78,52 +82,54 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
-              <Input id="displayName" {...profileForm.register('displayName')} />
-              {profileForm.formState.errors.displayName && (
-                <p className="text-sm text-red-600">{profileForm.formState.errors.displayName.message}</p>
-              )}
-            </div>
-            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Profile'}</Button>
-          </form>
-        </CardContent>
-      </Card>
+    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS} user={user} isLoading={isUserLoading}>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input id="displayName" {...profileForm.register('displayName')} />
+                {profileForm.formState.errors.displayName && (
+                  <p className="text-sm text-red-600">{profileForm.formState.errors.displayName.message}</p>
+                )}
+              </div>
+              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Profile'}</Button>
+            </form>
+          </CardContent>
+        </Card>
 
-      <Separator />
+        <Separator />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current Password</Label>
-              <Input id="currentPassword" type="password" {...passwordForm.register('currentPassword')} />
-              {passwordForm.formState.errors.currentPassword && (
-                <p className="text-sm text-red-600">{passwordForm.formState.errors.currentPassword.message}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input id="newPassword" type="password" {...passwordForm.register('newPassword')} />
-              {passwordForm.formState.errors.newPassword && (
-                <p className="text-sm text-red-600">{passwordForm.formState.errors.newPassword.message}</p>
-              )}
-            </div>
-            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Changing...' : 'Change Password'}</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input id="currentPassword" type="password" {...passwordForm.register('currentPassword')} />
+                {passwordForm.formState.errors.currentPassword && (
+                  <p className="text-sm text-red-600">{passwordForm.formState.errors.currentPassword.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input id="newPassword" type="password" {...passwordForm.register('newPassword')} />
+                {passwordForm.formState.errors.newPassword && (
+                  <p className="text-sm text-red-600">{passwordForm.formState.errors.newPassword.message}</p>
+                )}
+              </div>
+              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Changing...' : 'Change Password'}</Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </PermissionGuard>
   );
 }
 

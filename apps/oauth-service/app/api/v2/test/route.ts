@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
+import { successResponse, errorResponse } from '@repo/lib/node';
 
 export async function GET() {
   try {
-    return NextResponse.json({ 
-      status: 'ok', 
-      message: 'Test endpoint working',
-      timestamp: new Date().toISOString()
-    });
+    return successResponse(
+      { status: 'ok', timestamp: new Date().toISOString() },
+      200,
+      'Test endpoint working'
+    );
   } catch (error) {
     console.error('Test endpoint error:', error);
-    return NextResponse.json({ 
-      status: 'error', 
+    return errorResponse({
       message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+      statusCode: 500,
+      details: { timestamp: new Date().toISOString() },
+    });
   }
 } 

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { prisma } from '@repo/database';
-import { OAuth2Error, OAuth2ErrorCode, withErrorHandling } from '@repo/lib/node';
+import { OAuth2Error, OAuth2ErrorCode, withErrorHandling, successResponse, errorResponse } from '@repo/lib/node';
 import { z } from 'zod';
 
 // 登录请求验证模式
@@ -53,14 +53,11 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
 
   if (!validationResult.success) {
     const error = validationResult.error.errors[0];
-    return NextResponse.json(
-      {
-        success: false,
-        error: OAuth2ErrorCode.InvalidRequest,
-        error_description: `${error}`,
-      } as LoginErrorResponse,
-      { status: 400 }
-    );
+    return errorResponse({
+      message: `${error}`,
+      statusCode: 400,
+      details: { code: OAuth2ErrorCode.InvalidRequest },
+    });
   }
 
   const {
@@ -82,14 +79,11 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!client) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: OAuth2ErrorCode.InvalidClient,
-        error_description: '客户端ID无效或已禁用',
-      } as LoginErrorResponse,
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '客户端ID无效或已禁用',
+      statusCode: 400,
+      details: { code: OAuth2ErrorCode.InvalidClient },
+    });
   }
 
   // 验证重定向URI
@@ -101,14 +95,11 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
   }
 
   if (!allowedRedirectUris.includes(redirect_uri)) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: OAuth2ErrorCode.InvalidRequest,
-        error_description: '重定向URI无效',
-      } as LoginErrorResponse,
-      { status: 400 }
-    );
+    return errorResponse({
+      message: '重定向URI无效',
+      statusCode: 400,
+      details: { code: OAuth2ErrorCode.InvalidRequest },
+    });
   }
 
   // 查找用户
@@ -120,28 +111,22 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     // 记录登录失败
     await logLoginAttempt(username, null, false, 'USER_NOT_FOUND', req);
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: OAuth2ErrorCode.InvalidClient,
-        error_description: '用户名或密码错误',
-      } as LoginErrorResponse,
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '用户名或密码错误',
+      statusCode: 401,
+      details: { code: OAuth2ErrorCode.InvalidClient },
+    });
   }
 
   // 检查账户锁定
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     await logLoginAttempt(username, user.id, false, 'ACCOUNT_LOCKED', req);
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'account_locked',
-        error_description: '账户已被锁定，请稍后再试',
-      } as LoginErrorResponse,
-      { status: 423 }
-    );
+    return errorResponse({
+      message: '账户已被锁定，请稍后再试',
+      statusCode: 423,
+      details: { code: 'account_locked' },
+    });
   }
 
   // 验证密码
@@ -167,14 +152,11 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
 
     await logLoginAttempt(username, user.id, false, 'INVALID_CREDENTIALS', req);
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: OAuth2ErrorCode.InvalidClient,
-        error_description: '用户名或密码错误',
-      } as LoginErrorResponse,
-      { status: 401 }
-    );
+    return errorResponse({
+      message: '用户名或密码错误',
+      statusCode: 401,
+      details: { code: OAuth2ErrorCode.InvalidClient },
+    });
   }
 
   // 重置失败次数和锁定状态
@@ -190,9 +172,6 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
   // 记录成功登录
   await logLoginAttempt(username, user.id, true, 'SUCCESS', req);
 
-  // 创建用户会话（通过JWT）
-  const sessionToken = await createUserSession(user, client_id);
-
   // 构建授权端点URL
   const authorizeUrl = new URL('/api/v2/oauth/authorize', req.nextUrl.origin);
   authorizeUrl.searchParams.set('client_id', client_id);
@@ -206,46 +185,21 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     authorizeUrl.searchParams.set('code_challenge_method', code_challenge_method);
   if (nonce) authorizeUrl.searchParams.set('nonce', nonce);
 
-  // 设置会话cookie
-  const response = NextResponse.json({
-    success: true,
-    redirect_url: authorizeUrl.toString(),
-    user: {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-    },
-  } as LoginSuccessResponse);
-
-  response.cookies.set('auth_center_session_token', sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60, // 1小时
-    path: '/',
-  });
-
-  return response;
-}
-
-// 创建用户会话
-async function createUserSession(user: any, clientId: string): Promise<string> {
-  const { JWTUtils } = await import('@repo/lib/node');
-
-  return await JWTUtils.generateToken(
+  // 返回无状态响应，不设置cookie
+  return successResponse(
     {
-      sub: user.id,
-      aud: process.env.AUTH_CENTER_UI_AUDIENCE || 'urn:auth-center:ui',
-      iss: process.env.JWT_ISSUER || 'oauth-service',
-      client_id: clientId,
-      username: user.username,
-      session_type: 'auth_center_ui',
+      redirect_url: authorizeUrl.toString(),
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+      },
     },
-    {
-      expiresIn: '1h',
-    }
+    200,
+    '登录成功'
   );
 }
+
 
 // 记录登录尝试
 async function logLoginAttempt(

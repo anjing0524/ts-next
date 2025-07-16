@@ -12,8 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@repo/ui';
-import { ENDPOINTS } from '@/lib/api-endpoints';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, adminApi } from '@/lib/api';
 
 interface ConsentApiData {
   client: { id: string; name: string; logoUri?: string | null };
@@ -49,18 +48,25 @@ function ConsentContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!clientId || !redirectUri || !responseType) {
+      setLoading(false);
+      setError('缺少必要的OAuth参数');
+      return;
+    }
+
     // 拼接API参数
     const params = new URLSearchParams({
-      client_id: clientId || '',
-      redirect_uri: redirectUri || '',
-      response_type: responseType || '',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: responseType,
       scope: scope || '',
       state: state || '',
       code_challenge: codeChallenge || '',
-      code_challenge_method: codeChallengeMethod || '',
+      code_challenge_method: codeChallengeMethod || 'S256',
       nonce: nonce || '',
     });
-    // 统一通过apiRequest和ENDPOINTS管理API路径
+
+    // 调用OAuth服务获取同意信息
     apiRequest<{ data: ConsentApiData }>(`/oauth/consent?${params.toString()}`)
       .then((response) => {
         setApiData(response.data);
@@ -70,128 +76,188 @@ function ConsentContent() {
         setError(typeof err === 'string' ? err : err.message || '加载同意信息失败');
         setLoading(false);
       });
-  }, [clientId, redirectUri, responseType, scope, state, codeChallenge, codeChallengeMethod]);
+  }, [clientId, redirectUri, responseType, scope, state, codeChallenge, codeChallengeMethod, nonce]);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">加载同意信息...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600">正在加载授权信息...</p>
+        </div>
+      </div>
+    );
   }
+
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-red-600">加载失败</CardTitle>
+            <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>{error}</p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              重试
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  // 优先用API数据，否则用URL参数兜底
-  const displayClient = apiData?.client || { id: clientId, name: clientId, logoUri: null };
-  const displayScopes = apiData?.requested_scopes || (scope ? [{ name: scope, description: '基础账户访问权限' }] : []);
-  const displayUser = apiData?.user || { username: user?.username || '未知用户' };
 
   // 检查必要参数
   if (!clientId || !redirectUri || responseType !== 'code') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-red-600">错误</CardTitle>
+            <CardTitle className="text-red-600">参数错误</CardTitle>
+            <CardDescription>缺少必要的OAuth参数或参数格式不正确</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>缺少必要的OAuth参数（client_id、redirect_uri或response_type）。</p>
+            <Button 
+              onClick={() => router.push('/')}
+              className="w-full"
+            >
+              返回首页
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // 格式化权限范围
-  const formattedScope = scope
-    ? scope
-        .split(/[\s,_]+/)
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(', ')
-    : '基础账户访问权限';
-
   // 处理授权确认
   const handleConsent = async (action: 'allow' | 'deny') => {
     try {
+      // 优先调用adminApi.submitConsent，统一后端接口
       const consentParams = new URLSearchParams({
         decision: action,
-        client_id: clientId || '',
-        redirect_uri: redirectUri || '',
+        client_id: clientId!,
+        redirect_uri: redirectUri!,
         scope: scope || '',
-        response_type: responseType || '',
+        response_type: responseType!,
         state: state || '',
         code_challenge: codeChallenge || '',
         code_challenge_method: codeChallengeMethod || 'S256',
         nonce: nonce || '',
       });
-
+      // 调用统一的submitConsent工具函数
       const response = await adminApi.submitConsent(action, consentParams);
-
       if (response.redirect_uri) {
         window.location.href = response.redirect_uri;
       } else {
-        // Handle non-redirect responses if necessary
-        console.log('Consent submission successful', response);
+        throw new Error('无效的响应');
       }
     } catch (error) {
       console.error('授权确认错误:', error);
-      setError('网络错误或服务器不可用');
+      setError('处理授权请求失败，请重试');
     }
   };
 
+  // 格式化权限范围
+  const formatScopes = (scopes: string) => {
+    return scopes
+      .split(/[\s,_]+/)
+      .filter(s => s.trim())
+      .map(s => s.trim())
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(', ');
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-300 dark:from-slate-900 dark:to-slate-800">
-      <Card className="w-full max-w-lg shadow-xl">
-        <CardHeader className="space-y-2 text-center border-b pb-6">
-          <CardTitle className="text-3xl font-bold tracking-tight">授权应用</CardTitle>
-          <CardDescription className="text-gray-600 text-base">
-            应用 <strong className="text-indigo-600">{displayClient.name}</strong> 正在请求访问您的账户。
-          </CardDescription>
-          {displayClient.logoUri && (
-            <img src={displayClient.logoUri} alt="应用Logo" className="mx-auto h-12 w-12 rounded-full mt-2" />
-          )}
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
+      <Card className="w-full max-w-lg shadow-2xl border-0">
+        <CardHeader className="space-y-4 text-center border-b pb-6">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+            <svg 
+              className="w-8 h-8 text-white" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
+              />
+            </svg>
+          </div>
+          <div>
+            <CardTitle className="text-3xl font-bold tracking-tight text-gray-900">
+              授权应用访问
+            </CardTitle>
+            <CardDescription className="text-gray-600 text-lg mt-2">
+              应用 <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong> 正在请求访问您的账户
+            </CardDescription>
+            {apiData?.client.logoUri && (
+              <img 
+                src={apiData.client.logoUri} 
+                alt="应用Logo" 
+                className="mx-auto h-12 w-12 rounded-full mt-3 border-2 border-gray-200" 
+              />
+            )}
+          </div>
         </CardHeader>
+        
         <CardContent className="pt-6 space-y-6">
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-gray-800">请求的权限：</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-md p-4">
-              <ul className="list-disc list-inside space-y-1 text-gray-700">
-                {displayScopes.map((s) => (
-                  <li key={s.name}>
-                    <strong className="font-medium">{s.name}</strong>：{s.description}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+              <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              请求的权限范围
+            </h3>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <ul className="space-y-2">
+                {apiData?.requested_scopes.map((scope) => (
+                  <li key={scope.name} className="flex items-start">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <strong className="font-medium text-gray-900">{scope.name}</strong>
+                      <p className="text-sm text-gray-600 mt-1">{scope.description}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
-          <div className="text-sm text-gray-700 bg-slate-50 border border-slate-200 rounded-md p-4">
-            <p>
-              当前登录用户：{' '}
-              <strong className="font-medium text-indigo-600">{displayUser.username}</strong>。
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              如果这不是您，请取消并重新登录正确的账户。
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-sm text-blue-800">
+                  <strong>当前用户：</strong> {apiData?.user.username || user?.username || '未知用户'}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  如果这不是您的账户，请取消并重新登录正确的账户。
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <p className="text-lg font-medium text-gray-800">
+              您是否授权 <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong> 访问上述权限？
             </p>
           </div>
-          <p className="text-center font-medium text-gray-700 pt-2 text-base">
-            您是否授权 <strong className="text-indigo-600">{displayClient.name}</strong> 访问这些权限？
-          </p>
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-6 pt-6 border-t">
+        
+        <CardFooter className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t">
           <Button
             onClick={() => handleConsent('deny')}
             variant="outline"
             size="lg"
-            className="w-full border-gray-400 hover:bg-gray-100 text-gray-700"
+            className="w-full sm:w-auto border-gray-300 hover:bg-gray-50 text-gray-700 font-medium"
           >
             拒绝访问
           </Button>
@@ -199,7 +265,7 @@ function ConsentContent() {
             onClick={() => handleConsent('allow')}
             variant="default"
             size="lg"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
           >
             允许访问
           </Button>
@@ -215,16 +281,21 @@ export default function ConsentPage() {
   // 如果未登录，跳转到登录页面
   if (!isLoading && !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-red-600">需要登录</CardTitle>
+            <CardDescription>您需要先登录才能进行授权确认</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>您需要先登录才能进行授权确认。</p>
             <Button 
-              onClick={() => window.location.href = '/login'}
-              className="mt-4"
+              onClick={() => {
+                const currentUrl = window.location.href;
+                const loginUrl = new URL('/login', window.location.origin);
+                loginUrl.searchParams.set('redirect_uri', currentUrl);
+                window.location.href = loginUrl.toString();
+              }}
+              className="w-full"
             >
               前往登录
             </Button>
@@ -235,8 +306,15 @@ export default function ConsentPage() {
   }
 
   return (
-    <Suspense fallback={<div>加载中...</div>}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    }>
       <ConsentContent />
     </Suspense>
   );
-} 
+}

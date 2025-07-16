@@ -47,14 +47,16 @@
 
 | 文档名称 | 描述 | 状态 |
 |---|---|---|
-| [技术栈版本对照表](./技术栈版本对照表-2025-07-08.md) | 项目所有依赖的详细版本信息和标准化建议。 | ✅ 已更新 |
+| [技术栈版本对照表](./guidelines/tech-stack-versions.md) | 项目所有依赖的详细版本信息和标准化建议。 | ✅ 已更新 |
 | [系统架构设计](./design/系统架构设计.md) | 基于 Turborepo 的微服务架构、服务间通信和数据流设计。 | ✅ 已更新 |
 | [OAuth 服务 API 索引](./generated/oauth-service-api-index.md) | `oauth-service` 的完整 API 端点、请求/响应格式和安全说明。 | ✅ 已更新 |
 | [API 设计规范](./guidelines/API设计规范.md) | 项目统一的 RESTful API 设计标准和最佳实践。 | ✅ 已更新 |
 | [JWT 认证授权使用说明](./guidelines/JWT认证授权使用说明.md) | 关于如何与 OAuth2.1 流程集成以及如何处理 JWT 的开发者指南。 | ⚪️ 待审查 |
 | [部署与运维文档](./ops/部署运维文档.md) | 关于如何使用 Docker 和 K8s 部署、配置和维护本系统的指南。 | ⏳ 待更新 |
 | [测试策略文档](./tests/测试策略文档.md) | 项目的单元测试、集成测试和端到端（E2E）测试策略。 | ⚪️ 待审查 |
-| [文档更新清单](./文档更新清单-2025-07-07.md) | 跟踪每日文档变更的清单。 | ✅ 已更新 |
+| [OAuth 集成验证报告](./reports/oauth-verification-report.md) | OAuth 2.1 集成验证的详细报告 | ✅ 已更新 |
+| [OAuth 集成计划](./reports/oauth-integration-plan.md) | OAuth 2.1 集成分析与完整计划 | ✅ 已更新 |
+| [设计文档摘要](./design/design-summary.md) | 更新后的设计文档汇总 | ✅ 已更新 |
 
 ## 快速入门
 

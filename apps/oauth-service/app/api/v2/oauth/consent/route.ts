@@ -15,6 +15,7 @@ import {
   ResourceNotFoundError,
   ScopeUtils,
   withErrorHandling,
+  successResponse,
 } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
 // import type { ConsentPageData } from '@repo/lib/node';
@@ -23,85 +24,6 @@ type ConsentPageData = any;
 const CONSENT_API_URL_PATH = '/api/v2/oauth/consent';
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
 
-/**
- * @swagger
- * /api/v2/oauth/consent:
- *   get:
- *     summary: 获取用户同意信息 (Get User Consent Information)
- *     description: (需要 'auth-center:interact' 权限) 此端点准备并返回渲染同意页面所需的数据。
- *                  ((Requires 'auth-center:interact' permission) This endpoint prepares and returns data needed to render the consent page.)
- *     tags: [OAuth V2]
- *     security:
- *       - bearerAuth: []
- *     parameters: # 详细参数已在之前定义，此处省略 (Detailed parameters defined before, omitted here for brevity)
- *     responses:
- *       '200':
- *         description: 成功获取同意页面所需数据。 (Successfully fetched data required for the consent page.)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseConsentData'
- *       '400':
- *         description: 无效的请求参数。 (Invalid request parameters.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '401':
- *         description: 用户未认证或无权限访问认证中心交互功能。 (User not authenticated or no permission to interact with Auth Center.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '403':
- *         description: 禁止访问/客户端无效或用户记录问题。 (Forbidden / Invalid client or user record issue.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '500':
- *         description: 服务器内部错误。 (Internal server error.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *   post:
- *     summary: 用户提交同意决策 (User Submits Consent Decision)
- *     description: (需要 'auth-center:interact' 权限) 用户通过此端点提交同意或拒绝的决策。
- *                  ((Requires 'auth-center:interact' permission) User submits their consent or denial decision via this endpoint.)
- *     tags: [OAuth V2]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             $ref: '#/components/schemas/ConsentFormPayload'
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ConsentFormPayload'
- *     responses:
- *       '302': # 重定向 (Redirect)
- *         description: 同意决策已处理，重定向到客户端的redirect_uri。 (Consent decision processed, redirecting to client's redirect_uri.)
- *       '400':
- *         description: 无效的请求体或参数。 (Invalid request body or parameters.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '401':
- *         description: 用户未认证或无权限。 (User not authenticated or no permission.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '403':
- *         description: 客户端无效或用户记录问题。 (Invalid client or user record issue.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '415':
- *         description: 不支持的Content-Type。 (Unsupported Content-Type.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- *       '500':
- *         description: 服务器内部错误。 (Internal server error.)
- *         content: { $ref: '#/components/schemas/ApiResponseError' }
- * components:
- *   schemas:
- *     ConsentPageData: # 已在上面接口中定义 (Defined in interface above)
- *       # ... properties from ConsentPageData interface ...
- *     ApiResponseConsentData:
- *       allOf:
- *         - $ref: '#/components/schemas/ApiResponseBase'
- *         - type: object
- *           properties:
- *             data: { $ref: '#/components/schemas/ConsentPageData' }
- *             message: { type: string, example: "Consent data retrieved successfully." }
- *     ConsentFormPayload: # 已在上面接口中定义 (Defined in interface above for POST)
- *       # ... properties from POST handler ...
- *     # ApiResponseBase, ApiError, ApiResponseError 已在其他地方定义 (Defined elsewhere)
- */
 // GET 请求处理函数的内部实现 (Internal implementation of GET request handler)
 async function getConsentPageDataHandlerInternal(request: NextRequest): Promise<NextResponse> {
   try {
@@ -245,14 +167,7 @@ async function getConsentPageDataHandlerInternal(request: NextRequest): Promise<
 
     // 成功获取同意页面数据
     // Successfully retrieved consent page data
-    return NextResponse.json<ApiResponse<ConsentPageData>>(
-      {
-        success: true,
-        data: responseData,
-        message: 'Consent data retrieved successfully.',
-      },
-      { status: 200 }
-    );
+    return successResponse(responseData, 200, '同意页面数据获取成功');
   } catch (err: any) {
     return errorResponse({
       message: err.message || '获取同意信息失败',

@@ -12,63 +12,8 @@ import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
 import { ApiResponse } from '@repo/lib/node';
 import { OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
+import { successResponse } from '@repo/lib/node';
 
-/**
- * @swagger
- * /api/v2/oauth/revoke:
- *   post:
- *     summary: OAuth 2.0 令牌撤销 (Token Revocation) - RFC 7009
- *     description: |
- *       撤销一个访问令牌或刷新令牌 (RFC 7009)。
- *       Revokes an access token or a refresh token (RFC 7009).
- *       客户端通过提供令牌来进行撤销。服务器将验证客户端身份（如果适用）和令牌。
- *       The client makes a request by providing the token to be revoked. The server will validate client identity (if applicable) and the token.
- *       无论令牌是否有效或已被撤销，服务器通常都会返回 HTTP 200 OK，以防止信息泄露。
- *       The server typically returns HTTP 200 OK regardless of whether the token was valid or already revoked, to prevent information leakage.
- *     tags:
- *       - OAuth V2
- *     consumes:
- *       - application/x-www-form-urlencoded
- *     produces:
- *       - application/json
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             $ref: '#/components/schemas/RevokeTokenRequest'
- *     responses:
- *       '200':
- *         description: 令牌撤销请求已处理。 (Token revocation request processed.)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponseNull'
- *       '400':
- *         description: 无效的请求。 (Invalid request.)
- *       '401':
- *         description: 客户端认证失败。 (Client authentication failed.)
- *       '415':
- *         description: 不支持的媒体类型。 (Unsupported Media Type.)
- *       '500':
- *         description: 服务器内部错误。 (Internal server error.)
- * components:
- *   schemas:
- *     RevokeTokenRequest:
- *       type: object
- *       required: [token]
- *       properties:
- *         token: { type: string, description: "需要撤销的令牌。" }
- *         token_type_hint: { type: string, enum: [access_token, refresh_token], description: "可选的令牌类型提示。" }
- *         client_id: { type: string, description: "公共客户端的ID (如果未使用Basic Auth)。" }
- *         client_secret: { type: string, description: "机密客户端的密钥 (如果未使用Basic Auth)。" }
- *     ApiResponseNull: # 已在其他地方定义 (Defined elsewhere)
- *       allOf:
- *         - $ref: '#/components/schemas/ApiResponseBase'
- *         - type: object
- *           properties:
- *             data: { type: 'null', nullable: true }
- */
 // 令牌撤销端点处理函数
 // Token revocation endpoint handler function
 async function revocationHandlerInternal(request: NextRequest): Promise<NextResponse> {
@@ -271,13 +216,10 @@ async function revocationHandlerInternal(request: NextRequest): Promise<NextResp
 
   // RFC 7009: 服务器以 HTTP 200 响应，无论令牌是否有效或已撤销。
   // RFC 7009: Server responds with HTTP 200 if token revoked or client submitted invalid token.
-  return NextResponse.json<ApiResponse<null>>(
-    {
-      success: true,
-      message: 'Token revocation request processed.', // 消息表明已处理，而非一定已撤销某个特定令牌 (Message indicates processed, not necessarily that a specific token was revoked)
-      data: null,
-    },
-    { status: 200 }
+  return successResponse(
+    null,
+    200,
+    'Token revocation request processed.'
   );
 }
 
