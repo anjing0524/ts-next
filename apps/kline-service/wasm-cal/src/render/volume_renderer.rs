@@ -1,7 +1,8 @@
 //! 成交量图模块 - 专门负责绘制成交量图部分
 
+use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -16,6 +17,7 @@ impl VolumeRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        theme: &ChartTheme,
     ) {
         let data_manager_ref = data_manager.borrow();
         // 获取数据
@@ -78,7 +80,7 @@ impl VolumeRenderer {
 
         // 批量绘制所有上涨成交量矩形
         if !bullish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BULLISH);
+            ctx.set_fill_style_str(&theme.bullish);
             ctx.begin_path();
             for (x, y, width, height) in bullish_rects {
                 ctx.rect(x, y, width, height);
@@ -88,7 +90,7 @@ impl VolumeRenderer {
 
         // 批量绘制所有下跌成交量矩形
         if !bearish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BEARISH);
+            ctx.set_fill_style_str(&theme.bearish);
             ctx.begin_path();
             for (x, y, width, height) in bearish_rects {
                 ctx.rect(x, y, width, height);

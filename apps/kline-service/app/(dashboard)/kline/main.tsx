@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 // 节流函数工具
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number
@@ -24,7 +25,7 @@ function throttle<T extends (...args: any[]) => any>(
 }
 
 export default function Main() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow'; // 使用环境变量
 
   // Canvas引用
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,7 +74,8 @@ export default function Main() {
   const setupWorkerMessageHandler = useCallback(
     (worker: Worker) => {
       // 使用消息类型映射优化消息处理
-      const messageHandlers: Record<string, (data: unknown) => void> = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messageHandlers: Record<string, (data: any) => void> = {
         initialized: () => {
           if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
             setError('Canvas元素未找到');
@@ -102,40 +104,40 @@ export default function Main() {
         drawComplete: () => {
           setIsLoading(false);
         },
-        error: (data: any) => {
+        error: (data) => {
           setError(data.error);
           setIsLoading(false);
         },
-        cursorStyle: (data: any) => {
+        cursorStyle: (data) => {
           // 直接使用从WASM返回的cursor style字符串
           // 这些字符串现在来自CursorStyle枚举的to_string()方法
           setCursorStyle(data.style);
         },
-        mousedownHandled: (data: any) => {
+        mousedownHandled: (data) => {
           if (data.handled) {
             setIsDragging(true);
           }
         },
-        mouseupHandled: (data: any) => {
+        mouseupHandled: (data) => {
           if (data.isDragEnd) {
             setIsDragging(false);
           }
         },
-        mouseleaveHandled: (data: any) => {
+        mouseleaveHandled: (data) => {
           // 处理鼠标离开事件的结果
           if (data.needsRedraw) {
             // 如果需要重绘，可以在这里执行任何必要的UI更新
-            // 例如��可以重置拖动状态
+            // 例如，可以重置拖动状态
             setIsDragging(false);
           }
         },
-        clickHandled: (data: any) => {
+        clickHandled: (data) => {
           // 点击事件导致了模式切换，可以在这里执行任何额外操作
           if (data.modeChanged) {
             console.log('图表模式已切换');
           }
         },
-        performanceMetrics: (data: any) => {
+        performanceMetrics: (data) => {
           // 可以添加从Worker接收性能指标的处理
           if (data.renderTime) {
             console.log(`渲染时间: ${data.renderTime}ms`);
@@ -188,13 +190,13 @@ export default function Main() {
 
     // 在客户端设置 wasmPath
     if (typeof window !== 'undefined') {
-      wasmPath = `${window.location.origin}/wasm-cal/kline_processor_bg.wasm`;
+      wasmPath = `${window.location.origin}${basePath}/wasm-cal/kline_processor_bg.wasm`;
     }
 
     const fetchAndDraw = async () => {
       try {
         // 获取数据
-        const response = await fetch(`/api/kline`, {
+        const response = await fetch(`${basePath}/api/kline`, {
           method: 'POST',
           signal: controller.signal,
           headers: { 'Content-Type': 'application/octet-stream' },
@@ -285,7 +287,7 @@ export default function Main() {
     sendMessageToWorker({
       type: 'mouseleave',
     });
-
+    
     // 记录鼠标已离开canvas，但不立即重置isDragging状态
     // 让window事件处理程序来管理拖动结束
   }, [sendMessageToWorker]);
@@ -396,7 +398,7 @@ export default function Main() {
     if (typeof window === 'undefined') return;
 
     // 处理全局鼠标释放事件，用于捕获canvas外的释放
-    const handleGlobalMouseUp = () => {
+    const handleGlobalMouseUp = (e: MouseEvent) => {
       if (isDragging) {
         // 当在canvas外释放鼠标时，需要通知worker结束拖动
         sendMessageToWorker({
@@ -404,7 +406,7 @@ export default function Main() {
           x: -1, // 使用-1表示canvas外的位置
           y: -1,
         });
-
+        
         // 直接重置拖动状态
         setIsDragging(false);
       }
@@ -415,14 +417,16 @@ export default function Main() {
       if (isDragging && canvasRef.current) {
         // 获取canvas位置
         const rect = canvasRef.current.getBoundingClientRect();
-
+        
         // 计算相对于canvas的坐标
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
+        
         // 判断鼠标是否在canvas内
-        const isInCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
-
+        const isInCanvas = 
+          x >= 0 && x <= rect.width && 
+          y >= 0 && y <= rect.height;
+        
         if (isInCanvas) {
           // 如果在canvas内，发送正常的拖动事件
           sendMessageToWorker({

@@ -1,32 +1,3 @@
-// 文件路径: app/api/v2/oauth/token/route.ts
-// File path: app/api/v2/oauth/token/route.ts
-// 描述: 此文件实现了 OAuth 2.1 令牌端点 (Token Endpoint)，支持多种客户端认证方式
-// Description: This file implements the OAuth 2.1 Token Endpoint, supporting multiple client authentication methods
-//
-// 认证方式优先级 (Authentication method priority):
-// 1. client_assertion (JWT Client Assertion) - OAuth 2.1 推荐方式，最安全
-// 2. client_secret (Basic Auth 或请求体) - 兼容性支持，不推荐用于生产环境
-// 3. 公开客户端 (Public Client) - 仅适用于特定场景
-//
-// 主要职责:
-// Main responsibilities:
-// 1. 客户端认证 (Client Authentication): 优先支持JWT Client Assertion，兼容传统认证方式
-// 1. Client Authentication: Prioritizes JWT Client Assertion, compatible with traditional methods
-// 2. 处理不同的授权类型 (Grant Types):
-// 2. Handles different grant types:
-//    - 'authorization_code': 使用从授权端点获得的授权码来交换访问令牌和刷新令牌。包括 PKCE 验证。
-//    - 'authorization_code': Exchanges an authorization code (obtained from the authorization endpoint) for an access token and refresh token. Includes PKCE verification.
-//    - 'refresh_token': 使用刷新令牌来获取新的访问令牌，并可能实现刷新令牌轮换 (Refresh Token Rotation)。
-//    - 'refresh_token': Uses a refresh token to obtain a new access token, potentially implementing Refresh Token Rotation.
-//    - 'client_credentials': 允许客户端直接获取访问令牌以访问其自身拥有的资源或代表其自身执行操作。
-//    - 'client_credentials': Allows a client to directly obtain an access token to access its own resources or perform actions on its own behalf.
-// 3. 生成和存储令牌: 创建 JWT 格式的访问令牌和刷新令牌，并将它们（或其哈希）存储到数据库中。
-// 3. Generates and stores tokens: Creates access tokens and refresh tokens in JWT format, and stores them (or their hashes) in the database.
-// 4. 返回令牌响应: 将访问令牌、令牌类型 (Bearer)、有效期、刷新令牌（如果适用）和授予的范围返回给客户端。
-// 4. Returns token response: Sends the access token, token type (Bearer), expiration time, refresh token (if applicable), and granted scopes back to the client.
-// 安全性: 强调客户端认证、PKCE、授权码和刷新令牌的一次性使用或轮换机制。
-// Security: Emphasizes client authentication, PKCE, and one-time use or rotation mechanisms for authorization codes and refresh tokens.
-
 import { OAuthClient } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
 import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
 import { NextRequest, NextResponse } from 'next/server';
@@ -34,20 +5,20 @@ import { NextRequest, NextResponse } from 'next/server';
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
 import { ClientAuthUtils } from '@/lib/utils';
 import {
-  AuthorizationUtils,
   JWTUtils,
   OAuth2Error,
   OAuth2ErrorCode,
   RefreshTokenPayload,
   ScopeUtils,
   successResponse,
-  withErrorHandling,
+  withErrorHandling
 } from '@repo/lib/node';
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
 import { addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
+import { RBACService } from '@/lib/auth/services/rbac-service';
 import { z } from 'zod'; // Keep z import if used directly for type inference like z.infer
 import {
   // tokenRequestSchema, // 这是可区分联合类型 (This is the discriminated union) - Not directly used after individual parsing
@@ -56,7 +27,6 @@ import {
   tokenRefreshTokenGrantSchema, // refresh_token 授权的特定模式 (Specific schema for refresh_token grant)
   TokenSuccessResponse, // 成功响应的载荷类型 (Payload type for successful response)
 } from './schemas';
-import { RBACService } from '@/lib/auth/services/rbac-service';
 
 // 扩展TokenSuccessResponse类型以支持id_token
 interface ExtendedTokenSuccessResponse extends TokenSuccessResponse {

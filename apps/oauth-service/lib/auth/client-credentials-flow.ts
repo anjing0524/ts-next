@@ -13,16 +13,10 @@
  * - bcrypt (用于机密客户端密钥哈希比对)
  * - JWTUtils from ./oauth2 (用于JWT生成)
  */
-import { prisma } from '@repo/database';
-import bcrypt from 'bcrypt';
-import { JWTUtils, OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
 import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
-import {
-  AuthenticationError,
-  ValidationError,
-  CryptoError,
-  TokenGenerationError,
-} from '@repo/lib/node'; // 导入自定义错误类 (Import custom error classes)
+import { prisma } from '@repo/database';
+import { AuthenticationError, CryptoError, JWTUtils, TokenGenerationError, ValidationError } from '@repo/lib/node';
+import bcrypt from 'bcrypt';
 
 // AuthenticatedClient 接口定义了客户端认证成功后需要暴露的基本信息。
 // The AuthenticatedClient interface defines the basic information to be exposed after successful client authentication.

@@ -98,3 +98,5 @@ packages/**/dist
 .cursor
 .trae
 apps/kline-service/wasm-cal/target/*
+
+.kiro

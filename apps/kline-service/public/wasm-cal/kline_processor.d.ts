@@ -41,6 +41,10 @@ export class KlineProcess {
    * 处理鼠标点击事件（用于切换K线图/线图模式）
    */
   handle_click(x: number, y: number): boolean;
+  /**
+   * 设置配置JSON（动态切换主题/配色等）
+   */
+  set_config_json(json: string): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -59,6 +63,7 @@ export interface InitOutput {
   readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
   readonly klineprocess_handle_click: (a: number, b: number, c: number) => number;
+  readonly klineprocess_set_config_json: (a: number, b: number, c: number) => [number, number];
   readonly start: () => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;

@@ -1,6 +1,6 @@
 'use client';
 // kline.worker.ts - Web Worker 用于处理 WASM 和 Canvas 操作
-import init, { KlineProcess } from '../../../public/wasm-cal/kline_processor';
+import init, { KlineProcess } from '@/public/wasm-cal/kline_processor';
 
 // 定义消息类型
 interface InitMessage {
@@ -119,7 +119,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         // 处理canvas外的情况，如果坐标为-1，说明是canvas外的事件
         const isOutsideCanvas = data.x === -1 && data.y === -1;
         let isDragEnd;
-
+        
         if (isOutsideCanvas) {
           // 对于canvas外的事件，首先发送mouseleave
           processorRef.handle_mouse_leave();
@@ -129,7 +129,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           // 正常处理canvas内的鼠标抬起
           isDragEnd = processorRef.handle_mouse_up(data.x, data.y);
         }
-
+        
         // 通知主线程鼠标释放事件处理结果
         self.postMessage({
           type: 'mouseupHandled',
@@ -148,7 +148,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         // 通知主线程鼠标离开处理结果
         self.postMessage({
           type: 'mouseleaveHandled',
-          needsRedraw: needsRedraw,
+          needsRedraw: needsRedraw
         });
         break;
       case 'wheel':
@@ -277,6 +277,9 @@ async function handleDraw(message: DrawMessage) {
     // 设置 Canvas 到处理器
     processorRef.set_canvases(canvas, mainCanvas, overlayCanvas);
     console.timeEnd('[Worker] 设置 Canvas');
+
+    // 新增：设置标题
+    processorRef.set_config_json(JSON.stringify({ title: '期货/SR' }));
 
     // 绘制 K 线图
     console.time('[Worker] 绘制 K 线图');

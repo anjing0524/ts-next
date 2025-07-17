@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import { successResponse, errorResponse } from '@repo/lib/node';
+import { errorResponse, successResponse } from '@repo/lib/node';
 
 export async function GET() {
   try {

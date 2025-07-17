@@ -1,9 +1,7 @@
+import { errorResponse, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
-import { Prisma } from '@prisma/client';
-import { successResponse, errorResponse } from '@repo/lib/node';
 import { z } from 'zod';
-import { listRoles, createRole } from '../../../../lib/auth/services/role-service';
+import { createRole, listRoles } from '../../../../lib/auth/services/role-service';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;

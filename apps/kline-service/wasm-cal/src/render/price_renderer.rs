@@ -1,7 +1,8 @@
 //! 价格图(K线图)模块 - 专门负责绘制K线图部分
 
+use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartLayout;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -16,6 +17,7 @@ impl PriceRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        theme: &ChartTheme,
     ) {
         let data_manager_ref = data_manager.borrow();
         // 获取数据
@@ -86,7 +88,7 @@ impl PriceRenderer {
         // 批量绘制所有上涨K线影线 (绿色)
         if !bullish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_str(ChartColors::BULLISH);
+            ctx.set_stroke_style_str(&theme.bullish);
             ctx.set_line_width(1.5);
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
@@ -100,7 +102,7 @@ impl PriceRenderer {
         // 批量绘制所有下跌K线影线 (红色)
         if !bearish_high_low_lines.is_empty() {
             ctx.begin_path();
-            ctx.set_stroke_style_str(ChartColors::BEARISH);
+            ctx.set_stroke_style_str(&theme.bearish);
             ctx.set_line_width(1.5);
             let empty_array = js_sys::Float64Array::new_with_length(0);
             ctx.set_line_dash(&empty_array).unwrap();
@@ -113,7 +115,7 @@ impl PriceRenderer {
 
         // 批量绘制所有上涨K线实体
         if !bullish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BULLISH);
+            ctx.set_fill_style_str(&theme.bullish);
             ctx.begin_path();
             for (x, y, width, height) in bullish_rects {
                 ctx.rect(x, y, width, height);
@@ -123,7 +125,7 @@ impl PriceRenderer {
 
         // 批量绘制所有下跌K线实体
         if !bearish_rects.is_empty() {
-            ctx.set_fill_style_str(ChartColors::BEARISH);
+            ctx.set_fill_style_str(&theme.bearish);
             ctx.begin_path();
             for (x, y, width, height) in bearish_rects {
                 ctx.rect(x, y, width, height);

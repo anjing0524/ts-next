@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
-import { Prisma, PermissionType } from '@prisma/client';
-import { successResponse, errorResponse } from '@repo/lib/node';
-import { z } from 'zod';
 import {
-  listPermissions,
   createPermission,
+  listPermissions,
 } from '@/lib/auth/services/permission-service';
+import { PermissionType } from '@prisma/client';
+import { errorResponse, successResponse } from '@repo/lib/node';
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;

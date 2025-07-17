@@ -1,9 +1,10 @@
 //! DataZoom导航器模块 - 负责绘制和处理数据缩放导航器
 
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartLayout;
 use crate::render::cursor_style::CursorStyle;
 use flatbuffers;
 use std::cell::RefCell;
@@ -320,7 +321,12 @@ impl DataZoomRenderer {
     }
 
     /// 绘制DataZoom导航器
-    pub fn draw(&self, canvas_manager: &CanvasManager, data_manager: &Rc<RefCell<DataManager>>) {
+    pub fn draw(
+        &self,
+        canvas_manager: &CanvasManager,
+        data_manager: &Rc<RefCell<DataManager>>,
+        theme: &ChartTheme,
+    ) {
         // 获取 上下文和布局
         let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = canvas_manager.layout.borrow();
@@ -341,7 +347,7 @@ impl DataZoomRenderer {
         );
 
         // 绘制导航器背景
-        ctx.set_fill_style_str(ChartColors::NAVIGATOR_BG);
+        ctx.set_fill_style_str(&theme.navigator_bg);
         ctx.fill_rect(nav_x, nav_y, nav_width, nav_height);
 
         let items_opt = data_manager.borrow().get_items();
@@ -356,7 +362,7 @@ impl DataZoomRenderer {
         }
 
         // 绘制成交量曲线作为背景
-        self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height);
+        self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height, theme);
 
         // 绘制当前可见区域指示器
         self.draw_visible_range_indicator(
@@ -368,6 +374,7 @@ impl DataZoomRenderer {
             nav_width,
             nav_height,
             data_manager,
+            theme,
         );
     }
 
@@ -380,6 +387,7 @@ impl DataZoomRenderer {
         nav_x: f64,
         nav_y: f64,
         nav_height: f64,
+        theme: &ChartTheme,
     ) {
         let items_len = items.len();
         if items_len == 0 {
@@ -408,9 +416,9 @@ impl DataZoomRenderer {
 
         // 绘制成交量曲线
         ctx.begin_path();
-        ctx.set_stroke_style_str(ChartColors::VOLUME_LINE);
+        ctx.set_stroke_style_str(&theme.navigator_border);
         ctx.set_line_width(1.0);
-        ctx.set_fill_style_str(ChartColors::VOLUME_AREA);
+        ctx.set_fill_style_str(&theme.volume_area);
 
         // 对于大数据集，使用自适应采样提高性能
         // 最大采样200个点，确保不会有性能问题
@@ -468,6 +476,7 @@ impl DataZoomRenderer {
         nav_width: f64,
         nav_height: f64,
         data_manager: &Rc<RefCell<DataManager>>,
+        theme: &ChartTheme,
     ) {
         let items_len = items.len();
         if items_len == 0 {
@@ -505,7 +514,7 @@ impl DataZoomRenderer {
         ctx.clip();
 
         // 绘制半透明遮罩 (左侧不可见区域)
-        ctx.set_fill_style_str(ChartColors::NAVIGATOR_MASK);
+        ctx.set_fill_style_str(&theme.navigator_mask);
         ctx.fill_rect(nav_x, nav_y, clamped_start_x - nav_x, nav_height);
 
         // 绘制半透明遮罩 (右侧不可见区域)
@@ -521,18 +530,10 @@ impl DataZoomRenderer {
         let border_width = clamped_end_x - clamped_start_x;
 
         if border_width > 0.0 {
-            ctx.set_stroke_style_str(ChartColors::NAVIGATOR_BORDER);
+            ctx.set_stroke_style_str(&theme.navigator_border);
             ctx.set_line_width(1.0);
             ctx.stroke_rect(border_left, nav_y, border_width, nav_height);
         }
-
-        // 设置手柄样式
-        let handle_color = if self.is_dragging {
-            // 拖动时使用高亮颜色
-            ChartColors::NAVIGATOR_ACTIVE_HANDLE
-        } else {
-            ChartColors::NAVIGATOR_HANDLE
-        };
 
         let handle_width = if self.is_dragging {
             // 拖动时增加手柄宽度，提供更明显的视觉反馈
@@ -560,16 +561,16 @@ impl DataZoomRenderer {
         };
 
         let shadow_color = if self.is_dragging {
-            ChartColors::NAVIGATOR_ACTIVE_HANDLE_SHADOW
+            theme.navigator_active_handle_shadow.clone()
         } else {
-            ChartColors::TRANSPARENT
+            String::from("rgba(0,0,0,0)")
         };
 
         // 绘制左侧手柄
         if clamped_start_x >= nav_x && clamped_start_x <= nav_x + nav_width {
-            ctx.set_fill_style_str(handle_color);
+            ctx.set_fill_style_str(&theme.navigator_handle);
             ctx.set_shadow_blur(shadow_blur);
-            ctx.set_shadow_color(shadow_color);
+            ctx.set_shadow_color(&shadow_color);
             ctx.begin_path();
             // 绘制矩形作为左侧手柄
             ctx.fill_rect(
@@ -582,9 +583,9 @@ impl DataZoomRenderer {
 
         // 绘制右侧手柄
         if clamped_end_x >= nav_x && clamped_end_x <= nav_x + nav_width {
-            ctx.set_fill_style_str(handle_color);
+            ctx.set_fill_style_str(&theme.navigator_handle);
             ctx.set_shadow_blur(shadow_blur);
-            ctx.set_shadow_color(shadow_color);
+            ctx.set_shadow_color(&shadow_color);
             ctx.begin_path();
             // 绘制矩形作为右侧手柄
             ctx.fill_rect(

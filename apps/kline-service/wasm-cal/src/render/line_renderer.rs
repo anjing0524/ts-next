@@ -1,8 +1,9 @@
 //! 线图渲染器 - 负责绘制最新价、买一价、卖一价曲线
 
+use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::{ChartColors, ChartLayout};
+use crate::layout::ChartLayout;
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -35,6 +36,7 @@ impl LineRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
+        theme: &ChartTheme,
     ) {
         let data_manager_ref = data_manager.borrow();
         let (visible_start, visible_count, _) = data_manager_ref.get_visible();
@@ -64,7 +66,7 @@ impl LineRenderer {
                     min_low,
                     max_high,
                     |item| item.last_price(),
-                    ChartColors::LAST_PRICE_LINE,
+                    &theme.last_price_line,
                     2.0,
                     false, // 实线
                 );
@@ -81,7 +83,7 @@ impl LineRenderer {
                     min_low,
                     max_high,
                     |item| item.bid_price(),
-                    ChartColors::BID_PRICE_LINE,
+                    &theme.bid_price_line,
                     1.0,
                     true, // 虚线
                 );
@@ -98,7 +100,7 @@ impl LineRenderer {
                     min_low,
                     max_high,
                     |item| item.ask_price(),
-                    ChartColors::ASK_PRICE_LINE,
+                    &theme.ask_price_line,
                     1.0,
                     true, // 虚线
                 );

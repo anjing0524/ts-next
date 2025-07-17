@@ -4,185 +4,165 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { PriceVolume } from './price-volume';
+import { PriceVolume } from '../kline/price-volume';
+
 
 export class KlineItem {
-  bb: flatbuffers.ByteBuffer | null = null;
+  bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-  __init(i: number, bb: flatbuffers.ByteBuffer): KlineItem {
-    this.bb_pos = i;
-    this.bb = bb;
-    return this;
-  }
+  __init(i:number, bb:flatbuffers.ByteBuffer):KlineItem {
+  this.bb_pos = i;
+  this.bb = bb;
+  return this;
+}
 
-  static getRootAsKlineItem(bb: flatbuffers.ByteBuffer, obj?: KlineItem): KlineItem {
-    return (obj || new KlineItem()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-  }
+static getRootAsKlineItem(bb:flatbuffers.ByteBuffer, obj?:KlineItem):KlineItem {
+  return (obj || new KlineItem()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
 
-  static getSizePrefixedRootAsKlineItem(bb: flatbuffers.ByteBuffer, obj?: KlineItem): KlineItem {
-    bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
-    return (obj || new KlineItem()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-  }
+static getSizePrefixedRootAsKlineItem(bb:flatbuffers.ByteBuffer, obj?:KlineItem):KlineItem {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new KlineItem()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
 
-  timestamp(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 4);
-    return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
-  }
+timestamp():number {
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
 
-  open(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 6);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+open():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  high(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 8);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+high():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  low(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 10);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+low():number {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  close(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 12);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+close():number {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  bVol(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 14);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+bVol():number {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  sVol(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 16);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+sVol():number {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  volumes(index: number, obj?: PriceVolume): PriceVolume | null {
-    const offset = this.bb!.__offset(this.bb_pos, 18);
-    return offset
-      ? (obj || new PriceVolume()).__init(
-          this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4),
-          this.bb!
-        )
-      : null;
-  }
+volumes(index: number, obj?:PriceVolume):PriceVolume|null {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? (obj || new PriceVolume()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
 
-  volumesLength(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 18);
-    return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
-  }
+volumesLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
 
-  lastPrice(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 20);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+lastPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  bidPrice(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 22);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+bidPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  askPrice(): number {
-    const offset = this.bb!.__offset(this.bb_pos, 24);
-    return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
-  }
+askPrice():number {
+  const offset = this.bb!.__offset(this.bb_pos, 24);
+  return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
+}
 
-  static startKlineItem(builder: flatbuffers.Builder) {
-    builder.startObject(11);
-  }
+static startKlineItem(builder:flatbuffers.Builder) {
+  builder.startObject(11);
+}
 
-  static addTimestamp(builder: flatbuffers.Builder, timestamp: number) {
-    builder.addFieldInt32(0, timestamp, 0);
-  }
+static addTimestamp(builder:flatbuffers.Builder, timestamp:number) {
+  builder.addFieldInt32(0, timestamp, 0);
+}
 
-  static addOpen(builder: flatbuffers.Builder, open: number) {
-    builder.addFieldFloat64(1, open, 0.0);
-  }
+static addOpen(builder:flatbuffers.Builder, open:number) {
+  builder.addFieldFloat64(1, open, 0.0);
+}
 
-  static addHigh(builder: flatbuffers.Builder, high: number) {
-    builder.addFieldFloat64(2, high, 0.0);
-  }
+static addHigh(builder:flatbuffers.Builder, high:number) {
+  builder.addFieldFloat64(2, high, 0.0);
+}
 
-  static addLow(builder: flatbuffers.Builder, low: number) {
-    builder.addFieldFloat64(3, low, 0.0);
-  }
+static addLow(builder:flatbuffers.Builder, low:number) {
+  builder.addFieldFloat64(3, low, 0.0);
+}
 
-  static addClose(builder: flatbuffers.Builder, close: number) {
-    builder.addFieldFloat64(4, close, 0.0);
-  }
+static addClose(builder:flatbuffers.Builder, close:number) {
+  builder.addFieldFloat64(4, close, 0.0);
+}
 
-  static addBVol(builder: flatbuffers.Builder, bVol: number) {
-    builder.addFieldFloat64(5, bVol, 0.0);
-  }
+static addBVol(builder:flatbuffers.Builder, bVol:number) {
+  builder.addFieldFloat64(5, bVol, 0.0);
+}
 
-  static addSVol(builder: flatbuffers.Builder, sVol: number) {
-    builder.addFieldFloat64(6, sVol, 0.0);
-  }
+static addSVol(builder:flatbuffers.Builder, sVol:number) {
+  builder.addFieldFloat64(6, sVol, 0.0);
+}
 
-  static addVolumes(builder: flatbuffers.Builder, volumesOffset: flatbuffers.Offset) {
-    builder.addFieldOffset(7, volumesOffset, 0);
-  }
+static addVolumes(builder:flatbuffers.Builder, volumesOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(7, volumesOffset, 0);
+}
 
-  static createVolumesVector(
-    builder: flatbuffers.Builder,
-    data: flatbuffers.Offset[]
-  ): flatbuffers.Offset {
-    builder.startVector(4, data.length, 4);
-    for (let i = data.length - 1; i >= 0; i--) {
-      builder.addOffset(data[i]!);
-    }
-    return builder.endVector();
+static createVolumesVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
   }
+  return builder.endVector();
+}
 
-  static startVolumesVector(builder: flatbuffers.Builder, numElems: number) {
-    builder.startVector(4, numElems, 4);
-  }
+static startVolumesVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
 
-  static addLastPrice(builder: flatbuffers.Builder, lastPrice: number) {
-    builder.addFieldFloat64(8, lastPrice, 0.0);
-  }
+static addLastPrice(builder:flatbuffers.Builder, lastPrice:number) {
+  builder.addFieldFloat64(8, lastPrice, 0.0);
+}
 
-  static addBidPrice(builder: flatbuffers.Builder, bidPrice: number) {
-    builder.addFieldFloat64(9, bidPrice, 0.0);
-  }
+static addBidPrice(builder:flatbuffers.Builder, bidPrice:number) {
+  builder.addFieldFloat64(9, bidPrice, 0.0);
+}
 
-  static addAskPrice(builder: flatbuffers.Builder, askPrice: number) {
-    builder.addFieldFloat64(10, askPrice, 0.0);
-  }
+static addAskPrice(builder:flatbuffers.Builder, askPrice:number) {
+  builder.addFieldFloat64(10, askPrice, 0.0);
+}
 
-  static endKlineItem(builder: flatbuffers.Builder): flatbuffers.Offset {
-    const offset = builder.endObject();
-    return offset;
-  }
+static endKlineItem(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
 
-  static createKlineItem(
-    builder: flatbuffers.Builder,
-    timestamp: number,
-    open: number,
-    high: number,
-    low: number,
-    close: number,
-    bVol: number,
-    sVol: number,
-    volumesOffset: flatbuffers.Offset,
-    lastPrice: number,
-    bidPrice: number,
-    askPrice: number
-  ): flatbuffers.Offset {
-    KlineItem.startKlineItem(builder);
-    KlineItem.addTimestamp(builder, timestamp);
-    KlineItem.addOpen(builder, open);
-    KlineItem.addHigh(builder, high);
-    KlineItem.addLow(builder, low);
-    KlineItem.addClose(builder, close);
-    KlineItem.addBVol(builder, bVol);
-    KlineItem.addSVol(builder, sVol);
-    KlineItem.addVolumes(builder, volumesOffset);
-    KlineItem.addLastPrice(builder, lastPrice);
-    KlineItem.addBidPrice(builder, bidPrice);
-    KlineItem.addAskPrice(builder, askPrice);
-    return KlineItem.endKlineItem(builder);
-  }
+static createKlineItem(builder:flatbuffers.Builder, timestamp:number, open:number, high:number, low:number, close:number, bVol:number, sVol:number, volumesOffset:flatbuffers.Offset, lastPrice:number, bidPrice:number, askPrice:number):flatbuffers.Offset {
+  KlineItem.startKlineItem(builder);
+  KlineItem.addTimestamp(builder, timestamp);
+  KlineItem.addOpen(builder, open);
+  KlineItem.addHigh(builder, high);
+  KlineItem.addLow(builder, low);
+  KlineItem.addClose(builder, close);
+  KlineItem.addBVol(builder, bVol);
+  KlineItem.addSVol(builder, sVol);
+  KlineItem.addVolumes(builder, volumesOffset);
+  KlineItem.addLastPrice(builder, lastPrice);
+  KlineItem.addBidPrice(builder, bidPrice);
+  KlineItem.addAskPrice(builder, askPrice);
+  return KlineItem.endKlineItem(builder);
+}
 }

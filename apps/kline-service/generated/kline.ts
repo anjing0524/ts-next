@@ -2,6 +2,6 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { CalculationResult } from './kline/calculation-result';
-export { KlineArray } from './kline/kline-array';
 export { KlineData } from './kline/kline-data';
+export { KlineItem } from './kline/kline-item';
+export { PriceVolume } from './kline/price-volume';

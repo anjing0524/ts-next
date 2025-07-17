@@ -3,16 +3,13 @@
 // 描述: OAuth 2.0 令牌撤销端点 (RFC 7009)
 // Description: OAuth 2.0 Token Revocation Endpoint (RFC 7009)
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@repo/database';
-import { JWTUtils, AuthorizationUtils } from '@repo/lib/node';
-import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
-import { withErrorHandling } from '@repo/lib/node';
-import * as jose from 'jose';
-import { revokeTokenRequestSchema } from './schemas';
-import { ApiResponse } from '@repo/lib/node';
 import { OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
-import { successResponse } from '@repo/lib/node';
+import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
+import { prisma } from '@repo/database';
+import { AuthorizationUtils, JWTUtils, successResponse, withErrorHandling } from '@repo/lib/node';
+import * as jose from 'jose';
+import { NextRequest, NextResponse } from 'next/server';
+import { revokeTokenRequestSchema } from './schemas';
 
 // 令牌撤销端点处理函数
 // Token revocation endpoint handler function

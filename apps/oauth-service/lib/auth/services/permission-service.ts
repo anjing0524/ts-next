@@ -1,7 +1,7 @@
-import { Prisma, Permission, PermissionType } from '@prisma/client';
+import { PermissionType, Prisma } from '@prisma/client';
+import { CacheInterface, CacheManager } from '@repo/cache/src/cache-manager';
 import { prisma } from '@repo/database';
 import { logger } from '@repo/lib/node';
-import { CacheManager, CacheInterface } from '@repo/cache/src/cache-manager';
 
 interface PermissionCheckRequest {
   id?: string;

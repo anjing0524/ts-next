@@ -1,10 +1,9 @@
 // 文件路径: app/api/v2/auth/check/route.ts
 // 描述: 统一权限检查端点 (Unified permission check endpoint)
 
-import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { JWTUtils } from '@repo/lib/node';
-import { successResponse, errorResponse } from '@repo/lib/node';
+import { errorResponse, JWTUtils, successResponse } from '@repo/lib/node';
+import { NextRequest } from 'next/server';
 // import { PermissionService } from '@/lib/services/permissionService'; // 理想情况下，权限检查逻辑应位于服务层
 
 // --- 辅助函数 ---

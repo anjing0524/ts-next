@@ -75,4 +75,4 @@ let (start, count, end) = data_manager.get_visible();
 let (min_low, max_high, max_volume) = data_manager.calculate_data_ranges();
 ```
 
-这种架构设计使得代码更加清晰、可维护，并且提高了性能。
+这种架构设计使得代码更加清晰、可维护，并且提高了性能。 
