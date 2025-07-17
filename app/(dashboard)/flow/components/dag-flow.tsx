@@ -171,7 +171,7 @@ export function DagFlow() {
               <div className="p-4 border-b border-border/30">
                 <h2 className="text-xl font-bold">{stage.name}</h2>
                 <div className="text-sm text-muted-foreground mt-1">
-                  总任务: {stage.stats.total} | 成功: {stage.stats.success} | 失败:{' '}
+                  总计划: {stage.stats.total} | 成功: {stage.stats.success} | 失败:{' '}
                   {stage.stats.failed} | 运行中: {stage.stats.running} | 等待中:{' '}
                   {stage.stats.waiting}
                 </div>

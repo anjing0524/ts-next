@@ -436,7 +436,7 @@ export async function getTaskDetails(
  */
 async function callSchedulerApi(
   endpoint: string,
-  payload: { date: string; planId: string; rerunMode: number; param?: string }
+  payload: { date: string; planId: string; rerunMode?: number; param?: string; state?: string }
 ): Promise<{ success: boolean; message: string; state: number }> {
   try {
     logger.info(process.env.SCHEDULER_API_URL);
@@ -478,10 +478,22 @@ async function callSchedulerApi(
         message: result.msg || '计划正在运行,无需重复执行',
         state: result.state || 2,
       };
+    } else if (result.code === 5003) {
+      return {
+        success: false,
+        message: result.msg || '调度计划启动失败',
+        state: result.state || -1,
+      };
     } else if (result.code === 4001) {
       return {
         success: false,
         message: result.msg || '无法关闭调度计划',
+        state: result.state || -1,
+      };
+    } else if (result.code === 20001) {
+      return {
+        success: false,
+        message: result.msg || '状态更改失败',
         state: result.state || -1,
       };
     } else {
@@ -702,5 +714,40 @@ export async function getTaskInfo(
   } catch (error) {
     logger.error('获取任务详情失败:', error);
     throw new Error('获取任务详情失败');
+  }
+}
+
+/**
+ * 置计划及任务为成功
+ * @param planId 计划ID
+ * @param redate 日期
+ * @returns 操作结果
+ */
+export async function setPlanSuccess(
+  planId: string,
+  redate: string
+): Promise<{ success: boolean; message: string; state: number }> {
+  try {
+    logger.info(`尝试置计划及任务为成功: planId=${planId}, redate=${redate}`);
+    const payload = {
+      planId,
+      date: redate,
+      state: 'D',
+    };
+    // 使用 callSchedulerApi 统一调度接口调用，类型断言绕过 rerunMode 限制
+    const result = await callSchedulerApi('/tsm/sched/plan/altState', payload);
+    if (result.success) {
+      result.message = result.message === '操作成功' ? '计划及任务已置为成功' : result.message;
+    } else {
+      result.message = result.message || '置成功失败，未知错误';
+    }
+    return result;
+  } catch (error) {
+    logger.error(`置计划及任务为成功出错:`, error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : '未知错误',
+      state: -1,
+    };
   }
 }

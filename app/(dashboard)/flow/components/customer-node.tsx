@@ -17,7 +17,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '../store/flow-store';
 import { useShallow } from 'zustand/react/shallow';
-import { rerunPlan, rerunFailedTasks, stopPlan, handleSearch } from '@/app/actions/flow-actions';
+import {
+  rerunPlan,
+  rerunFailedTasks,
+  stopPlan,
+  handleSearch,
+  setPlanSuccess,
+} from '@/app/actions/flow-actions';
 import { formatToCST } from '@/lib/utils/timezone';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -57,8 +63,17 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
   // 在需要打开任务详情对话框的地方
   const [loading, setLoading] = useState<string | null>(null);
   // 从data中获取更多信息
-  const { plan_id, plan_desc, progress, cost_time, redate, exe_id, status, pid, exec_desc } =
-    data as unknown as PlanStateWithStatus;
+  const {
+    plan_id,
+    plan_desc,
+    progress,
+    cost_time,
+    redate,
+    exe_id = 0,
+    status,
+    pid,
+    exec_desc,
+  } = data as unknown as PlanStateWithStatus;
 
   // 使用 useCallback 优化函数，依赖项包括 plan_id, plan_desc, redate, exe_id 和 openTaskDetail
   const handleViewDetails = useCallback(() => {
@@ -87,13 +102,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         setLoading('rerun');
         const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await rerunPlan(plan_id as string, formattedDate);
-        if (result.success) {
-          toast({
-            title: '操作成功',
-            description: result.message,
-            variant: 'success',
-          });
-        } else {
+        if (!result.success) {
           toast({
             title: '操作失败',
             description: result.message,
@@ -119,19 +128,11 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!plan_id || !redate || !exe_id) return;
-
       try {
         setLoading('rerunFailed');
         const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await rerunFailedTasks(plan_id as string, formattedDate, exe_id as number);
-
-        if (result.success) {
-          toast({
-            title: '操作成功',
-            description: result.message,
-            variant: 'success',
-          });
-        } else {
+        if (!result.success) {
           toast({
             title: '操作失败',
             description: result.message,
@@ -157,18 +158,11 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!plan_id || !redate || !pid) return;
-
       try {
         setLoading('stop');
         const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
         const result = await stopPlan(plan_id as string, formattedDate, pid);
-        if (result.success) {
-          toast({
-            title: '操作成功',
-            description: result.message,
-            variant: 'success',
-          });
-        } else {
+        if (!result.success) {
           toast({
             title: '操作失败',
             description: result.message,
@@ -187,6 +181,36 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
       }
     },
     [plan_id, redate, pid, refresh]
+  );
+
+  // 处理置成功
+  const handleSetSuccess = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!plan_id || !redate) return;
+      try {
+        setLoading('setSuccess');
+        const formattedDate = formatToCST(new Date(redate), 'yyyy-MM-dd');
+        const result = await setPlanSuccess(plan_id as string, formattedDate);
+        if (!result.success) {
+          toast({
+            title: '操作失败',
+            description: result.message,
+            variant: 'error',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: '操作异常',
+          description: error instanceof Error ? error.message : '未知错误',
+          variant: 'error',
+        });
+      } finally {
+        refresh();
+        setLoading(null);
+      }
+    },
+    [plan_id, redate, refresh]
   );
 
   // 状态配置映射表 - 直接使用 status 字段
@@ -237,7 +261,9 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
   };
 
   // 新增：管理弹窗状态
-  const [confirmType, setConfirmType] = useState<null | 'rerun' | 'rerunFailed'>(null);
+  const [confirmType, setConfirmType] = useState<
+    null | 'rerun' | 'rerunFailed' | 'setSuccess' | 'stop'
+  >(null);
 
   // 新增：确认后执行对应操作
   const handleConfirm = useCallback(
@@ -246,10 +272,14 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
         handleRerun(e);
       } else if (confirmType === 'rerunFailed') {
         handleRerunFailed(e);
+      } else if (confirmType === 'setSuccess') {
+        handleSetSuccess(e);
+      } else if (confirmType === 'stop') {
+        handleStop(e);
       }
       setConfirmType(null);
     },
-    [confirmType, handleRerun, handleRerunFailed]
+    [confirmType, handleRerun, handleRerunFailed, handleSetSuccess, handleStop]
   );
 
   // 根据状态渲染不同的操作按钮
@@ -296,7 +326,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>确认重跑计划？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    此操作将重新执行该计划，是否继续？
+                    此操作将重新执行该计划，请在前置计划执行成功后点击，是否继续？
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -356,7 +386,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>确认重跑计划？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    此操作将重新执行该计划，是否继续？
+                    此操作将重新执行该计划，请在前置计划执行成功后点击，是否继续？
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -419,6 +449,51 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            <AlertDialog
+              open={confirmType === 'setSuccess'}
+              onOpenChange={(open) => !open && setConfirmType(null)}
+            >
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs flex items-center gap-1 text-green-600"
+                  disabled={loading !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmType('setSuccess');
+                  }}
+                >
+                  {loading === 'setSuccess' ? (
+                    <Clock className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3" />
+                  )}
+                  置成功
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认置成功？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    此操作将改变该计划及计划内任务状态为成功，是否继续？
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={loading !== null}
+                    >
+                      确认
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       case 'running':
@@ -434,20 +509,51 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
               <Info className="h-3 w-3" />
               详情
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs flex items-center gap-1 text-red-600"
-              onClick={handleStop}
-              disabled={loading !== null}
+            <AlertDialog
+              open={confirmType === 'stop'}
+              onOpenChange={(open) => !open && setConfirmType(null)}
             >
-              {loading === 'stop' ? (
-                <Clock className="h-3 w-3 animate-spin" />
-              ) : (
-                <StopCircle className="h-3 w-3" />
-              )}
-              停止
-            </Button>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs flex items-center gap-1 text-red-600"
+                  disabled={loading !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmType('stop');
+                  }}
+                >
+                  {loading === 'stop' ? (
+                    <Clock className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <StopCircle className="h-3 w-3" />
+                  )}
+                  停止
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认停止计划？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    此操作将取消计划中的待执行任务，是否继续？
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirm}
+                      disabled={loading !== null}
+                    >
+                      确认
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       default: // 其他状态
