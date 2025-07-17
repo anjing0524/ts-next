@@ -32,6 +32,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React from 'react';
+import { Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 type StateInfo = { label: string; variant: string; color?: string };
 
@@ -123,6 +126,51 @@ const FastBadge: React.FC<{ state: string }> = React.memo(function FastBadge({ s
   );
 });
 FastBadge.displayName = 'FastBadge';
+
+// 执行信息可复制单元格组件
+const ExecDescCell: React.FC<{ value: string; maxWidth: string }> = React.memo(
+  function ExecDescCell({ value, maxWidth }) {
+    // 复制状态：false=未复制，true=已复制
+    const [copied, setCopied] = React.useState(false);
+    // 处理复制按钮点击
+    const handleCopy = React.useCallback(() => {
+      if (!value) return;
+      navigator.clipboard.writeText(value).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }, [value]);
+    return (
+      <div className="flex items-center gap-1" style={{ maxWidth }}>
+        {/* 复制按钮，带悬浮提示 */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 p-0 mr-1"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopy();
+              }}
+              aria-label={copied ? '已复制' : '复制执行信息'}
+            >
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{copied ? '已复制' : '复制执行信息'}</TooltipContent>
+        </Tooltip>
+        {/* 截断文本显示 */}
+        <div className="truncate" style={{ maxWidth: `calc(${maxWidth} - 28px)` }} title={value}>
+          {value}
+        </div>
+      </div>
+    );
+  }
+);
+ExecDescCell.displayName = 'ExecDescCell';
 
 export function TaskDetailsDialog() {
   // 从 store 中获取任务详情对话框状态
@@ -321,7 +369,7 @@ export function TaskDetailsDialog() {
         size: 200,
         cell: ({ row }) => {
           const desc = row.getValue('exec_desc') as string;
-          return desc ? <TruncateCell value={desc} maxWidth="300px" /> : null;
+          return desc ? <ExecDescCell value={desc} maxWidth="200px" /> : null;
         },
       },
       {

@@ -62,7 +62,7 @@ kubectl apply -k k8s
 
 #### MySQL 部署
 
-MySQL 部署配置位于 `k8s/mysql/` 目录下，详细说明请参考 [MySQL 部署说明](k8s/mysql/README.md)。
+MySQL 部署配置位于 `k8s/mysql/` 目录2下，详细说明请参考 [MySQL 部署说明](k8s/mysql/README.md)。
 
 ```bash
 # 使用 Kustomize 应用所有 MySQL 资源
