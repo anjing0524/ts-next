@@ -11,7 +11,7 @@ async function createAdminUser() {
   try {
     // 检查是否已存在管理员用户
     const existingUser = await prisma.user.findUnique({
-      where: { username: 'admin' }
+      where: { username: 'admin' },
     });
 
     if (existingUser) {
@@ -36,7 +36,7 @@ async function createAdminUser() {
         mustChangePassword: false,
         failedLoginAttempts: 0,
         createdBy: 'system',
-      }
+      },
     });
 
     console.log('✅ 成功创建管理员用户');
@@ -53,7 +53,7 @@ async function createAdminUser() {
         displayName: '系统管理员',
         description: '拥有系统所有权限的管理员角色',
         isSystemRole: true,
-      }
+      },
     });
 
     // 分配管理员角色给用户
@@ -61,14 +61,13 @@ async function createAdminUser() {
       data: {
         userId: adminUser.id,
         roleId: adminRole.id,
-        assignedBy: 'system'
-      }
+        assignedBy: 'system',
+      },
     });
 
     console.log('✅ 已为管理员用户分配系统管理员角色');
 
     return adminUser;
-
   } catch (error) {
     console.error('❌ 创建管理员用户失败:', error);
     throw error;

@@ -1,7 +1,18 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { DataTable, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Badge, ColumnDef } from '@repo/ui';
+import {
+  DataTable,
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Badge,
+  ColumnDef,
+} from '@repo/ui';
 import { useAuditLogManagement } from '../hooks/use-audit-log-management';
 import type { AuditLog } from '@/types/auth';
 import { format } from 'date-fns';
@@ -51,7 +62,7 @@ export const AuditLogView = () => {
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Audit Logs</h1>
       </header>
-      
+
       {/* Filter controls */}
 
       <DataTable
@@ -65,7 +76,10 @@ export const AuditLogView = () => {
         }}
         onPaginationChange={(updater) => {
           if (typeof updater === 'function') {
-            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            const newPagination = updater({
+              pageIndex: meta ? meta.currentPage - 1 : 0,
+              pageSize: limit,
+            });
             setPage(newPagination.pageIndex + 1);
             setLimit(newPagination.pageSize);
           } else {

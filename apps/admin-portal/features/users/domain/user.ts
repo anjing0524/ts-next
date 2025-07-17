@@ -55,19 +55,18 @@ export const UpdateUserSchema = z.object({
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
 
 // 为“创建用户”的表单/API输入创建 Zod 验证 Schema
-export const CreateUserSchema = z
-  .object({
-    username: z.string().min(3, '用户名至少需要3个字符'),
-    password: z.string().min(8, { message: '密码至少需要8个字符。' }).optional(), // 密码在创建时可选，如果为空则后端生成随机密码
-    displayName: z.string().min(1, '显示名称不能为空'),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    organization: z.string().optional(),
-    department: z.string().optional(),
-    isActive: z.boolean().default(true),
-    mustChangePassword: z.boolean().default(true),
-    roleIds: z.array(z.string().cuid('无效的角色ID')).default([]),
-  });
+export const CreateUserSchema = z.object({
+  username: z.string().min(3, '用户名至少需要3个字符'),
+  password: z.string().min(8, { message: '密码至少需要8个字符。' }).optional(), // 密码在创建时可选，如果为空则后端生成随机密码
+  displayName: z.string().min(1, '显示名称不能为空'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  organization: z.string().optional(),
+  department: z.string().optional(),
+  isActive: z.boolean().default(true),
+  mustChangePassword: z.boolean().default(true),
+  roleIds: z.array(z.string().cuid('无效的角色ID')).default([]),
+});
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 

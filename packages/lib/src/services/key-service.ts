@@ -19,8 +19,7 @@ export async function getKeyPair(): Promise<{
   privateKey: KeyLike;
 }> {
   if (!privateKey || !publicKey) {
-    const { publicKey: newPublicKey, privateKey: newPrivateKey } =
-      await generateKeyPair('RS256');
+    const { publicKey: newPublicKey, privateKey: newPrivateKey } = await generateKeyPair('RS256');
     publicKey = newPublicKey;
     privateKey = newPrivateKey;
   }

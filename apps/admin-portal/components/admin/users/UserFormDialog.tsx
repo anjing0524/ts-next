@@ -130,7 +130,9 @@ export function UserFormDialog({
         <DialogHeader>
           <DialogTitle>{currentUser ? 'Edit User' : 'Create New User'}</DialogTitle>
           <DialogDescription>
-            {currentUser ? 'Edit the details of the existing user.' : 'Enter the details for the new user.'}
+            {currentUser
+              ? 'Edit the details of the existing user.'
+              : 'Enter the details for the new user.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -156,7 +158,7 @@ export function UserFormDialog({
               />
             </div>
             {!currentUser && (
-               <div className="space-y-2 col-span-2">
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
@@ -234,4 +236,3 @@ export function UserFormDialog({
     </Dialog>
   );
 }
-

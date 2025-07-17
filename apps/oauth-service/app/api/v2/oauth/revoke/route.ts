@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { JWTUtils, AuthorizationUtils } from '@repo/lib/node';
-import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
-import { withErrorHandling } from '@/lib/utils/error-handler';
+import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
+import { withErrorHandling } from '@/app/utils/error-handler';
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
 import { ApiResponse } from '@repo/lib/node';
@@ -216,11 +216,7 @@ async function revocationHandlerInternal(request: NextRequest): Promise<NextResp
 
   // RFC 7009: 服务器以 HTTP 200 响应，无论令牌是否有效或已撤销。
   // RFC 7009: Server responds with HTTP 200 if token revoked or client submitted invalid token.
-  return successResponse(
-    null,
-    200,
-    'Token revocation request processed.'
-  );
+  return successResponse(null, 200, 'Token revocation request processed.');
 }
 
 // 使用 withErrorHandling 包装处理函数

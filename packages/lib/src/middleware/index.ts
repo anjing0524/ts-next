@@ -3,11 +3,7 @@
  */
 
 // Bearer认证中间件
-export {
-  authenticateBearer,
-  type AuthContext,
-  type AuthOptions,
-} from './bearer-auth';
+export { authenticateBearer, type AuthContext, type AuthOptions } from './bearer-auth';
 
 // CORS中间件
 export {

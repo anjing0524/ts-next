@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PaginationState, SortingState } from '@tanstack/react-table';
-import {
-  User,
-  CreateUserInput,
-  UpdateUserInput,
-  PaginatedResponse,
-} from './domain/user';
+import { User, CreateUserInput, UpdateUserInput, PaginatedResponse } from './domain/user';
 import { UserService } from './application/user.service';
 import { UserRepository } from './infrastructure/user.repository';
 import { adminApi } from '../../lib/api'; // Still needed for stats summary if not moved to UserService
@@ -91,7 +86,7 @@ export const useSearchUsersQuery = (
   } = {}
 ) => {
   const { enabled = true } = options;
-  
+
   return useQuery<PaginatedResponse<User>, Error>({
     queryKey: userQueryKeys.list({ search: searchTerm, limit: 20 }),
     queryFn: () => userService.getUsers({ search: searchTerm, limit: 20 }), // Using userService.getUsers
@@ -104,16 +99,17 @@ export const useSearchUsersQuery = (
 // 创建用户变更
 export const useCreateUserMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<User, Error, CreateUserInput>({ // Changed return type to User
+  return useMutation<User, Error, CreateUserInput>({
+    // Changed return type to User
     mutationFn: (userData) => userService.createUser(userData),
     onSuccess: (newUser) => {
       // 创建成功后，更新相关查询
       queryClient.invalidateQueries({ queryKey: userQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.stats() });
-      
+
       // 直接设置新用户的缓存数据
       queryClient.setQueryData(userQueryKeys.detail(newUser.id), newUser);
-      
+
       // 触发成功通知
       console.log('用户创建成功:', newUser.username);
     },
@@ -126,20 +122,16 @@ export const useCreateUserMutation = () => {
 // 更新用户变更
 export const useUpdateUserMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    User,
-    Error,
-    { userId: string; userData: UpdateUserInput }
-  >({
+  return useMutation<User, Error, { userId: string; userData: UpdateUserInput }>({
     mutationFn: ({ userId, userData }) => userService.updateUser(userId, userData),
     onSuccess: (updatedUser, { userId }) => {
       // 更新成功后，更新相关查询
       queryClient.invalidateQueries({ queryKey: userQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.stats() });
-      
+
       // 直接更新用户详情缓存
       queryClient.setQueryData(userQueryKeys.detail(userId), updatedUser);
-      
+
       console.log('用户更新成功:', updatedUser.username);
     },
     onError: (error) => {
@@ -151,16 +143,17 @@ export const useUpdateUserMutation = () => {
 // 删除用户变更
 export const useDeleteUserMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, string>({ // Changed return type to void
+  return useMutation<void, Error, string>({
+    // Changed return type to void
     mutationFn: (userId) => userService.deleteUser(userId),
     onSuccess: (_, userId) => {
       // 删除成功后，更新相关查询
       queryClient.invalidateQueries({ queryKey: userQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.stats() });
-      
+
       // 移除用户详情缓存
       queryClient.removeQueries({ queryKey: userQueryKeys.detail(userId) });
-      
+
       console.log('用户删除成功');
     },
     onError: (error) => {
@@ -172,12 +165,13 @@ export const useDeleteUserMutation = () => {
 // 修改密码变更 - 使用现有的updatePassword方法
 export const useChangePasswordMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, { oldPassword?: string; newPassword?: string }>({ // Changed return type to void
+  return useMutation<void, Error, { oldPassword?: string; newPassword?: string }>({
+    // Changed return type to void
     mutationFn: (passwordData) => userService.updatePassword(passwordData),
     onSuccess: () => {
       // 密码修改成功后，可能需要更新当前用户信息
       queryClient.invalidateQueries({ queryKey: userQueryKeys.profile('current') });
-      
+
       console.log('密码修改成功');
     },
     onError: (error) => {
@@ -189,7 +183,7 @@ export const useChangePasswordMutation = () => {
 // 自定义Hook：用户状态管理
 export const useUserStatus = (userId: string | null) => {
   const { data: user } = useUserQuery(userId);
-  
+
   return {
     isActive: user?.isActive ?? false,
     mustChangePassword: user?.mustChangePassword ?? false,
@@ -202,18 +196,18 @@ export const useUserStatus = (userId: string | null) => {
 export const useUserSearch = (initialSearchTerm: string = '') => {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearchTerm);
-  
+
   // 防抖处理
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
     }, 300);
-    
+
     return () => clearTimeout(timer);
   }, [searchTerm]);
-  
+
   const searchQuery = useSearchUsersQuery(debouncedSearchTerm);
-  
+
   return {
     searchTerm,
     setSearchTerm,
@@ -227,20 +221,20 @@ export const useUserSearch = (initialSearchTerm: string = '') => {
 // 自定义Hook：分页用户列表
 export const usePaginatedUsers = (initialParams: UsersQueryVariables = {}) => {
   const [params, setParams] = useState<UsersQueryVariables>(initialParams);
-  
+
   const query = useUsersQuery(params);
-  
+
   const updateParams = (newParams: Partial<UsersQueryVariables>) => {
-    setParams(prev => ({ ...prev, ...newParams }));
+    setParams((prev) => ({ ...prev, ...newParams }));
   };
-  
+
   const resetParams = () => {
     setParams(initialParams);
   };
-  
+
   const currentPage = Math.floor((params.offset || 0) / (params.limit || 10)) + 1;
   const totalPages = query.data?.meta?.totalPages || 0;
-  
+
   return {
     ...query,
     params,

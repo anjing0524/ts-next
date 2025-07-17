@@ -3,7 +3,11 @@ import { IClientRepository } from '../domain/client.repository';
 import { OAuthClient, ClientFormInput } from '../domain/client';
 
 export class ClientRepository implements IClientRepository {
-  async getClients(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<OAuthClient>> {
+  async getClients(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<OAuthClient>> {
     return adminApi.getClients(params);
   }
 

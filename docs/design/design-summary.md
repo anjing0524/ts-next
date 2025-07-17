@@ -14,14 +14,17 @@
 ### 2.1 产品需求文档更新 (PRD v5.1)
 
 **更新内容**:
+
 - 明确OAuth2.1授权码+PKCE流程为强制要求
 - 细化权限控制粒度要求
 - 增加单点登录(SSO)用户体验标准
 - 补充安全审计要求
 
 **关键变更**:
+
 ```markdown
 ### 3.1.1 OAuth2.1 授权流程 (更新)
+
 - **强制要求**: 所有客户端必须使用授权码+PKCE流程
 - **权限检查**: 每个页面访问前必须进行权限验证
 - **用户体验**: 登录后应重定向到原目标页面
@@ -31,11 +34,13 @@
 ### 2.2 系统架构设计更新
 
 **更新内容**:
+
 - 明确admin-portal作为OAuth客户端的角色
 - 更新认证流程时序图
 - 补充权限检查架构
 
 **架构图更新**:
+
 ```mermaid
 graph TD
     subgraph "Admin Portal"
@@ -47,7 +52,7 @@ graph TD
         F -->|否| G[重定向到/unauthorized]
         F -->|是| H[显示页面内容]
     end
-    
+
     subgraph "OAuth Service"
         D --> I[授权端点]
         I --> J[用户认证]
@@ -61,6 +66,7 @@ graph TD
 ### 2.3 权限设计文档更新
 
 **更新内容**:
+
 - 重新定义页面权限映射
 - 补充系统配置权限
 - 更新权限继承关系
@@ -80,11 +86,13 @@ graph TD
 ### 2.4 数据库设计更新
 
 **更新内容**:
+
 - 补充权限相关表结构
 - 更新用户-角色关联设计
 - 增加审计日志表索引
 
 **新增权限表结构**:
+
 ```sql
 -- 权限定义表
 CREATE TABLE permissions (
@@ -121,6 +129,7 @@ CREATE TABLE user_permission_cache (
 ### 3.1 OAuth2.1端点规范
 
 **标准端点**:
+
 - `GET /oauth/authorize` - 授权端点
 - `POST /oauth/token` - 令牌端点
 - `GET /oauth/userinfo` - 用户信息端点
@@ -128,16 +137,19 @@ CREATE TABLE user_permission_cache (
 - `POST /oauth/revoke` - 令牌撤销
 
 **PKCE参数要求**:
+
 ```typescript
 interface PKCEParams {
-  code_challenge: string;      // Base64URL编码的SHA256哈希
+  code_challenge: string; // Base64URL编码的SHA256哈希
   code_challenge_method: 'S256'; // 固定为S256
-  code_verifier: string;       // 43-128字符的随机字符串
+  code_verifier: string; // 43-128字符的随机字符串
 }
 ```
 
 ### 3.2 权限验证方式
+
 **权限验证方法**:
+
 - 使用中间件统一处理权限检查（Next.js middleware.ts）
 - 静态权限映射表：在中间件中配置每个路由所需的权限
 - 权限检查流程：
@@ -146,6 +158,7 @@ interface PKCEParams {
   3. 如果权限不足，则重定向到未授权页面
 
 **权限映射表示例**:
+
 ```typescript
 const permissionMap = {
   '/admin': 'dashboard:view',
@@ -155,11 +168,12 @@ const permissionMap = {
   '/admin/system/roles': 'role:list',
   '/admin/system/permissions': 'permission:list',
   '/admin/system/audits': 'audit:list',
-  '/admin/system/config': 'system:config'
+  '/admin/system/config': 'system:config',
 };
 ```
 
 **优势**:
+
 - 减少API调用，提高性能
 - 统一权限检查逻辑
 - 简化前端实现
@@ -170,6 +184,7 @@ const permissionMap = {
 ### 4.1 登录流程优化
 
 **标准登录流程**:
+
 1. 用户访问任意受保护页面
 2. 系统自动重定向到统一登录页
 3. 用户输入凭据并提交
@@ -178,6 +193,7 @@ const permissionMap = {
 6. 系统颁发token并重定向到原页面
 
 **错误处理**:
+
 - 无效凭据：显示友好错误提示
 - 权限不足：显示未授权页面
 - Token过期：自动重定向重新认证
@@ -186,6 +202,7 @@ const permissionMap = {
 ### 4.2 权限提示设计
 
 **未授权页面**:
+
 ```html
 <div class="unauthorized-container">
   <h1>权限不足</h1>
@@ -200,18 +217,21 @@ const permissionMap = {
 ### 5.1 安全要求强化
 
 **认证安全**:
+
 - 强制使用HTTPS
 - 密码复杂度要求
 - 登录失败限制
 - 会话超时设置
 
 **授权安全**:
+
 - PKCE强制使用
 - state参数验证
 - 重定向URI白名单
 - 权限最小化原则
 
 **数据安全**:
+
 - 敏感信息加密存储
 - 审计日志完整记录
 - 定期安全扫描
@@ -220,6 +240,7 @@ const permissionMap = {
 ### 5.2 审计日志规范
 
 **日志记录内容**:
+
 ```typescript
 interface AuditLog {
   id: string;
@@ -241,6 +262,7 @@ interface AuditLog {
 ### 6.1 环境变量配置
 
 **必需环境变量**:
+
 ```bash
 # OAuth服务配置
 OAUTH_SERVICE_URL=https://oauth.example.com
@@ -263,6 +285,7 @@ REDIS_URL=redis://localhost:6379
 ### 6.2 Docker配置更新
 
 **docker-compose.yml更新**:
+
 ```yaml
 version: '3.8'
 services:
@@ -272,15 +295,15 @@ services:
       - DATABASE_URL=postgresql://oauth:password@postgres:5432/oauth
       - REDIS_URL=redis://redis:6379
     ports:
-      - "3001:3000"
-    
+      - '3001:3000'
+
   admin-portal:
     image: admin-portal:latest
     environment:
       - NEXT_PUBLIC_OAUTH_SERVICE_URL=http://oauth-service:3000
       - NEXT_PUBLIC_API_URL=http://oauth-service:3000/api/v2
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
       - oauth-service
 ```
@@ -290,12 +313,14 @@ services:
 ### 7.1 关键指标监控
 
 **业务指标**:
+
 - 登录成功率
 - 授权确认率
 - 权限检查延迟
 - 页面访问统计
 
 **技术指标**:
+
 - API响应时间
 - 数据库查询性能
 - 内存使用率
@@ -304,6 +329,7 @@ services:
 ### 7.2 告警规则
 
 **关键告警**:
+
 - 登录失败率 > 5%
 - API响应时间 > 2秒
 - 权限检查失败 > 10次/分钟
@@ -314,6 +340,7 @@ services:
 ### 8.1 功能验证清单
 
 **OAuth2.1流程验证**:
+
 - [ ] 未登录用户自动重定向到登录
 - [ ] PKCE参数正确生成和验证
 - [ ] 授权确认页面正确显示
@@ -321,12 +348,14 @@ services:
 - [ ] Token过期自动重新认证
 
 **权限控制验证**:
+
 - [ ] 每个页面都有明确的权限要求
 - [ ] 权限不足用户看到友好提示
 - [ ] 权限变更实时生效
 - [ ] 权限缓存机制正常工作
 
 **用户体验验证**:
+
 - [ ] 登录流程流畅无中断
 - [ ] 错误提示清晰友好
 - [ ] 页面加载时间 < 3秒
@@ -335,12 +364,14 @@ services:
 ### 8.2 性能验证标准
 
 **响应时间要求**:
+
 - 登录流程: < 3秒
 - 权限检查: < 100ms
 - 页面加载: < 2秒
 - API调用: < 500ms
 
 **并发能力要求**:
+
 - 支持1000并发用户
 - 登录成功率 > 99%
 - 系统可用性 > 99.9%
@@ -348,18 +379,21 @@ services:
 ## 9. 后续优化计划
 
 ### 9.1 短期优化 (1-2周)
+
 - 添加记住我功能
 - 实现单点登出(SLO)
 - 优化权限缓存策略
 - 完善错误处理
 
 ### 9.2 中期优化 (1-2月)
+
 - 支持多因素认证(MFA)
 - 实现用户自助服务
 - 添加登录历史查看
 - 支持社交登录集成
 
 ### 9.3 长期规划 (3-6月)
+
 - 实现基于属性的访问控制(ABAC)
 - 支持动态权限管理
 - 添加行为分析和风控
@@ -368,12 +402,14 @@ services:
 ## 10. 文档维护计划
 
 ### 10.1 定期更新机制
+
 - 每月审查设计文档
 - 每季度更新架构图
 - 每半年全面评估
 - 重大变更立即更新
 
 ### 10.2 版本控制
+
 - 所有文档使用Git版本控制
 - 变更记录详细说明
 - 回滚机制准备就绪

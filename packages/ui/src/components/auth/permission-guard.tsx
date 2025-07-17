@@ -42,7 +42,6 @@ export function PermissionGuard({
     </div>
   ),
 }: PermissionGuardProps) {
-
   const hasPermission = (permission: string): boolean => {
     return user?.permissions?.includes(permission) ?? false;
   };

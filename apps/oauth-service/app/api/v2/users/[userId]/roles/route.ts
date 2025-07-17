@@ -10,10 +10,7 @@ const updateUserRolesSchema = z.object({
   roleIds: z.array(z.string().cuid()).min(1, 'At least one role ID must be provided.'),
 });
 
-async function updateUserRoles(
-  request: NextRequest,
-  params: { userId: string }
-) {
+async function updateUserRoles(request: NextRequest, params: { userId: string }) {
   const actorId = request.headers.get('X-User-Id');
   if (!actorId) {
     return errorResponse({ message: 'Unauthorized: Missing user identifier.', statusCode: 401 });
@@ -25,7 +22,11 @@ async function updateUserRoles(
     const body = await request.json();
     const validation = updateUserRolesSchema.safeParse(body);
     if (!validation.success) {
-      return errorResponse({ message: 'Invalid request body.', statusCode: 400, details: validation.error.flatten() });
+      return errorResponse({
+        message: 'Invalid request body.',
+        statusCode: 400,
+        details: validation.error.flatten(),
+      });
     }
     const { roleIds } = validation.data;
 
@@ -84,8 +85,10 @@ async function updateUserRoles(
  * Replaces all roles for a user.
  * Authorization is handled by middleware.
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
   const routeParams = await params;
   return await updateUserRoles(request, routeParams);
 }
-

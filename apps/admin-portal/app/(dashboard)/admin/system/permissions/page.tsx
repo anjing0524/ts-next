@@ -34,7 +34,8 @@ function PermissionsPageContent() {
     {
       accessorKey: 'resource',
       header: 'Resource',
-      cell: ({ row }) => row.original.resource || <span className="text-muted-foreground">N/A</span>,
+      cell: ({ row }) =>
+        row.original.resource || <span className="text-muted-foreground">N/A</span>,
     },
   ];
 
@@ -72,7 +73,10 @@ function PermissionsPageContent() {
         }}
         onPaginationChange={(updater) => {
           if (typeof updater === 'function') {
-            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            const newPagination = updater({
+              pageIndex: meta ? meta.currentPage - 1 : 0,
+              pageSize: limit,
+            });
             setPage(newPagination.pageIndex + 1);
             setLimit(newPagination.pageSize);
           } else {
@@ -88,7 +92,11 @@ function PermissionsPageContent() {
 export default function GuardedPermissionsPage() {
   const { user, isLoading } = useAuth();
   return (
-    <PermissionGuard requiredPermission={REQUIRED_PERMISSIONS_VIEW} user={user} isLoading={isLoading}>
+    <PermissionGuard
+      requiredPermission={REQUIRED_PERMISSIONS_VIEW}
+      user={user}
+      isLoading={isLoading}
+    >
       <PermissionsPageContent />
     </PermissionGuard>
   );

@@ -1,9 +1,4 @@
-import {
-  jwtVerify,
-  createRemoteJWKSet,
-  type JWTVerifyResult,
-  type JWTPayload,
-} from 'jose';
+import { jwtVerify, createRemoteJWKSet, type JWTVerifyResult, type JWTPayload } from 'jose';
 
 interface VerificationResult {
   user: JWTPayload | null;
@@ -34,7 +29,10 @@ export function createVerifier(jwksUrl: string | URL) {
       if (e instanceof Error) {
         return { user: null, error: e };
       }
-      return { user: null, error: new Error('An unknown error occurred during token verification.') };
+      return {
+        user: null,
+        error: new Error('An unknown error occurred during token verification.'),
+      };
     }
   }
 

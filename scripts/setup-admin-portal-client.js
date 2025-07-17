@@ -10,7 +10,7 @@ async function setupAdminPortalClient() {
   try {
     // 检查是否已存在admin-portal客户端
     const existingClient = await prisma.oAuthClient.findUnique({
-      where: { clientId: 'admin-portal-client' }
+      where: { clientId: 'admin-portal-client' },
     });
 
     if (existingClient) {
@@ -28,12 +28,9 @@ async function setupAdminPortalClient() {
         clientType: 'CONFIDENTIAL',
         redirectUris: JSON.stringify([
           'http://localhost:3001/auth/callback',
-          'https://your-domain.com/auth/callback'
+          'https://your-domain.com/auth/callback',
         ]),
-        grantTypes: JSON.stringify([
-          'authorization_code',
-          'refresh_token'
-        ]),
+        grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
         responseTypes: JSON.stringify(['code']),
         allowedScopes: JSON.stringify([
           'openid',
@@ -47,21 +44,20 @@ async function setupAdminPortalClient() {
           'permission:write',
           'client:read',
           'client:write',
-          'audit:read'
+          'audit:read',
         ]),
         requirePkce: true,
         requireConsent: false, // 管理员门户不需要用户同意
         tokenEndpointAuthMethod: 'client_secret_basic',
         accessTokenTtl: 3600, // 1小时
         refreshTokenTtl: 86400, // 24小时
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     console.log('✅ 成功创建admin-portal-client');
     console.log('客户端ID:', adminPortalClient.clientId);
     console.log('客户端密钥: admin-portal-secret-key-change-this-in-production');
-    
   } catch (error) {
     console.error('❌ 创建admin-portal-client失败:', error);
     throw error;

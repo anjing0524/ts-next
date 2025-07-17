@@ -54,9 +54,9 @@ logs/
 dev-debug.log
 
 # rust/wasm
-wasm-cal/target/
-wasm-cal/install.sh
-wasm-cal/pkg/
+**/wasm-cal/target/
+**/wasm-cal/install.sh
+**/wasm-cal/pkg/
 
 # editor directories and files
 .idea/
@@ -97,3 +97,4 @@ packages/**/dist
 .gemini
 .cursor
 .trae
+apps/kline-service/wasm-cal/target/*

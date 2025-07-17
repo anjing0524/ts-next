@@ -9,7 +9,8 @@ const OAuthConfig = {
   redirectUri: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
   authorizationEndpoint: '/api/v2/oauth/authorize',
   tokenEndpoint: '/api/v2/oauth/token',
-  scope: 'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
+  scope:
+    'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
 };
 
 export const authService: AuthProviderInterface = {
@@ -36,7 +37,7 @@ export const authService: AuthProviderInterface = {
     // 检查是否有从oauth-service重定向过来的原始参数
     const originalParams = sessionStorage.getItem('oauth_original_params');
     let targetUrl = OAuthConfig.authorizationEndpoint;
-    
+
     if (originalParams) {
       // 如果有原始oauth参数，直接重定向回oauth-service继续流程
       sessionStorage.removeItem('oauth_original_params');

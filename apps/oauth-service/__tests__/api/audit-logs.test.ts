@@ -1,4 +1,3 @@
-
 import { NextRequest } from 'next/server';
 import { GET } from '../../app/api/v2/audit-logs/route';
 import { createTestUser, createTestClient, cleanupTestData } from '../setup/test-data';

@@ -6,10 +6,7 @@ import { OAuthClient } from '@repo/database';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v2';
 
 // 基础请求函数
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const response = await fetch(url, {
     headers: {
@@ -28,10 +25,7 @@ async function apiRequest<T>(
 }
 
 // 带认证的请求函数
-async function authenticatedRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function authenticatedRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   // 使用TokenStorage获取access_token，而不是直接从localStorage
   const { TokenStorage } = await import('./auth/token-storage');
   const accessToken = TokenStorage.getAccessToken();
@@ -47,7 +41,10 @@ async function authenticatedRequest<T>(
 
 // 认证API
 export const authApi = {
-  async exchangeCodeForToken(code: string, codeVerifier: string): Promise<import('@repo/ui').AuthTokens> {
+  async exchangeCodeForToken(
+    code: string,
+    codeVerifier: string
+  ): Promise<import('@repo/ui').AuthTokens> {
     return apiRequest('/oauth/token', {
       method: 'POST',
       headers: {
@@ -63,7 +60,16 @@ export const authApi = {
     });
   },
 
-  async login(credentials: { grant_type: string; username: string; password: string }): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number }> {
+  async login(credentials: {
+    grant_type: string;
+    username: string;
+    password: string;
+  }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    refreshExpiresIn: number;
+  }> {
     return apiRequest('/oauth/token', {
       method: 'POST',
       headers: {
@@ -142,12 +148,7 @@ export const adminApi = {
     return authenticatedRequest(endpoint);
   },
 
-  async getUsers(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    role?: string;
-  }) {
+  async getUsers(params?: { page?: number; limit?: number; search?: string; role?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
     if (params?.limit) searchParams.set('limit', params.limit.toString());
@@ -159,11 +160,7 @@ export const adminApi = {
     return authenticatedRequest(endpoint);
   },
 
-  async getRoles(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
+  async getRoles(params?: { page?: number; limit?: number; search?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
     if (params?.limit) searchParams.set('limit', params.limit.toString());
@@ -174,11 +171,7 @@ export const adminApi = {
     return authenticatedRequest(endpoint);
   },
 
-  async getPermissions(params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }) {
+  async getPermissions(params?: { page?: number; limit?: number; search?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
     if (params?.limit) searchParams.set('limit', params.limit.toString());
@@ -250,9 +243,7 @@ export const adminApi = {
     });
   },
 
-  async updateUserProfile(profileData: {
-    displayName: string;
-  }): Promise<{ message: string }> {
+  async updateUserProfile(profileData: { displayName: string }): Promise<{ message: string }> {
     return authenticatedRequest('/users/me/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
@@ -283,15 +274,18 @@ export const adminApi = {
     });
   },
 
-  async updateUser(userId: string, userData: {
-    displayName: string;
-    firstName: string;
-    lastName: string;
-    organization: string;
-    department: string;
-    isActive: boolean;
-    mustChangePassword: boolean;
-  }): Promise<{ message: string }> {
+  async updateUser(
+    userId: string,
+    userData: {
+      displayName: string;
+      firstName: string;
+      lastName: string;
+      organization: string;
+      department: string;
+      isActive: boolean;
+      mustChangePassword: boolean;
+    }
+  ): Promise<{ message: string }> {
     return authenticatedRequest(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
@@ -359,14 +353,14 @@ export const adminApi = {
 
   async submitConsent(decision: 'allow' | 'deny', consentParams: URLSearchParams): Promise<any> {
     return authenticatedRequest(`/oauth/consent`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            decision,
-            ...Object.fromEntries(consentParams),
-        }),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        decision,
+        ...Object.fromEntries(consentParams),
+      }),
     });
   },
 };

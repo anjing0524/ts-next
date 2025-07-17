@@ -8,7 +8,29 @@ import {
   useSystemConfigQuery,
   useUpdateSystemConfigMutation,
 } from '@/features/system-config/queries';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, Input, Switch, toast, Skeleton, PermissionGuard, Alert, AlertDescription, AlertTitle } from '@repo/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  Input,
+  Switch,
+  toast,
+  Skeleton,
+  PermissionGuard,
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@repo/ui';
 import { AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -52,18 +74,21 @@ function SystemConfigForm() {
   }, [config, form]);
 
   function onSubmit(data: ConfigFormValues) {
-    updateConfig.mutate({ value: data }, {
-      onSuccess: () => {
-        toast({ title: '成功', description: '系统配置已更新。' });
-      },
-      onError: (error) => {
-        toast({
-          variant: 'destructive',
-          title: '更新失败',
-          description: error.message,
-        });
-      },
-    });
+    updateConfig.mutate(
+      { value: data },
+      {
+        onSuccess: () => {
+          toast({ title: '成功', description: '系统配置已更新。' });
+        },
+        onError: (error) => {
+          toast({
+            variant: 'destructive',
+            title: '更新失败',
+            description: error.message,
+          });
+        },
+      }
+    );
   }
 
   if (isLoading) {
@@ -176,11 +201,7 @@ function SystemConfigPageContent() {
 export default function GuardedSystemConfigPage() {
   const { user, isLoading } = useAuth();
   return (
-    <PermissionGuard
-      requiredPermission="system:config:edit"
-      user={user}
-      isLoading={isLoading}
-    >
+    <PermissionGuard requiredPermission="system:config:edit" user={user} isLoading={isLoading}>
       <SystemConfigPageContent />
     </PermissionGuard>
   );

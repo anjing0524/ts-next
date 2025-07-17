@@ -29,14 +29,10 @@ export const getUserColumns = ({ onEdit, onDelete }: UserActions): ColumnDef<Use
         status === UserStatus.ACTIVE
           ? 'default'
           : status === UserStatus.INACTIVE
-          ? 'outline'
-          : 'destructive';
+            ? 'outline'
+            : 'destructive';
       const text =
-        status === UserStatus.ACTIVE
-          ? '活动'
-          : status === UserStatus.INACTIVE
-          ? '禁用'
-          : '封禁';
+        status === UserStatus.ACTIVE ? '活动' : status === UserStatus.INACTIVE ? '禁用' : '封禁';
       return <Badge variant={variant}>{text}</Badge>;
     },
     filterFn: (row, id, value) => {

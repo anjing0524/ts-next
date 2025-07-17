@@ -5,7 +5,11 @@ import { PaginatedResponse } from '../../../lib/api';
 export class RoleService {
   constructor(private roleRepository: IRoleRepository) {}
 
-  async getRoles(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Role>> {
+  async getRoles(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Role>> {
     return this.roleRepository.getRoles(params);
   }
 

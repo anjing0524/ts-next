@@ -1,5 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useRolesQuery, useCreateRoleMutation, useUpdateRoleMutation, useDeleteRoleMutation, useUpdateRolePermissionsMutation } from '../queries';
+import {
+  useRolesQuery,
+  useCreateRoleMutation,
+  useUpdateRoleMutation,
+  useDeleteRoleMutation,
+  useUpdateRolePermissionsMutation,
+} from '../queries';
 import { toast } from '@repo/ui';
 import type { Role, CreateRoleInput, UpdateRoleInput } from '../domain/role';
 
@@ -14,7 +20,10 @@ export const useRoleManagement = () => {
   const [isPermissionsEditorOpen, setPermissionsEditorOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  const queryParams = useMemo(() => ({ page, limit, search: appliedSearchTerm }), [page, limit, appliedSearchTerm]);
+  const queryParams = useMemo(
+    () => ({ page, limit, search: appliedSearchTerm }),
+    [page, limit, appliedSearchTerm]
+  );
   const { data, isLoading, error, isFetching } = useRolesQuery(queryParams);
 
   const handleApiError = (err: any, context: string) => {
@@ -35,7 +44,7 @@ export const useRoleManagement = () => {
     setSelectedRole(role);
     setIsModalOpen(true);
   };
-  
+
   const openPermissionsEditor = (role: Role) => {
     setSelectedRole(role);
     setPermissionsEditorOpen(true);
@@ -80,22 +89,24 @@ export const useRoleManagement = () => {
 
   const deleteRole = () => {
     if (!selectedRole) return;
-    deleteRoleMutation.mutateAsync(selectedRole.id)
+    deleteRoleMutation
+      .mutateAsync(selectedRole.id)
       .then(() => {
         toast({ variant: 'success', title: 'Success', description: 'Role deleted.' });
         closeModal();
       })
-      .catch(err => handleApiError(err, 'deleting role'));
+      .catch((err) => handleApiError(err, 'deleting role'));
   };
-  
+
   const savePermissions = (permissionIds: string[]) => {
     if (!selectedRole) return;
-    updatePermissionsMutation.mutateAsync({ roleId: selectedRole.id, permissionIds })
+    updatePermissionsMutation
+      .mutateAsync({ roleId: selectedRole.id, permissionIds })
       .then(() => {
-        toast({ variant: 'success', title: 'Success', description: "Role permissions updated." });
+        toast({ variant: 'success', title: 'Success', description: 'Role permissions updated.' });
         closeModal();
       })
-      .catch(err => handleApiError(err, 'updating permissions'));
+      .catch((err) => handleApiError(err, 'updating permissions'));
   };
 
   return {
@@ -122,6 +133,9 @@ export const useRoleManagement = () => {
     setLimit,
     searchTerm,
     setSearchTerm,
-    handleSearch: () => { setPage(1); setAppliedSearchTerm(searchTerm); },
+    handleSearch: () => {
+      setPage(1);
+      setAppliedSearchTerm(searchTerm);
+    },
   };
 };

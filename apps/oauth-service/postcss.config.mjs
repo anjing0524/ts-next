@@ -1,1 +1,1 @@
-export { default } from '@repo/tailwind-config/postcss'; 
+export { default } from '@repo/tailwind-config/postcss';

@@ -1,5 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useClientsQuery, useCreateClientMutation, useUpdateClientMutation, useDeleteClientMutation, useRotateClientSecretMutation } from '../queries';
+import {
+  useClientsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
+  useRotateClientSecretMutation,
+} from '../queries';
 import { toast } from '@repo/ui';
 import type { OAuthClient as Client, ClientFormInput } from '../domain/client';
 
@@ -15,7 +21,10 @@ export const useClientManagement = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [newSecret, setNewSecret] = useState<string | null>(null);
 
-  const queryParams = useMemo(() => ({ page, limit, search: appliedSearchTerm }), [page, limit, appliedSearchTerm]);
+  const queryParams = useMemo(
+    () => ({ page, limit, search: appliedSearchTerm }),
+    [page, limit, appliedSearchTerm]
+  );
   const { data, isLoading, error, isFetching } = useClientsQuery(queryParams);
 
   const handleApiError = (err: any, context: string) => {
@@ -41,7 +50,7 @@ export const useClientManagement = () => {
     setSelectedClient(client);
     setIsDeleteConfirmOpen(true);
   };
-  
+
   const closeModal = () => {
     setIsModalOpen(false);
     setIsDeleteConfirmOpen(false);
@@ -81,24 +90,26 @@ export const useClientManagement = () => {
 
   const deleteClient = () => {
     if (!selectedClient) return;
-    deleteClientMutation.mutateAsync(selectedClient.id)
+    deleteClientMutation
+      .mutateAsync(selectedClient.id)
       .then(() => {
         toast({ variant: 'success', title: 'Success', description: 'Client deleted.' });
         closeModal();
       })
-      .catch(err => handleApiError(err, 'deleting client'));
+      .catch((err) => handleApiError(err, 'deleting client'));
   };
-  
+
   const rotateSecret = (clientId: string) => {
-    rotateSecretMutation.mutateAsync(clientId)
+    rotateSecretMutation
+      .mutateAsync(clientId)
       .then((res: any) => {
         if (res.clientSecret) {
           setNewSecret(res.clientSecret);
           setIsSecretModalOpen(true);
         }
-        toast({ variant: 'success', title: 'Success', description: "Client secret rotated." });
+        toast({ variant: 'success', title: 'Success', description: 'Client secret rotated.' });
       })
-      .catch(err => handleApiError(err, 'rotating secret'));
+      .catch((err) => handleApiError(err, 'rotating secret'));
   };
 
   return {
@@ -125,6 +136,9 @@ export const useClientManagement = () => {
     setLimit,
     searchTerm,
     setSearchTerm,
-    handleSearch: () => { setPage(1); setAppliedSearchTerm(searchTerm); },
+    handleSearch: () => {
+      setPage(1);
+      setAppliedSearchTerm(searchTerm);
+    },
   };
 };

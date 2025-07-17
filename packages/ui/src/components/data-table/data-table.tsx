@@ -74,8 +74,10 @@ export function DataTable<TData, TValue>({
     manualFiltering: true,
   });
 
-  const handleCopyRow = onCopyRow ?? ((row: TData) => navigator.clipboard.writeText(JSON.stringify(row, null, 2)));
-  const handleCopyCell = onCopyCell ?? ((value: unknown) => navigator.clipboard.writeText(String(value)));
+  const handleCopyRow =
+    onCopyRow ?? ((row: TData) => navigator.clipboard.writeText(JSON.stringify(row, null, 2)));
+  const handleCopyCell =
+    onCopyCell ?? ((value: unknown) => navigator.clipboard.writeText(String(value)));
 
   return (
     <div className={className}>
@@ -102,7 +104,10 @@ export function DataTable<TData, TValue>({
           >
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   加载中...
                 </TableCell>
               </TableRow>
@@ -134,7 +139,10 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   暂无数据
                 </TableCell>
               </TableRow>
@@ -156,4 +164,3 @@ export function DataTable<TData, TValue>({
 }
 
 export type { ColumnDef } from '@tanstack/react-table';
-

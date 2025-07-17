@@ -3,7 +3,7 @@ const baseConfig = require('./base.cjs');
 
 function createNextJestConfig(dir = './') {
   const createJestConfig = nextJest({ dir });
-  
+
   return (customConfig = {}) => {
     const config = {
       ...baseConfig,
@@ -13,7 +13,7 @@ function createNextJestConfig(dir = './') {
       setupFilesAfterEnv: [`<rootDir>/jest.setup.ts`],
       ...customConfig,
     };
-    
+
     return createJestConfig(config);
   };
 }

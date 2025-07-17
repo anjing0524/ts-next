@@ -6,4 +6,4 @@ threads: 2
 pid_file: /tmp/pingora_proxy.pid
 error_log: /tmp/pingora_proxy_error.log
 upgrade_sock: /tmp/pingora_proxy_upgrade.sock
-daemon: off 
+daemon: off

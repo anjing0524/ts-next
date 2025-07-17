@@ -35,9 +35,7 @@
         "name": "Desktop Chrome",
         "testDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
         "testIgnore": [],
-        "testMatch": [
-          "**/*.{test,spec}.{js,ts}"
-        ],
+        "testMatch": ["**/*.{test,spec}.{js,ts}"],
         "timeout": 30000
       }
     ],

@@ -4,7 +4,7 @@
 import { prisma } from '@repo/database/client';
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
-import { RBACService } from '../services';
+import { RBACService } from '../../../../apps/oauth-service/lib/auth/services/rbac-service';
 
 /**
  * 认证上下文接口
@@ -107,12 +107,14 @@ export async function authenticateBearer(
   const userId = jwtValidatedPayload.sub as string;
   const clientId = jwtValidatedPayload.client_id as string;
   const scopes = (jwtValidatedPayload.scope as string)?.split(' ') || [];
-  
+
   const userPermissions = await RBACService.getUserPermissions(userId);
   const permissions = userPermissions ? userPermissions.permissions : [];
 
   if (options.requiredPermissions && options.requiredPermissions.length > 0) {
-    const hasRequiredPermissions = options.requiredPermissions.every((p) => permissions.includes(p));
+    const hasRequiredPermissions = options.requiredPermissions.every((p) =>
+      permissions.includes(p)
+    );
     if (!hasRequiredPermissions) {
       return {
         success: false,

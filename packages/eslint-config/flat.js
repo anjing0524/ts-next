@@ -24,7 +24,7 @@ const compat = new FlatCompat({
  */
 export function createBaseConfig(options = {}) {
   const { extends: extendsConfig = [], includeImportPlugin = true } = options;
-  
+
   const config = [
     // 扩展指定的配置
     ...compat.extends(...extendsConfig),
@@ -57,7 +57,15 @@ export function createBaseConfig(options = {}) {
 
   // 全局忽略模式
   config.push({
-    ignores: ['node_modules/', '.next/', 'out/', 'logs/', 'public/wasm-cal/', '**/dist/', 'coverage/'],
+    ignores: [
+      'node_modules/',
+      '.next/',
+      'out/',
+      'logs/',
+      'public/wasm-cal/',
+      '**/dist/',
+      'coverage/',
+    ],
   });
 
   // 通用规则覆盖，可根据需要调整
@@ -100,4 +108,4 @@ export function createLibConfig(options = {}) {
     extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'turbo', 'prettier'],
     ...options,
   });
-} 
+}

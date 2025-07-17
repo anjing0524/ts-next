@@ -46,10 +46,7 @@ export function generateCodeVerifier(): string {
  * @returns 编码后的字符串
  */
 export function safeUrlEncode(str: string): string {
-  return encodeURIComponent(str)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  return encodeURIComponent(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 /**
@@ -76,4 +73,4 @@ export function formatDate(date: Date): string {
  */
 export function getCurrentTimestamp(): number {
   return Date.now();
-} 
+}

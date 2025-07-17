@@ -17,10 +17,10 @@ export async function POST(
     };
 
     const newSecret = await ClientService.rotateClientSecret(clientId, auditInfo);
-    
+
     return successResponse({
       newSecret: newSecret,
-      message: '客户端密钥重置成功。请立即保存新的密钥，它将不会再次显示。'
+      message: '客户端密钥重置成功。请立即保存新的密钥，它将不会再次显示。',
     });
   } catch (error) {
     console.error(`重置客户端密钥失败:`, error);

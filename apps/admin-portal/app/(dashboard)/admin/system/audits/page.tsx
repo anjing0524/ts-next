@@ -55,15 +55,19 @@ function AuditLogsPage() {
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
-  const queryParams = useMemo(() => ({ page, limit, ...appliedFilters }), [page, limit, appliedFilters]);
+  const queryParams = useMemo(
+    () => ({ page, limit, ...appliedFilters }),
+    [page, limit, appliedFilters]
+  );
 
   const { data, isLoading, error, isFetching } = useQuery<AuditLogsResponse>({
     queryKey: ['auditLogs', queryParams],
-    queryFn: () => adminApi.getAuditLogs({
-      ...queryParams,
-      startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
-      endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,
-    }),
+    queryFn: () =>
+      adminApi.getAuditLogs({
+        ...queryParams,
+        startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
+        endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,
+      }),
     placeholderData: (prev) => prev,
   });
 
@@ -111,9 +115,7 @@ function AuditLogsPage() {
   return (
     <div className="container mx-auto py-10 space-y-4">
       <h1 className="text-2xl font-bold">Audit Logs</h1>
-      <div className="flex flex-wrap gap-2 items-end">
-        {/* Filter inputs */}
-      </div>
+      <div className="flex flex-wrap gap-2 items-end">{/* Filter inputs */}</div>
       <DataTable
         columns={columns as ColumnDef<any>[]}
         data={logs}
@@ -125,7 +127,10 @@ function AuditLogsPage() {
         }}
         onPaginationChange={(updater) => {
           if (typeof updater === 'function') {
-            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            const newPagination = updater({
+              pageIndex: meta ? meta.currentPage - 1 : 0,
+              pageSize: limit,
+            });
             setPage(newPagination.pageIndex + 1);
             setLimit(newPagination.pageSize);
           } else {

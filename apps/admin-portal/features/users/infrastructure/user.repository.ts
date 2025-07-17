@@ -10,9 +10,13 @@ export class UserRepository implements IUserRepository {
    * @param params 查询参数
    * @returns 用户分页响应
    */
-  async getUsers(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<User>> {
+  async getUsers(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<User>> {
     // 兼容 meta 字段结构，补齐 itemCount 字段
-    const res = await adminApi.getUsers(params) as any;
+    const res = (await adminApi.getUsers(params)) as any;
     return {
       ...res,
       meta: {

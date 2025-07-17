@@ -15,7 +15,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { URL } from 'url';
 import { prisma } from '@repo/database';
 import { User } from '@prisma/client';
-import { PKCEUtils, ScopeUtils, AuthorizationUtils, withErrorHandling, OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
+import {
+  PKCEUtils,
+  ScopeUtils,
+  AuthorizationUtils,
+  withErrorHandling,
+  OAuth2Error,
+  OAuth2ErrorCode,
+} from '@repo/lib/node';
 import * as jose from 'jose';
 import { authorizeQuerySchema } from './schemas';
 // storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
@@ -391,4 +398,3 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
 // 使用 withErrorHandling 包装 authorizeHandlerInternal
 // Wrap authorizeHandlerInternal with withErrorHandling
 export const GET = withErrorHandling(authorizeHandlerInternal);
-

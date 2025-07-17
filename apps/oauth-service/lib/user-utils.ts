@@ -42,8 +42,8 @@ export async function getUserProfileData(userId: string) {
   }
 
   // 提取所有权限名称
-  const permissions = fullUserData.userRoles.flatMap(userRole =>
-    userRole.role.rolePermissions.map(rp => rp.permission.name)
+  const permissions = fullUserData.userRoles.flatMap((userRole) =>
+    userRole.role.rolePermissions.map((rp) => rp.permission.name)
   );
 
   // 构建响应数据
@@ -59,7 +59,7 @@ export async function getUserProfileData(userId: string) {
     isActive: fullUserData.isActive,
     createdAt: fullUserData.createdAt,
     updatedAt: fullUserData.updatedAt,
-    roles: fullUserData.userRoles.map(userRole => userRole.role.name),
+    roles: fullUserData.userRoles.map((userRole) => userRole.role.name),
     permissions: Array.from(new Set(permissions)), // 去重
   };
 

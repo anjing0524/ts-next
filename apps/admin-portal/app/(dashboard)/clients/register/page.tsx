@@ -47,11 +47,7 @@ const clientRegisterSchema = z.object({
 export default function GuardedClientRegisterPage() {
   const { user, isLoading } = useAuth();
   return (
-    <PermissionGuard
-      requiredPermission="clients:create"
-      user={user}
-      isLoading={isLoading}
-    >
+    <PermissionGuard requiredPermission="clients:create" user={user} isLoading={isLoading}>
       <ClientRegisterPage />
     </PermissionGuard>
   );

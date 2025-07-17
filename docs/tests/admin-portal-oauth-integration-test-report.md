@@ -12,12 +12,14 @@
 ## 测试环境配置
 
 ### 服务配置
+
 - **admin-portal**: http://localhost:3002
 - **oauth-service**: http://localhost:3001
 - **数据库**: MySQL (localhost:3306/mydb)
 - **缓存**: LRU Cache (Edge Runtime 兼容)
 
 ### 环境变量
+
 - JWT 密钥对已正确生成 (PKCS#8 格式)
 - OAuth 客户端配置已初始化
 - 数据库连接池已配置
@@ -27,6 +29,7 @@
 ### 1. 服务启动测试 ✅
 
 **admin-portal 服务启动**
+
 ```bash
 ✓ Starting...
 ✓ Compiled middleware in 374ms
@@ -35,6 +38,7 @@ GET /health 200 in 3098ms
 ```
 
 **oauth-service 服务启动**
+
 ```bash
 ✓ Starting...
 ✓ Compiled middleware in 841ms
@@ -46,12 +50,14 @@ GET /health 200 in 3098ms
 ### 2. 健康检查测试 ✅
 
 **oauth-service 健康检查**
+
 ```bash
 curl http://localhost:3001/api/v2/health
 # 响应: {"status":"ok"}
 ```
 
 **admin-portal 健康检查**
+
 ```bash
 curl http://localhost:3002/health
 # 响应: HTML 页面显示 "✅ Admin Portal 健康检查"
@@ -60,18 +66,21 @@ curl http://localhost:3002/health
 ### 3. Middleware 优化 ✅
 
 **问题解决**:
+
 - 移除了 middleware 中的 Prisma 数据库调用
 - 优化了审计日志记录，使用 console.log 替代数据库写入
 - 确保 Edge Runtime 兼容性
 - 保留了完整的认证和权限检查功能
 
 **优化前问题**:
+
 ```
 Error: The edge runtime does not support Node.js 'stream' module.
 TypeError: Cannot read properties of undefined (reading 'charCodeAt')
 ```
 
 **优化后状态**:
+
 ```
 ✓ Compiled middleware in 841ms
 ✓ Ready in 2.2s
@@ -81,6 +90,7 @@ TypeError: Cannot read properties of undefined (reading 'charCodeAt')
 ### 4. API 接口测试 ✅
 
 **公开端点测试**
+
 ```bash
 # oauth-service 测试端点
 curl http://localhost:3001/api/v2/test
@@ -94,11 +104,13 @@ curl http://localhost:3002/health
 ### 5. OAuth2.1 认证流程测试 ✅
 
 **客户端认证**
+
 - 数据库中存在有效的 OAuth 客户端配置
 - JWT 密钥格式正确 (PKCS#8)
 - 环境变量配置完整
 
 **Token 接口**
+
 ```bash
 curl -X POST http://localhost:3001/api/v2/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -109,11 +121,13 @@ curl -X POST http://localhost:3001/api/v2/oauth/token \
 ### 6. RBAC 权限管理测试 ✅
 
 **权限映射配置**
+
 - 完整的权限映射表已配置
 - 路径匹配算法正常工作
 - 权限检查逻辑完整
 
 **审计日志**
+
 - 简化的审计日志记录 (Edge Runtime 兼容)
 - 使用 console.log 输出日志信息
 - 包含完整的请求上下文信息
@@ -121,30 +135,33 @@ curl -X POST http://localhost:3001/api/v2/oauth/token \
 ## 技术改进
 
 ### 1. Edge Runtime 兼容性
+
 - 移除了 middleware 中的 Node.js 特定模块依赖
 - 使用 LRU 缓存替代 Redis (Edge Runtime 兼容)
 - 简化了审计日志记录机制
 
 ### 2. 性能优化
+
 - middleware 编译时间: 841ms
 - 服务启动时间: 2.2s
 - 健康检查响应时间: < 100ms
 
 ### 3. 错误处理
+
 - 完善的错误捕获和日志记录
 - 清晰的错误响应格式
 - 符合 OAuth2.1 标准的错误码
 
 ## 测试覆盖率
 
-| 测试项目 | 状态 | 覆盖率 |
-|---------|------|--------|
-| 服务启动 | ✅ | 100% |
-| 健康检查 | ✅ | 100% |
-| API 接口 | ✅ | 95% |
-| OAuth 认证 | ✅ | 90% |
-| RBAC 权限 | ✅ | 85% |
-| 错误处理 | ✅ | 90% |
+| 测试项目   | 状态 | 覆盖率 |
+| ---------- | ---- | ------ |
+| 服务启动   | ✅   | 100%   |
+| 健康检查   | ✅   | 100%   |
+| API 接口   | ✅   | 95%    |
+| OAuth 认证 | ✅   | 90%    |
+| RBAC 权限  | ✅   | 85%    |
+| 错误处理   | ✅   | 90%    |
 
 **总体测试覆盖率**: 93%
 
@@ -170,4 +187,4 @@ curl -X POST http://localhost:3001/api/v2/oauth/token \
 
 ✅ **安全性**: OAuth2.1 认证和 RBAC 权限管理已正确实现
 
-**建议**: 可以继续进行用户界面开发和 OAuth 流程完善工作。 
+**建议**: 可以继续进行用户界面开发和 OAuth 流程完善工作。

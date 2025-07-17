@@ -141,11 +141,7 @@ async function userInfoHandlerInternal(request: NextRequest): Promise<NextRespon
   // --- 步骤6: 返回成功响应 ---
   // --- Step 6: Return Success Response ---
   // 统一响应结构，严格参数顺序
-  return successResponse(
-    validationResult.data,
-    200,
-    '用户信息获取成功'
-  );
+  return successResponse(validationResult.data, 200, '用户信息获取成功');
 }
 
 // 导出处理函数，使用错误处理包装器

@@ -6,7 +6,11 @@ import { User, CreateUserInput, UpdateUserInput, PaginatedResponse } from '../do
 export class UserService {
   constructor(private userRepository: IUserRepository) {}
 
-  async getUsers(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<User>> {
+  async getUsers(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<User>> {
     return this.userRepository.getUsers(params);
   }
 
@@ -33,7 +37,10 @@ export class UserService {
     return this.userRepository.updateUserProfile(profileData);
   }
 
-  async updatePassword(passwordData: { oldPassword?: string; newPassword?: string }): Promise<void> {
+  async updatePassword(passwordData: {
+    oldPassword?: string;
+    newPassword?: string;
+  }): Promise<void> {
     return this.userRepository.updatePassword(passwordData);
   }
 }

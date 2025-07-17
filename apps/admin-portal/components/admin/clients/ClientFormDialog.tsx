@@ -107,10 +107,7 @@ export function ClientFormDialog({
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCheckboxGroupChange = (
-    type: 'grantTypes' | 'responseTypes',
-    value: string
-  ) => {
+  const handleCheckboxGroupChange = (type: 'grantTypes' | 'responseTypes', value: string) => {
     setFormState((prev) => {
       const currentValues = new Set(prev[type]);
       if (currentValues.has(value)) {
@@ -224,9 +221,7 @@ export function ClientFormDialog({
                     <Checkbox
                       id={`gt-${gt.id}`}
                       checked={formState.grantTypes.includes(gt.id)}
-                      onCheckedChange={() =>
-                        handleCheckboxGroupChange('grantTypes', gt.id)
-                      }
+                      onCheckedChange={() => handleCheckboxGroupChange('grantTypes', gt.id)}
                     />
                     <Label htmlFor={`gt-${gt.id}`} className="font-normal">
                       {gt.label}
@@ -244,9 +239,7 @@ export function ClientFormDialog({
                     <Checkbox
                       id={`rt-${rt.id}`}
                       checked={formState.responseTypes.includes(rt.id)}
-                      onCheckedChange={() =>
-                        handleCheckboxGroupChange('responseTypes', rt.id)
-                      }
+                      onCheckedChange={() => handleCheckboxGroupChange('responseTypes', rt.id)}
                     />
                     <Label htmlFor={`rt-${rt.id}`} className="font-normal">
                       {rt.label}
@@ -322,4 +315,3 @@ export function ClientFormDialog({
     </Dialog>
   );
 }
-

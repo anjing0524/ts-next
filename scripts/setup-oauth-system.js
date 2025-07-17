@@ -43,7 +43,6 @@ async function setupOAuthSystem() {
     console.log('   1. 启动oauth-service: pnpm dev:oauth');
     console.log('   2. 启动admin-portal: pnpm dev:admin');
     console.log('   3. 访问管理后台开始测试');
-
   } catch (error) {
     console.error('❌ 系统初始化失败:', error);
     process.exit(1);
@@ -63,7 +62,11 @@ async function setupPermissionsAndRoles() {
       { name: 'permission:read', displayName: '查看权限', description: '查看权限列表和详情' },
       { name: 'permission:write', displayName: '管理权限', description: '创建、更新、删除权限' },
       { name: 'client:read', displayName: '查看客户端', description: '查看OAuth客户端列表' },
-      { name: 'client:write', displayName: '管理客户端', description: '创建、更新、删除OAuth客户端' },
+      {
+        name: 'client:write',
+        displayName: '管理客户端',
+        description: '创建、更新、删除OAuth客户端',
+      },
       { name: 'audit:read', displayName: '查看审计日志', description: '查看系统审计日志' },
     ];
 
@@ -79,42 +82,41 @@ async function setupPermissionsAndRoles() {
           action: perm.name.split(':')[1],
           type: 'API',
           isSystemPerm: true,
-        }
+        },
       });
     }
 
     // 获取管理员角色
     const adminRole = await prisma.role.findUnique({
-      where: { name: 'administrator' }
+      where: { name: 'administrator' },
     });
 
     if (adminRole) {
       // 为管理员角色分配所有权限
       for (const perm of adminPermissions) {
         const permission = await prisma.permission.findUnique({
-          where: { name: perm.name }
+          where: { name: perm.name },
         });
-        
+
         if (permission) {
           await prisma.rolePermission.upsert({
             where: {
               roleId_permissionId: {
                 roleId: adminRole.id,
-                permissionId: permission.id
-              }
+                permissionId: permission.id,
+              },
             },
             update: {},
             create: {
               roleId: adminRole.id,
-              permissionId: permission.id
-            }
+              permissionId: permission.id,
+            },
           });
         }
       }
     }
 
     console.log('✅ 权限和角色配置完成');
-
   } catch (error) {
     console.error('❌ 创建权限和角色失败:', error);
     throw error;
@@ -129,10 +131,10 @@ async function validateSystemSetup() {
       include: {
         userRoles: {
           include: {
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     });
 
     if (!adminUser) {
@@ -141,7 +143,7 @@ async function validateSystemSetup() {
 
     // 验证admin-portal客户端
     const adminClient = await prisma.oAuthClient.findUnique({
-      where: { clientId: 'admin-portal-client' }
+      where: { clientId: 'admin-portal-client' },
     });
 
     if (!adminClient) {
@@ -158,7 +160,6 @@ async function validateSystemSetup() {
     console.log(`   - 管理员用户: ${adminUser.username}`);
     console.log(`   - 客户端: ${adminClient.name} (${adminClient.clientId})`);
     console.log(`   - 权限数量: ${permissions.length}`);
-
   } catch (error) {
     console.error('❌ 系统验证失败:', error);
     throw error;

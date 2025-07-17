@@ -9,6 +9,7 @@
 ## Node 端唯一出口（@repo/lib/node）
 
 ### 认证相关（auth）
+
 - `JWTUtils`：JWT 工具类
 - `PKCEUtils`：PKCE 工具类
 - `ScopeUtils`：Scope 权限工具
@@ -20,6 +21,7 @@
   - `RefreshTokenPayload`、`AccessTokenPayload`、`IdTokenPayload`
 
 ### 通用工具（utils）
+
 - `RateLimitUtils`：速率限制工具
 - `withErrorHandling`：错误处理高阶函数
 - `TimeWheel`、`getTimeWheelInstance`：时间轮算法
@@ -28,23 +30,27 @@
 - 类型：`RateLimitConfig`、`RateLimitResult`、`TaskOptions`
 
 ### 服务（services）
+
 - `RBACService`：RBAC 权限服务
 - `PermissionService`：权限服务
 - `getUserDetails`：用户信息服务
 - 类型：`UserPermissions`、`PermissionCheckResult`
 
 ### 中间件（middleware）
+
 - `authenticateBearer`、`AuthContext`、`AuthOptions`：Bearer 认证中间件
 - `withCORS`、`withDefaultCORS`、`withEnvCORS`、`getCORSOptionsFromEnv`、`CORSOptions`：CORS 中间件
 - `withRateLimit`、`withOAuthRateLimit`、`withIPRateLimit`、`withUserRateLimit`、`RateLimitOptions`：速率限制中间件
 - `validateRequest`、`validateRedirectUri`、`validatePKCE`、`withValidation`、`ValidationOptions`、`ValidationResult`：请求校验中间件
 
 ### 配置（config）
+
 - `OAuthConfig`：OAuth2 配置管理类
 - `DEFAULT_OAUTH_CONFIG`：默认 OAuth2 配置
 - 类型：`OAuthClientConfig`、`OAuthServiceConfig`
 
 ### 其他
+
 - `successResponse`、`errorResponse`、`generateRequestId`：API 响应工具
 - `@repo/cache`、`@repo/database`：缓存与数据库服务
 - `errors`：全部错误类型与工具
@@ -54,6 +60,7 @@
 ---
 
 ## Browser 端唯一出口（@repo/lib/browser）
+
 - `BrowserPKCEUtils`：浏览器 PKCE 工具
 - 类型定义（部分）
 - `LIB_VERSION`：库版本号
@@ -61,11 +68,13 @@
 ---
 
 ## 类型定义（@repo/lib/types）
+
 - 统一导出所有类型（如 auth-types、RBAC、权限等）
 
 ---
 
 ## 说明
+
 - Node 端请统一使用 `@repo/lib/node` 导入，Browser 端请统一使用 `@repo/lib/browser` 导入。
 - 禁止深层路径 import（如 `@repo/lib/auth/xxx`），如需类型可用 `@repo/lib/types`。
 - 如需补充导出，请在 `node/index.ts` 或 `browser/index.ts` 维护。

@@ -5,7 +5,11 @@ import { successResponse, errorResponse } from '@repo/lib/node';
 import { Prisma } from '@prisma/client';
 
 const scopeCreateSchema = z.object({
-  name: z.string().min(3).max(100).regex(/^[a-zA-Z0-9_:-]+$/),
+  name: z
+    .string()
+    .min(3)
+    .max(100)
+    .regex(/^[a-zA-Z0-9_:-]+$/),
   description: z.string().max(500).optional().nullable(),
   isPublic: z.boolean().default(false).optional(),
   isActive: z.boolean().default(true).optional(),

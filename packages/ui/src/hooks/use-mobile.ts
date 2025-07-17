@@ -12,7 +12,7 @@ export function useMobile(breakpoint: number = MOBILE_BREAKPOINT): boolean {
     const checkDevice = () => {
       setIsMobile(window.innerWidth < breakpoint);
     };
-    
+
     checkDevice();
 
     // Listen for window resize

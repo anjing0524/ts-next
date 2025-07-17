@@ -26,10 +26,21 @@ const createClientSchema = z.object({
 
 const queryClientsSchema = z.object({
   clientType: z.nativeEnum(ClientType).optional(),
-  isActive: z.string().transform((val) => val === 'true').optional(),
+  isActive: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
   name: z.string().optional(),
-  limit: z.string().transform((val) => parseInt(val, 10)).pipe(z.number().int().positive().max(100)).optional(),
-  offset: z.string().transform((val) => parseInt(val, 10)).pipe(z.number().int().min(0)).optional(),
+  limit: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().int().positive().max(100))
+    .optional(),
+  offset: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .pipe(z.number().int().min(0))
+    .optional(),
 });
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

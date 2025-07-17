@@ -41,12 +41,14 @@ This proxy is a single service that listens for incoming HTTP requests and forwa
 ## 🚀 Quick Start
 
 ### System Requirements
+
 - **Rust**: 2021 edition or later
 - **OS**: Linux, macOS, or Windows
 
 ### Build and Run
 
 1.  **Clone the repository**
+
     ```bash
     # Clone the project
     git clone <repository-url>
@@ -59,17 +61,18 @@ This proxy is a single service that listens for incoming HTTP requests and forwa
 
     ```yaml
     server:
-      bind_address: "0.0.0.0:6188"
+      bind_address: '0.0.0.0:6188'
       worker_threads: 4
 
     upstreams:
-      - name: "backend"
+      - name: 'backend'
         addrs:
-          - "127.0.0.1:3001"
-          - "127.0.0.1:3002"
+          - '127.0.0.1:3001'
+          - '127.0.0.1:3002'
     ```
 
 3.  **Build the application**
+
     ```bash
     cargo build --release
     ```
@@ -86,6 +89,7 @@ This proxy is a single service that listens for incoming HTTP requests and forwa
 ## 🔧 Development
 
 ### Project Structure
+
 ```
 apps/pingora-proxy/
 ├── src/
@@ -98,6 +102,7 @@ apps/pingora-proxy/
 ```
 
 ### Running Tests
+
 ```bash
 cargo test
 ```

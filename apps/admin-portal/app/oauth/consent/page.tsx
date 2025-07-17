@@ -76,7 +76,16 @@ function ConsentContent() {
         setError(typeof err === 'string' ? err : err.message || '加载同意信息失败');
         setLoading(false);
       });
-  }, [clientId, redirectUri, responseType, scope, state, codeChallenge, codeChallengeMethod, nonce]);
+  }, [
+    clientId,
+    redirectUri,
+    responseType,
+    scope,
+    state,
+    codeChallenge,
+    codeChallengeMethod,
+    nonce,
+  ]);
 
   if (loading) {
     return (
@@ -98,10 +107,7 @@ function ConsentContent() {
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => window.location.reload()}
-              className="w-full"
-            >
+            <Button onClick={() => window.location.reload()} className="w-full">
               重试
             </Button>
           </CardContent>
@@ -120,10 +126,7 @@ function ConsentContent() {
             <CardDescription>缺少必要的OAuth参数或参数格式不正确</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => router.push('/')}
-              className="w-full"
-            >
+            <Button onClick={() => router.push('/')} className="w-full">
               返回首页
             </Button>
           </CardContent>
@@ -164,9 +167,9 @@ function ConsentContent() {
   const formatScopes = (scopes: string) => {
     return scopes
       .split(/[\s,_]+/)
-      .filter(s => s.trim())
-      .map(s => s.trim())
-      .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+      .filter((s) => s.trim())
+      .map((s) => s.trim())
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
       .join(', ');
   };
 
@@ -175,17 +178,17 @@ function ConsentContent() {
       <Card className="w-full max-w-lg shadow-2xl border-0">
         <CardHeader className="space-y-4 text-center border-b pb-6">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-            <svg 
-              className="w-8 h-8 text-white" 
-              fill="none" 
-              stroke="currentColor" 
+            <svg
+              className="w-8 h-8 text-white"
+              fill="none"
+              stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
           </div>
@@ -194,23 +197,34 @@ function ConsentContent() {
               授权应用访问
             </CardTitle>
             <CardDescription className="text-gray-600 text-lg mt-2">
-              应用 <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong> 正在请求访问您的账户
+              应用 <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong>{' '}
+              正在请求访问您的账户
             </CardDescription>
             {apiData?.client.logoUri && (
-              <img 
-                src={apiData.client.logoUri} 
-                alt="应用Logo" 
-                className="mx-auto h-12 w-12 rounded-full mt-3 border-2 border-gray-200" 
+              <img
+                src={apiData.client.logoUri}
+                alt="应用Logo"
+                className="mx-auto h-12 w-12 rounded-full mt-3 border-2 border-gray-200"
               />
             )}
           </div>
         </CardHeader>
-        
+
         <CardContent className="pt-6 space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-              <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <svg
+                className="w-5 h-5 mr-2 text-indigo-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
               </svg>
               请求的权限范围
             </h3>
@@ -228,15 +242,26 @@ function ConsentContent() {
               </ul>
             </div>
           </div>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <div>
                 <p className="text-sm text-blue-800">
-                  <strong>当前用户：</strong> {apiData?.user.username || user?.username || '未知用户'}
+                  <strong>当前用户：</strong>{' '}
+                  {apiData?.user.username || user?.username || '未知用户'}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   如果这不是您的账户，请取消并重新登录正确的账户。
@@ -244,14 +269,16 @@ function ConsentContent() {
               </div>
             </div>
           </div>
-          
+
           <div className="text-center">
             <p className="text-lg font-medium text-gray-800">
-              您是否授权 <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong> 访问上述权限？
+              您是否授权{' '}
+              <strong className="text-indigo-600">{apiData?.client.name || clientId}</strong>{' '}
+              访问上述权限？
             </p>
           </div>
         </CardContent>
-        
+
         <CardFooter className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 pt-6 border-t">
           <Button
             onClick={() => handleConsent('deny')}
@@ -288,7 +315,7 @@ export default function ConsentPage() {
             <CardDescription>您需要先登录才能进行授权确认</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
+            <Button
               onClick={() => {
                 const currentUrl = window.location.href;
                 const loginUrl = new URL('/login', window.location.origin);
@@ -306,14 +333,16 @@ export default function ConsentPage() {
   }
 
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <ConsentContent />
     </Suspense>
   );

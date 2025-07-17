@@ -3,7 +3,11 @@ import { IPermissionRepository } from '../domain/permission.repository';
 import { Permission } from '../domain/permission';
 
 export class PermissionRepository implements IPermissionRepository {
-  async getPermissions(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Permission>> {
+  async getPermissions(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Permission>> {
     // 类型断言，确保返回值符合 PaginatedResponse<Permission>
     return adminApi.getPermissions(params) as Promise<PaginatedResponse<Permission>>;
   }

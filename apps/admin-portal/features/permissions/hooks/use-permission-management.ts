@@ -8,7 +8,10 @@ export const usePermissionManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
 
-  const queryParams = useMemo(() => ({ page, limit, search: appliedSearchTerm }), [page, limit, appliedSearchTerm]);
+  const queryParams = useMemo(
+    () => ({ page, limit, search: appliedSearchTerm }),
+    [page, limit, appliedSearchTerm]
+  );
   const { data, isLoading, error, isFetching } = usePermissionsQuery(queryParams);
 
   const handleSearchSubmit = () => {

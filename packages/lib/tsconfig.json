@@ -9,16 +9,8 @@
     "module": "commonjs",
     "target": "ES2022",
     "moduleResolution": "node",
-    "types": [
-      "next",
-      "node"
-    ]
+    "types": ["next", "node"]
   },
-  "include": [
-    "next-env.d.ts",
-    "src/**/*"
-  ],
-  "exclude": [
-    "dist"
-  ]
+  "include": ["next-env.d.ts", "src/**/*"],
+  "exclude": ["dist"]
 }

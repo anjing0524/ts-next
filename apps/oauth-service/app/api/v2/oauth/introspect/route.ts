@@ -3,16 +3,16 @@
 // 描述: OAuth 2.0 令牌内省端点 (RFC 7662)
 // Description: OAuth 2.0 Token Introspection Endpoint (RFC 7662)
 
-import { ClientAuthUtils } from '@/lib/auth/utils'; // 本地工具类
+import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
 import { ConfigurationError, OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
-import { withErrorHandling } from '@/lib/utils/error-handler';
+import { withErrorHandling } from '@/app/utils/error-handler';
 import { prisma } from '@repo/database';
 import { JWTUtils, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   IntrospectResponseActive,
   introspectResponseActiveSchema,
-  introspectTokenRequestSchema
+  introspectTokenRequestSchema,
 } from './schemas';
 
 // 令牌内省端点处理函数 (内部逻辑)
@@ -177,11 +177,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
     // 使用 Zod 验证构建的活动响应 (Validate constructed active response with Zod)
     const parsedActiveResponse = introspectResponseActiveSchema.safeParse(activeResponsePayload);
     if (parsedActiveResponse.success) {
-      return successResponse(
-        parsedActiveResponse.data,
-        200,
-        'Token is active.'
-      );
+      return successResponse(parsedActiveResponse.data, 200, 'Token is active.');
     } else {
       console.error(
         'Introspection active response schema validation failed:',
@@ -196,11 +192,7 @@ async function introspectionHandlerInternal(request: NextRequest): Promise<NextR
 
   // 如果令牌无效、已过期、已撤销，或通过任何方式都找不到，则返回 active: false
   // If token is invalid, expired, revoked, or not found by any means, return active: false
-  return successResponse(
-    { active: false },
-    200,
-    'Token is not active.'
-  );
+  return successResponse({ active: false }, 200, 'Token is not active.');
 }
 
 // 使用 withErrorHandling 包装处理函数 (Wrap the handler with withErrorHandling)

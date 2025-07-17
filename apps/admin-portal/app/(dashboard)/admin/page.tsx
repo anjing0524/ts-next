@@ -2,10 +2,28 @@
 
 import { useAuth } from '@repo/ui/hooks';
 import { useDashboardStatsQuery } from '@/features/dashboard/hooks/useDashboardStatsQuery';
-import { Card, CardContent, CardHeader, CardTitle, Skeleton, Alert, AlertDescription, AlertTitle, PermissionGuard } from '@repo/ui';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  PermissionGuard,
+} from '@repo/ui';
 import { AlertTriangle, Users, AppWindow, ShieldCheck, KeyRound } from 'lucide-react';
-import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar } from 'recharts';
-
+import {
+  ResponsiveContainer,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Bar,
+} from 'recharts';
 
 function StatCard({
   title,
@@ -116,11 +134,7 @@ export default function GuardedDashboardPage() {
   const { user, isLoading } = useAuth();
 
   return (
-    <PermissionGuard
-      requiredPermission="dashboard:view"
-      user={user}
-      isLoading={isLoading}
-    >
+    <PermissionGuard requiredPermission="dashboard:view" user={user} isLoading={isLoading}>
       <DashboardPageContent />
     </PermissionGuard>
   );

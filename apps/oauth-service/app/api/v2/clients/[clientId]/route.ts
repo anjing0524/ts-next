@@ -60,7 +60,11 @@ export async function PUT(
       userAgent: headersList.get('user-agent') || 'unknown',
     };
 
-    const updatedClient = await ClientService.updateClient(clientId, validationResult.data, auditInfo);
+    const updatedClient = await ClientService.updateClient(
+      clientId,
+      validationResult.data,
+      auditInfo
+    );
     return successResponse(updatedClient);
   } catch (error) {
     console.error(`更新客户端 ${clientId} 失败:`, error);

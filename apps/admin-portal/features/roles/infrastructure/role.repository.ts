@@ -3,7 +3,11 @@ import { IRoleRepository } from '../domain/role.repository';
 import { Role, CreateRoleInput, UpdateRoleInput } from '../domain/role';
 
 export class RoleRepository implements IRoleRepository {
-  async getRoles(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Role>> {
+  async getRoles(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Role>> {
     return adminApi.getRoles(params) as Promise<PaginatedResponse<Role>>;
   }
 

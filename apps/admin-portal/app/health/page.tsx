@@ -12,4 +12,4 @@ export default function HealthPage() {
       <p>路径: /health</p>
     </div>
   );
-} 
+}

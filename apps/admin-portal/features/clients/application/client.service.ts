@@ -5,7 +5,11 @@ import { PaginatedResponse } from '../../../lib/api';
 export class ClientService {
   constructor(private clientRepository: IClientRepository) {}
 
-  async getClients(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<OAuthClient>> {
+  async getClients(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<OAuthClient>> {
     return this.clientRepository.getClients(params);
   }
 

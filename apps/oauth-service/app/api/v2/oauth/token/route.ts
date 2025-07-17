@@ -34,7 +34,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
 import { AuthorizationUtils, JWTUtils, ScopeUtils, OAuth2Error, OAuth2ErrorCode, TokenError, withErrorHandling, RefreshTokenPayload } from '@repo/lib/node';
 import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
-import { ClientAuthUtils } from '../../../../../lib/auth/utils'; // OAuth 2.0 辅助工具 (OAuth 2.0 helper utilities)
+import { ClientAuthUtils } from '../../../../../lib/auth/utils2.0 辅助工具 (OAuth 2.0 helper utilities))
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
 import { successResponse, errorResponse } from '@repo/lib/node';
 

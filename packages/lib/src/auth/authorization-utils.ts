@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { prisma } from '@repo/database';
-import { RBACService } from '../services/rbac-service';
+import { RBACService } from '../../../../apps/oauth-service/lib/auth/services/rbac-service';
 
 // ===== 函数实现区域 (Function implementations) =====
 

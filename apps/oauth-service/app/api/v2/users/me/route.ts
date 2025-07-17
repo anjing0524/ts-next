@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { getUserDetails, excludePassword, successResponse, errorResponse } from '@repo/lib/node';
+import { excludePassword, successResponse, errorResponse } from '@repo/lib/node';
 import { prisma } from '@repo/database';
 import { z } from 'zod';
+import { getUserDetails } from '@/lib/auth/services/user-service';
 
 export async function GET(): Promise<NextResponse> {
   try {

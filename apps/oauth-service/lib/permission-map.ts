@@ -13,11 +13,19 @@ export const permissionMap: PermissionMap = {
   '/api/v2/users': { GET: 'user:list', POST: 'user:create' },
   '/api/v2/users/:userId': { GET: 'user:read', PUT: 'user:update', DELETE: 'user:delete' },
   // 用户角色分配
-  '/api/v2/users/:userId/roles': { GET: 'user:roles:read', POST: 'user:roles:assign', DELETE: 'user:roles:remove' },
+  '/api/v2/users/:userId/roles': {
+    GET: 'user:roles:read',
+    POST: 'user:roles:assign',
+    DELETE: 'user:roles:remove',
+  },
 
   // --- 客户端管理 ---
   '/api/v2/clients': { GET: 'client:list', POST: 'client:create' },
-  '/api/v2/clients/:clientId': { GET: 'client:read', PUT: 'client:update', DELETE: 'client:delete' },
+  '/api/v2/clients/:clientId': {
+    GET: 'client:read',
+    PUT: 'client:update',
+    DELETE: 'client:delete',
+  },
   '/api/v2/clients/:clientId/secret': { POST: 'oauth:clients:manage' },
 
   // --- 角色管理 ---
@@ -40,7 +48,11 @@ export const permissionMap: PermissionMap = {
     GET: 'permission:list',
     POST: 'permission:create',
   },
-  '/api/v2/permissions/:permissionId': { GET: 'permission:read', PUT: 'permission:update', DELETE: 'permission:delete' },
+  '/api/v2/permissions/:permissionId': {
+    GET: 'permission:read',
+    PUT: 'permission:update',
+    DELETE: 'permission:delete',
+  },
 
   // --- 范围管理 ---
   '/api/v2/scopes': { GET: 'scope:list', POST: 'scope:create' },

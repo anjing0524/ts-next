@@ -14,15 +14,15 @@ async function jwksEndpointHandler(): Promise<NextResponse> {
   try {
     // 获取公钥
     const publicKey = await JWTUtils.getPublicKey();
-    
+
     // 导出公钥为JWK格式
     const jwk = await JWTUtils.exportPublicKeyAsJWK(publicKey);
-    
+
     // 返回JWKS格式的响应
     const jwks = {
-      keys: [jwk]
+      keys: [jwk],
     };
-    
+
     return NextResponse.json(jwks, {
       headers: {
         'Content-Type': 'application/json',
@@ -35,4 +35,4 @@ async function jwksEndpointHandler(): Promise<NextResponse> {
   }
 }
 
-export const GET = withErrorHandling(jwksEndpointHandler); 
+export const GET = withErrorHandling(jwksEndpointHandler);

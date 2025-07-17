@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { login } = useAuth();
-  
+
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +96,10 @@ export default function AuthCallbackPage() {
 
       // 统一使用TokenStorage存储令牌
       TokenStorage.setTokens(response.access_token, response.refresh_token);
-      localStorage.setItem('token_expires_at', (Date.now() + response.expires_in * 1000).toString());
+      localStorage.setItem(
+        'token_expires_at',
+        (Date.now() + response.expires_in * 1000).toString()
+      );
 
       // 更新认证状态 - 修复类型错误
       login(JSON.stringify(response.user));
@@ -104,14 +107,13 @@ export default function AuthCallbackPage() {
       // 重定向到原始页面或首页
       const redirectPath = sessionStorage.getItem('redirect_after_login') || '/dashboard';
       sessionStorage.removeItem('redirect_after_login');
-      
+
       setStatus('success');
-      
+
       // 延迟重定向，让用户看到成功状态
       setTimeout(() => {
         router.push(redirectPath);
       }, 1500);
-
     } catch (err) {
       console.error('OAuth回调处理错误:', err);
       setStatus('error');
@@ -132,13 +134,33 @@ export default function AuthCallbackPage() {
               <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
             )}
             {status === 'success' && (
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-8 h-8 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             )}
             {status === 'error' && (
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-8 h-8 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             )}
           </div>
@@ -151,37 +173,31 @@ export default function AuthCallbackPage() {
             <CardDescription className="text-gray-600 mt-2">
               {status === 'processing' && '正在处理您的登录请求...'}
               {status === 'success' && '正在重定向到管理后台...'}
-              {status === 'error' && error || '发生未知错误'}
+              {(status === 'error' && error) || '发生未知错误'}
             </CardDescription>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {status === 'processing' && (
             <div className="text-center">
               <div className="animate-pulse">
                 <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
-              <p className="text-sm text-gray-500 mt-4">
-                正在验证您的身份，请稍候...
-              </p>
+              <p className="text-sm text-gray-500 mt-4">正在验证您的身份，请稍候...</p>
             </div>
           )}
-          
+
           {status === 'success' && (
             <div className="text-center">
-              <p className="text-green-600 font-medium">
-                身份验证成功！正在为您准备管理后台...
-              </p>
+              <p className="text-green-600 font-medium">身份验证成功！正在为您准备管理后台...</p>
             </div>
           )}
-          
+
           {status === 'error' && (
             <div className="text-center space-y-4">
-              <div className="text-red-600 text-sm">
-                {error}
-              </div>
-              <Button 
+              <div className="text-red-600 text-sm">{error}</div>
+              <Button
                 onClick={handleRetry}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >

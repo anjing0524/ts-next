@@ -38,4 +38,4 @@ export const ENDPOINTS = {
   systemConfig: API_ROUTES.SYSTEM.CONFIG,
 };
 
-export type EndpointKey = keyof typeof ENDPOINTS; 
+export type EndpointKey = keyof typeof ENDPOINTS;

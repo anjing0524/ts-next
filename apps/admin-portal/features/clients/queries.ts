@@ -36,9 +36,18 @@ export const useCreateClientMutation = () => {
 
 export const useUpdateClientMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<OAuthClient, Error, { clientId: string; clientData: Partial<ClientFormInput> }>({
-    mutationFn: ({ clientId, clientData }: { clientId: string; clientData: Partial<ClientFormInput> }) =>
-      clientService.updateClient(clientId, clientData),
+  return useMutation<
+    OAuthClient,
+    Error,
+    { clientId: string; clientData: Partial<ClientFormInput> }
+  >({
+    mutationFn: ({
+      clientId,
+      clientData,
+    }: {
+      clientId: string;
+      clientData: Partial<ClientFormInput>;
+    }) => clientService.updateClient(clientId, clientData),
     onSuccess: (_, { clientId }) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['client', clientId] });

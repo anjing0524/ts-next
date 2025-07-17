@@ -8,7 +8,11 @@ export interface IUserRepository {
    * @param params 查询参数
    * @returns 用户分页响应
    */
-  getUsers(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<User>>;
+  getUsers(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<User>>;
   getUserById(userId: string): Promise<User>;
   createUser(userData: CreateUserInput): Promise<User>;
   updateUser(userId: string, userData: UpdateUserInput): Promise<User>;

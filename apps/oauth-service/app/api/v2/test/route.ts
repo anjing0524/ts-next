@@ -16,4 +16,4 @@ export async function GET() {
       details: { timestamp: new Date().toISOString() },
     });
   }
-} 
+}

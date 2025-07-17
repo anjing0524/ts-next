@@ -85,8 +85,13 @@ export function validateScopes(
  */
 export function validateScopes(
   requestedScopes: string[],
-  allowedScopesOrClient: string[] | OAuthClient | { allowedScopes?: string; clientScopes?: string; scopes?: string }
-): { valid: boolean; invalidScopes: string[]; error_description?: string } | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
+  allowedScopesOrClient:
+    | string[]
+    | OAuthClient
+    | { allowedScopes?: string; clientScopes?: string; scopes?: string }
+):
+  | { valid: boolean; invalidScopes: string[]; error_description?: string }
+  | Promise<{ valid: boolean; invalidScopes: string[]; error_description?: string }> {
   if (requestedScopes.length === 0) {
     return { valid: true, invalidScopes: [] };
   }

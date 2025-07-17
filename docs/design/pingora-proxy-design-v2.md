@@ -1,4 +1,3 @@
-
 # Pingora 高性能反向代理 - V2 设计文档
 
 本文档描述了一个基于 [Pingora](https://github.com/cloudflare/pingora) 框架构建的高性能、可扩展、易于管理的反向代理的设计方案。该方案在现有实现的基础上，增加了动态配置、高级路由、增强的可观测性和更高的灵活性。
@@ -64,56 +63,56 @@
 # 全局设置
 server:
   worker_threads: 8
-  log_level: "info"
-  log_format: "json" # "text" or "json"
+  log_level: 'info'
+  log_format: 'json' # "text" or "json"
 
 # 管理 API
 admin:
-  bind_address: "127.0.0.1:6190"
+  bind_address: '127.0.0.1:6190'
   enabled: true
 
 # Prometheus 指标
 metrics:
-  bind_address: "127.0.0.1:9090"
+  bind_address: '127.0.0.1:9090'
   enabled: true
 
 # 代理服务列表
 services:
-  - name: "api-gateway"
-    bind_address: "0.0.0.0:8000"
+  - name: 'api-gateway'
+    bind_address: '0.0.0.0:8000'
     tls:
       enabled: true
-      cert_path: "/path/to/cert.pem"
-      key_path: "/path/to/key.pem"
+      cert_path: '/path/to/cert.pem'
+      key_path: '/path/to/key.pem'
 
     # 路由规则，按顺序匹配
     routes:
       # 规则1: 基于路径路由到用户服务
-      - name: "users-service-route"
-        path_prefix: "/api/v1/users"
+      - name: 'users-service-route'
+        path_prefix: '/api/v1/users'
         # 要移除的前缀，转发给上游时，/api/v1/users/123 -> /123
-        strip_prefix: "/api/v1/users"
+        strip_prefix: '/api/v1/users'
         upstreams:
-          - name: "users-service"
-            lb_strategy: "round_robin" # round_robin, random, hash
-            hash_on: "client_ip" # for hash strategy
+          - name: 'users-service'
+            lb_strategy: 'round_robin' # round_robin, random, hash
+            hash_on: 'client_ip' # for hash strategy
             health_check:
-              schema: "tcp" # "tcp" or "http"
-              http_path: "/health" # for http check
+              schema: 'tcp' # "tcp" or "http"
+              http_path: '/health' # for http check
               frequency_secs: 5
             nodes:
-              - addr: "10.0.1.1:8080"
-                sni: "users.internal" # 覆盖 SNI
-              - addr: "10.0.1.2:8080"
+              - addr: '10.0.1.1:8080'
+                sni: 'users.internal' # 覆盖 SNI
+              - addr: '10.0.1.2:8080'
 
       # 规则2: 基于主机名路由到网站
-      - name: "website-route"
-        host: "www.example.com"
+      - name: 'website-route'
+        host: 'www.example.com'
         upstreams:
-          - name: "website-service"
-            lb_strategy: "random"
+          - name: 'website-service'
+            lb_strategy: 'random'
             nodes:
-              - addr: "10.0.2.1:3000"
+              - addr: '10.0.2.1:3000'
 ```
 
 ### 3.2. 核心逻辑 (`src/proxy/mod.rs`)

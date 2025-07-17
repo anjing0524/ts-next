@@ -11,6 +11,7 @@
 本文档定义了基于 Turborepo 的 OAuth2.1 认证授权中心和微服务平台的 API 设计规范。所有微服务应用都必须遵循这些规范，以确保 API 的一致性、可维护性和可扩展性。
 
 **架构层次**:
+
 - **Pingora Proxy (8080)**: 统一网关入口，负责路由分发和负载均衡
 - **微服务应用**: oauth-service, admin-portal, flow-service, kline-service
 - **共享包**: @repo/ui, @repo/lib, @repo/database 等
@@ -30,6 +31,7 @@
 ### 3.1 网关层路由设计
 
 **Pingora Proxy 统一入口 (8080)**:
+
 ```
 http://localhost:8080/api/v2/*     → oauth-service (3001)
 http://localhost:8080/admin/*      → admin-portal (3002)
@@ -52,6 +54,7 @@ http://localhost:8080/kline/*      → kline-service (3003)
 - 避免使用动词
 
 **正确示��**:
+
 ```
 /api/v2/users
 /api/v2/user-profiles
@@ -60,6 +63,7 @@ http://localhost:8080/kline/*      → kline-service (3003)
 ```
 
 **错误示例**:
+
 ```
 /api/v1/user
 /api/v1/getUserProfile
@@ -82,6 +86,7 @@ http://localhost:8080/kline/*      → kline-service (3003)
 各微服务的特定路径规范：
 
 **oauth-service**:
+
 ```
 /api/v2/oauth/authorize     # 授权端点
 /api/v2/oauth/token        # 令牌端点
@@ -92,6 +97,7 @@ http://localhost:8080/kline/*      → kline-service (3003)
 ```
 
 **其他服务**:
+
 ```
 /admin/api/v1/*            # 管理后台API (示例)
 /flow/api/v1/*             # 工作流API (示例)
@@ -101,6 +107,7 @@ http://localhost:8080/kline/*      → kline-service (3003)
 - **操作**: 对于非CRUD操作，可以使用动词，但应谨慎使用，例如 `/api/v2/users/{userId}/activate`。
 
 **示例**:
+
 - `GET /api/v2/users` - 获取用户列表
 - `GET /api/v2/users/{userId}` - 获取特定用户
 - `POST /api/v2/users` - 创建新用户
@@ -155,7 +162,9 @@ http://localhost:8080/kline/*      → kline-service (3003)
   "error": {
     "code": "ERROR_CODE",
     "message": "错误描述",
-    "details": { /* 可选：更详细的错误信息，如字段验证失败 */ }
+    "details": {
+      /* 可选：更详细的错误信息，如字段验证失败 */
+    }
   }
 }
 ```
@@ -165,39 +174,56 @@ http://localhost:8080/kline/*      → kline-service (3003)
 所有服务端API必须统一使用`successResponse`和`errorResponse`工具函数返回响应，禁止直接调用`NextResponse.json`。
 
 ### successResponse 用法
+
 ```ts
 successResponse(data, statusCode = 200, message = '操作成功', meta?)
 ```
+
 - data: 主数据内容（必填）
 - statusCode: HTTP状态码（可选，默认200）
 - message: 成功消息（可选，默认“操作成功”）
 - meta: 分页等元信息（可选）
 
 ### errorResponse 用法
+
 ```ts
-errorResponse({ message, statusCode = 500, details })
+errorResponse({ message, statusCode = 500, details });
 ```
+
 - message: 错误消息（必填）
 - statusCode: HTTP状态码（可选，默认500）
 - details: 附加错误详情（可选，建议包含业务错误码code）
 
 **示例：**
+
 ```ts
 return successResponse(user, 200, '用户信息获取成功');
-return errorResponse({ message: '认证失败', statusCode: 401, details: { code: 'UNAUTHENTICATED' } });
+return errorResponse({
+  message: '认证失败',
+  statusCode: 401,
+  details: { code: 'UNAUTHENTICATED' },
+});
 ```
 
 ### 响应结构
+
 - 成功：
+
 ```json
 {
   "success": true,
   "message": "操作成功",
-  "data": { /* ... */ },
-  "meta": { /* ... */ }
+  "data": {
+    /* ... */
+  },
+  "meta": {
+    /* ... */
+  }
 }
 ```
+
 - 失败：
+
 ```json
 {
   "success": false,
@@ -216,6 +242,7 @@ return errorResponse({ message: '认证失败', statusCode: 401, details: { code
 - **业务错误码**: 在 `error.code` 字段中提供更具体的业务错误信息。建议使用统一的错误码范围或前缀。
 
 **示例**:
+
 - `INVALID_REQUEST`: 请求参数验证失败
 - `UNAUTHENTICATED`: 认证失败/令牌无效
 - `FORBIDDEN`: 权限不足
@@ -224,13 +251,13 @@ return errorResponse({ message: '认证失败', statusCode: 401, details: { code
 
 ## 7. 分页/排序/筛选规范
 
-- **分页**: 
+- **分页**:
   - `page`: 当前页码 (从1开始，默认1)
   - `pageSize`: 每页记录数 (默认20，最大100)
-- **排序**: 
+- **排序**:
   - `sortBy`: 排序字段，例如 `createdAt`
   - `sortOrder`: 排序顺序，`asc` (升序) 或 `desc` (降序)，默认 `desc`
-- **筛选**: 
+- **筛选**:
   - 使用查询参数进行筛选，例如 `GET /users?status=active&role=admin`
   - 对于复杂筛选，可以使用JSON字符串编码的查询参数，但应谨慎使用。
 

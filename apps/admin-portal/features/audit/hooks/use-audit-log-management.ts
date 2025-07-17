@@ -14,7 +14,10 @@ export const useAuditLogManagement = () => {
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
-  const queryParams = useMemo(() => ({ page, limit, ...appliedFilters }), [page, limit, appliedFilters]);
+  const queryParams = useMemo(
+    () => ({ page, limit, ...appliedFilters }),
+    [page, limit, appliedFilters]
+  );
   const { data, isLoading, error, isFetching } = useAuditLogsQuery(queryParams);
 
   const handleApplyFilters = () => {

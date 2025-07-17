@@ -8,7 +8,11 @@
     "*.js",
     "*.d.ts"
   ],
-  "keywords": ["nextjs", "config", "monorepo"],
+  "keywords": [
+    "nextjs",
+    "config",
+    "monorepo"
+  ],
   "author": "",
   "license": "MIT"
-} 
+}

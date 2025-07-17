@@ -6,10 +6,7 @@
  * @param keys - 要排除的键数组。
  * @returns 一个不包含指定键的新对象。
  */
-export function exclude<T, Key extends keyof T>(
-  obj: T,
-  keys: Key[]
-): Omit<T, Key> {
+export function exclude<T, Key extends keyof T>(obj: T, keys: Key[]): Omit<T, Key> {
   const newObj = { ...obj };
   for (const key of keys) {
     delete newObj[key];
@@ -24,6 +21,6 @@ export function exclude<T, Key extends keyof T>(
  * @returns 不包含 'passwordHash' 字段的新用户对象。
  */
 export function excludePassword<User>(user: User): Omit<User, 'passwordHash'> {
-    // @ts-ignore
+  // @ts-ignore
   return exclude(user, ['passwordHash']);
 }

@@ -59,35 +59,20 @@ function ErrorPageContent() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-red-600">{getErrorTitle()}</CardTitle>
-          <CardDescription>
-            OAuth授权过程中发生错误
-          </CardDescription>
+          <CardDescription>OAuth授权过程中发生错误</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert variant="destructive">
-            <AlertDescription>
-              {getErrorMessage()}
-            </AlertDescription>
+            <AlertDescription>{getErrorMessage()}</AlertDescription>
           </Alert>
-          
-          {state && (
-            <p className="text-sm text-gray-600">
-              状态参数: {state}
-            </p>
-          )}
-          
+
+          {state && <p className="text-sm text-gray-600">状态参数: {state}</p>}
+
           <div className="space-y-3">
-            <Button 
-              onClick={() => router.push('/login')}
-              className="w-full"
-            >
+            <Button onClick={() => router.push('/login')} className="w-full">
               返回登录
             </Button>
-            <Button 
-              onClick={() => router.push('/admin')}
-              variant="outline"
-              className="w-full"
-            >
+            <Button onClick={() => router.push('/admin')} variant="outline" className="w-full">
               返回管理后台
             </Button>
           </div>
@@ -103,16 +88,20 @@ function ErrorPageContent() {
  */
 export default function OAuthErrorPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardContent>
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-4 text-gray-600">加载中...</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <Card className="w-full max-w-md">
+            <CardContent>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+                <p className="mt-4 text-gray-600">加载中...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
       <ErrorPageContent />
     </Suspense>
   );

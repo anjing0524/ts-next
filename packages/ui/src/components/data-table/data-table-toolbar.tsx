@@ -13,7 +13,10 @@ interface DataTableToolbarProps<TData> {
   filterColumn?: string;
 }
 
-export function DataTableToolbar<TData>({ table, filterColumn = 'title' }: DataTableToolbarProps<TData>) {
+export function DataTableToolbar<TData>({
+  table,
+  filterColumn = 'title',
+}: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
   return (

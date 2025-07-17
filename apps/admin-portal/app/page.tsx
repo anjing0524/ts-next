@@ -16,4 +16,4 @@ export default function HomePage() {
       <p className="mt-4">请通过左侧菜单或顶部导航访问各功能模块。</p>
     </main>
   );
-} 
+}

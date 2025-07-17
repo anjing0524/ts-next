@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 
 // --- Interfaces for the Auth Provider ---
 
@@ -100,14 +107,17 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     }
   };
 
-  const hasPermission = useCallback((requiredPermission: string | string[]) => {
-    if (!user?.permissions) return false;
-    const permissions = new Set(user.permissions);
-    if (Array.isArray(requiredPermission)) {
-      return requiredPermission.every(p => permissions.has(p));
-    }
-    return permissions.has(requiredPermission);
-  }, [user]);
+  const hasPermission = useCallback(
+    (requiredPermission: string | string[]) => {
+      if (!user?.permissions) return false;
+      const permissions = new Set(user.permissions);
+      if (Array.isArray(requiredPermission)) {
+        return requiredPermission.every((p) => permissions.has(p));
+      }
+      return permissions.has(requiredPermission);
+    },
+    [user]
+  );
 
   const value = {
     user,

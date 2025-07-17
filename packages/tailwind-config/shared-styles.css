@@ -1,46 +1,48 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-family-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  
+  --font-family-sans:
+    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+
   /* Container */
   --breakpoint-2xl: 1400px;
-  
+
   /* Colors - shadcn/ui design tokens */
   --color-border: hsl(240 5.9% 90%);
   --color-input: hsl(240 5.9% 90%);
   --color-ring: hsl(240 10% 3.9%);
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(240 10% 3.9%);
-  
+
   --color-primary: hsl(240 9% 7.9%);
   --color-primary-foreground: hsl(0 0% 98%);
-  
+
   --color-secondary: hsl(240 4.8% 95.9%);
   --color-secondary-foreground: hsl(240 5.9% 10%);
-  
+
   --color-destructive: hsl(0 72% 51%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  
+
   --color-muted: hsl(240 4.8% 95.9%);
   --color-muted-foreground: hsl(240 3.8% 45.1%);
-  
+
   --color-accent: hsl(240 4.8% 95.9%);
   --color-accent-foreground: hsl(240 5.9% 10%);
-  
+
   --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(240 10% 3.9%);
-  
+
   --color-card: hsl(0 0% 100%);
   --color-card-foreground: hsl(240 10% 3.9%);
-  
+
   /* Chart colors */
   --color-chart-1: hsl(12 76% 61%);
   --color-chart-2: hsl(173 58% 39%);
   --color-chart-3: hsl(197 37% 24%);
   --color-chart-4: hsl(43 74% 66%);
   --color-chart-5: hsl(27 87% 67%);
-  
+
   /* Border radius */
   --radius: 0.5rem;
 }
@@ -53,28 +55,28 @@
     --color-ring: hsl(240 4.9% 83.9%);
     --color-background: hsl(240 10% 3.9%);
     --color-foreground: hsl(0 0% 98%);
-    
+
     --color-primary: hsl(0 0% 98%);
     --color-primary-foreground: hsl(240 5.9% 10%);
-    
+
     --color-secondary: hsl(240 3.7% 15.9%);
     --color-secondary-foreground: hsl(0 0% 98%);
-    
+
     --color-destructive: hsl(0 62.8% 30.6%);
     --color-destructive-foreground: hsl(0 0% 98%);
-    
+
     --color-muted: hsl(240 3.7% 15.9%);
     --color-muted-foreground: hsl(240 5% 64.9%);
-    
+
     --color-accent: hsl(240 3.7% 15.9%);
     --color-accent-foreground: hsl(0 0% 98%);
-    
+
     --color-popover: hsl(240 10% 3.9%);
     --color-popover-foreground: hsl(0 0% 98%);
-    
+
     --color-card: hsl(240 10% 3.9%);
     --color-card-foreground: hsl(0 0% 98%);
-    
+
     /* Dark mode chart colors */
     --color-chart-1: hsl(220 70% 50%);
     --color-chart-2: hsl(160 60% 45%);
@@ -86,11 +88,13 @@
   * {
     border-color: hsl(var(--color-border));
   }
-  
+
   body {
     background-color: hsl(var(--color-background));
     color: hsl(var(--color-foreground));
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
 
   /* 自定义滚动条样式 */
@@ -122,23 +126,23 @@
 @utility container {
   margin-inline: auto;
   padding-inline: 2rem;
-  
+
   @media (min-width: 640px) {
     max-width: 640px;
   }
-  
+
   @media (min-width: 768px) {
     max-width: 768px;
   }
-  
+
   @media (min-width: 1024px) {
     max-width: 1024px;
   }
-  
+
   @media (min-width: 1280px) {
     max-width: 1280px;
   }
-  
+
   @media (min-width: 1400px) {
     max-width: 1400px;
   }
@@ -148,4 +152,4 @@
   .text-balance {
     text-wrap: balance;
   }
-} 
+}

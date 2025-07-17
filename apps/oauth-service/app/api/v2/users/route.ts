@@ -6,6 +6,7 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 
 import { excludePassword } from '@repo/lib/node';
+import { listUsers, createUser } from '../../../../lib/auth/services/user-service';
 
 const userQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -36,55 +37,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     const { page, pageSize, sort, ...filters } = validation.data;
-
-    const where: Prisma.UserWhereInput = {};
-    if (filters.username) where.username = { contains: filters.username };
-    if (filters.organization) where.organization = { contains: filters.organization };
-    if (typeof filters.isActive === 'boolean') where.isActive = filters.isActive;
-
-    const [sortField, sortOrder] = sort.split(':');
-
-    // 验证排序字段是否有效，防止注入风险
-    const validSortFields = ['username', 'displayName', 'createdAt', 'organization'];
-    let orderBy: Prisma.UserOrderByWithRelationInput = { createdAt: 'desc' }; // 默认排序
-
-    if (
-      sortField &&
-      sortOrder &&
-      validSortFields.includes(sortField) &&
-      ['asc', 'desc'].includes(sortOrder)
-    ) {
-      orderBy = { [sortField]: sortOrder as 'asc' | 'desc' };
-    }
-
-    const totalItems = await prisma.user.count({ where });
-    const users = await prisma.user.findMany({
-      where,
-      take: pageSize,
-      skip: (page - 1) * pageSize,
-      orderBy,
-      select: {
-        id: true,
-        username: true,
-        displayName: true,
-        organization: true,
-        department: true,
-        isActive: true,
-        mustChangePassword: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return successResponse({
-      items: users,
-      pagination: {
-        totalItems,
-        currentPage: page,
-        pageSize,
-        totalPages: Math.ceil(totalItems / pageSize),
-      },
-    });
+    // 调用service层
+    const result = await listUsers({ page, pageSize, sort, filters });
+    return successResponse(result);
   } catch (error) {
     console.error('获取用户列表失败:', error);
     return errorResponse({ message: '服务器内部错误' });
@@ -114,17 +69,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         details: validationResult.error.flatten(),
       });
     }
-
-    const { password, ...userData } = validationResult.data;
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const newUser = await prisma.user.create({
-      data: {
-        ...userData,
-        passwordHash,
-      },
-    });
-
+    // 调用service层
+    const newUser = await createUser(validationResult.data);
     return successResponse(excludePassword(newUser), 201);
   } catch (error: any) {
     if (error.code === 'P2002') {

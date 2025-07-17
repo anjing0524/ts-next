@@ -13,4 +13,4 @@ module.exports = {
   arrowParens: 'always',
   endOfLine: 'lf',
   embeddedLanguageFormatting: 'auto',
-}; 
+};

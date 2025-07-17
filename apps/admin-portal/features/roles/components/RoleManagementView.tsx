@@ -7,16 +7,26 @@ import { useAuth } from '@repo/ui';
 import { useRoleManagement } from '../hooks/use-role-management';
 import type { Role } from '@/types/auth';
 
-const columns = (openEditModal: (role: Role) => void, openPermissionsModal: (role: Role) => void, openDeleteModal: (role: Role) => void): ColumnDef<Role>[] => [
+const columns = (
+  openEditModal: (role: Role) => void,
+  openPermissionsModal: (role: Role) => void,
+  openDeleteModal: (role: Role) => void
+): ColumnDef<Role>[] => [
   { accessorKey: 'name', header: 'Role Name' },
   { accessorKey: 'description', header: 'Description' },
   {
     id: 'actions',
     cell: ({ row }) => (
       <div className="space-x-2">
-        <Button variant="outline" size="sm" onClick={() => openPermissionsModal(row.original)}>Permissions</Button>
-        <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>Edit</Button>
-        <Button variant="destructive" size="sm" onClick={() => openDeleteModal(row.original)}>Delete</Button>
+        <Button variant="outline" size="sm" onClick={() => openPermissionsModal(row.original)}>
+          Permissions
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>
+          Edit
+        </Button>
+        <Button variant="destructive" size="sm" onClick={() => openDeleteModal(row.original)}>
+          Delete
+        </Button>
       </div>
     ),
   },
@@ -40,7 +50,10 @@ export const RoleManagementView = () => {
     setLimit,
   } = useRoleManagement();
 
-  const roleColumns = useMemo(() => columns(openEditModal, openPermissionsEditor, openDeleteConfirm), [openEditModal, openPermissionsEditor, openDeleteConfirm]);
+  const roleColumns = useMemo(
+    () => columns(openEditModal, openPermissionsEditor, openDeleteConfirm),
+    [openEditModal, openPermissionsEditor, openDeleteConfirm]
+  );
 
   if (isLoading) return <div>Loading roles...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -55,7 +68,7 @@ export const RoleManagementView = () => {
           </Button>
         )}
       </header>
-      
+
       <DataTable
         columns={roleColumns}
         data={roles}
@@ -67,7 +80,10 @@ export const RoleManagementView = () => {
         }}
         onPaginationChange={(updater) => {
           if (typeof updater === 'function') {
-            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            const newPagination = updater({
+              pageIndex: meta ? meta.currentPage - 1 : 0,
+              pageSize: limit,
+            });
             setPage(newPagination.pageIndex + 1);
             setLimit(newPagination.pageSize);
           } else {

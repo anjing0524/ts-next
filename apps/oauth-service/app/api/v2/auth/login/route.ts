@@ -8,7 +8,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { prisma } from '@repo/database';
-import { OAuth2Error, OAuth2ErrorCode, withErrorHandling, successResponse, errorResponse } from '@repo/lib/node';
+import {
+  OAuth2Error,
+  OAuth2ErrorCode,
+  withErrorHandling,
+  successResponse,
+  errorResponse,
+} from '@repo/lib/node';
 import { z } from 'zod';
 
 // 登录请求验证模式
@@ -199,7 +205,6 @@ async function loginHandler(req: NextRequest): Promise<NextResponse> {
     '登录成功'
   );
 }
-
 
 // 记录登录尝试
 async function logLoginAttempt(

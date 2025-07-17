@@ -66,11 +66,15 @@ export async function POST(req: NextRequest) {
     if (existingEntry) {
       // JTI already blacklisted. Could return 200 or 204 as it's effectively revoked.
       // Or return a specific message. For now, a 200 with a note.
-      return successResponse({
-        message: 'JTI已在黑名单',
-        jti: existingEntry.jti,
-        expiresAt: existingEntry.expiresAt,
-      }, 200, 'JTI已在黑名单');
+      return successResponse(
+        {
+          message: 'JTI已在黑名单',
+          jti: existingEntry.jti,
+          expiresAt: existingEntry.expiresAt,
+        },
+        200,
+        'JTI已在黑名单'
+      );
     }
 
     const newBlacklistEntry = await prisma.tokenBlacklist.create({
@@ -81,12 +85,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return successResponse({
-      message: 'Token JTI成功加入黑名单',
-      jti: newBlacklistEntry.jti,
-      tokenType: newBlacklistEntry.tokenType,
-      expiresAt: newBlacklistEntry.expiresAt,
-    }, 201, 'JTI黑名单添加成功');
+    return successResponse(
+      {
+        message: 'Token JTI成功加入黑名单',
+        jti: newBlacklistEntry.jti,
+        tokenType: newBlacklistEntry.tokenType,
+        expiresAt: newBlacklistEntry.expiresAt,
+      },
+      201,
+      'JTI黑名单添加成功'
+    );
   } catch (error: any) {
     // Prisma unique constraint violation (P2002) is handled by the findUnique check above.
     // This catch block is for other unexpected errors.

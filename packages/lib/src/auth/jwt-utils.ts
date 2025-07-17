@@ -35,7 +35,10 @@ export interface TokenValidationResult {
 /**
  * 获取或生成JWT密钥对
  */
-async function getOrGenerateKeyPair(): Promise<{ publicKey: jose.KeyLike; privateKey: jose.KeyLike }> {
+async function getOrGenerateKeyPair(): Promise<{
+  publicKey: jose.KeyLike;
+  privateKey: jose.KeyLike;
+}> {
   const publicKeyPem = process.env.JWT_PUBLIC_KEY;
   const privateKeyPem = process.env.JWT_PRIVATE_KEY;
 
@@ -44,10 +47,10 @@ async function getOrGenerateKeyPair(): Promise<{ publicKey: jose.KeyLike; privat
       // 确保PEM格式正确
       const cleanPublicKey = publicKeyPem.replace(/\\n/g, '\n');
       const cleanPrivateKey = privateKeyPem.replace(/\\n/g, '\n');
-      
+
       const publicKey = await jose.importSPKI(cleanPublicKey, 'RS256');
       const privateKey = await jose.importPKCS8(cleanPrivateKey, 'RS256');
-      
+
       console.log('Successfully imported existing JWT keys');
       return { publicKey, privateKey };
     } catch (error) {
@@ -96,7 +99,9 @@ export class JWTUtils {
       return jwt;
     } catch (error) {
       console.error('Failed to generate JWT token:', error);
-      throw new Error(`JWT token generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `JWT token generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -118,7 +123,10 @@ export class JWTUtils {
     return jose.decodeJwt(token);
   }
 
-  static async verifyAndDecodeRefreshToken(token: string, client: any): Promise<RefreshTokenPayload> {
+  static async verifyAndDecodeRefreshToken(
+    token: string,
+    client: any
+  ): Promise<RefreshTokenPayload> {
     const result = await this.verifyToken(token);
     if (!result.valid || !result.payload) {
       throw result.error || new Error('Invalid refresh token');

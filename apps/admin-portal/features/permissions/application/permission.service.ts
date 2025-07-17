@@ -5,7 +5,11 @@ import { PaginatedResponse } from '../../../lib/api';
 export class PermissionService {
   constructor(private permissionRepository: IPermissionRepository) {}
 
-  async getPermissions(params?: { offset?: number; limit?: number; search?: string }): Promise<PaginatedResponse<Permission>> {
+  async getPermissions(params?: {
+    offset?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Permission>> {
     return this.permissionRepository.getPermissions(params);
   }
 

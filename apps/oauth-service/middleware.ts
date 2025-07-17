@@ -13,14 +13,14 @@ export const config = {
 function getRequiredPermission(pathname: string, method: string): string | null {
   // 移除 /api/v2 前缀
   const cleanPath = pathname.replace('/api/v2', '');
-  
+
   // 遍历权限映射表，找到匹配的路径
   for (const [pattern, methods] of Object.entries(permissionMap)) {
     if (matchPath(cleanPath, pattern)) {
       return methods[method as keyof typeof methods] || null;
     }
   }
-  
+
   return null;
 }
 
@@ -32,7 +32,7 @@ function matchPath(path: string, pattern: string): boolean {
   const regexPattern = pattern
     .replace(/:[^/]+/g, '[^/]+') // 将 :param 替换为 [^/]+
     .replace(/\//g, '\\/'); // 转义斜杠
-  
+
   const regex = new RegExp(`^${regexPattern}$`);
   return regex.test(path);
 }
@@ -48,11 +48,10 @@ function logAuditEvent(
   details?: Record<string, any>
 ) {
   try {
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown';
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    
+
     // 简化的日志记录，仅使用console.log
     const logEntry = {
       timestamp: new Date().toISOString(),
@@ -67,7 +66,7 @@ function logAuditEvent(
       status: success ? 'SUCCESS' : 'FAILURE',
       details: details ? JSON.stringify(details) : undefined,
     };
-    
+
     // 在Edge Runtime中，我们只能使用console.log记录日志
     console.log('AUDIT_LOG:', JSON.stringify(logEntry));
   } catch (error) {
@@ -78,13 +77,15 @@ function logAuditEvent(
 export async function middleware(request: NextRequest) {
   const { pathname } = new URL(request.url);
   const method = request.method;
-  
+
   // 跳过健康检查和公开端点
-  if (pathname === '/api/v2/health' || 
-      pathname === '/api/v2/test' ||
-      pathname.startsWith('/api/v2/oauth/authorize') ||
-      pathname.startsWith('/api/v2/oauth/consent') ||
-      pathname.startsWith('/api/v2/oauth/token')) {
+  if (
+    pathname === '/api/v2/health' ||
+    pathname === '/api/v2/test' ||
+    pathname.startsWith('/api/v2/oauth/authorize') ||
+    pathname.startsWith('/api/v2/oauth/consent') ||
+    pathname.startsWith('/api/v2/oauth/token')
+  ) {
     return NextResponse.next();
   }
 
@@ -111,7 +112,7 @@ export async function middleware(request: NextRequest) {
     // 如果需要权限检查
     if (requiredPermission) {
       const hasPermission = context.permissions.includes(requiredPermission);
-      
+
       if (!hasPermission) {
         logAuditEvent(request, context, 'PERMISSION_DENIED', false, {
           requiredPermission,
@@ -119,7 +120,7 @@ export async function middleware(request: NextRequest) {
         });
 
         return NextResponse.json(
-          { 
+          {
             error: 'insufficient_permissions',
             message: `Required permission: ${requiredPermission}`,
             requiredPermission,
@@ -144,7 +145,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('Middleware error:', error);
-    
+
     return NextResponse.json(
       { error: 'server_error', message: 'Internal server error in middleware' },
       { status: 500 }

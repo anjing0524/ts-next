@@ -62,4 +62,4 @@ test.describe('简化集成测试', () => {
       expect(tokenData).toHaveProperty('token_type', 'Bearer');
     }
   });
-}); 
+});

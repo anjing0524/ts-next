@@ -7,16 +7,26 @@ import { useAuth } from '@repo/ui';
 import { useClientManagement } from '../hooks/use-client-management';
 import type { Client } from '@/types/auth';
 
-const columns = (openEditModal: (client: Client) => void, openDeleteModal: (client: Client) => void, rotateSecret: (clientId: string) => void): ColumnDef<Client>[] => [
+const columns = (
+  openEditModal: (client: Client) => void,
+  openDeleteModal: (client: Client) => void,
+  rotateSecret: (clientId: string) => void
+): ColumnDef<Client>[] => [
   { accessorKey: 'name', header: 'Client Name' },
   { accessorKey: 'clientId', header: 'Client ID' },
   {
     id: 'actions',
     cell: ({ row }) => (
       <div className="space-x-2">
-        <Button variant="outline" size="sm" onClick={() => rotateSecret(row.original.id)}>Rotate Secret</Button>
-        <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>Edit</Button>
-        <Button variant="destructive" size="sm" onClick={() => openDeleteModal(row.original)}>Delete</Button>
+        <Button variant="outline" size="sm" onClick={() => rotateSecret(row.original.id)}>
+          Rotate Secret
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>
+          Edit
+        </Button>
+        <Button variant="destructive" size="sm" onClick={() => openDeleteModal(row.original)}>
+          Delete
+        </Button>
       </div>
     ),
   },
@@ -40,7 +50,10 @@ export const ClientManagementView = () => {
     setLimit,
   } = useClientManagement();
 
-  const clientColumns = useMemo(() => columns(openEditModal, openDeleteConfirm, rotateSecret), [openEditModal, openDeleteConfirm, rotateSecret]);
+  const clientColumns = useMemo(
+    () => columns(openEditModal, openDeleteConfirm, rotateSecret),
+    [openEditModal, openDeleteConfirm, rotateSecret]
+  );
 
   if (isLoading) return <div>Loading clients...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -55,7 +68,7 @@ export const ClientManagementView = () => {
           </Button>
         )}
       </header>
-      
+
       <DataTable
         columns={clientColumns}
         data={clients}
@@ -67,7 +80,10 @@ export const ClientManagementView = () => {
         }}
         onPaginationChange={(updater) => {
           if (typeof updater === 'function') {
-            const newPagination = updater({ pageIndex: meta ? meta.currentPage - 1 : 0, pageSize: limit });
+            const newPagination = updater({
+              pageIndex: meta ? meta.currentPage - 1 : 0,
+              pageSize: limit,
+            });
             setPage(newPagination.pageIndex + 1);
             setLimit(newPagination.pageSize);
           } else {

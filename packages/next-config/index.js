@@ -5,16 +5,16 @@
  */
 function withNextConfig(config = {}) {
   return {
-  // 基础配置
-    output: "standalone",
+    // 基础配置
+    output: 'standalone',
     poweredByHeader: false,
     compress: true,
-    
+
     // 实验性功能
     experimental: {
-      optimizePackageImports: ["@repo/ui"],
+      optimizePackageImports: ['@repo/ui'],
     },
-    
+
     // 新增：告知 Next.js 转译这些工作区内的包
     transpilePackages: ['@repo/ui', '@repo/lib', '@repo/database'],
 
@@ -23,4 +23,4 @@ function withNextConfig(config = {}) {
   };
 }
 
-module.exports = withNextConfig; 
+module.exports = withNextConfig;

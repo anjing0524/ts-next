@@ -40,7 +40,10 @@ const jsonStringToArray = (defaultVal: string[] = []) =>
           const parsed = JSON.parse(val);
           return Array.isArray(parsed) ? parsed : defaultVal;
         } catch (e) {
-          return val.split(',').map((s) => s.trim()).filter(Boolean);
+          return val
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
         }
       }
       return val ?? defaultVal;

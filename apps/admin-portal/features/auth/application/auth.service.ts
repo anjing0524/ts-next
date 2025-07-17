@@ -4,7 +4,15 @@ import { User } from '../../users/domain/user';
 export class AuthService {
   constructor(private authRepository: IAuthRepository) {}
 
-  async login(username: string, password: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number }> {
+  async login(
+    username: string,
+    password: string
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    refreshExpiresIn: number;
+  }> {
     return this.authRepository.login({ username, password });
   }
 
@@ -12,7 +20,14 @@ export class AuthService {
     return this.authRepository.logout(refreshToken);
   }
 
-  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number }> {
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    refreshExpiresIn: number;
+  }> {
     return this.authRepository.refreshAccessToken(refreshToken);
   }
 

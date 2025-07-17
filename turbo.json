@@ -3,12 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**",
-        "dist/**",
-        ".next/standalone/**"
-      ],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", ".next/standalone/**"],
       "env": [
         "NODE_ENV",
         "NEXT_PUBLIC_*",
@@ -116,13 +111,6 @@
       "dependsOn": ["e2e"]
     }
   },
-  "globalDependencies": [
-    "package.json",
-    "pnpm-lock.yaml",
-    "tsconfig.json",
-    "components.json"
-  ],
-  "globalEnv": [
-    "NODE_ENV"
-  ]
+  "globalDependencies": ["package.json", "pnpm-lock.yaml", "tsconfig.json", "components.json"],
+  "globalEnv": ["NODE_ENV"]
 }

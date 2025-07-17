@@ -14,7 +14,7 @@ export class AuthHelpers {
    */
   static async loginAsUser(page: Page, username: string, password: string) {
     await page.goto('/login');
-    
+
     // Wait for the main login button to be visible, which is more reliable
     await page.waitForSelector('[data-testid="login-oauth-button"]', { timeout: 15000 });
     const loginButton = page.locator('[data-testid="login-oauth-button"]');

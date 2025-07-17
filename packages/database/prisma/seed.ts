@@ -825,16 +825,16 @@ async function main() {
       },
       create: scopeData,
     });
-    
+
     // 为admin:full_access scope关联所有权限
     if (scopeData.name === 'admin:full_access') {
       for (const permission of Object.values(seededPermissions)) {
         await prisma.scopePermission.upsert({
-          where: { 
-            scopeId_permissionId: { 
-              scopeId: createdScope.id, 
-              permissionId: permission.id 
-            } 
+          where: {
+            scopeId_permissionId: {
+              scopeId: createdScope.id,
+              permissionId: permission.id,
+            },
           },
           update: {},
           create: {
@@ -845,17 +845,17 @@ async function main() {
       }
       console.log(`Scope '${scopeData.name}' 已关联所有权限`);
     }
-    
+
     // 为其他scope关联对应的权限
     if (scopeData.name === 'order:read') {
       const orderReadPermission = seededPermissions['order:read'];
       if (orderReadPermission) {
         await prisma.scopePermission.upsert({
-          where: { 
-            scopeId_permissionId: { 
-              scopeId: createdScope.id, 
-              permissionId: orderReadPermission.id 
-            } 
+          where: {
+            scopeId_permissionId: {
+              scopeId: createdScope.id,
+              permissionId: orderReadPermission.id,
+            },
           },
           update: {},
           create: {
@@ -865,16 +865,16 @@ async function main() {
         });
       }
     }
-    
+
     if (scopeData.name === 'order:create') {
       const orderCreatePermission = seededPermissions['order:create'];
       if (orderCreatePermission) {
         await prisma.scopePermission.upsert({
-          where: { 
-            scopeId_permissionId: { 
-              scopeId: createdScope.id, 
-              permissionId: orderCreatePermission.id 
-            } 
+          where: {
+            scopeId_permissionId: {
+              scopeId: createdScope.id,
+              permissionId: orderCreatePermission.id,
+            },
           },
           update: {},
           create: {
@@ -884,16 +884,16 @@ async function main() {
         });
       }
     }
-    
+
     if (scopeData.name === 'product:read') {
       const productReadPermission = seededPermissions['product:read'];
       if (productReadPermission) {
         await prisma.scopePermission.upsert({
-          where: { 
-            scopeId_permissionId: { 
-              scopeId: createdScope.id, 
-              permissionId: productReadPermission.id 
-            } 
+          where: {
+            scopeId_permissionId: {
+              scopeId: createdScope.id,
+              permissionId: productReadPermission.id,
+            },
           },
           update: {},
           create: {
@@ -1081,7 +1081,14 @@ async function main() {
       ]),
       grantTypes: JSON.stringify(['authorization_code', 'refresh_token', 'client_credentials']),
       responseTypes: JSON.stringify(['code']),
-      allowedScopes: JSON.stringify(['openid', 'profile', 'order:read', 'order:create', 'product:read', 'offline_access']),
+      allowedScopes: JSON.stringify([
+        'openid',
+        'profile',
+        'order:read',
+        'order:create',
+        'product:read',
+        'offline_access',
+      ]),
       requirePkce: true,
       requireConsent: true,
       isActive: true,

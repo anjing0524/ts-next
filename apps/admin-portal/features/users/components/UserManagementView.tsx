@@ -39,7 +39,8 @@ export function UserManagementView() {
     [openEditModal, openDeleteConfirm]
   );
 
-  if (areUsersLoading && !usersMeta) { // Initial load
+  if (areUsersLoading && !usersMeta) {
+    // Initial load
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -50,8 +51,6 @@ export function UserManagementView() {
       </div>
     );
   }
-
-  
 
   return (
     <div className="space-y-4">
@@ -80,7 +79,7 @@ export function UserManagementView() {
         isProcessing={isProcessing}
         onSubmit={selectedUser ? handleUpdate : handleCreate}
       />
-      
+
       <DeleteConfirmDialog
         isOpen={isDeleteConfirmOpen}
         onClose={closeDeleteConfirm}
