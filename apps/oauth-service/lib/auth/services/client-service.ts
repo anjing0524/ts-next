@@ -12,7 +12,7 @@
 import { OAuthClient, ClientType } from '@prisma/client';
 import { prisma } from '@repo/database';
 import { AuthorizationUtils } from '@repo/lib/node';
-import { OAuth2Error, OAuth2ErrorCode } from '../errors';
+import { OAuth2Error, OAuth2ErrorCode } from '../../errors';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 

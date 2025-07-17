@@ -2,7 +2,7 @@
 // File path: app/api/v2/oauth/token/route.ts
 // 描述: 此文件实现了 OAuth 2.1 令牌端点 (Token Endpoint)，支持多种客户端认证方式
 // Description: This file implements the OAuth 2.1 Token Endpoint, supporting multiple client authentication methods
-// 
+//
 // 认证方式优先级 (Authentication method priority):
 // 1. client_assertion (JWT Client Assertion) - OAuth 2.1 推荐方式，最安全
 // 2. client_secret (Basic Auth 或请求体) - 兼容性支持，不推荐用于生产环境
@@ -27,16 +27,24 @@
 // 安全性: 强调客户端认证、PKCE、授权码和刷新令牌的一次性使用或轮换机制。
 // Security: Emphasizes client authentication, PKCE, and one-time use or rotation mechanisms for authorization codes and refresh tokens.
 
-import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
+import { OAuthClient } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
 import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
 import { NextRequest, NextResponse } from 'next/server';
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.
-import { AuthorizationUtils, JWTUtils, ScopeUtils, OAuth2Error, OAuth2ErrorCode, TokenError, withErrorHandling, RefreshTokenPayload } from '@repo/lib/node';
-import { addDays, addHours } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
-import { ClientAuthUtils } from '../../../../../lib/auth/utils2.0 辅助工具 (OAuth 2.0 helper utilities))
+import { ClientAuthUtils } from '@/lib/utils';
+import {
+  AuthorizationUtils,
+  JWTUtils,
+  OAuth2Error,
+  OAuth2ErrorCode,
+  RefreshTokenPayload,
+  ScopeUtils,
+  successResponse,
+  withErrorHandling,
+} from '@repo/lib/node';
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
-import { successResponse, errorResponse } from '@repo/lib/node';
+import { addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
@@ -48,6 +56,7 @@ import {
   tokenRefreshTokenGrantSchema, // refresh_token 授权的特定模式 (Specific schema for refresh_token grant)
   TokenSuccessResponse, // 成功响应的载荷类型 (Payload type for successful response)
 } from './schemas';
+import { RBACService } from '@/lib/auth/services/rbac-service';
 
 // 扩展TokenSuccessResponse类型以支持id_token
 interface ExtendedTokenSuccessResponse extends TokenSuccessResponse {
@@ -60,15 +69,15 @@ async function hashToken(token: string): Promise<string> {
 }
 
 // 辅助函数：验证刷新令牌
-async function validateRefreshToken(refreshToken: string, client: OAuthClient): Promise<RefreshTokenPayload> {
+async function validateRefreshToken(
+  refreshToken: string,
+  client: OAuthClient
+): Promise<RefreshTokenPayload> {
   try {
     const payload = await JWTUtils.verifyAndDecodeRefreshToken(refreshToken, client);
     return payload;
   } catch (error) {
-    throw new OAuth2Error(
-      'Invalid refresh token.',
-      OAuth2ErrorCode.InvalidGrant
-    );
+    throw new OAuth2Error('Invalid refresh token.', OAuth2ErrorCode.InvalidGrant);
   }
 }
 
@@ -92,7 +101,7 @@ async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
 
   // --- 步骤 1: 客户端认证 (优先支持 client_assertion) ---
   // --- Step 1: Client Authentication (prioritize client_assertion) ---
-  // 
+  //
   // 认证方式优先级 (Authentication method priority):
   // 1. client_assertion (JWT Client Assertion) - OAuth 2.1 推荐，最安全
   // 2. client_secret (Basic Auth 或请求体) - 兼容性支持
@@ -208,7 +217,7 @@ async function handleAuthorizationCodeGrant(
   );
 
   // 获取用户权限
-  const userPermissions = await AuthorizationUtils.getUserPermissions(validatedAuthCode.userId);
+  const userPermissions = await RBACService.getUserPermissionsArr(validatedAuthCode.userId);
 
   // 获取用户信息（用于可能的ID令牌）
   const user = await prisma.user.findUnique({
@@ -332,7 +341,9 @@ async function handleRefreshTokenGrant(
   }
 
   // 获取用户权限 (Get user permissions)
-  const userPermissions = await AuthorizationUtils.getUserPermissions(refreshTokenPayload.user_id as string);
+  const userPermissions = await RBACService.getUserPermissionsArr(
+    refreshTokenPayload.user_id as string
+  );
 
   // 生成新的访问令牌 (Generate new access token)
   const newAccessTokenString = await JWTUtils.generateToken({
@@ -410,7 +421,7 @@ async function handleClientCredentialsGrant(
   // 验证请求的范围 (Validate requested scope)
   const requestedScopes = data.scope ? ScopeUtils.parseScopes(data.scope) : [];
   let allowedScopes: string[] = [];
-  
+
   try {
     // 安全地解析允许的范围
     if (client.allowedScopes) {
@@ -423,7 +434,7 @@ async function handleClientCredentialsGrant(
   }
 
   // 检查请求的范围是否在允许的范围内 (Check if requested scopes are within allowed scopes)
-  const invalidScopes = requestedScopes.filter(scope => !allowedScopes.includes(scope));
+  const invalidScopes = requestedScopes.filter((scope) => !allowedScopes.includes(scope));
   if (invalidScopes.length > 0) {
     throw new OAuth2Error(
       `Invalid scope(s): ${invalidScopes.join(', ')}`,

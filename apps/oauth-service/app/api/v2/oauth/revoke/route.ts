@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
 import { JWTUtils, AuthorizationUtils } from '@repo/lib/node';
 import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
-import { withErrorHandling } from '@/app/utils/error-handler';
+import { withErrorHandling } from '@repo/lib/node';
 import * as jose from 'jose';
 import { revokeTokenRequestSchema } from './schemas';
 import { ApiResponse } from '@repo/lib/node';

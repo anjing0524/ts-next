@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { ClientService } from '@/lib/services/client-service';
+import { ClientService } from '@/lib/auth/services/client-service';
 import { successResponse, errorResponse } from '@repo/lib/node';
 
 export async function POST(

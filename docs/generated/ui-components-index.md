@@ -1,6 +1,12 @@
 # UI 组件索引
 
-本索引自动生成，列出了 `packages/ui/src/components/ui` 目录下的所有基础UI组件。
+本索引列出了项目中所有可用的 UI 组件，包括基础组件、复合组件和类型定义。
+
+**最后更新时间：2025-07-17**
+
+## 基础 UI 组件 (Basic UI Components)
+
+这些组件来自 `packages/ui/src/components/ui` 目录，提供基础的用户界面元素。
 
 | 组件名         | 文件路径            | 描述                                         |
 | -------------- | ------------------- | -------------------------------------------- |
@@ -34,3 +40,121 @@
 | `Textarea`     | `textarea.tsx`      | 多行文本输入框。                             |
 | `Tooltip`      | `tooltip.tsx`       | 鼠标悬停时显示的提示信息。                   |
 | `useToast`     | `use-toast.tsx`     | 用于触发和管理Toast通知的Hook。              |
+
+## 复合组件 (Composite Components)
+
+### 认证组件 (Auth Components)
+
+来自 `apps/admin-portal/components/auth/` 目录的认证相关组件。
+
+| 组件名               | 文件路径                              | 描述                               |
+| -------------------- | ------------------------------------- | ---------------------------------- |
+| `AuthLayout`         | `components/AuthLayout.tsx`          | 认证页面布局包装器。               |
+| `LoginForm`          | `components/auth/LoginForm.tsx`      | 用户登录表单组件。                 |
+| `OAuthConsentForm`   | `components/auth/OAuthConsentForm.tsx` | OAuth 授权同意表单。               |
+
+### 管理后台组件 (Admin Components)
+
+来自 `apps/admin-portal/components/admin/` 目录的管理后台专用组件。
+
+#### 客户端管理组件
+| 组件名               | 文件路径                                          | 描述                               |
+| -------------------- | ------------------------------------------------- | ---------------------------------- |
+| `ClientFormDialog`   | `components/admin/clients/ClientFormDialog.tsx`   | 客户端创建/编辑对话框。            |
+| `ClientSecretDialog` | `components/admin/clients/ClientSecretDialog.tsx` | 客户端密钥重置对话框。             |
+
+#### 角色管理组件
+| 组件名                   | 文件路径                                          | 描述                               |
+| ------------------------ | ------------------------------------------------- | ---------------------------------- |
+| `RoleFormDialog`         | `components/admin/roles/RoleFormDialog.tsx`       | 角色创建/编辑对话框。              |
+| `RolePermissionsDialog`  | `components/admin/roles/RolePermissionsDialog.tsx`| 角色权限分配对话框。               |
+
+#### 用户管理组件
+| 组件名               | 文件路径                                      | 描述                               |
+| -------------------- | --------------------------------------------- | ---------------------------------- |
+| `UserFormDialog`     | `components/admin/users/UserFormDialog.tsx`   | 用户创建/编辑对话框。              |
+
+### 通用组件 (Common Components)
+
+来自 `apps/admin-portal/components/common/` 目录的通用组件。
+
+| 组件名               | 文件路径                                     | 描述                               |
+| -------------------- | -------------------------------------------- | ---------------------------------- |
+| `DeleteConfirmDialog`| `components/common/DeleteConfirmDialog.tsx`  | 删除确认对话框。                   |
+| `ErrorDisplay`       | `components/common/ErrorDisplay.tsx`         | 错误信息显示组件。                 |
+| `SkeletonLoader`     | `components/common/SkeletonLoader.tsx`       | 骨架屏加载占位符。                 |
+| `Spinner`            | `components/common/Spinner.tsx`              | 加载旋转器组件。                   |
+
+### 布局组件 (Layout Components)
+
+来自 `apps/admin-portal/components/` 目录的布局组件。
+
+| 组件名               | 文件路径                              | 描述                               |
+| -------------------- | ------------------------------------- | ---------------------------------- |
+| `AdminHeader`        | `components/admin/header.tsx`        | 管理后台顶部导航栏。               |
+| `AdminSidebar`       | `components/admin/sidebar.tsx`       | 管理后台侧边栏导航。               |
+
+## 功能视图组件 (Feature View Components)
+
+### 管理视图组件
+
+来自 `apps/admin-portal/features/` 目录的功能视图组件。
+
+| 组件名                  | 文件路径                                                   | 描述                               |
+| ----------------------- | ---------------------------------------------------------- | ---------------------------------- |
+| `UserManagementView`    | `features/users/components/UserManagementView.tsx`        | 用户管理完整视图组件。             |
+| `ClientManagementView`  | `features/clients/components/ClientManagementView.tsx`    | 客户端管理完整视图组件。           |
+| `RoleManagementView`    | `features/roles/components/RoleManagementView.tsx`        | 角色管理完整视图组件。             |
+| `AuditLogView`          | `features/audit/components/AuditLogView.tsx`              | 审计日志查看组件。                 |
+
+## 数据表格组件 (Data Table Components)
+
+### 列定义组件
+
+| 组件名               | 文件路径                                      | 描述                               |
+| -------------------- | --------------------------------------------- | ---------------------------------- |
+| `UserTableColumns`   | `features/users/components/UserTableColumns.tsx`   | 用户表格列定义。                   |
+
+## 类型定义 (Type Definitions)
+
+### UI 相关类型
+
+来自 `packages/ui/src/types/` 和 `apps/admin-portal/types/` 目录的类型定义。
+
+| 类型名         | 文件路径            | 描述                       |
+| -------------- | ------------------- | -------------------------- |
+| `MenuItem`     | `ui/src/types/menu.ts` | 菜单项类型定义。           |
+| `MenuConfig`   | `ui/src/types/menu.ts` | 菜单配置类型定义。         |
+| `User`         | `admin-portal/types/auth.ts` | 用户类型定义。             |
+| `AuthState`    | `admin-portal/types/auth.ts` | 认证状态类型定义。         |
+
+## 使用说明
+
+### 组件导入方式
+
+```typescript
+// 基础UI组件
+import { Button, Input, Card } from '@repo/ui';
+
+// 管理后台组件
+import { UserManagementView } from '@/features/users/components/UserManagementView';
+import { ClientFormDialog } from '@/components/admin/clients/ClientFormDialog';
+
+// 通用组件
+import { ErrorDisplay, Spinner } from '@/components/common';
+```
+
+### 组件分类说明
+
+1. **基础组件**：提供原子级的 UI 元素，如按钮、输入框等
+2. **复合组件**：由多个基础组件组合而成的功能组件
+3. **布局组件**：负责页面整体布局结构
+4. **功能组件**：特定业务功能相关的组件
+5. **类型定义**：确保组件使用的类型安全
+
+### 开发规范
+
+- **命名规范**：组件名使用 PascalCase，文件名使用 kebab-case
+- **类型定义**：每个组件都应该有对应的 TypeScript 类型定义
+- **文档注释**：复杂组件需要添加 JSDoc 注释说明使用方式
+- **样式隔离**：使用 CSS Modules 或 Tailwind CSS 确保样式隔离

@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, Permission, PermissionType } from '@prisma/client';
+import { prisma } from '@repo/database';
 import { logger } from '@repo/lib/node';
 import { CacheManager, CacheInterface } from '@repo/cache/src/cache-manager';
 
@@ -19,11 +20,9 @@ interface BatchPermissionCheckResult {
 }
 
 export class PermissionService {
-  private prisma: PrismaClient;
   private cache: CacheInterface;
 
-  constructor(prisma: PrismaClient) {
-    this.prisma = prisma;
+  constructor() {
     this.cache = CacheManager.getInstance().getCache();
     logger.info('PermissionService initialized with cache manager');
   }
@@ -40,7 +39,7 @@ export class PermissionService {
       logger.error('Error reading from cache:', error);
     }
     logger.debug(`[DB Fetch] Fetching permissions from DB for user ${userId}`);
-    const userWithRoles = await this.prisma.user.findUnique({
+    const userWithRoles = await prisma.user.findUnique({
       where: { id: userId, isActive: true },
       include: {
         userRoles: {
@@ -65,11 +64,11 @@ export class PermissionService {
       return emptyPermissions;
     }
     const effectivePermissions = new Set<string>();
-    userWithRoles.userRoles.forEach((userRole) => {
+    userWithRoles.userRoles.forEach((userRole: any) => {
       if (userRole.role && userRole.role.isActive) {
         const isExpired = userRole.expiresAt && userRole.expiresAt.getTime() <= Date.now();
         if (!isExpired) {
-          userRole.role.rolePermissions.forEach((rolePermission: { permission: { isActive: any; name: any; }; }) => {
+          userRole.role.rolePermissions.forEach((rolePermission: { permission: { isActive: boolean; name: string; }; }) => {
             if (
               rolePermission.permission &&
               rolePermission.permission.isActive &&
@@ -146,4 +145,50 @@ export class PermissionService {
     }
     return results;
   }
+}
+
+/**
+ * 分页查询权限列表
+ * @param params 查询参数
+ */
+export async function listPermissions(params: {
+  page: number;
+  pageSize: number;
+  name?: string;
+  type?: PermissionType;
+  resource?: string;
+  action?: string;
+}) {
+  const { page, pageSize, name, type, resource, action } = params;
+  const where: Prisma.PermissionWhereInput = {};
+  if (name) where.name = { contains: name };
+  if (type) where.type = type;
+  if (resource) where.resource = { contains: resource };
+  if (action) where.action = { contains: action };
+
+  const permissions = await prisma.permission.findMany({
+    where,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    orderBy: { createdAt: 'desc' },
+  });
+  const total = await prisma.permission.count({ where });
+  return {
+    permissions,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  };
+}
+
+/**
+ * 创建新权限
+ * @param data 权限数据
+ */
+export async function createPermission(data: Prisma.PermissionCreateInput) {
+  const newPermission = await prisma.permission.create({
+    data,
+  });
+  return newPermission;
 } 

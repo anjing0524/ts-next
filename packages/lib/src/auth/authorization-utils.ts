@@ -1,6 +1,5 @@
 import * as crypto from 'crypto';
 import { prisma } from '@repo/database';
-import { RBACService } from '../../../../apps/oauth-service/lib/auth/services/rbac-service';
 
 // ===== 函数实现区域 (Function implementations) =====
 
@@ -93,19 +92,6 @@ export async function logAuditEvent(event: {
   }
 }
 
-/** 获取用户权限 */
-export async function getUserPermissions(userId: string): Promise<string[]> {
-  try {
-    const userPermissions = await RBACService.getUserPermissions(userId);
-    const permissions = userPermissions?.permissions || [];
-    const permissionsSet = new Set(permissions.filter((p): p is string => typeof p === 'string'));
-    return Array.from(permissionsSet);
-  } catch (error) {
-    console.error('Error getting user permissions:', error);
-    return [];
-  }
-}
-
 // ===== 兼容旧调用：导出同名对象 =====
 /**
  * 为了兼容旧代码中 AuthorizationUtils.method 的调用，
@@ -118,7 +104,6 @@ export const AuthorizationUtils = {
   generateNonce,
   generateAuthorizationCode,
   logAuditEvent,
-  getUserPermissions,
 } as const;
 
 // ===== 私有辅助函数 =====

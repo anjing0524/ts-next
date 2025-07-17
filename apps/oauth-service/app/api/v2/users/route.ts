@@ -1,12 +1,9 @@
+import { errorResponse, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
-import { successResponse, errorResponse } from '@repo/lib/node';
-import { prisma } from '@repo/database';
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
 
 import { excludePassword } from '@repo/lib/node';
-import { listUsers, createUser } from '../../../../lib/auth/services/user-service';
+import { createUser, listUsers } from '../../../../lib/auth/services/user-service';
 
 const userQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

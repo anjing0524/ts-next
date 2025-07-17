@@ -6,7 +6,7 @@ import { z } from 'zod';
 import {
   listPermissions,
   createPermission,
-} from '../../../../lib/auth/services/permission-service';
+} from '@/lib/auth/services/permission-service';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;

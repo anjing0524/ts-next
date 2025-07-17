@@ -3,12 +3,11 @@
 // 描述: OAuth 2.0 / OpenID Connect UserInfo端点 (OIDC Core 1.0)
 // Description: OAuth 2.0 / OpenID Connect UserInfo Endpoint (OIDC Core 1.0)
 
+import { successResponse, withErrorHandling } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@repo/lib/node';
-import { successResponse, errorResponse } from '@repo/lib/node';
 // authenticateBearer 已移至 @repo/lib/middleware
 import { OAuth2Error, OAuth2ErrorCode } from '@repo/lib/node';
-import { userInfoResponseSchema, UserInfoResponse } from './schemas';
+import { UserInfoResponse, userInfoResponseSchema } from './schemas';
 // import { ApiResponse } from '@repo/lib/types';
 import { getUserProfileData } from '@/lib/user-utils';
 

@@ -72,12 +72,12 @@ export class RBACService {
     }
 
     // 收集所有角色
-    const roles = user.userRoles.map((ur: { role: { name: any; }; }) => ur.role.name);
+    const roles = user.userRoles.map((ur: { role: { name: any } }) => ur.role.name);
 
     // 收集所有权限（去重）
     const permissionSet = new Set<string>();
-    user.userRoles.forEach((userRole: { role: { rolePermissions: any[]; }; }) => {
-      userRole.role.rolePermissions.forEach((rolePermission: { permission: { name: any; }; }) => {
+    user.userRoles.forEach((userRole: { role: { rolePermissions: any[] } }) => {
+      userRole.role.rolePermissions.forEach((rolePermission: { permission: { name: any } }) => {
         permissionSet.add(rolePermission.permission.name);
       });
     });
@@ -97,6 +97,19 @@ export class RBACService {
     return result;
   }
 
+  /** 获取用户权限 */
+  static async getUserPermissionsArr(userId: string): Promise<string[]> {
+    try {
+      const userPermissions = await RBACService.getUserPermissions(userId);
+      const permissions = userPermissions?.permissions || [];
+      const permissionsSet = new Set(permissions.filter((p): p is string => typeof p === 'string'));
+      return Array.from(permissionsSet);
+    } catch (error) {
+      console.error('Error getting user permissions:', error);
+      return [];
+    }
+  }
+
   /**
    * 检查用户是否拥有特定权限
    */
@@ -107,4 +120,4 @@ export class RBACService {
     }
     return userPermissions.permissions.includes(permissionName);
   }
-} 
+}

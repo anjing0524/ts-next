@@ -2,19 +2,18 @@
 // 描述: 用户名密码登录端点，用于OAuth2.1授权码流程的第一步
 // 主要职责:
 // 1. 验证用户名密码凭据
-// 2. 启动用户会话
 // 3. 重定向到授权端点继续OAuth流程
 
-import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcrypt';
 import { prisma } from '@repo/database';
 import {
+  errorResponse,
   OAuth2Error,
   OAuth2ErrorCode,
-  withErrorHandling,
   successResponse,
-  errorResponse,
+  withErrorHandling,
 } from '@repo/lib/node';
+import bcrypt from 'bcrypt';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 // 登录请求验证模式
@@ -30,23 +29,6 @@ const loginRequestSchema = z.object({
   code_challenge_method: z.string().optional(),
   nonce: z.string().optional(),
 });
-
-// 登录响应类型
-interface LoginSuccessResponse {
-  success: true;
-  redirect_url: string;
-  user: {
-    id: string;
-    username: string;
-    displayName?: string;
-  };
-}
-
-interface LoginErrorResponse {
-  success: false;
-  error: string;
-  error_description: string;
-}
 
 // 主处理函数
 async function loginHandler(req: NextRequest): Promise<NextResponse> {

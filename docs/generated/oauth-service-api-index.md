@@ -2,6 +2,8 @@
 
 本文档为 `oauth-service` v2 版本的 API 端点提供了一个全面的索引。所有端点都以 `/api/v2` 为前缀。
 
+**最后更新时间：2025-07-17**
+
 ## 1. 核心安全最佳实践 (Core Security Best Practices)
 
 `oauth-service` 的设计和实现遵循了多项安全最佳实践，以确保认证授权流程的健壮性。
@@ -15,7 +17,7 @@
 ### 1.2. 令牌安全与 JWKS
 
 - **JWT 签名**: 所有访问令牌（Access Token）和身份令牌（ID Token）都使用 RS256 非对称算法进行签名。
-- **JWKS 端点**: 服务通过 `/.well-known/jwks.json` 端点动态发布用于验证 JWT 签名的公钥。这允许客户端和资源服务器安全地、自动地获取和缓���公钥，而无需硬编码。
+- **JWKS 端点**: 服务通过 `/.well-known/jwks.json` 端点动态发布用于验证 JWT 签名的公钥。这允许客户端和资源服务器安全地、自动地获取和缓存公钥，而无需硬编码。
 
 ### 1.3. 速率限制
 
@@ -57,17 +59,19 @@
 
 ## 4. 用户管理 (User Management)
 
-用于管理用户账户��信息的端点。
+用于管理用户账户信息的端点。
 
-| HTTP 方法 | 路径                       | 功能描述                                             | 认证/权限                   |
-| :-------- | :------------------------- | :--------------------------------------------------- | :-------------------------- |
-| `GET`     | `/api/v2/users`            | 列出所有用户，支持分页和按用户名、组织等条件过滤。   | Bearer 令牌 (`user:list`)   |
-| `POST`    | `/api/v2/users`            | 创建一个新用户。                                     | Bearer 令牌 (`user:create`) |
-| `GET`     | `/api/v2/users/{userId}`   | 获取指定 ID 的单个用户的详细信息。                   | Bearer 令牌 (`user:read`)   |
-| `PUT`     | `/api/v2/users/{userId}`   | 更新指定 ID 的用户的基本信息（如显示名称、组织等）。 | Bearer 令牌 (`user:update`) |
-| `DELETE`  | `/api/v2/users/{userId}`   | 删除指定 ID 的用户。                                 | Bearer 令牌 (`user:delete`) |
-| `GET`     | `/api/v2/users/me`         | 获取当前登录用户的详细信息。                         | Bearer 令牌                 |
-| `PUT`     | `/api/v2/users/me/profile` | 更新当前登录用户的个人资料（如显示名称、头像等）。   | Bearer 令牌                 |
+| HTTP 方法 | 路径                             | 功能描述                                             | 认证/权限                   |
+| :-------- | :------------------------------- | :--------------------------------------------------- | :-------------------------- |
+| `GET`     | `/api/v2/users`                  | 列出所有用户，支持分页和按用户名、组织等条件过滤。   | Bearer 令牌 (`user:list`)   |
+| `POST`    | `/api/v2/users`                  | 创建一个新用户。                                     | Bearer 令牌 (`user:create`) |
+| `GET`     | `/api/v2/users/{userId}`         | 获取指定 ID 的单个用户的详细信息。                   | Bearer 令牌 (`user:read`)   |
+| `PUT`     | `/api/v2/users/{userId}`         | 更新指定 ID 的用户的基本信息（如显示名称、组织等）。 | Bearer 令牌 (`user:update`) |
+| `DELETE`  | `/api/v2/users/{userId}`         | 删除指定 ID 的用户。                                 | Bearer 令牌 (`user:delete`) |
+| `GET`     | `/api/v2/users/me`               | 获取当前登录用户的详细信息。                         | Bearer 令牌                 |
+| `PUT`     | `/api/v2/users/me/profile`       | 更新当前登录用户的个人资料（如显示名称、头像等）。   | Bearer 令牌                 |
+| `GET`     | `/api/v2/users/{userId}/roles`   | 获取指定用户的角色列表。                             | Bearer 令牌 (`user:read`)   |
+| `PUT`     | `/api/v2/users/{userId}/roles`   | 为指定用户分配角色。                                 | Bearer 令牌 (`user:update`) |
 
 ## 5. 客户端管理 (Client Management)
 
@@ -127,12 +131,67 @@
 | HTTP 方法 | 路径                           | 功能描述                                                         | 认证/权限   |
 | :-------- | :----------------------------- | :--------------------------------------------------------------- | :---------- |
 | `POST`    | `/api/v2/auth/check`           | **权限检查**: 检查当前用户的访问令牌是否具有执行特定操作的权限。 | Bearer 令牌 |
+| `POST`    | `/api/v2/auth/login`           | **用户登录**: 使用用户名和密码进行登录认证。                     | 公开        |
+| `POST`    | `/api/v2/auth/logout`          | **用户登出**: 清除用户会话和令牌。                               | Bearer 令牌 |
+| `GET`     | `/api/v2/auth/me`              | **获取当前用户**: 获取当前登录用户的基本信息。                   | Bearer 令牌 |
+| `POST`    | `/api/v2/auth/password/change` | **修改密码**: 修改当前用户的密码。                               | Bearer 令牌 |
 | `POST`    | `/api/v2/auth/password/forgot` | **忘记密码**: 请求发送密码重置链接。                             | 公开        |
+| `POST`    | `/api/v2/auth/password/reset`  | **重置密码**: 使用重置令牌重置用户密码。                         | 公开        |
 
-## 9. 内部管理与测试 (Internal & Testing)
+## 9. 审计与日志 (Audit & Logs)
+
+| HTTP 方法 | 路径                 | 功能描述                                                                    | 认证/权限                  |
+| :-------- | :------------------- | :-------------------------------------------------------------------------- | :------------------------- |
+| `GET`     | `/api/v2/audit-logs` | 获取审计日志，支持分页和按用户、操作等条件过滤。                            | Bearer 令牌 (`audit:list`) |
+
+## 10. 内部管理与测试 (Internal & Testing)
 
 | HTTP 方法 | 路径                          | 功能描述                                                                    | 认证/权限                  |
 | :-------- | :---------------------------- | :-------------------------------------------------------------------------- | :------------------------- |
-| `GET`     | `/api/v2/audit-logs`          | 获取审计日志，支持分页和按用户、操作等条件过滤。                            | Bearer 令牌 (`audit:list`) |
 | `POST`    | `/api/v2/revoke_token_by_jti` | **JTI 撤销**: (内部管理) 通过 JWT ID (JTI) 将令牌加入黑名单，实现强制下线。 | 内部 Admin API Key         |
-| `POST`    | `/api/v2/test-setup`          | **测试数据填充**: (仅限非���产环境) 清空并填充用于 E2E 测试的标准化数据库。 | 仅限非生产环境             |
+| `POST`    | `/api/v2/test-setup`          | **测试数据填充**: (仅限非生产环境) 清空并填充用于 E2E 测试的标准化数据库。 | 仅限非生产环境             |
+
+## 11. API 使用说明
+
+### 认证方式
+
+1. **Bearer Token**: 在请求头中添加 `Authorization: Bearer <token>`
+2. **Client Credentials**: 对于客户端认证，使用 HTTP Basic Auth 或表单参数
+3. **无状态JWT认证**: 系统采用无状态JWT令牌机制，不依赖服务器端session存储
+
+### 响应格式
+
+所有 API 响应都遵循统一的 JSON 格式：
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "操作成功",
+  "timestamp": "2025-07-17T10:30:00.000Z"
+}
+```
+
+### 错误处理
+
+错误响应格式：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "请求参数验证失败",
+    "details": { ... }
+  },
+  "timestamp": "2025-07-17T10:30:00.000Z"
+}
+```
+
+### 分页参数
+
+支持分页的端点接受以下参数：
+- `page`: 页码，默认为 1
+- `limit`: 每页数量，默认为 10，最大 100
+- `sort`: 排序字段和方向，如 `createdAt:desc`
+- `filter`: 过滤条件，如 `name:admin`

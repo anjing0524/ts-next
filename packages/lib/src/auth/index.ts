@@ -31,4 +31,3 @@ export type { RefreshTokenPayload, AccessTokenPayload, IdTokenPayload } from './
 
 // 只导出浏览器安全工具和类型
 export { BrowserPKCEUtils } from '../utils/browser-pkce-utils';
-// 不导出authorization-utils、rbac-service、@repo/cache等node-only依赖

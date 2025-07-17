@@ -5,7 +5,7 @@
 
 import { ClientAuthUtils } from '@/lib/utils'; // 本地工具类
 import { ConfigurationError, OAuth2Error, OAuth2ErrorCode } from '@/lib/errors';
-import { withErrorHandling } from '@/app/utils/error-handler';
+import { withErrorHandling } from '@repo/lib/node';
 import { prisma } from '@repo/database';
 import { JWTUtils, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
