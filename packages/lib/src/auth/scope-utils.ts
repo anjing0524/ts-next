@@ -1,4 +1,4 @@
-import type { OAuthClient } from '@prisma/client';
+import type { OAuthClient } from '@repo/database';
 
 // ===== 函数实现区域 (Function implementations) =====
 

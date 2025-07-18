@@ -1,8 +1,7 @@
+import { prisma, Prisma } from '@repo/database';
+import { errorResponse, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@repo/database';
-import { successResponse, errorResponse } from '@repo/lib/node';
-import { Prisma } from '@prisma/client';
 
 const scopeUpdateSchema = z.object({
   description: z.string().max(500).optional().nullable(),

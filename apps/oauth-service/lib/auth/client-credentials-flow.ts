@@ -13,7 +13,7 @@
  * - bcrypt (用于机密客户端密钥哈希比对)
  * - JWTUtils from ./oauth2 (用于JWT生成)
  */
-import { OAuthClient, ClientType as PrismaClientType } from '@prisma/client'; // Import Prisma generated type
+import { OAuthClient, ClientType as PrismaClientType } from '@repo/database'; // Import Prisma generated type
 import { prisma } from '@repo/database';
 import { AuthenticationError, CryptoError, JWTUtils, TokenGenerationError, ValidationError } from '@repo/lib/node';
 import bcrypt from 'bcrypt';

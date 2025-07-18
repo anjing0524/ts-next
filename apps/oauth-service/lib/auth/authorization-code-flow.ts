@@ -26,7 +26,7 @@ import {
   TokenValidationError,
   TokenExpiredError,
 } from '@repo/lib/node'; // 导入自定义错误类 (Import custom error classes)
-import { AuthorizationCode as PrismaAuthorizationCode, Prisma } from '@prisma/client'; // Prisma 类型 (Prisma type)
+import { AuthorizationCode as PrismaAuthorizationCode, Prisma } from '@repo/database';; // Prisma 类型 (Prisma type)
 
 // 授权码数据接口，定义了授权码对象的基本结构
 // AuthorizationCodeData interface, defines the basic structure of an authorization code object

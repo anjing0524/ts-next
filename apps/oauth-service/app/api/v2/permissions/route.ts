@@ -2,7 +2,7 @@ import {
   createPermission,
   listPermissions,
 } from '@/lib/auth/services/permission-service';
-import { PermissionType } from '@prisma/client';
+import { PermissionType } from '@repo/database';
 import { errorResponse, successResponse } from '@repo/lib/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';

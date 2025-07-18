@@ -1,5 +1,4 @@
-import { OAuthClient } from '@prisma/client'; // Prisma 生成的数据库模型类型 (Prisma generated database model types)
-import { prisma } from '@repo/database'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
+import { prisma,OAuthClient } from '@repo/database'; // Prisma ORM 用于数据库交互 (Prisma ORM for database interaction)
 import { NextRequest, NextResponse } from 'next/server';
 // 注意：Prisma模型中的 AuthorizationCode, RefreshToken, AccessToken 在此文件中未直接作为类型导入，因为它们通常在操作后通过Prisma客户端返回或作为参数传递。
 // Note: Prisma models AuthorizationCode, RefreshToken, AccessToken are not directly imported as types here as they are usually returned by Prisma client or passed as args after operations.

@@ -50,7 +50,7 @@
     "pkce-challenge": "^5.0.0",
     "prettier": "^3.5.3",
     "start-server-and-test": "^2.0.12",
-    "turbo": "^2.5.4",
+    "turbo": "^2.5.5",
     "typescript": "^5.8.2"
   },
   "packageManager": "pnpm@10.6.2",

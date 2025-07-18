@@ -10,23 +10,20 @@
 // 4. 检查用户是否已授予第三方客户端所请求的权限 (scopes)。如果未授予或部分授予，则重定向到同意页面。
 // 5. 如果所有检查通过且用户已同意，则生成一个授权码 (Authorization Code) 并将其通过重定向发送给第三方客户端。
 // 此端点支持 PKCE (Proof Key for Code Exchange, RFC 7636) 以增强安全性。
-
-import { NextRequest, NextResponse } from 'next/server';
-import { URL } from 'url';
-import { prisma } from '@repo/database';
-import { User } from '@prisma/client';
+import { prisma, User } from '@repo/database';
 import {
-  PKCEUtils,
-  ScopeUtils,
   AuthorizationUtils,
-  withErrorHandling,
   OAuth2Error,
   OAuth2ErrorCode,
+  PKCEUtils,
+  ScopeUtils,
+  withErrorHandling,
 } from '@repo/lib/node';
 import * as jose from 'jose';
+import { NextRequest, NextResponse } from 'next/server';
+import { URL } from 'url';
 import { authorizeQuerySchema } from './schemas';
-// storeAuthorizationCode 已删除，业务逻辑应在 route handler 中实现
-import { ValidationError, ConfigurationError } from '@repo/lib/node';
+import { ConfigurationError, ValidationError } from '@repo/lib/node';
 
 // --- 认证中心UI相关的常量 --- (Constants related to Auth Center UI - preserved)
 const AUTH_CENTER_LOGIN_PAGE_URL = process.env.AUTH_CENTER_LOGIN_PAGE_URL || '/login';

@@ -1,4 +1,4 @@
-import { PermissionType, Prisma } from '@prisma/client';
+import { PermissionType, Prisma } from '@repo/database';
 import { CacheInterface, CacheManager } from '@repo/cache/src/cache-manager';
 import { prisma } from '@repo/database';
 import { logger } from '@repo/lib/node';

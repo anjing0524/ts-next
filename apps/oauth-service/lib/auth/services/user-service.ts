@@ -2,7 +2,7 @@
 import { prisma } from '@repo/database';
 import { excludePassword } from '@repo/lib/node';
 import bcrypt from 'bcrypt';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, User } from '@repo/database';
 
 /**
  * 根据用户ID获取用户详细信息，包括其角色和权限。

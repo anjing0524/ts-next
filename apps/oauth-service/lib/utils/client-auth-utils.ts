@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import { NextRequest } from 'next/server';
 import { prisma } from '@repo/database';
 import { OAuth2Error, OAuth2ErrorCode, ConfigurationError } from '../errors';
-import type { OAuthClient as Client } from '@prisma/client';
+import type { OAuthClient as Client } from '@repo/database';
 
 /**
  * 客户端认证工具类 - 提供OAuth2客户端认证功能

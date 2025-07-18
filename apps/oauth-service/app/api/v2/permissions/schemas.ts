@@ -1,6 +1,6 @@
 // app/api/v2/permissions/schemas.ts
 import { z } from 'zod';
-import { PermissionType } from '@prisma/client'; // Import enum from Prisma client
+import { PermissionType } from '@repo/database'; // Import enum from Prisma client
 
 /**
  * Zod schema for a single Permission response.

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { z } from 'zod';
-import { ClientType } from '@prisma/client';
+import { ClientType } from '@repo/database';
 import { ClientService } from '@/lib/auth/services/client-service';
 import { successResponse, errorResponse } from '@repo/lib/node';
 

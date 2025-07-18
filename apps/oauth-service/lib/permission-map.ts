@@ -1,5 +1,5 @@
 // apps/oauth-service/lib/permission-map.ts
-import { HttpMethod } from '@prisma/client';
+import { HttpMethod } from '@repo/database';
 
 type PermissionMap = Record<string, Partial<Record<HttpMethod, string>>>;
 

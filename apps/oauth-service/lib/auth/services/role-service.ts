@@ -1,6 +1,6 @@
 // 角色服务层，负责角色相关业务逻辑
 // @file apps/oauth-service/app/services/role-service.ts
-import { Prisma, Role } from '@prisma/client';
+import { Prisma, Role } from '@repo/database';
 import { prisma } from '@repo/database';
 
 /**
