@@ -22,39 +22,14 @@ impl Default for HeatRenderer {
 impl HeatRenderer {
     /// 创建新的热图渲染器
     pub fn new() -> Self {
-        // 预计算256个颜色值，使用u32存储避免String分配
-        let mut color_cache = Vec::with_capacity(256);
-        for i in 0..256 {
-            let t = i as f64 / 255.0;
-            let color = Self::calculate_heat_color_u32(t);
-            color_cache.push(color);
+        // 预计算100个颜色值，对应0.0-1.0的归一化值
+        let mut color_cache = Vec::with_capacity(100);
+        for i in 0..100 {
+            let norm = i as f64 / 99.0;
+            color_cache.push(Self::calculate_heat_color_static(norm));
         }
 
         Self { color_cache }
-    }
-
-    #[inline(always)]
-    fn calculate_heat_color_u32(t: f64) -> u32 {
-        // 直接返回CSS颜色字符串的u32表示
-        let idx = (t * 255.0).clamp(0.0, 255.0) as usize;
-        match idx {
-            0..=63 => 0xFF440154,    // 紫色
-            64..=127 => 0xFF31688E, // 蓝色  
-            128..=191 => 0xFF35B778, // 绿色
-            _ => 0xFFFDE725,        // 黄色
-        }
-    }
-
-    #[inline(always)]
-    pub fn get_heat_color(&self, value: f64) -> &str {
-        let idx = (value * 255.0).clamp(0.0, 255.0) as usize;
-        // 直接返回预计算的CSS颜色字符串
-        match idx {
-            0..=63 => "#440154",
-            64..=127 => "#31688E",
-            128..=191 => "#35B778", 
-            _ => "#FDE725",
-        }
     }
 
     /// 绘制热图 - 按 tick 区间绘制色块

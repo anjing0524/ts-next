@@ -16,8 +16,6 @@ pub struct DataManager {
     cached_data_range: Option<DataRange>,
     /// 数据范围是否有效
     cached_range_valid: bool,
-    /// 缓存的坐标数据，避免重复计算
-    cached_coordinates: Option<(f64, f64, f64)>,  // (min, max, tick)
 }
 
 impl DataManager {
@@ -104,7 +102,7 @@ impl DataManager {
         (0.0, 0.0, 0.0)
     }
 
-    /// 计算可见区域的价格范围和最大成交量，使用缓存避免重复计算
+    /// 计算可见区域的价格范围和最大成交量
     pub fn calculate_data_ranges(&mut self) -> (f64, f64, f64) {
         // 如果缓存有效，直接返回
         if self.cached_range_valid && self.cached_data_range.is_some() {
@@ -113,35 +111,17 @@ impl DataManager {
 
         // 获取数据
         if let Some(items) = &self.items {
-            let (start, count, _) = self.visible_range.get_range();
-            if count == 0 {
-                let result = (0.0, 100.0, 1000.0);
-                self.cached_data_range = Some(DataRange { min_low: 0.0, max_high: 100.0, max_volume: 1000.0 });
-                self.cached_range_valid = true;
-                return result;
-            }
+            // 使用VisibleRange的calculate_data_ranges方法计算数据范围
+            let data_range = self.visible_range.calculate_data_ranges(items);
 
-            let end_idx = (start + count).min(items.len());
-            let mut min_low = f64::MAX;
-            let mut max_high = f64::MIN;
-            let mut max_volume = f64::MIN;
-
-            // 批量计算，减少函数调用开销
-            for i in start..end_idx {
-                let item = items.get(i);
-                min_low = min_low.min(item.low());
-                max_high = max_high.max(item.high());
-                max_volume = max_volume.max(item.volume() as f64);
-            }
-
-            let data_range = DataRange { min_low, max_high, max_volume };
+            // 缓存计算结果
             self.cached_data_range = Some(data_range);
             self.cached_range_valid = true;
-            
-            (min_low, max_high, max_volume)
-        } else {
-            (0.0, 100.0, 1000.0)
+
+            return data_range.get();
         }
+
+        (0.0, 0.0, 0.0)
     }
 
     /// 处理鼠标滚轮事件
