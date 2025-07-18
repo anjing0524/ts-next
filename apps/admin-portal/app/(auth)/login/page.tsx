@@ -13,69 +13,47 @@ import {
   Alert,
 } from '@repo/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/browser';
 
 /**
  * 管理员门户登录页面
- * 实现OAuth2.1授权码+PKCE流程，支持用户名密码验证
+ * 实现OAuth2.1授权码+PKCE流程，直接重定向到oauth-service授权端点
  */
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleOAuthLogin = async () => {
     setIsLoading(true);
 
     try {
-      // 获取OAuth参数
-      const clientId = searchParams.get('client_id') || 'admin-portal-client';
-      const redirectUri =
-        searchParams.get('redirect_uri') || `${window.location.origin}/auth/callback`;
-      const state = searchParams.get('state') || '';
-      const scope = searchParams.get('scope') || 'openid profile user:read';
-      const codeChallenge = searchParams.get('code_challenge') || '';
-      const codeChallengeMethod = searchParams.get('code_challenge_method') || 'S256';
-      const nonce = searchParams.get('nonce') || '';
+      // 生成PKCE参数
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      const state = generateCodeVerifier();
 
-      // 验证用户名密码并获取授权码
-      const response = await fetch('/api/v2/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          state,
-          scope,
-          response_type: 'code',
-          code_challenge: codeChallenge,
-          code_challenge_method: codeChallengeMethod,
-          nonce,
-        }),
+      // 存储PKCE参数到sessionStorage
+      sessionStorage.setItem('oauth_code_verifier', codeVerifier);
+      sessionStorage.setItem('oauth_state', state);
+
+      // 构建OAuth授权URL
+      const oauthParams = new URLSearchParams({
+        client_id: 'admin-portal-client',
+        redirect_uri: `${window.location.origin}/auth/callback`,
+        response_type: 'code',
+        scope: 'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
+        state: state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
       });
 
-      const data = await response.json();
-
-      if (!data.success) {
-        setError(data.error_description || '登录失败');
-        return;
-      }
-
-      // 重定向到授权端点继续OAuth流程
-      window.location.href = data.redirect_url;
-    } catch (err) {
-      setError('网络错误或服务器异常');
-      console.error('登录错误:', err);
-    } finally {
+      // 重定向到oauth-service授权端点
+      const authUrl = `/api/v2/oauth/authorize?${oauthParams.toString()}`;
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('OAuth登录初始化失败:', error);
       setIsLoading(false);
     }
   };
@@ -103,61 +81,19 @@ function LoginForm() {
           <h1 className="text-2xl font-bold text-center mb-6">登录认证中心</h1>
           <CardTitle data-slot="card-title">登录认证中心</CardTitle>
           <CardDescription className="text-gray-600">
-            请输入您的用户名和密码登录管理后台
+            点击下方按钮开始OAuth2.1认证流程
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <p className="text-sm text-red-600 ml-2">{error}</p>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-                用户名
-              </Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="请输入用户名"
-                required
-                className="w-full"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                密码
-              </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="请输入密码"
-                required
-                className="w-full"
-                disabled={isLoading}
-              />
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-4">
+                系统将使用OAuth2.1授权码流程进行安全认证
+              </p>
             </div>
 
             <Button
-              type="submit"
+              onClick={handleOAuthLogin}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200"
               disabled={isLoading}
             >
@@ -183,17 +119,23 @@ function LoginForm() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  登录中...
+                  正在初始化...
                 </>
               ) : (
-                '登录'
+                '开始登录'
               )}
             </Button>
-          </form>
 
-          {/* 忘记密码提示 */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">忘记密码？请联系系统管理员重置密码。</p>
+            {/* 技术说明 */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">技术说明</h3>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li>• 使用OAuth2.1授权码流程</li>
+                <li>• 强制PKCE (Proof Key for Code Exchange)</li>
+                <li>• State参数防止CSRF攻击</li>
+                <li>• 安全的令牌交换机制</li>
+              </ul>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -201,7 +143,6 @@ function LoginForm() {
   );
 }
 
-// 代理登录端点，处理admin-portal的登录请求
 export default function LoginPage() {
   return <LoginForm />;
 }

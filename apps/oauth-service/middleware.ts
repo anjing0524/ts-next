@@ -27,14 +27,15 @@ function getRequiredPermission(pathname: string, method: string): string | null 
 /**
  * 简单的路径匹配函数
  */
-function matchPath(path: string, pattern: string): boolean {
+function matchPath(requestPath: string, pattern: string): boolean {
   // 将模式转换为正则表达式
   const regexPattern = pattern
-    .replace(/:[^/]+/g, '[^/]+') // 将 :param 替换为 [^/]+
-    .replace(/\//g, '\\/'); // 转义斜杠
+    .replace(/\/\*/g, '/.*') // 将 /* 转换为 /.*
+    .replace(/\//g, '\\/') // 转义斜杠
+    .replace(/\*/g, '.*'); // 将 * 转换为 .*
 
   const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(path);
+  return regex.test(requestPath);
 }
 
 /**
@@ -75,79 +76,71 @@ function logAuditEvent(
 }
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = new URL(request.url);
+  const pathname = request.nextUrl.pathname;
   const method = request.method;
 
-  // 跳过健康检查和公开端点
-  if (
-    pathname === '/api/v2/health' ||
-    pathname === '/api/v2/test' ||
-    pathname.startsWith('/api/v2/oauth/authorize') ||
-    pathname.startsWith('/api/v2/oauth/consent') ||
-    pathname.startsWith('/api/v2/oauth/token')
-  ) {
+  // 跳过不需要认证的路径
+  // Skip paths that don't require authentication
+  const publicPaths = [
+    '/api/v2/oauth/authorize',
+    '/api/v2/oauth/token',
+    '/api/v2/oauth/userinfo',
+    '/api/v2/oauth/revoke',
+    '/api/v2/oauth/introspect',
+    '/api/v2/health',
+  ];
+
+  if (publicPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // 获取所需权限
+  // Get required permission
+  const requiredPermission = getRequiredPermission(pathname, method);
+
+  if (!requiredPermission) {
+    // 如果没有配置权限要求，允许访问
+    // If no permission is configured, allow access
     return NextResponse.next();
   }
 
   try {
-    // 执行Bearer令牌认证
-    const authResult = await authenticateBearer(request, {
-      requireUserContext: true,
-    });
+    // 验证Bearer令牌
+    // Validate Bearer token
+    const authContext = await authenticateBearer(request);
 
-    if (!authResult.success) {
-      return authResult.response!;
-    }
-
-    if (!authResult.context) {
+    if (!authContext) {
       return NextResponse.json(
-        { error: 'server_error', message: 'Authentication context missing' },
-        { status: 500 }
+        { error: 'unauthorized', error_description: '无效的访问令牌' },
+        { status: 401 }
       );
     }
 
-    const { context } = authResult;
-    const requiredPermission = getRequiredPermission(pathname, method);
+    // 检查权限
+    // Check permissions
+    const hasPermission = authContext.context?.permissions?.includes(requiredPermission);
 
-    // 如果需要权限检查
-    if (requiredPermission) {
-      const hasPermission = context.permissions.includes(requiredPermission);
-
-      if (!hasPermission) {
-        logAuditEvent(request, context, 'PERMISSION_DENIED', false, {
-          requiredPermission,
-          userPermissions: context.permissions,
-        });
-
-        return NextResponse.json(
-          {
-            error: 'insufficient_permissions',
-            message: `Required permission: ${requiredPermission}`,
-            requiredPermission,
-            userPermissions: context.permissions,
-          },
-          { status: 403 }
-        );
-      }
+    if (!hasPermission) {
+      return NextResponse.json(
+        { 
+          error: 'insufficient_scope', 
+          error_description: `缺少所需权限: ${requiredPermission}` 
+        },
+        { status: 403 }
+      );
     }
 
-    // 记录成功的审计日志
-    logAuditEvent(request, context, 'API_ACCESS', true, {
-      method,
-      pathname,
-      requiredPermission,
-    });
-
-    // 将认证上下文添加到请求中，供后续处理使用
-    const requestWithContext = request.clone();
-    (requestWithContext as any).authContext = context;
-
+    // 权限验证通过，继续处理请求
+    // Permission validation passed, continue processing request
     return NextResponse.next();
   } catch (error) {
-    console.error('Middleware error:', error);
-
+    console.error('中间件错误:', error);
+    
     return NextResponse.json(
-      { error: 'server_error', message: 'Internal server error in middleware' },
+      { 
+        error: 'server_error', 
+        error_description: '服务器内部错误' 
+      },
       { status: 500 }
     );
   }

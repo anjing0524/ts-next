@@ -992,6 +992,53 @@ async function main() {
 
   // 5.3 Seed OAuth Clients (保留现有客户端)
   console.log('正在填充 OAuth 客户端...'); // Seeding OAuth Clients...
+  
+  // Admin Portal Client (admin-portal应用使用的客户端)
+  const adminPortalSecretRaw = 'admin-portal-secret-key-change-this-in-production';
+  const hashedAdminPortalSecret = await bcrypt.hash(adminPortalSecretRaw, SALT_ROUNDS);
+
+  await prisma.oAuthClient.upsert({
+    where: { clientId: 'admin-portal-client' },
+    update: {
+      clientSecret: hashedAdminPortalSecret,
+      name: '管理员门户',
+      allowedScopes: JSON.stringify([
+        'openid', 'profile', 'email', 'user:read', 'user:write', 'role:read', 
+        'role:write', 'permission:read', 'permission:write', 'client:read', 
+        'client:write', 'audit:read'
+      ]),
+    },
+    create: {
+      clientId: 'admin-portal-client',
+      clientSecret: hashedAdminPortalSecret,
+      name: '管理员门户',
+      description: '企业统一认证管理后台，用于用户和权限管理',
+      clientType: 'CONFIDENTIAL',
+      redirectUris: JSON.stringify([
+        'http://localhost:3002/auth/callback',
+        'https://admin-portal.example.com/auth/callback',
+      ]),
+      grantTypes: JSON.stringify(['authorization_code', 'refresh_token']),
+      responseTypes: JSON.stringify(['code']),
+      allowedScopes: JSON.stringify([
+        'openid', 'profile', 'email', 'user:read', 'user:write', 'role:read', 
+        'role:write', 'permission:read', 'permission:write', 'client:read', 
+        'client:write', 'audit:read'
+      ]),
+      requirePkce: true,
+      requireConsent: false, // 管理员门户不需要用户同意
+      accessTokenTtl: 3600, // 1小时
+      refreshTokenTtl: 86400, // 24小时
+      authorizationCodeLifetime: 600, // 10分钟
+      isActive: true,
+      tokenEndpointAuthMethod: 'client_secret_basic',
+    },
+  });
+  console.log(
+    `OAuth客户端已更新/创建: admin-portal-client (原始密钥: ${adminPortalSecretRaw})`
+  );
+
+  // Auth Center Admin Client (现有的认证中心管理客户端)
   const adminClientSecretRaw = 'authcenteradminclientsecret'; // CHANGE THIS IN PRODUCTION
   const hashedAdminClientSecret = await bcrypt.hash(adminClientSecretRaw, SALT_ROUNDS);
 

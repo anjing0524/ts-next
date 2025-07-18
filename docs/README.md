@@ -1,106 +1,206 @@
-# 项目文档库
-
-**文档版本**: v3.1.0
-**创建日期**: 2025-01-28
-**最后更新**: 2025-07-08
-**维护团队**: 开发团队
-**状态**: 正式版 - 核心功能已完成
+# OAuth2.1 认证授权系统
 
 ## 项目概述
 
-本项目是基于 **Turborepo** 的 **OAuth2.1 认证授权中心和微服务平台**，采用现代化技术栈构建企业级身份认证和授权解决方案。
+本项目是一个基于 Next.js 15 的 OAuth2.1 认证授权系统，采用 monorepo 架构，包含以下核心组件：
 
-### 核心特性
+- **oauth-service**: OAuth2.1 认证授权服务
+- **admin-portal**: 管理后台，作为 OAuth 客户端
+- **共享库**: 工具函数和 UI 组件
 
-- **高性能网关**: 基于 Rust 和 Pingora 的高性能反向代理。
-- **标准 OAuth2.1 + OIDC**: 完全符合最新的 OAuth 2.1 和 OpenID Connect 规范。
-- **强制 PKCE**: 增强公共客户端的安全性，有���防止授权码拦截攻击。
-- **现代化技术栈**: Next.js 15, React 19, TypeScript 5, Prisma 6。
-- **企业级 RBAC**: 支持灵活的基于角色的访问控制。
-- **微服务架构**: 采用 Turborepo 管理的 Monorepo，实现服务间松耦合、高可扩展。
-- **统一监控与可观测性**: 集成 Prometheus, Grafana, 和 Distributed Tracing (B3 Propagation)。
-- **内网环境优化**: 专为企业内网环境设计，注重安全与性能。
+## 系统架构
 
-### 技术栈概览
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   admin-portal  │    │  oauth-service  │    │   shared libs   │
+│   (OAuth Client)│◄──►│  (OAuth Server) │◄──►│   (@repo/*)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
-- **网关层**: Rust, Pingora
-- **前端**: Next.js, React, TypeScript, TailwindCSS
-- **后端**: Node.js, Next.js API Routes
-- **数据库**: Prisma, SQLite (开发), MySQL (生产)
-- **认证与安全**: OAuth2.1, OIDC, JWT (jose), bcrypt
-- **构建与管理**: Turborepo, PNPM, Docker, Cargo
-- **测试**: Jest, Playwright, Testing Library
-- **日志与监控**: Winston, Prometheus, Grafana
-
-## 微服务应用
-
-| 服务名称        | 端口   | 描述                                                                          |
-| --------------- | ------ | ----------------------------------------------------------------------------- |
-| `pingora-proxy` | `8080` | **高性能反向代理网关**，作为所有服务的统一入口，负责路由、负载均衡和监控。    |
-| `oauth-service` | `3001` | **OAuth2.1 认证授权核心服务**，处理用户认证、令牌颁发、客户端管理和权限控制。 |
-| `admin-portal`  | `3002` | **系统管理后台**，提供用户、角色、权限和客户端的可视化管理���面。             |
-| `kline-service` | `3003` | **K线图服务**，提供数据可视化功能，包括实时数据处理和图表渲染。               |
-| `flow-service`  | `3004` | **工作流服务**，支持业务流程的可视化设计、执行和状态管理。                    |
-| `test-service`  | `3005` | 用于集成和功能测试的示例服务。                                                |
-
-## 核心文档导航
-
-| 文档名称                                                      | 描述                                                        | 状态      |
-| ------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
-| [技术栈版本对照表](./guidelines/tech-stack-versions.md)       | 项目所有依赖的详细版本信息和标准化建议。                    | ✅ 已更新 |
-| [系统架构设计](./design/系统架构设计.md)                      | 基于 Turborepo 的微服务架构、服务间通信和数据流设计。       | ✅ 已更新 |
-| [OAuth 服务 API 索引](./generated/oauth-service-api-index.md) | `oauth-service` 的完整 API 端点、请求/响应格式和安全说明。  | ✅ 已更新 |
-| [API 设计规范](./guidelines/API设计规范.md)                   | 项目统一的 RESTful API 设计标准和最佳实践。                 | ✅ 已更新 |
-| [JWT 认证授权使用说明](./guidelines/JWT认证授权使用说明.md)   | 关于如何与 OAuth2.1 流程集成以及如何处理 JWT 的开发者指南。 | ⚪️ 待审查 |
-| [部署与运维文档](./ops/部署运维文档.md)                       | 关于如何使用 Docker 和 K8s 部署、配置和维护本系统的指南。   | ⏳ 待更新 |
-| [测试策略文档](./tests/测试策略文档.md)                       | 项目的单元测试、集成测试和端到端（E2E）测试策略。           | ⚪️ 待审查 |
-| [OAuth 集成验证报告](./reports/oauth-verification-report.md)  | OAuth 2.1 集成验证的详细报告                                | ✅ 已更新 |
-| [OAuth 集成计划](./reports/oauth-integration-plan.md)         | OAuth 2.1 集成分析与完整计划                                | ✅ 已更新 |
-| [设计文档摘要](./design/design-summary.md)                    | 更新后的设计文档汇总                                        | ✅ 已更新 |
-
-## 快速入门
+## 快速开始
 
 ### 1. 环境准备
 
-- 安装 [Node.js](https://nodejs.org/) (版本请参考 `.node-version` 文件)
-- 安装 [pnpm](https://pnpm.io/) (版本请参考 `package.json` 中的 `packageManager` 字段)
-- 安装 [Rust](https://www.rust-lang.org/tools/install) 和 `cargo`
-
-### 2. 安装与启动
-
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd ts-next-template
-
-# 安装所有依赖
+# 安装依赖
 pnpm install
 
-# 首次启动或Schema变更后，同步数据库
-pnpm db:push
+# 生成 Prisma 客户端
+pnpm db:generate
 
-# 启动所有微服务进行本地开发
-pnpm dev
+# 推送数据库架构
+pnpm db:push
 ```
 
-### 3. 运行测试
+### 2. 系统初始化
+
+**重要**: 系统使用 Prisma seed 脚本进行初始化，这是正确的数据管理方式。请按照以下步骤操作：
 
 ```bash
-# 运行所有测试
+# 完整系统初始化（推荐）
+pnpm db:seed
+
+# 或者使用别名命令
+pnpm oauth:setup
+```
+
+**初始化说明**:
+- 系统使用 `packages/database/prisma/seed.ts` 管理初始数据，符合最佳实践
+- 配置修改应通过管理页面操作，而不是代码中硬编码
+- oauth-service 专注于 OAuth2.1 核心功能，不处理初始化
+- seed 脚本会创建所有必要的角色、权限、用户和 OAuth 客户端
+
+**初始化内容包括**:
+- 默认角色：SYSTEM_ADMIN、USER_ADMIN、PERMISSION_ADMIN 等
+- 默认权限：完整的 RBAC 权限体系
+- 默认用户：admin（管理员）、testuser（测试用户）等
+- OAuth 客户端：admin-portal-client、auth-center-admin-client 等
+
+### 3. 启动服务
+
+```bash
+# 启动所有服务
+pnpm dev
+
+# 或者分别启动
+pnpm dev:oauth    # OAuth 服务 (http://localhost:3002)
+pnpm dev:admin    # 管理后台 (http://localhost:3001)
+```
+
+### 4. 访问系统
+
+- **管理后台**: http://localhost:3001
+- **OAuth 服务**: http://localhost:3002
+- **默认管理员**: admin / admin123
+
+## 核心功能
+
+### OAuth2.1 授权码流程
+
+系统实现了完整的 OAuth2.1 授权码流程，包括：
+
+- **PKCE 支持**: 强制使用 PKCE (Proof Key for Code Exchange)
+- **State 参数**: 防止 CSRF 攻击
+- **令牌刷新**: 自动刷新访问令牌
+- **权限验证**: 基于 JWT 的权限控制
+
+### 权限管理
+
+- **RBAC 模型**: 基于角色的访问控制
+- **细粒度权限**: 支持 API 级别的权限控制
+- **权限继承**: 角色权限继承机制
+
+### 安全特性
+
+- **JWT 令牌**: 安全的令牌机制
+- **HTTPS 支持**: 生产环境强制 HTTPS
+- **审计日志**: 完整的操作审计
+- **IP 白名单**: 客户端 IP 限制
+
+## 开发指南
+
+### 项目结构
+
+```
+├── apps/
+│   ├── oauth-service/     # OAuth2.1 服务
+│   └── admin-portal/      # 管理后台
+├── packages/
+│   ├── lib/              # 共享工具库
+│   └── ui/               # 共享 UI 组件
+├── scripts/              # 初始化脚本
+└── docs/                 # 项目文档
+```
+
+### 开发命令
+
+```bash
+# 开发模式
+pnpm dev
+
+# 测试
 pnpm test
 
-# 运行特定工作区的测试
-pnpm test --filter=@repo/lib
+# 类型检查
+pnpm type-check
+
+# 代码格式化
+pnpm format
+
+# 数据库操作
+pnpm db:studio    # 打开 Prisma Studio
+pnpm db:push      # 推送数据库变更
+pnpm db:generate  # 生成 Prisma 客户端
 ```
+
+### 初始化脚本
+
+系统提供了完整的初始化脚本：
+
+- `scripts/setup-oauth-system.js`: 完整系统初始化
+- `scripts/setup-admin-portal-client.js`: admin-portal 客户端创建
+- `scripts/create-admin-user.js`: 管理员用户创建
+
+**使用建议**:
+- 首次部署时使用 `pnpm oauth:setup`
+- 开发环境可以使用分步初始化
+- 生产环境请修改默认密码和密钥
+
+## 部署说明
+
+### 环境变量
+
+```bash
+# 数据库配置
+DATABASE_URL="sqlite:./oauth.db"
+
+# JWT 密钥
+JWT_SECRET="your-jwt-secret"
+
+# OAuth 配置
+OAUTH_ISSUER="http://localhost:3002"
+```
+
+### 生产环境
+
+1. **修改默认配置**:
+   - 更改默认管理员密码
+   - 修改客户端密钥
+   - 配置 HTTPS
+
+2. **数据库迁移**:
+   ```bash
+   pnpm prisma:migrate
+   pnpm oauth:setup
+   ```
+
+3. **启动服务**:
+   ```bash
+   pnpm build
+   pnpm start
+   ```
+
+## 技术栈
+
+- **前端**: Next.js 15, React 18, TypeScript
+- **UI 组件**: shadcn/ui, TailwindCSS 4
+- **后端**: Next.js API Routes, Prisma ORM
+- **数据库**: SQLite (开发), PostgreSQL (生产)
+- **认证**: OAuth2.1, JWT
+- **测试**: Jest, Playwright
 
 ## 贡献指南
 
-我们欢迎任何形式的贡献！请在提交代码或文档前，详细阅读我们的贡献指南。
+1. Fork 项目
+2. 创建功能分支
+3. 提交更改
+4. 推送到分支
+5. 创建 Pull Request
 
-- **代码风格**: 请遵循项目配置的 ESLint 和 Prettier 规则。
-- **提交信息**: 请遵循 [Commitlint](https://commitlint.js.org/) 规范。
-- **文档同步**: 任何代码变更若影响现有功能或新增功能，都必须同步更新相关文档。
+## 许可证
+
+MIT License
 
 ---
 
-**最后更新**: 2025-07-08 | **文档版本**: v3.2.0 | **项目状态**: 生产就绪
+**注意**: 本系统使用 seed 脚本进行初始化，符合软件工程最佳实践。请勿在代码中实现自动初始化逻辑，而应使用提供的 setup 脚本。

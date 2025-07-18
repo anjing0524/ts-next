@@ -25,7 +25,7 @@ function throttle<T extends (...args: any[]) => any>(
 }
 
 export default function Main() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/datamgr_flow'; // 使用环境变量
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''; // 使用环境变量
 
   // Canvas引用
   const canvasRef = useRef<HTMLCanvasElement>(null);

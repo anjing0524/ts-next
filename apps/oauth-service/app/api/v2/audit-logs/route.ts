@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { successResponse, errorResponse } from '@repo/lib/node';
-import { prisma } from '@repo/database';
-import { Prisma } from '@prisma/client';
+import { prisma,Prisma } from '@repo/database';
 import z from 'zod';
 
 const auditLogQuerySchema = z.object({

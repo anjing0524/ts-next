@@ -9,12 +9,11 @@
  * @since 1.0.0
  */
 
-import { OAuthClient, ClientType } from '@prisma/client';
-import { prisma } from '@repo/database';
+import { ClientType, OAuthClient, prisma } from '@repo/database';
 import { AuthorizationUtils } from '@repo/lib/node';
-import { OAuth2Error, OAuth2ErrorCode } from '../../errors';
-import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { OAuth2Error, OAuth2ErrorCode } from '../../errors';
 
 /**
  * 客户端创建参数接口
