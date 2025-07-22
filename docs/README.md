@@ -1,206 +1,155 @@
-# OAuth2.1 认证授权系统
+# 项目文档中心
 
-## 项目概述
+> **最后更新**: 2025-07-22
 
-本项目是一个基于 Next.js 15 的 OAuth2.1 认证授权系统，采用 monorepo 架构，包含以下核心组件：
+本目录包含 OAuth2.1 认证授权中心项目的完整技术文档。
 
-- **oauth-service**: OAuth2.1 认证授权服务
-- **admin-portal**: 管理后台，作为 OAuth 客户端
-- **共享库**: 工具函数和 UI 组件
+## 文档导航
 
-## 系统架构
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   admin-portal  │    │  oauth-service  │    │   shared libs   │
-│   (OAuth Client)│◄──►│  (OAuth Server) │◄──►│   (@repo/*)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+- **[文档导航](./guidelines/文档导航.md)** - 完整文档索引
+- **[产品需求](./requirements/产品需求文档.md)** - 业务需求和用户故事
+- **[系统设计](./design/详细设计文档.md)** - 架构和技术设计
+- **[API规范](./guidelines/API设计规范.md)** - 接口设计标准
 
 ## 快速开始
 
 ### 1. 环境准备
-
 ```bash
 # 安装依赖
 pnpm install
 
-# 生成 Prisma 客户端
-pnpm db:generate
-
-# 推送数据库架构
-pnpm db:push
+# 数据库初始化
+pnpm db:generate  # 生成 Prisma 客户端
+pnpm db:push      # 推送数据库架构
+pnpm db:seed      # 初始化数据
 ```
 
-### 2. 系统初始化
-
-**重要**: 系统使用 Prisma seed 脚本进行初始化，这是正确的数据管理方式。请按照以下步骤操作：
-
-```bash
-# 完整系统初始化（推荐）
-pnpm db:seed
-
-# 或者使用别名命令
-pnpm oauth:setup
-```
-
-**初始化说明**:
-- 系统使用 `packages/database/prisma/seed.ts` 管理初始数据，符合最佳实践
-- 配置修改应通过管理页面操作，而不是代码中硬编码
-- oauth-service 专注于 OAuth2.1 核心功能，不处理初始化
-- seed 脚本会创建所有必要的角色、权限、用户和 OAuth 客户端
-
-**初始化内容包括**:
-- 默认角色：SYSTEM_ADMIN、USER_ADMIN、PERMISSION_ADMIN 等
-- 默认权限：完整的 RBAC 权限体系
-- 默认用户：admin（管理员）、testuser（测试用户）等
-- OAuth 客户端：admin-portal-client、auth-center-admin-client 等
-
-### 3. 启动服务
-
+### 2. 启动服务
 ```bash
 # 启动所有服务
 pnpm dev
 
-# 或者分别启动
-pnpm dev:oauth    # OAuth 服务 (http://localhost:3002)
-pnpm dev:admin    # 管理后台 (http://localhost:3001)
+# 或分别启动
+pnpm --filter=oauth-service dev  # 认证服务 (3001)
+pnpm --filter=admin-portal dev   # 管理后台 (3002)
+pnpm --filter=kline-service dev  # 金融数据服务 (3003)
 ```
 
-### 4. 访问系统
-
-- **管理后台**: http://localhost:3001
-- **OAuth 服务**: http://localhost:3002
+### 3. 访问系统
+- **管理后台**: http://localhost:3002
+- **认证服务**: http://localhost:3001
+- **金融数据服务**: http://localhost:3003
 - **默认管理员**: admin / admin123
 
 ## 核心功能
 
-### OAuth2.1 授权码流程
+### OAuth2.1 安全认证
+- PKCE 支持
+- 自动令牌刷新
+- JWT 权限验证
+- RBAC 权限模型
 
-系统实现了完整的 OAuth2.1 授权码流程，包括：
+### 金融数据可视化
+- WebAssembly 高性能渲染
+- 实时K线数据处理
+- 自定义指标分析
 
-- **PKCE 支持**: 强制使用 PKCE (Proof Key for Code Exchange)
-- **State 参数**: 防止 CSRF 攻击
-- **令牌刷新**: 自动刷新访问令牌
-- **权限验证**: 基于 JWT 的权限控制
-
-### 权限管理
-
-- **RBAC 模型**: 基于角色的访问控制
-- **细粒度权限**: 支持 API 级别的权限控制
-- **权限继承**: 角色权限继承机制
-
-### 安全特性
-
-- **JWT 令牌**: 安全的令牌机制
-- **HTTPS 支持**: 生产环境强制 HTTPS
-- **审计日志**: 完整的操作审计
-- **IP 白名单**: 客户端 IP 限制
+### 运维支持
+- 健康检查端点
+- Prometheus 监控指标
+- 日志审计系统
 
 ## 开发指南
 
 ### 项目结构
-
 ```
 ├── apps/
-│   ├── oauth-service/     # OAuth2.1 服务
-│   └── admin-portal/      # 管理后台
-├── packages/
-│   ├── lib/              # 共享工具库
-│   └── ui/               # 共享 UI 组件
-├── scripts/              # 初始化脚本
+│   ├── oauth-service/     # OAuth2.1 认证服务
+│   ├── admin-portal/      # 管理后台
+│   ├── kline-service/     # 金融数据服务
+│   └── pingora-proxy/     # 反向代理
+├── packages/              # 共享包
+│   ├── ui/               # UI组件
+│   ├── lib/              # 工具库
+│   ├── database/         # 数据库模块
+│   └── cache/            # 缓存模块
 └── docs/                 # 项目文档
 ```
 
-### 开发命令
-
+### 常用命令
 ```bash
-# 开发模式
-pnpm dev
-
 # 测试
-pnpm test
+pnpm test              # 单元测试
+pnpm test:e2e          # 端到端测试
 
-# 类型检查
-pnpm type-check
+# 代码质量
+pnpm lint              # 代码检查
+pnpm format            # 代码格式化
+pnpm type-check        # 类型检查
 
-# 代码格式化
-pnpm format
-
-# 数据库操作
-pnpm db:studio    # 打开 Prisma Studio
-pnpm db:push      # 推送数据库变更
-pnpm db:generate  # 生成 Prisma 客户端
+# 数据库管理
+pnpm db:studio         # 打开数据库管理界面
 ```
 
-### 初始化脚本
-
-系统提供了完整的初始化脚本：
-
-- `scripts/setup-oauth-system.js`: 完整系统初始化
-- `scripts/setup-admin-portal-client.js`: admin-portal 客户端创建
-- `scripts/create-admin-user.js`: 管理员用户创建
-
-**使用建议**:
-- 首次部署时使用 `pnpm oauth:setup`
-- 开发环境可以使用分步初始化
-- 生产环境请修改默认密码和密钥
+### WebAssembly 编译
+```bash
+cd apps/kline-service/wasm-cal
+./build.sh  # 编译 WASM 模块
+```
 
 ## 部署说明
 
 ### 环境变量
-
-```bash
+```env
 # 数据库配置
-DATABASE_URL="sqlite:./oauth.db"
+DATABASE_URL="file:./dev.db"
 
-# JWT 密钥
-JWT_SECRET="your-jwt-secret"
+# JWT 配置
+JWT_PRIVATE_KEY_PATH="./private.pem"
+JWT_PUBLIC_KEY_PATH="./public.pem"
 
-# OAuth 配置
-OAUTH_ISSUER="http://localhost:3002"
+# 服务端点
+AUTH_CENTER_URL="http://localhost:3001"
+REDIS_URL="redis://localhost:6379"
 ```
 
-### 生产环境
-
-1. **修改默认配置**:
-   - 更改默认管理员密码
-   - 修改客户端密钥
-   - 配置 HTTPS
+### 生产部署
+1. **配置更新**:
+   - 修改默认管理员密码
+   - 更新JWT密钥
+   - 配置HTTPS证书
 
 2. **数据库迁移**:
    ```bash
-   pnpm prisma:migrate
-   pnpm oauth:setup
+   pnpm db:generate
+   pnpm db:push
+   pnpm db:seed
    ```
 
-3. **启动服务**:
+3. **构建启动**:
    ```bash
    pnpm build
    pnpm start
    ```
 
 ## 技术栈
-
-- **前端**: Next.js 15, React 18, TypeScript
-- **UI 组件**: shadcn/ui, TailwindCSS 4
-- **后端**: Next.js API Routes, Prisma ORM
-- **数据库**: SQLite (开发), PostgreSQL (生产)
-- **认证**: OAuth2.1, JWT
-- **测试**: Jest, Playwright
+| 类别       | 技术                     |
+|------------|--------------------------|
+| 前端       | Next.js 15, React 19     |
+| UI框架     | shadcn/ui, TailwindCSS 4 |
+| 后端       | Node.js, Prisma ORM      |
+| 数据库     | SQLite (开发), PostgreSQL|
+| 安全认证   | OAuth2.1, JWT            |
+| 高性能计算 | Rust, WebAssembly        |
+| 测试       | Jest 30, Playwright      |
+| 部署       | Docker, Kubernetes       |
 
 ## 贡献指南
-
-1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
+1. Fork 项目仓库
+2. 创建功能分支 (`feat/xxx`)
+3. 提交代码变更
+4. 创建 Pull Request
+5. 通过CI测试后合并
 
 ## 许可证
-
 MIT License
-
----
-
-**注意**: 本系统使用 seed 脚本进行初始化，符合软件工程最佳实践。请勿在代码中实现自动初始化逻辑，而应使用提供的 setup 脚本。

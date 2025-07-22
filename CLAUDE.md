@@ -1,103 +1,61 @@
-# CLAUDE.md
+# 项目技术指南
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 架构服务
+| 服务          | 功能                     | 端口  |
+|---------------|--------------------------|-------|
+| oauth-service | OAuth 2.1服务            | 3001  |
+| admin-portal  | 管理后台+认证UI          | 3002  |
+| kline-service | 金融图表服务(WASM计算)   | 3003  |
+| pingora-proxy | 反向代理                 | 6188  |
 
-## Project Overview
+## 共享包
+- `@repo/ui`: UI组件库
+- `@repo/lib`: 工具函数
+- `@repo/database`: 数据库ORM
+- `@repo/cache`: 缓存层
 
-Next.js 15 + TypeScript enterprise monorepo with OAuth 2.1 authentication center, financial data visualization, and WebAssembly high-performance computing. Built with TurboRepo, Rust, and modern DevOps practices.
-
-## Architecture
-
-### Services
-- **oauth-service** (3001): OAuth 2.1 authentication service with PKCE, JWT, and comprehensive client management
-- **admin-portal** (3002): Management dashboard with shadcn/ui, React 19, and full OAuth integration
-- **kline-service** (3003): Financial charting service with WebAssembly + Rust for high-performance rendering
-- **pingora-proxy**: Rust-based reverse proxy using Cloudflare Pingora framework
-
-### Shared Packages
-- `@repo/ui`: Shared UI component library
-- `@repo/lib`: Shared utilities and middleware
-- `@repo/database`: Prisma ORM with SQLite
-- `@repo/cache`: Redis caching layer
-- `@repo/eslint-config`: ESLint configurations
-- `@repo/jest-config`: Jest testing configurations
-- `@repo/typescript-config`: TypeScript configurations
-
-## Essential Commands
-
-### Development
+## 关键命令
 ```bash
-pnpm install              # Install dependencies
-pnpm dev                  # Start all services in parallel
-pnpm start:e2e           # Start OAuth integration (admin-portal + oauth-service)
-pnpm --filter=oauth-service dev  # Start specific service
+# 开发
+pnpm install           # 安装依赖
+pnpm dev               # 启动所有服务
+pnpm --filter=oauth-service dev  # 启动指定服务
+
+# 数据库
+pnpm db:generate && pnpm db:push && pnpm db:seed  # 初始化数据库
+pnpm db:studio         # 打开数据库管理
+
+# 测试
+pnpm test              # 单元测试
+pnpm e2e               # 端到端测试
+
+# 构建与质量
+pnpm build             # 构建项目
+pnpm lint              # 代码检查
+pnpm format            # 代码格式化
 ```
 
-### Database
+## 环境变量
 ```bash
-pnpm db:generate         # Generate Prisma Client
-pnpm db:push            # Sync database schema
-pnpm db:seed            # Seed database with test data
-pnpm db:studio          # Launch Prisma Studio UI
-```
-
-### Testing
-```bash
-pnpm test               # Run all unit tests
-pnpm e2e               # Run end-to-end tests
-pnpm e2e:ui            # Run Playwright UI tests
-pnpm test:e2e:admin    # Admin portal integration tests
-```
-
-### Build & Quality
-```bash
-pnpm build              # Build all services
-pnpm lint               # Run ESLint
-pnpm format             # Format code
-pnpm type-check         # Type checking
-```
-
-### Environment Setup
-```bash
-# Core environment variables
 DATABASE_URL="file:./dev.db"
 JWT_PRIVATE_KEY_PATH="./test-private.pem"
-JWT_PUBLIC_KEY_PATH="./test-public.pem"
-AUTH_CENTER_LOGIN_PAGE_URL="http://localhost:3001"
 REDIS_URL="redis://localhost:6379"
 ```
 
-## Service Ports
-- oauth-service: 3001
-- admin-portal: 3002
-- kline-service: 3003
-- pingora-proxy: 6188
-- redis: 6379
+## 技术栈
+- 前端: Next.js, React, TypeScript, TailwindCSS
+- 后端: Node.js, Prisma, JWT
+- 性能: Rust/WASM, Pingora代理
+- 测试: Jest, Playwright
+- 工程: TurboRepo, pnpm
 
-## Key Technologies
-- **Frontend**: Next.js 15, React 19, TypeScript 5.8, Tailwind CSS 4.1
-- **Backend**: Node.js, Prisma ORM, JWT authentication
-- **Performance**: Rust + WebAssembly, Pingora proxy
-- **Database**: SQLite with Prisma
-- **Testing**: Jest 30 + Playwright
-- **Monorepo**: TurboRepo + pnpm
+## 开发流程
+1. 安装依赖
+2. 初始化数据库
+3. 启动开发服务
+4. 运行测试
 
-## Development Workflow
-1. `pnpm install` → setup dependencies
-2. `pnpm db:generate && pnpm db:push && pnpm db:seed` → initialize database
-3. `pnpm dev` → start development environment
-4. `pnpm test` → run tests
-5. `pnpm commit` → commit with Commitizen
-
-## WebAssembly Build
+## WASM构建
 ```bash
-cd apps/kline-service/wasm-cal
-./build.sh  # Build WASM modules
-```
-
-## Health Checks
-```bash
-curl http://localhost:3001/api/health  # oauth-service
-curl http://localhost:3002/api/health  # admin-portal
-curl http://localhost:3003/api/health  # kline-service
+cd apps/kline-service/wasm-cal && ./build.sh
 ```

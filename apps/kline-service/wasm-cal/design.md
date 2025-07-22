@@ -14,6 +14,9 @@
 - **分层渲染**: 三层 Canvas 架构，支持独立渲染和性能优化
 - **数据驱动**: FlatBuffers 高效序列化，支持大数据量实时处理
 - **响应式设计**: 适配多种设备尺寸，提供最佳用户体验
+- **内存安全**: 零拷贝设计结合安全封装，消除 unsafe 代码
+- **插件化扩展**: Trait-based 架构支持动态渲染器扩展
+- **UI分离**: Web Components 实现渲染与控制的完全解耦
 
 ### 技术栈
 
@@ -78,8 +81,7 @@ pub fn start() -> Result<(), JsValue> {
 ```rust
 #[wasm_bindgen]
 pub struct KlineProcess {
-    data: Vec<u8>,                          // 原始FlatBuffer数据
-    parsed_data: Option<KlineData<'static>>, // 解析后数据
+    data_wrapper: SafeKlineDataWrapper,     // 安全的数据封装器
     chart_renderer: Option<ChartRenderer>,   // 渲染器实例
 }
 ```
@@ -90,13 +92,15 @@ pub struct KlineProcess {
 - 🎨 **渲染控制**: 三层 Canvas 管理、统一绘制接口
 - 🖱️ **交互处理**: 鼠标事件、滚轮缩放、点击切换
 - ⚡ **性能监控**: 渲染时间统计、错误处理
+- 🛡️ **内存安全**: 基于 SafeKlineDataWrapper 的安全数据管理
 
 **关键方法**:
 
-- `new()`: 从 WASM 内存创建实例
+- `new()`: 使用 SafeKlineDataWrapper 安全创建实例
 - `set_canvases()`: 设置三层 Canvas
 - `draw_all()`: 统一绘制接口
 - `handle_*()`: 各种交互事件处理
+- `switch_mode()`: 基于 trait 的动态模式切换
 
 ---
 
@@ -108,6 +112,7 @@ pub struct KlineProcess {
 data/
 ├── mod.rs              // 模块导出 ✅
 ├── data_manager.rs     // 数据管理器 ✅
+├── safe_wrapper.rs     // 安全数据封装器 ✅
 ├── visible_range.rs    // 可见范围管理 ✅
 └── README.md          // 模块说明 ✅
 ```
@@ -118,7 +123,7 @@ data/
 
 ```rust
 pub struct DataManager {
-    /// K线数据 - 使用FlatBuffers Vector
+    /// K线数据 - 使用FlatBuffers Vector with SafeKlineDataWrapper
     items: Option<flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>>,
     /// 最小变动价位
     tick: f64,
@@ -128,8 +133,41 @@ pub struct DataManager {
     cached_data_range: Option<DataRange>,
     /// 数据范围是否有效
     cached_range_valid: bool,
+    /// 安全数据封装器引用
+    data_wrapper: Arc<SafeKlineDataWrapper>,
 }
 ```
+
+#### SafeKlineDataWrapper - 安全数据封装器
+
+**架构**: 零拷贝安全内存管理
+
+```rust
+pub struct SafeKlineDataWrapper {
+    inner: Arc<Vec<u8>>,
+}
+
+impl SafeKlineDataWrapper {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { inner: Arc::new(data) }
+    }
+    
+    pub fn as_slice(&self) -> &[u8] {
+        self.inner.as_slice()
+    }
+    
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+```
+
+**安全特性**:
+
+- 🛡️ **内存安全**: 基于 Arc 的引用计数，避免悬垂指针
+- 🔒 **生命周期管理**: 自动管理 FlatBuffers 数据生命周期
+- ⚡ **零拷贝**: 避免不必要的数据复制
+- 🔄 **共享所有权**: 支持多个组件共享同一数据源
 
 **核心特性**:
 
