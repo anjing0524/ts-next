@@ -98,7 +98,7 @@ export async function GET() {
             id: 'system-config',
             name: '系统配置',
             key: 'system-config',
-            path: '/admin/system/config',
+            path: '/admin/config',
             icon: 'Settings2',
             order: 160,
             permissions: ['menu:system:config:view'],

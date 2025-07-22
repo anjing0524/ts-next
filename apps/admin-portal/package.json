@@ -11,7 +11,10 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
-    "test:e2e:integration": "playwright test __tests__/e2e/admin-oauth-integration.spec.ts"
+    "test:e2e:ci": "playwright test --reporter=json",
+    "test:e2e:full": "../../scripts/test-e2e.sh",
+    "test:e2e:integration": "playwright test tests/e2e/oauth2.1-flow.spec.ts",
+    "playwright:install": "playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",

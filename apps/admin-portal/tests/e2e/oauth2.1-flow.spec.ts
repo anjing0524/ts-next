@@ -101,22 +101,22 @@ test.describe('OAuth2.1 完整流程 E2E 测试', () => {
 
     // 测试角色管理页面访问
     console.log('测试角色管理页面访问');
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/roles`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/roles`);
     await expect(page.locator('h1')).toContainText('角色管理');
 
     // 测试权限管理页面访问
     console.log('测试权限管理页面访问');
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/permissions`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/permissions`);
     await expect(page.locator('h1')).toContainText('权限管理');
 
     // 测试客户端管理页面访问
     console.log('测试客户端管理页面访问');
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/clients`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/clients`);
     await expect(page.locator('h1')).toContainText('客户端管理');
 
     // 测试审计日志页面访问
     console.log('测试审计日志页面访问');
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/audit`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/audits`);
     await expect(page.locator('h1')).toContainText('审计日志');
 
     console.log('✅ 受保护页面访问权限验证通过');
@@ -152,7 +152,7 @@ test.describe('OAuth2.1 完整流程 E2E 测试', () => {
     await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/users`);
 
     await page.click('text=角色管理');
-    await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/roles`);
+    await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/system/roles`);
 
     await page.click('text=仪表盘');
     await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/dashboard`);
@@ -378,7 +378,7 @@ test.describe('OAuth2.1 完整流程 E2E 测试', () => {
     // 步骤4: 访问角色管理页面
     console.log('步骤4: 访问角色管理页面');
     await page.click('text=角色管理');
-    await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/roles`);
+    await expect(page).toHaveURL(`${ADMIN_PORTAL_URL}/admin/system/roles`);
 
     // 步骤5: 创建新角色
     console.log('步骤5: 创建新角色');

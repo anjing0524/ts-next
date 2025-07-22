@@ -58,10 +58,10 @@ interface WheelMessage {
   isDragging?: boolean; // 添加可选的拖动状态标志
 }
 
-interface ClickMessage {
-  type: 'click';
-  x: number;
-  y: number;
+
+interface SwitchModeMessage {
+  type: 'switchMode';
+  mode: string;
 }
 
 type WorkerMessage =
@@ -74,7 +74,7 @@ type WorkerMessage =
   | MouseLeaveMessage
   | WheelMessage
   | GetCursorStyleMessage
-  | ClickMessage;
+  | SwitchModeMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -173,15 +173,18 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           });
         }
         break;
-      case 'click':
+      case 'switchMode':
         if (!processorRef) return;
-        // 调用WASM中的点击处理函数
-        const wasModeChanged = processorRef.handle_click(data.x, data.y);
-        // 通知主线程点击事件是否被处理（导致了模式切换）
-        self.postMessage({
-          type: 'clickHandled',
-          modeChanged: wasModeChanged,
-        });
+        try {
+          processorRef.set_render_mode(data.mode);
+          processorRef.draw_all(); // 重绘图表
+          self.postMessage({
+            type: 'modeChanged',
+            mode: data.mode,
+          });
+        } catch (err) {
+          console.error('[Worker] 切换模式失败:', err);
+        }
         break;
       default:
         console.error('Worker 收到未知类型的消息');

@@ -6,11 +6,18 @@ export class PermissionService {
   constructor(private permissionRepository: IPermissionRepository) {}
 
   async getPermissions(params?: {
-    offset?: number;
+    page?: number;
     limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<Permission>> {
-    return this.permissionRepository.getPermissions(params);
+    // 转换 page 参数为 offset 参数
+    const repositoryParams = params ? {
+      offset: params.page ? (params.page - 1) * (params.limit || 10) : undefined,
+      limit: params.limit,
+      search: params.search
+    } : undefined;
+    
+    return this.permissionRepository.getPermissions(repositoryParams);
   }
 
   async getPermissionById(permissionId: string): Promise<Permission> {

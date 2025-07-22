@@ -215,10 +215,10 @@ impl OverlayRenderer {
         match mouse_position {
             MousePosition::MainChart => {
                 self.draw_main_chart_elements(
-                    ctx, &*layout, min_low, max_high, max_volume, items, theme,
+                    ctx, &layout, min_low, max_high, max_volume, items, theme,
                 );
                 self.draw_main_chart_tooltip(
-                    ctx, &*layout, items, mode, min_low, max_high, tick, theme,
+                    ctx, &layout, items, mode, min_low, max_high, tick, theme,
                 );
             }
             MousePosition::BookArea => {
@@ -916,37 +916,6 @@ impl OverlayRenderer {
         ctx.fill_text("热力图", heatmap_x, heatmap_y).unwrap();
     }
 
-    /// 检查点击是否在切换按钮区域内，如果是，返回选中的模式
-    pub fn check_switch_button_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<bool> {
-        // 计算切换按钮的位置
-        let button_width = layout.switch_btn_width * 2.0;
-        let button_height = layout.switch_btn_height;
-        let button_x = (layout.canvas_width - button_width) / 2.0;
-        let button_y = layout.padding;
-
-        // 检查点击是否在按钮区域内
-        if x >= button_x
-            && x <= button_x + button_width
-            && y >= button_y
-            && y <= button_y + button_height
-        {
-            // 确定点击的是哪个选项
-            let kline_button_x = button_x;
-            let heatmap_button_x = button_x + layout.switch_btn_width;
-
-            if x >= kline_button_x && x < heatmap_button_x {
-                // 点击了K线选项
-                return Some(true);
-            } else {
-                // 点击了热图选项
-                return Some(false);
-            }
-        }
-
-        // 移除不必要的日志
-        None
-    }
-
     /// 热图模式下tooltip：时间、价格、tick区间合并数量
     fn draw_heatmap_tooltip(
         &self,
@@ -1037,20 +1006,6 @@ impl OverlayRenderer {
         let _ = ctx.fill_text(&formatted_volume, label_x, current_y);
     }
 
-    /// 处理鼠标点击事件 (特别用于切换图表模式)
-    pub fn handle_click(&self, x: f64, y: f64, layout: &ChartLayout) -> Option<RenderMode> {
-        // 检查是否点击了切换按钮
-        if let Some(is_kmap) = self.check_switch_button_click(x, y, layout) {
-            // 根据点击的按钮返回对应的渲染模式
-            if is_kmap {
-                return Some(RenderMode::Kmap);
-            } else {
-                return Some(RenderMode::Heatmap);
-            }
-        }
-        None
-    }
-
     /// 处理鼠标拖动事件（只在主图区域 main_chart 内响应）
     pub fn handle_mouse_drag(
         &mut self,
@@ -1086,20 +1041,6 @@ impl OverlayRenderer {
 
         // 默认光标样式
         CursorStyle::Default
-    }
-
-    /// 清除并重绘交互层
-    pub fn redraw(
-        &self,
-        canvas_manager: &CanvasManager,
-        data_manager: &Rc<RefCell<DataManager>>,
-        mode: RenderMode,
-        theme: &ChartTheme,
-    ) {
-        // 清除交互层
-        self.clear(canvas_manager);
-        // 重新绘制交互层
-        self.draw(canvas_manager, data_manager, mode, theme);
     }
 
     /// 获取当前悬停的K线索引

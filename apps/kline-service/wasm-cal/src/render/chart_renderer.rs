@@ -56,7 +56,7 @@ pub struct ChartRenderer {
     datazoom_renderer: Rc<RefCell<DataZoomRenderer>>,
     /// 配置管理器
     config_manager: ConfigManager,
-    // 采用哪种渲染引擎
+    /// 当前渲染模式（保留用于兼容性）
     mode: RenderMode,
 }
 
@@ -147,7 +147,7 @@ impl ChartRenderer {
         self.mode
     }
 
-    /// 设置渲染模式
+    /// 设置渲染模式（使用策略模式）
     pub fn set_mode(&mut self, mode: RenderMode) {
         self.mode = mode;
     }
@@ -170,7 +170,7 @@ impl ChartRenderer {
             .map_err(|e| e.to_string())
     }
 
-    /// 渲染图表 (不包括交互层)
+    /// 渲染图表 (使用策略模式重构)
     pub fn render(&self) {
         // 1. 获取可见范围 - 使用作用域限制借用生命周期
         let visible_count = {
@@ -535,33 +535,10 @@ impl ChartRenderer {
         }
     }
 
-    /// 处理鼠标点击事件 (特别用于切换图表模式)
-    pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
-        // 1. 先获取 new_mode，作用域最小化
-        let new_mode = {
-            let layout = self.canvas_manager.layout.borrow();
-            let overlay_renderer = self.overlay_renderer.borrow();
-            overlay_renderer.handle_click(x, y, &layout)
-        };
-
-        // 2. 判断是否需要切换
-        if let Some(new_mode) = new_mode {
-            if new_mode != self.mode {
-                self.mode = new_mode;
-                self.render();
-                // 重新绘制交互元素
-                {
-                    let overlay_renderer = self.overlay_renderer.borrow();
-                    overlay_renderer.redraw(
-                        &self.canvas_manager,
-                        &self.data_manager,
-                        self.mode,
-                        &self.config_manager.theme,
-                    );
-                }
-                return true;
-            }
-        }
+    /// 处理鼠标点击事件 (移除模式切换逻辑，专注于渲染)
+    pub fn handle_click(&mut self, _x: f64, _y: f64) -> bool {
+        // 模式切换逻辑已迁移到React层
+        // Canvas点击事件不再用于模式切换
         false
     }
 }

@@ -81,16 +81,24 @@ test.describe('Admin-Portal 与 OAuth-Service 集成测试', () => {
     await expect(page.locator('h1')).toContainText('用户管理');
 
     // 测试角色管理页面访问
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/roles`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/roles`);
     await expect(page.locator('h1')).toContainText('角色管理');
 
     // 测试权限管理页面访问
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/permissions`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/permissions`);
     await expect(page.locator('h1')).toContainText('权限管理');
 
     // 测试客户端管理页面访问
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/clients`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/clients`);
     await expect(page.locator('h1')).toContainText('客户端管理');
+
+    // 测试审计日志页面访问
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/audits`);
+    await expect(page.locator('h1')).toContainText('审计日志');
+
+    // 测试系统配置页面访问
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/config`);
+    await expect(page.locator('h1')).toContainText('系统配置');
   });
 
   test('TC-004: API集成测试', async ({ page }) => {
@@ -193,7 +201,7 @@ test.describe('Admin-Portal 与 OAuth-Service 集成测试', () => {
     await page.waitForURL(`${ADMIN_PORTAL_URL}/admin/dashboard`);
 
     // 访问角色管理页面
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/roles`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/roles`);
 
     // 验证角色列表加载
     await expect(page.locator('.role-list')).toBeVisible();
@@ -217,7 +225,7 @@ test.describe('Admin-Portal 与 OAuth-Service 集成测试', () => {
     await page.waitForURL(`${ADMIN_PORTAL_URL}/admin/dashboard`);
 
     // 访问客户端管理页面
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/clients`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/clients`);
 
     // 验证客户端列表加载
     await expect(page.locator('.client-list')).toBeVisible();
@@ -241,7 +249,7 @@ test.describe('Admin-Portal 与 OAuth-Service 集成测试', () => {
     await page.waitForURL(`${ADMIN_PORTAL_URL}/admin/dashboard`);
 
     // 访问审计日志页面
-    await page.goto(`${ADMIN_PORTAL_URL}/admin/audit`);
+    await page.goto(`${ADMIN_PORTAL_URL}/admin/system/audits`);
 
     // 验证日志列表加载
     await expect(page.locator('.audit-list')).toBeVisible();

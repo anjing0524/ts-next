@@ -6,11 +6,18 @@ export class RoleService {
   constructor(private roleRepository: IRoleRepository) {}
 
   async getRoles(params?: {
-    offset?: number;
+    page?: number;
     limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<Role>> {
-    return this.roleRepository.getRoles(params);
+    // 转换 page 参数为 offset 参数
+    const repositoryParams = params ? {
+      offset: params.page ? (params.page - 1) * (params.limit || 10) : undefined,
+      limit: params.limit,
+      search: params.search
+    } : undefined;
+    
+    return this.roleRepository.getRoles(repositoryParams);
   }
 
   async getRoleById(roleId: string): Promise<Role> {

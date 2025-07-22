@@ -7,11 +7,18 @@ export class UserService {
   constructor(private userRepository: IUserRepository) {}
 
   async getUsers(params?: {
-    offset?: number;
+    page?: number;
     limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<User>> {
-    return this.userRepository.getUsers(params);
+    // 转换 page 参数为 offset 参数
+    const repositoryParams = params ? {
+      offset: params.page ? (params.page - 1) * (params.limit || 10) : undefined,
+      limit: params.limit,
+      search: params.search
+    } : undefined;
+    
+    return this.userRepository.getUsers(repositoryParams);
   }
 
   async getUserById(userId: string): Promise<User> {

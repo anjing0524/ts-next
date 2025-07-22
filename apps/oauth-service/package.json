@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev -p 3001 --turbopack",
     "build": "next build",
-    "start": "next start -p 3001"
+    "start": "next start -p 3001",
+    "db:generate": "pnpm --filter @repo/database db:generate",
+    "db:migrate": "pnpm --filter @repo/database db:migrate",
+    "db:seed": "pnpm --filter @repo/database db:seed",
+    "db:reset": "pnpm --filter @repo/database db:reset"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",

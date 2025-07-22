@@ -131,12 +131,6 @@ export default function Main() {
             setIsDragging(false);
           }
         },
-        clickHandled: (data) => {
-          // 点击事件导致了模式切换，可以在这里执行任何额外操作
-          if (data.modeChanged) {
-            console.log('图表模式已切换');
-          }
-        },
         performanceMetrics: (data) => {
           // 可以添加从Worker接收性能指标的处理
           if (data.renderTime) {
@@ -353,20 +347,11 @@ export default function Main() {
     [getMouseCoordinates, sendMessageToWorker]
   );
 
-  // 处理点击事件
-  const handleClick = useCallback(
-    (e: ReactMouseEvent<HTMLCanvasElement>) => {
-      const coords = getMouseCoordinates(e);
-      if (!coords) return;
-
-      sendMessageToWorker({
-        type: 'click',
-        x: coords.x,
-        y: coords.y,
-      });
-    },
-    [getMouseCoordinates, sendMessageToWorker]
-  );
+  // 处理点击事件 - 已移除，模式切换通过按钮完成
+  const handleClick = useCallback(() => {
+    // 模式切换功能已迁移到React层按钮
+    // Canvas点击事件不再用于模式切换
+  }, []);
 
   // 添加错误边界处理函数
   const handleError = useCallback((err: Error) => {
@@ -449,9 +434,34 @@ export default function Main() {
     };
   }, [isDragging, sendMessageToWorker]);
 
+  // 添加模式切换函数
+  const switchMode = useCallback((mode: string) => {
+    sendMessageToWorker({
+      type: 'switchMode',
+      mode: mode,
+    });
+  }, [sendMessageToWorker]);
+
   return (
     <div className="p-4">
-      <h2 className="text-xl font-semibold mb-4">K 线图 (Web Worker + OffscreenCanvas)</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">K 线图 (Web Worker + OffscreenCanvas)</h2>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => switchMode('kline')}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            K线图
+          </button>
+          <button
+            onClick={() => switchMode('heatmap')}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+          >
+            热图
+          </button>
+        </div>
+      </div>
+      
       {/* 显示性能指标 */}
       <div className="text-sm text-gray-600 mb-2">性能: {fps} FPS</div>
       {isLoading && (
@@ -461,6 +471,7 @@ export default function Main() {
         </div>
       )}
       {error && <div className="p-4 text-red-600">错误: {error}</div>}
+      
       {/* 新增容器并设置固定尺寸 */}
       <div
         className="relative m-0 border-0 p-0"
@@ -477,7 +488,6 @@ export default function Main() {
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
-          onClick={handleClick}
           ref={overlayCanvasRef}
           className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
         />

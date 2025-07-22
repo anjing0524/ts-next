@@ -1,0 +1,165 @@
+name: E2E Tests
+
+# E2E测试工作流
+# 在PR和主分支推送时运行端到端测试
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/admin-portal/**'
+      - 'apps/oauth-service/**'
+      - 'packages/**'
+      - '.github/workflows/e2e-tests.yml'
+
+env:
+  NODE_ENV: test
+  CI: true
+  DATABASE_URL: file:./test.db
+  NEXT_PUBLIC_OAUTH_SERVICE_URL: http://localhost:3001
+  NEXT_PUBLIC_APP_URL: http://localhost:3002
+  JWT_SECRET: test-jwt-secret-key-for-e2e-testing-ci
+  ENCRYPTION_KEY: test-encryption-key-32-chars-long
+
+jobs:
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        node-version: [20]
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 🟢 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔨 Build projects
+        run: pnpm build
+
+      - name: 🗄️ Setup test database
+        run: |
+          cd apps/oauth-service
+          mkdir -p data
+          DATABASE_URL="file:./test.db" pnpm db:migrate
+          DATABASE_URL="file:./test.db" pnpm db:seed
+
+      - name: 🌐 Install Playwright browsers
+        run: |
+          cd apps/admin-portal
+          pnpm exec playwright install chromium
+
+      - name: 🧪 Run E2E tests
+        run: |
+          cd apps/admin-portal
+          pnpm test:e2e:ci
+        env:
+          PLAYWRIGHT_WORKERS: 1
+
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            apps/admin-portal/test-results/
+            apps/admin-portal/test-results.json
+          retention-days: 7
+
+      - name: 📸 Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: apps/admin-portal/test-results/
+          retention-days: 7
+
+      - name: 📝 Comment PR with test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'apps/admin-portal/test-results.json';
+            
+            if (fs.existsSync(path)) {
+              const results = JSON.parse(fs.readFileSync(path, 'utf8'));
+              const { stats } = results;
+              
+              const passed = stats.expected || 0;
+              const failed = stats.unexpected || 0;
+              const skipped = stats.skipped || 0;
+              const total = passed + failed + skipped;
+              
+              const status = failed > 0 ? '❌ Failed' : '✅ Passed';
+              
+              const comment = `## E2E Test Results ${status}
+              
+              📊 **Test Summary:**
+              - Total: ${total}
+              - Passed: ${passed}
+              - Failed: ${failed}
+              - Skipped: ${skipped}
+              
+              ${failed > 0 ? '⚠️ Some tests failed. Please check the test results for details.' : '🎉 All tests passed!'}
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+
+  # 可选：性能测试作业
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔨 Build projects
+        run: pnpm build
+
+      - name: ⚡ Run Lighthouse CI
+        run: |
+          cd apps/admin-portal
+          # 这里可以添加Lighthouse CI或其他性能测试
+          echo "Performance tests placeholder"

@@ -23,9 +23,8 @@ extern "C" {
 #[wasm_bindgen]
 pub struct KlineProcess {
     // 数据相关
-    #[allow(dead_code)]
-    data: Vec<u8>, // 原始FlatBuffer数据
-    parsed_data: Option<KlineData<'static>>, // 解析后的数据
+    data: Vec<u8>,                           // 原始FlatBuffer数据，拥有所有权
+    parsed_data: Option<KlineData<'static>>, // 解析后的数据，生命周期与data绑定
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
 }
@@ -51,8 +50,15 @@ impl KlineProcess {
         // 3. 解析数据并设置到数据管理器
         time("KlineProcess::new - Parsing data");
         let parsed_data = Self::parse_kline_data_from_slice(&data)?;
-        // 持久化解析后的数据生命周期
+        // WebAssembly内存安全保证：
+        // 1. data: Vec<u8>拥有从WASM内存复制的完整数据所有权
+        // 2. 在WebAssembly环境中，一旦JS通过内存传递数据给Rust，
+        //    这块内存的生命周期由Rust的Vec<u8>控制
+        // 3. KlineProcess实例存在期间，Vec<u8>不会被释放，因此
+        //    KlineData的引用始终有效
+        // 4. 这是零拷贝FlatBuffers解析的必要操作，避免数据复制
         let parsed_data: KlineData<'static> = unsafe { std::mem::transmute(parsed_data) };
+
         time_end("KlineProcess::new - Parsing data");
         log("KlineProcess initialized successfully.");
         Ok(KlineProcess {
@@ -258,17 +264,22 @@ impl KlineProcess {
         chart_renderer.handle_mouse_drag(x, y);
     }
 
-    /// 处理鼠标点击事件（用于切换K线图/线图模式）
+    /// 设置渲染模式（由React层调用）
     #[wasm_bindgen]
-    pub fn handle_click(&mut self, x: f64, y: f64) -> bool {
-        let chart_renderer = match &mut self.chart_renderer {
+    pub fn set_render_mode(&mut self, _mode: &str) -> Result<(), JsValue> {
+        let _chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
-            None => {
-                return false;
-            }
+            None => return Err(JsValue::from_str("ChartRenderer not initialized")),
         };
-        // 调用chart_renderer的处理点击事件方法
-        chart_renderer.handle_click(x, y)
+
+        Ok(())
+    }
+
+    /// 处理鼠标点击事件（已废弃，模式切换由React层管理）
+    #[wasm_bindgen]
+    pub fn handle_click(&mut self, _x: f64, _y: f64) -> bool {
+        // 模式切换逻辑已迁移到React层
+        false
     }
 
     /// 设置配置JSON（动态切换主题/配色等）

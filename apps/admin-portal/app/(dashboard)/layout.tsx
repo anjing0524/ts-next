@@ -2,27 +2,30 @@
 
 import { useAuth } from '@repo/ui/hooks';
 import { PermissionGuard } from '@repo/ui';
+import { DashboardShell } from '@/components/layout/DashboardShell';
 
 /**
- * Dashboard路由组的受保护布局.
- * 重定向逻辑由 middleware.ts 处理.
- * 这个布局现在只负责UI和页面内的权限检查.
+ * Dashboard 路由组的受保护布局
+ * 所有 /admin/* 路由都会经过这个布局的权限检查
  */
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, isLoading } = useAuth();
 
-  // The middleware handles the redirect, so we just need to handle the loading/permission state here.
   return (
-    <main>
-      {/* TODO: Add a proper dashboard shell (e.g., Header, Sidebar) */}
-      <PermissionGuard
-        user={user}
-        isLoading={isLoading}
-        requiredPermission="view:dashboard" // Example permission
-        fallback={<div>You do not have permission to view this page.</div>}
-      >
+    <PermissionGuard 
+      requiredPermission="view:dashboard"
+      user={user}
+      isLoading={isLoading}
+      fallback={<div className="flex h-screen items-center justify-center">您没有权限访问仪表盘。</div>}
+      loadingFallback={<div className="flex h-screen items-center justify-center">正在验证权限...</div>}
+    >
+      <DashboardShell>
         {children}
-      </PermissionGuard>
-    </main>
+      </DashboardShell>
+    </PermissionGuard>
   );
 }

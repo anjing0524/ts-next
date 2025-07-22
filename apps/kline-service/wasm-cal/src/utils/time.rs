@@ -15,7 +15,7 @@ pub fn format_volume(volume: f64, precision: usize) -> String {
         ),
         v if v >= 1_000_000.0 => format!("{:.precision$}M", v / 1_000_000.0, precision = precision),
         v if v >= 1_000.0 => format!("{:.precision$}K", v / 1_000.0, precision = precision),
-        v => format!("{:.precision$}", v, precision = precision),
+        v => format!("{v:.precision$}"),
     }
 }
 

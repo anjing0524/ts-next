@@ -6,6 +6,10 @@ import { ClientManagementView } from '@/features/clients/components/ClientManage
 
 const REQUIRED_PERMISSIONS = ['menu:system:client:view', 'clients:list'];
 
+/**
+ * OAuth客户端管理页面
+ * 提供OAuth客户端的增删改查功能，支持权限控制
+ */
 export default function GuardedClientsPage() {
   const { user, isLoading } = useAuth();
 
@@ -14,8 +18,8 @@ export default function GuardedClientsPage() {
       requiredPermission={REQUIRED_PERMISSIONS}
       user={user}
       isLoading={isLoading}
-      fallback={<div>You do not have permission to view this page.</div>}
-      loadingFallback={<div>Verifying permissions...</div>}
+      fallback={<div>您没有权限访问此页面。</div>}
+      loadingFallback={<div>正在验证权限...</div>}
     >
       <ClientManagementView />
     </PermissionGuard>

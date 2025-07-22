@@ -301,13 +301,25 @@ export class KlineProcess {
         wasm.klineprocess_handle_mouse_drag(this.__wbg_ptr, x, y);
     }
     /**
-     * 处理鼠标点击事件（用于切换K线图/线图模式）
-     * @param {number} x
-     * @param {number} y
+     * 设置渲染模式（由React层调用）
+     * @param {string} _mode
+     */
+    set_render_mode(_mode) {
+        const ptr0 = passStringToWasm0(_mode, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_set_render_mode(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * 处理鼠标点击事件（已废弃，模式切换由React层管理）
+     * @param {number} _x
+     * @param {number} _y
      * @returns {boolean}
      */
-    handle_click(x, y) {
-        const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, x, y);
+    handle_click(_x, _y) {
+        const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, _x, _y);
         return ret !== 0;
     }
     /**

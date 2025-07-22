@@ -4,7 +4,8 @@
 import { prisma } from '@repo/database/client';
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
-import { RBACService } from '../../../../apps/oauth-service/lib/auth/services/rbac-service';
+// import { RBACService } from '../../../../apps/oauth-service/lib/auth/services/rbac-service';
+// 临时注释掉RBACService导入，避免循环依赖
 
 /**
  * 认证上下文接口
@@ -108,8 +109,10 @@ export async function authenticateBearer(
   const clientId = jwtValidatedPayload.client_id as string;
   const scopes = (jwtValidatedPayload.scope as string)?.split(' ') || [];
 
-  const userPermissions = await RBACService.getUserPermissions(userId);
-  const permissions = userPermissions ? userPermissions.permissions : [];
+  // 临时注释掉RBACService调用，避免循环依赖
+  // const userPermissions = await RBACService.getUserPermissions(userId);
+  // const permissions = userPermissions ? userPermissions.permissions : [];
+  const permissions: string[] = []; // 临时返回空权限数组
 
   if (options.requiredPermissions && options.requiredPermissions.length > 0) {
     const hasRequiredPermissions = options.requiredPermissions.every((p) =>

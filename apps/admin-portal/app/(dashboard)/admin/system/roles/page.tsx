@@ -6,6 +6,10 @@ import { RoleManagementView } from '@/features/roles/components/RoleManagementVi
 
 const REQUIRED_PERMISSIONS = ['menu:system:role:view', 'roles:list'];
 
+/**
+ * 角色管理页面
+ * 提供角色的增删改查功能，支持权限控制
+ */
 export default function GuardedRolesPage() {
   const { user, isLoading } = useAuth();
 
@@ -14,8 +18,8 @@ export default function GuardedRolesPage() {
       requiredPermission={REQUIRED_PERMISSIONS}
       user={user}
       isLoading={isLoading}
-      fallback={<div>You do not have permission to view this page.</div>}
-      loadingFallback={<div>Verifying permissions...</div>}
+      fallback={<div>您没有权限访问此页面。</div>}
+      loadingFallback={<div>正在验证权限...</div>}
     >
       <RoleManagementView />
     </PermissionGuard>

@@ -6,11 +6,18 @@ export class ClientService {
   constructor(private clientRepository: IClientRepository) {}
 
   async getClients(params?: {
-    offset?: number;
+    page?: number;
     limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<OAuthClient>> {
-    return this.clientRepository.getClients(params);
+    // 转换 page 参数为 offset 参数
+    const repositoryParams = params ? {
+      offset: params.page ? (params.page - 1) * (params.limit || 10) : undefined,
+      limit: params.limit,
+      search: params.search
+    } : undefined;
+    
+    return this.clientRepository.getClients(repositoryParams);
   }
 
   async getClientById(clientId: string): Promise<OAuthClient> {

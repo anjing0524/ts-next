@@ -38,9 +38,13 @@ export class KlineProcess {
    */
   handle_mouse_drag(x: number, y: number): void;
   /**
-   * 处理鼠标点击事件（用于切换K线图/线图模式）
+   * 设置渲染模式（由React层调用）
    */
-  handle_click(x: number, y: number): boolean;
+  set_render_mode(_mode: string): void;
+  /**
+   * 处理鼠标点击事件（已废弃，模式切换由React层管理）
+   */
+  handle_click(_x: number, _y: number): boolean;
   /**
    * 设置配置JSON（动态切换主题/配色等）
    */
@@ -62,6 +66,7 @@ export interface InitOutput {
   readonly klineprocess_handle_mouse_down: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
+  readonly klineprocess_set_render_mode: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_click: (a: number, b: number, c: number) => number;
   readonly klineprocess_set_config_json: (a: number, b: number, c: number) => [number, number];
   readonly start: () => void;

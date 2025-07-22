@@ -80,7 +80,6 @@ export async function middleware(request: NextRequest) {
   const method = request.method;
 
   // 跳过不需要认证的路径
-  // Skip paths that don't require authentication
   const publicPaths = [
     '/api/v2/oauth/authorize',
     '/api/v2/oauth/token',
@@ -95,43 +94,43 @@ export async function middleware(request: NextRequest) {
   }
 
   // 获取所需权限
-  // Get required permission
   const requiredPermission = getRequiredPermission(pathname, method);
 
   if (!requiredPermission) {
     // 如果没有配置权限要求，允许访问
-    // If no permission is configured, allow access
     return NextResponse.next();
   }
 
   try {
-    // 验证Bearer令牌
-    // Validate Bearer token
-    const authContext = await authenticateBearer(request);
+    // 进行Bearer Token认证
+    const authResult = await authenticateBearer(request, {
+      requiredPermissions: [requiredPermission],
+    });
 
-    if (!authContext) {
-      return NextResponse.json(
-        { error: 'unauthorized', error_description: '无效的访问令牌' },
-        { status: 401 }
-      );
+    if (!authResult.success) {
+      // 记录认证失败的审计日志
+      const tempContext: AuthContext = {
+        client_id: 'unknown',
+        scopes: [],
+        permissions: [],
+        tokenPayload: {},
+      };
+      logAuditEvent(request, tempContext, `ACCESS_${method}_${pathname}`, false, {
+        reason: 'authentication_failed',
+        requiredPermission,
+      });
+      
+      return authResult.response!;
     }
 
-    // 检查权限
-    // Check permissions
-    const hasPermission = authContext.context?.permissions?.includes(requiredPermission);
-
-    if (!hasPermission) {
-      return NextResponse.json(
-        { 
-          error: 'insufficient_scope', 
-          error_description: `缺少所需权限: ${requiredPermission}` 
-        },
-        { status: 403 }
-      );
+    // 记录成功访问的审计日志
+    if (authResult.context) {
+      logAuditEvent(request, authResult.context, `ACCESS_${method}_${pathname}`, true, {
+        requiredPermission,
+      });
     }
 
     // 权限验证通过，继续处理请求
-    // Permission validation passed, continue processing request
     return NextResponse.next();
   } catch (error) {
     console.error('中间件错误:', error);
