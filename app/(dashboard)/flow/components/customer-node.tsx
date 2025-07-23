@@ -326,7 +326,7 @@ export const CustomNode = ({ data, isConnectable }: NodeProps) => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>确认重跑计划？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    此操作将重新执行该计划，请在前置计划执行成功后点击，是否继续？
+                    此操作将重新执行该计划，是否继续？
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
