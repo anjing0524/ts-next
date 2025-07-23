@@ -10,5 +10,7 @@ pub mod line_renderer;
 pub mod overlay_renderer;
 pub mod price_renderer;
 pub mod volume_renderer;
+pub mod renderer_factory;  // 新增：工厂模式
 
 pub use chart_renderer::ChartRenderer;
+pub use renderer_factory::{RendererFactory, RenderStrategy, KlineRenderStrategy, HeatmapRenderStrategy};

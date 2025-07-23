@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { cn } from '@repo/ui/lib/utils';
-import { Button } from '@repo/ui/components/ui/button';
-import { ScrollArea } from '@repo/ui/components/ui/scroll-area';
-import { Sheet, SheetContent, SheetTrigger } from '@repo/ui/components/ui/sheet';
+import { cn } from "@repo/ui";
+import { Button } from "@repo/ui";
+import { ScrollArea } from "@repo/ui";
+import { Sheet, SheetContent, SheetTrigger } from "@repo/ui";
 import {
   Menu,
   Home,
@@ -20,7 +20,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '@repo/ui/hooks';
-import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@repo/ui/components/ui/dropdown-menu';
+} from "@repo/ui";
 
 interface MenuItem {
   id: string;
@@ -108,13 +108,9 @@ function SidebarContent() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  // 简化的权限检查 - 在实际应用中应该使用 hasPermission hook
-  const hasPermission = (permissions?: string[]) => {
-    if (!permissions || !user?.permissions) return true;
-    return permissions.some(permission => user.permissions?.includes(permission));
-  };
+  const { hasPermission } = useAuth();
 
-  const filteredMenuItems = menuItems.filter(item => hasPermission(item.permissions));
+  const filteredMenuItems = menuItems.filter(item => item.permissions ? hasPermission(item.permissions) : true);
 
   return (
     <div className="flex h-full flex-col">

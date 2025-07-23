@@ -2,7 +2,7 @@
 
 import { PermissionGuard } from '@repo/ui';
 import { useAuth } from '@repo/ui/hooks';
-import { ConfigManagementView } from '@/features/config/components/ConfigManagementView';
+import { ConfigManagementView } from '@/features/system-config/components/ConfigManagementView';
 
 const REQUIRED_PERMISSIONS = ['menu:system:config:view'];
 
