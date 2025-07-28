@@ -40,7 +40,7 @@ export class KlineProcess {
   /**
    * 设置渲染模式（由React层调用）
    */
-  set_render_mode(_mode: string): void;
+  set_render_mode(mode: string): void;
   /**
    * 处理鼠标点击事件（已废弃，模式切换由React层管理）
    */

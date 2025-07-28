@@ -150,27 +150,8 @@ export function getPool(): mysql.Pool {
   return mysqlPool;
 }
 
-// 添加进程退出事件监听器，确保在应用退出前关闭连接池
-if (process.env.NODE_ENV !== 'test') {
-  // 在测试环境中不自动关闭，避免干扰测试
-  process.on('SIGINT', async () => {
-    console.log('接收到 SIGINT 信号，准备关闭 MySQL 连接池');
-    await closePool();
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    console.log('接收到 SIGTERM 信号，准备关闭 MySQL 连接池');
-    await closePool();
-    process.exit(0);
-  });
-
-  // 处理未捕获的异常，确保连接池能够正常关闭
-  process.on('uncaughtException', async (error) => {
-    console.error('未捕获的异常', error);
-    await closePool();
-    process.exit(1);
-  });
-}
+// 注意：Edge Runtime 不支持 process 事件监听器
+// 在生产环境中，应该通过其他方式管理连接池的生命周期
+// 例如：在应用关闭时手动调用 closePool()
 
 export default mysqlPool;

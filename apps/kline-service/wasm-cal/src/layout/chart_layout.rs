@@ -1,4 +1,5 @@
 // 图表布局配置 - 定义整个K线图的布局参数
+#[derive(Clone)]
 pub struct ChartLayout {
     // 基础尺寸
     pub canvas_width: f64,  // 画布总宽度
@@ -45,9 +46,7 @@ pub struct ChartLayout {
     pub navigator_y: f64,            // 导航器Y坐标起点
     pub navigator_handle_width: f64, // 导航器滑块宽度
 
-    //  切换按钮
-    pub switch_btn_width: f64,
-    pub switch_btn_height: f64,
+    // 切换按钮已移至外部 React 组件
 
     // 新增主图和订单簿分区宽度
     pub main_chart_width: f64, // 主图区域宽度(80%)
@@ -102,8 +101,7 @@ impl ChartLayout {
         // 导航器位置 (计算方式不变)
         let navigator_y = canvas_height - navigator_height;
 
-        let switch_btn_height = 16.0;
-        let switch_btn_width = 60.0;
+        // 切换按钮配置已移除
 
         Self {
             canvas_width,
@@ -133,8 +131,7 @@ impl ChartLayout {
             grid_line_count,
             navigator_y, // 使用更新后的值
             navigator_handle_width,
-            switch_btn_height,
-            switch_btn_width,
+            // 切换按钮字段已移除
             main_chart_width,
             book_area_width,
         }

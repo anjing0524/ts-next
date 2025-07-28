@@ -16,6 +16,23 @@ const config = {
   moduleNameMapper: {
     // Force module uuid to resolve with the CJS entry point
     uuid: require.resolve('uuid'),
+    // Mock lucide-react icons
+    '^lucide-react$': '<rootDir>/__mocks__/lucide-react.js',
+    '^lucide-react/dynamicIconImports$': '<rootDir>/__mocks__/lucide-react.js',
+    // Path aliases
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  transformIgnorePatterns: [
+    'node_modules/(?!(lucide-react|@repo|@radix-ui)/)',
+  ],
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['babel-jest', {
+      presets: [
+        ['@babel/preset-env', { targets: { node: 'current' } }],
+        ['@babel/preset-react', { runtime: 'automatic' }],
+        '@babel/preset-typescript'
+      ]
+    }]
   },
 };
 

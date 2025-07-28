@@ -12,6 +12,27 @@ export class TokenStorage {
   private static readonly REFRESH_TOKEN_KEY = 'refresh_token'; // Refresh Token 在 sessionStorage 中的键名
 
   /**
+   * 获取Cookie的安全配置
+   */
+  private static getCookieConfig(): {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: 'Strict' | 'Lax' | 'None';
+    maxAge: number;
+    path: string;
+  } {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    return {
+      httpOnly: true, // 防止XSS攻击
+      secure: isProduction, // 生产环境强制HTTPS
+      sameSite: 'Lax', // CSRF防护
+      maxAge: 3600, // 1小时
+      path: '/',
+    };
+  }
+
+  /**
    * 设置 Access Token 和可选的 Refresh Token。
    * @param accessToken - 要存储的 Access Token。
    * @param refreshToken - (可选) 要存储的 Refresh Token。
@@ -19,10 +40,25 @@ export class TokenStorage {
   static setTokens(accessToken: string, refreshToken?: string): void {
     if (typeof window === 'undefined') return; // 服务器端跳过
 
-    // 存储 Access Token 到 Cookie
-    // 在生产环境中，建议将 Secure 属性设置为 true，HttpOnly 也应考虑设置
-    // SameSite=Lax 有助于防止 CSRF 攻击
-    document.cookie = `${this.ACCESS_TOKEN_KEY}=${accessToken}; path=/; SameSite=Lax;`;
+    const config = this.getCookieConfig();
+    
+    // 构建Cookie字符串
+    const cookieParts = [
+      `${this.ACCESS_TOKEN_KEY}=${accessToken}`,
+      `path=${config.path}`,
+      `SameSite=${config.sameSite}`,
+      `Max-Age=${config.maxAge}`,
+    ];
+    
+    if (config.httpOnly) {
+      cookieParts.push('HttpOnly');
+    }
+    
+    if (config.secure) {
+      cookieParts.push('Secure');
+    }
+
+    document.cookie = cookieParts.join('; ');
 
     // 如果提供了 Refresh Token，则将其存储到 sessionStorage
     if (refreshToken && typeof Storage !== 'undefined') {
@@ -63,8 +99,26 @@ export class TokenStorage {
   static clearTokens(): void {
     if (typeof window === 'undefined') return; // 服务器端跳过
 
-    // 清除 Access Token Cookie
-    document.cookie = `${this.ACCESS_TOKEN_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;`;
+    const config = this.getCookieConfig();
+    
+    // 构建清除Cookie的字符串
+    const cookieParts = [
+      `${this.ACCESS_TOKEN_KEY}=`,
+      `path=${config.path}`,
+      'expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      `SameSite=${config.sameSite}`,
+    ];
+    
+    if (config.httpOnly) {
+      cookieParts.push('HttpOnly');
+    }
+    
+    if (config.secure) {
+      cookieParts.push('Secure');
+    }
+
+    document.cookie = cookieParts.join('; ');
+    
     // 从 sessionStorage 中移除 Refresh Token
     if (typeof Storage !== 'undefined') {
       sessionStorage.removeItem(this.REFRESH_TOKEN_KEY);

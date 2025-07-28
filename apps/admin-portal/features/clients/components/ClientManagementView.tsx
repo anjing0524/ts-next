@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { DataTable, Button, ColumnDef } from '@repo/ui';
+import { DataTable, Button, ColumnDef, Skeleton } from '@repo/ui';
 import { PlusCircle } from 'lucide-react';
 import { useAuth } from '@repo/ui';
 import { useClientManagement } from '../hooks/use-client-management';
+import { ClientFormDialog } from '@/components/admin/clients/ClientFormDialog';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
+import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import type { Client } from '@/types/auth';
 
 const columns = (
@@ -12,20 +15,20 @@ const columns = (
   openDeleteModal: (client: Client) => void,
   rotateSecret: (clientId: string) => void
 ): ColumnDef<Client>[] => [
-  { accessorKey: 'name', header: 'Client Name' },
-  { accessorKey: 'clientId', header: 'Client ID' },
+  { accessorKey: 'name', header: '客户端名称' },
+  { accessorKey: 'clientId', header: '客户端ID' },
   {
     id: 'actions',
     cell: ({ row }) => (
       <div className="space-x-2">
         <Button variant="outline" size="sm" onClick={() => rotateSecret(row.original.id)}>
-          Rotate Secret
+          重置密钥
         </Button>
         <Button variant="outline" size="sm" onClick={() => openEditModal(row.original)}>
-          Edit
+          编辑
         </Button>
         <Button variant="destructive" size="sm" onClick={() => openDeleteModal(row.original)}>
-          Delete
+          删除
         </Button>
       </div>
     ),
@@ -44,6 +47,12 @@ export const ClientManagementView = () => {
     openEditModal,
     openDeleteConfirm,
     rotateSecret,
+    isModalOpen,
+    isDeleteConfirmOpen,
+    selectedClient,
+    saveClient,
+    deleteClient,
+    closeModal,
     page,
     setPage,
     limit,
@@ -55,24 +64,37 @@ export const ClientManagementView = () => {
     [openEditModal, openDeleteConfirm, rotateSecret]
   );
 
-  if (isLoading) return <div>Loading clients...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+
+  if (isLoading && !clients.length) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-28" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <ErrorDisplay error={error} />;
+  }
 
   return (
-    <div className="container mx-auto py-8">
-      <header className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">OAuth Client Management</h1>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">客户端管理</h2>
         {hasPermission('clients:create') && (
           <Button onClick={openCreateModal}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Client
+            <PlusCircle className="mr-2 h-4 w-4" /> 添加客户端
           </Button>
         )}
-      </header>
+      </div>
 
       <DataTable
         columns={clientColumns}
         data={clients}
-        isLoading={isFetching}
         pageCount={meta?.totalPages ?? 0}
         pagination={{
           pageIndex: meta ? meta.currentPage - 1 : 0,
@@ -91,6 +113,27 @@ export const ClientManagementView = () => {
             setLimit(updater.pageSize);
           }
         }}
+        isLoading={isFetching}
+      />
+
+      <ClientFormDialog
+        isOpen={isModalOpen}
+        onOpenChange={(open) => !open && closeModal()}
+        onSubmit={async (clientData) => {
+          saveClient(clientData as any);
+          return Promise.resolve();
+        }}
+        client={selectedClient}
+        isLoading={false}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={isDeleteConfirmOpen}
+        onClose={closeModal}
+        onConfirm={deleteClient}
+        isProcessing={false}
+        itemName={selectedClient?.name || '该客户端'}
+        itemType="客户端"
       />
     </div>
   );

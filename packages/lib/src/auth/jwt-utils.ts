@@ -1,6 +1,7 @@
 import * as jose from 'jose';
 import { NextRequest } from 'next/server';
 import { createHash } from 'crypto';
+import { KeyService } from './key-service';
 
 // --- Type Definitions ---
 export interface JWTPayload extends jose.JWTPayload {
@@ -28,61 +29,7 @@ export interface TokenValidationResult {
   valid: boolean;
   payload?: JWTPayload;
   error?: Error;
-}
-
-// --- Helper Functions ---
-
-/**
- * 获取或生成JWT密钥对
- */
-async function getOrGenerateKeyPair(): Promise<{
-  publicKey: jose.KeyLike;
-  privateKey: jose.KeyLike;
-}> {
-  const publicKeyPem = process.env.JWT_PUBLIC_KEY;
-  const privateKeyPem = process.env.JWT_PRIVATE_KEY;
-
-  if (publicKeyPem && privateKeyPem) {
-    try {
-      // 确保PEM格式正确
-      const cleanPublicKey = publicKeyPem.replace(/\\n/g, '\n');
-      const cleanPrivateKey = privateKeyPem.replace(/\\n/g, '\n');
-
-      const publicKey = await jose.importSPKI(cleanPublicKey, 'RS256');
-      const privateKey = await jose.importPKCS8(cleanPrivateKey, 'RS256');
-
-      console.log('Successfully imported existing JWT keys');
-      return { publicKey, privateKey };
-    } catch (error) {
-      console.warn('Failed to import existing JWT keys, generating new ones:', error);
-    }
-  }
-
-  // 生成新的密钥对
-  console.log('Generating new JWT key pair...');
-  const { publicKey, privateKey } = await jose.generateKeyPair('RS256', {
-    modulusLength: 2048,
-  });
-
-  // 导出密钥为PEM格式
-  const publicKeyPemNew = await jose.exportSPKI(publicKey);
-  const privateKeyPemNew = await jose.exportPKCS8(privateKey);
-
-  console.log('Generated new JWT keys. Please update your environment variables:');
-  console.log('JWT_PUBLIC_KEY=' + publicKeyPemNew);
-  console.log('JWT_PRIVATE_KEY=' + privateKeyPemNew);
-
-  return { publicKey, privateKey };
-}
-
-async function getPublicKey(): Promise<jose.KeyLike> {
-  const { publicKey } = await getOrGenerateKeyPair();
-  return publicKey;
-}
-
-async function getPrivateKey(): Promise<jose.KeyLike> {
-  const { privateKey } = await getOrGenerateKeyPair();
-  return privateKey;
+  version?: string;
 }
 
 // --- Main JWT Utility Class ---
@@ -90,12 +37,8 @@ async function getPrivateKey(): Promise<jose.KeyLike> {
 export class JWTUtils {
   static async generateToken(payload: JWTPayload, options: JWTOptions = {}): Promise<string> {
     try {
-      const privateKey = await getPrivateKey();
-      const jwt = await new jose.SignJWT(payload)
-        .setProtectedHeader({ alg: 'RS256' })
-        .setIssuedAt()
-        .setExpirationTime(options.expiresIn || '1h')
-        .sign(privateKey);
+      const keyService = await KeyService.getInstance();
+      const jwt = await keyService.signToken(payload, options);
       return jwt;
     } catch (error) {
       console.error('Failed to generate JWT token:', error);
@@ -107,9 +50,14 @@ export class JWTUtils {
 
   static async verifyToken(token: string): Promise<TokenValidationResult> {
     try {
-      const publicKey = await getPublicKey();
-      const { payload } = await jose.jwtVerify(token, publicKey);
-      return { valid: true, payload };
+      const keyService = await KeyService.getInstance();
+      const result = await keyService.verifyToken(token);
+      return {
+        valid: result.valid,
+        payload: result.payload as JWTPayload,
+        version: result.version,
+        error: result.error,
+      };
     } catch (error) {
       return { valid: false, error: error as Error };
     }
@@ -141,14 +89,43 @@ export class JWTUtils {
    * 获取公钥
    */
   static async getPublicKey(): Promise<jose.KeyLike> {
-    return await getPublicKey();
+    const keyService = await KeyService.getInstance();
+    return keyService.getCurrentKey().publicKey;
   }
 
   /**
    * 导出公钥为JWK格式
    */
-  static async exportPublicKeyAsJWK(publicKey: jose.KeyLike): Promise<jose.JWK> {
-    return await jose.exportJWK(publicKey);
+  static async exportPublicKeyAsJWK(publicKey?: jose.KeyLike): Promise<jose.JWK> {
+    if (publicKey) {
+      return await jose.exportJWK(publicKey);
+    }
+    const keyService = await KeyService.getInstance();
+    return await keyService.getJWK();
+  }
+
+  /**
+   * Get JWK for JWKS endpoint
+   */
+  static async getJWK(): Promise<jose.JWK> {
+    const keyService = await KeyService.getInstance();
+    return await keyService.getJWK();
+  }
+
+  /**
+   * Get old JWK for JWKS endpoint during rotation
+   */
+  static async getOldJWK(): Promise<jose.JWK | undefined> {
+    const keyService = await KeyService.getInstance();
+    return await keyService.getOldJWK();
+  }
+
+  /**
+   * Get key information for monitoring
+   */
+  static async getKeyInfo() {
+    const keyService = await KeyService.getInstance();
+    return keyService.getKeyInfo();
   }
 }
 

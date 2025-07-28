@@ -1,6 +1,6 @@
 // apps/oauth-service/middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateBearer, type AuthContext } from '@repo/lib/middleware';
+import { authenticateBearer, type AuthContext } from './lib/auth/bearer-auth';
 import { permissionMap } from './lib/permission-map';
 
 export const config = {

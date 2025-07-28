@@ -1,0 +1,600 @@
+
+> oauth-service@0.1.0 dev /Users/liushuo/code/ts-next-template/apps/oauth-service
+> next dev -p 3001 --turbopack
+
+   ▲ Next.js 15.3.5 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.95.36:3001
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ○ Compiling middleware ...
+ ✓ Compiled middleware in 1301ms
+ ✓ Ready in 4.2s
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 5.7s
+ GET /?ide_webview_request_time=1753261421834 404 in 6488ms
+
+> oauth-service@0.1.0 dev /Users/liushuo/code/ts-next-template/apps/oauth-service
+> next dev -p 3001 --turbopack
+
+ GET /@vite/client 404 in 111ms
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::3001
+    at <unknown> (Error: listen EADDRINUSE: address already in use :::3001)
+    at new Promise (<anonymous>) {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}
+[?25h
+ GET /robots.txt 404 in 126ms
+ ○ Compiling /api/v2/health ...
+ ✓ Compiled /api/v2/health in 2.7s
+ GET /api/v2/health 200 in 3039ms
+ GET /?ide_webview_request_time=1753261665620 404 in 92ms
+ GET /@vite/client 404 in 136ms
+ GET /api/health?ide_webview_request_time=1753261672279 404 in 248ms
+ GET /@vite/client 404 in 83ms
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 5.8s
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.gkhtft632um'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.gkhtft632um'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.200m5ub8jjr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.200m5ub8jjr'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.j7snbt3ob2'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.j7snbt3ob2'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.sc60asqtx4n'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.sc60asqtx4n'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.gfjjghr5uji'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.gfjjghr5uji'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l38djtxezh'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l38djtxezh'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.0nasss6ktnek'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.0nasss6ktnek'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l4obfauk15c'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l4obfauk15c'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.udhgho9pty'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.udhgho9pty'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.uz3ozj41u4'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.uz3ozj41u4'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.6xcemfs7sgo'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.6xcemfs7sgo'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ss0vmq3odoj'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ss0vmq3odoj'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kyhbjcek3f'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kyhbjcek3f'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.a5mhxxitzal'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.a5mhxxitzal'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.pp9fh40zir'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.pp9fh40zir'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.fpoapsjpo87'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.fpoapsjpo87'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ifpdgl0kts'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ifpdgl0kts'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.xx1ntp81o5'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.xx1ntp81o5'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.uxgx3r0orn'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.uxgx3r0orn'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.90vi990coyr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.90vi990coyr'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b8coibfadot'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b8coibfadot'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.g49ql4vitxo'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.g49ql4vitxo'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.fc9nxspydu'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.fc9nxspydu'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.6hg9wg2omtw'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.6hg9wg2omtw'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ws2p2rl8wg'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ws2p2rl8wg'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ni7l65wq3xr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ni7l65wq3xr'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.s2unxu1ozj'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.s2unxu1ozj'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.j5dc7a32phb'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.j5dc7a32phb'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.4cwgyzd0gsg'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.4cwgyzd0gsg'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.iac8jxq17zh'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.iac8jxq17zh'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ih3kavrqi5n'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ih3kavrqi5n'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.v1oubgnhx7'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.v1oubgnhx7'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.psyg0fa42x'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.psyg0fa42x'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.by8qgxuf9kw'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.by8qgxuf9kw'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.u6f788bj5gr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.u6f788bj5gr'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.wj483z005u'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.wj483z005u'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nd83ehhlbyk'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nd83ehhlbyk'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.pqwzgvvo8'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.pqwzgvvo8'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.agdwwoe6q1d'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.agdwwoe6q1d'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.q20hgfvf60f'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.q20hgfvf60f'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nekdej32qi'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nekdej32qi'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.61qd3ys1fwm'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.61qd3ys1fwm'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kbubfhbfpp'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kbubfhbfpp'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.po5cparlvro'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.po5cparlvro'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.v4ifgt2bxg'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.v4ifgt2bxg'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.5n6jn6j5t0y'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.5n6jn6j5t0y'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b6wo12tnu0h'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b6wo12tnu0h'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.z2hv5ltu7c9'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.z2hv5ltu7c9'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.akctn6kohdg'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.akctn6kohdg'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.mc62a5qah5'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.mc62a5qah5'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l7c9xez0qoq'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.l7c9xez0qoq'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.4u91msbyc6w'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.4u91msbyc6w'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.enqj08uma1'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.enqj08uma1'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.8dcztfiv58t'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.8dcztfiv58t'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ljjqkyo4yq'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.ljjqkyo4yq'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.tfnq4ko96zf'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.tfnq4ko96zf'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.o1x6cw2mhtq'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.o1x6cw2mhtq'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.jestbbrxj39'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.jestbbrxj39'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nu76sw0f6qc'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.nu76sw0f6qc'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b04kq6ym2y8'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.b04kq6ym2y8'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/server/middleware-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.duvqpe2co16'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.duvqpe2co16'
+}
+[Error: ENOENT: no such file or directory, open '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kw493j84pqk'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/liushuo/code/ts-next-template/apps/oauth-service/.next/static/development/_buildManifest.js.tmp.kw493j84pqk'
+}

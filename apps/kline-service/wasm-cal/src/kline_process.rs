@@ -266,12 +266,20 @@ impl KlineProcess {
 
     /// 设置渲染模式（由React层调用）
     #[wasm_bindgen]
-    pub fn set_render_mode(&mut self, _mode: &str) -> Result<(), JsValue> {
-        let _chart_renderer = match &mut self.chart_renderer {
+    pub fn set_render_mode(&mut self, mode: &str) -> Result<(), JsValue> {
+        let chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
             None => return Err(JsValue::from_str("ChartRenderer not initialized")),
         };
 
+        // 解析模式字符串并设置渲染模式
+        let render_mode = match mode {
+            "kmap" => crate::render::chart_renderer::RenderMode::Kmap,
+            "heatmap" => crate::render::chart_renderer::RenderMode::Heatmap,
+            _ => return Err(JsValue::from_str(&format!("Unknown render mode: {}", mode))),
+        };
+
+        chart_renderer.set_mode(render_mode);
         Ok(())
     }
 

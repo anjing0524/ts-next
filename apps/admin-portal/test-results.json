@@ -4,8 +4,8 @@
     "rootDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
     "forbidOnly": false,
     "fullyParallel": true,
-    "globalSetup": null,
-    "globalTeardown": null,
+    "globalSetup": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-setup.ts",
+    "globalTeardown": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-teardown.ts",
     "globalTimeout": 0,
     "grep": {},
     "grepInvert": null,
@@ -35,7 +35,9 @@
         "name": "Desktop Chrome",
         "testDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
         "testIgnore": [],
-        "testMatch": ["**/*.{test,spec}.{js,ts}"],
+        "testMatch": [
+          "**/*.{test,spec}.{js,ts}"
+        ],
         "timeout": 30000
       }
     ],
@@ -49,13 +51,29 @@
   "suites": [],
   "errors": [
     {
-      "message": "Error: No tests found.\nMake sure that arguments are regular expressions matching test files.\nYou may need to escape symbols like \"$\" or \"*\" and quote the arguments.",
-      "stack": "Error: No tests found.\nMake sure that arguments are regular expressions matching test files.\nYou may need to escape symbols like \"$\" or \"*\" and quote the arguments."
+      "message": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.",
+      "stack": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.\n    at Object.<anonymous> (/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-setup.ts:9:6)",
+      "location": {
+        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-setup.ts",
+        "column": 6,
+        "line": 9
+      },
+      "snippet": "\u001b[90m   at \u001b[39mglobal-setup.ts:9\n\n   7 |  * 在E2E测试开始前初始化测试环境\n   8 |  */\n>  9 | setup('全局测试设置', async () => {\n     |      ^\n  10 |   console.log('🚀 开始全局测试设置...');\n  11 |\n  12 |   // 1. 确保数据库已初始化"
+    },
+    {
+      "message": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.",
+      "stack": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.\n    at Object.<anonymous> (/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-teardown.ts:9:9)",
+      "location": {
+        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-teardown.ts",
+        "column": 9,
+        "line": 9
+      },
+      "snippet": "\u001b[90m   at \u001b[39mglobal-teardown.ts:9\n\n   7 |  * 在E2E测试完成后清理测试环境\n   8 |  */\n>  9 | teardown('全局测试清理', async () => {\n     |         ^\n  10 |   console.log('🧹 开始全局测试清理...');\n  11 |\n  12 |   try {"
     }
   ],
   "stats": {
-    "startTime": "2025-07-16T07:50:50.324Z",
-    "duration": 34.41800000000012,
+    "startTime": "2025-07-25T03:05:39.037Z",
+    "duration": 107.67399999999998,
     "expected": 0,
     "skipped": 0,
     "unexpected": 0,

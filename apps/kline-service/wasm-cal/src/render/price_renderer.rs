@@ -1,8 +1,11 @@
 //! 价格图(K线图)模块 - 专门负责绘制K线图部分
 
+use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::layout::ChartLayout;
+use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -132,5 +135,28 @@ impl PriceRenderer {
             }
             ctx.fill();
         }
+    }
+}
+
+impl RenderStrategy for PriceRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        let canvas_ref = ctx.canvas_manager.borrow();
+        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        let layout_ref = ctx.layout.borrow();
+        self.draw(main_ctx, &layout_ref, ctx.data_manager, ctx.theme);
+        Ok(())
+    }
+
+    fn supports_mode(&self, mode: RenderMode) -> bool {
+        // PriceRenderer 只在 Kmap 模式下使用
+        mode == RenderMode::Kmap
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Main
+    }
+
+    fn get_priority(&self) -> u32 {
+        10 // 价格图优先级
     }
 }

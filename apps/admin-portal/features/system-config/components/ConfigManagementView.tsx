@@ -1,20 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Switch, Alert, AlertDescription, Textarea, Separator } from '@repo/ui';
 import { Loader2, Save, RefreshCw } from 'lucide-react';
 import { useSystemConfigQuery, useUpdateSystemConfigMutation } from '../queries';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import type { SystemConfig } from '../domain/system-config';
 
 // 系统配置表单验证模式
 const configSchema = z.object({
@@ -38,8 +32,46 @@ const configSchema = z.object({
 
 type ConfigFormData = z.infer<typeof configSchema>;
 
+// 辅助函数：从SystemConfig数组中获取配置值
+const getConfigValue = (configs: SystemConfig[], key: string, defaultValue: any = '') => {
+  const config = configs.find(c => c.key === key);
+  if (!config) return defaultValue;
+  
+  // 根据配置类型解析值
+  switch (config.type) {
+    case 'boolean':
+      return config.value === true || config.value === 'true';
+    case 'number':
+      return typeof config.value === 'number' ? config.value : parseInt(String(config.value)) || defaultValue;
+    default:
+      return config.value || defaultValue;
+  }
+};
+
+// 辅助函数：将表单数据转换为SystemConfig更新格式
+const convertFormDataToConfigs = (data: ConfigFormData): Partial<SystemConfig>[] => {
+  return [
+    { key: 'site.name', value: data.siteName, type: 'string' },
+    { key: 'site.description', value: data.siteDescription || '', type: 'string' },
+    { key: 'system.maintenance_mode', value: data.maintenanceMode, type: 'boolean' },
+    { key: 'auth.registration_enabled', value: data.registrationEnabled, type: 'boolean' },
+    { key: 'auth.email_verification_required', value: data.emailVerificationRequired, type: 'boolean' },
+    { key: 'security.max_login_attempts', value: data.maxLoginAttempts, type: 'number' },
+    { key: 'security.session_timeout', value: data.sessionTimeout, type: 'number' },
+    { key: 'security.password_min_length', value: data.passwordMinLength, type: 'number' },
+    { key: 'security.password_require_special_char', value: data.passwordRequireSpecialChar, type: 'boolean' },
+    { key: 'security.password_require_number', value: data.passwordRequireNumber, type: 'boolean' },
+    { key: 'security.password_require_uppercase', value: data.passwordRequireUppercase, type: 'boolean' },
+    { key: 'smtp.host', value: data.smtpHost || '', type: 'string' },
+    { key: 'smtp.port', value: data.smtpPort || 587, type: 'number' },
+    { key: 'smtp.username', value: data.smtpUsername || '', type: 'string' },
+    { key: 'smtp.password', value: data.smtpPassword || '', type: 'string' },
+    { key: 'smtp.secure', value: data.smtpSecure, type: 'boolean' },
+  ];
+};
+
 export function ConfigManagementView() {
-  const { data: config, isLoading, error, refetch } = useSystemConfigQuery();
+  const { data: configs, isLoading, error, refetch } = useSystemConfigQuery();
   const updateConfigMutation = useUpdateSystemConfigMutation();
 
   const {
@@ -73,31 +105,32 @@ export function ConfigManagementView() {
 
   // 当配置数据加载完成时，更新表单默认值
   React.useEffect(() => {
-    if (config) {
+    if (configs && Array.isArray(configs)) {
       reset({
-        siteName: config.siteName || '',
-        siteDescription: config.siteDescription || '',
-        maintenanceMode: config.maintenanceMode || false,
-        registrationEnabled: config.registrationEnabled ?? true,
-        emailVerificationRequired: config.emailVerificationRequired || false,
-        maxLoginAttempts: config.maxLoginAttempts || 5,
-        sessionTimeout: config.sessionTimeout || 60,
-        passwordMinLength: config.passwordMinLength || 8,
-        passwordRequireSpecialChar: config.passwordRequireSpecialChar ?? true,
-        passwordRequireNumber: config.passwordRequireNumber ?? true,
-        passwordRequireUppercase: config.passwordRequireUppercase ?? true,
-        smtpHost: config.smtpHost || '',
-        smtpPort: config.smtpPort || 587,
-        smtpUsername: config.smtpUsername || '',
-        smtpPassword: config.smtpPassword || '',
-        smtpSecure: config.smtpSecure ?? true,
+        siteName: getConfigValue(configs, 'site.name', ''),
+        siteDescription: getConfigValue(configs, 'site.description', ''),
+        maintenanceMode: getConfigValue(configs, 'system.maintenance_mode', false),
+        registrationEnabled: getConfigValue(configs, 'auth.registration_enabled', true),
+        emailVerificationRequired: getConfigValue(configs, 'auth.email_verification_required', false),
+        maxLoginAttempts: getConfigValue(configs, 'security.max_login_attempts', 5),
+        sessionTimeout: getConfigValue(configs, 'security.session_timeout', 60),
+        passwordMinLength: getConfigValue(configs, 'security.password_min_length', 8),
+        passwordRequireSpecialChar: getConfigValue(configs, 'security.password_require_special_char', true),
+        passwordRequireNumber: getConfigValue(configs, 'security.password_require_number', true),
+        passwordRequireUppercase: getConfigValue(configs, 'security.password_require_uppercase', true),
+        smtpHost: getConfigValue(configs, 'smtp.host', ''),
+        smtpPort: getConfigValue(configs, 'smtp.port', 587),
+        smtpUsername: getConfigValue(configs, 'smtp.username', ''),
+        smtpPassword: getConfigValue(configs, 'smtp.password', ''),
+        smtpSecure: getConfigValue(configs, 'smtp.secure', true),
       });
     }
-  }, [config, reset]);
+  }, [configs, reset]);
 
   const onSubmit = async (data: ConfigFormData) => {
     try {
-      await updateConfigMutation.mutateAsync(data);
+      const configUpdates = convertFormDataToConfigs(data);
+      await updateConfigMutation.mutateAsync(configUpdates);
       toast.success('系统配置已更新');
     } catch (error) {
       toast.error('更新系统配置失败');
@@ -122,7 +155,7 @@ export function ConfigManagementView() {
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          加载系统配置失败: {error.message}
+          加载系统配置失败: {error instanceof Error ? error.message : String(error)}
         </AlertDescription>
       </Alert>
     );

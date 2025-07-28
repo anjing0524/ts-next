@@ -18,6 +18,31 @@ export const DefaultConfig = {
 } as const;
 
 /**
+ * Cookie安全配置常量
+ * Cookie security configuration constants
+ */
+export const CookieSecurityConfig = {
+  HTTP_ONLY: true, // 防止XSS攻击
+  SECURE: process.env.NODE_ENV === 'production', // 生产环境强制HTTPS
+  SAME_SITE: 'Lax' as const, // CSRF防护
+  ACCESS_TOKEN_MAX_AGE: 3600, // 1小时
+  REFRESH_TOKEN_MAX_AGE: 2592000, // 30天
+  PATH: '/',
+} as const;
+
+/**
+ * 环境变量配置键
+ * Environment variable configuration keys
+ */
+export const EnvConfigKeys = {
+  COOKIE_SECURE: 'COOKIE_SECURE',
+  COOKIE_SAMESITE: 'COOKIE_SAMESITE',
+  COOKIE_MAX_AGE: 'COOKIE_MAX_AGE',
+  ACCESS_TOKEN_MAX_AGE: 'ACCESS_TOKEN_MAX_AGE',
+  REFRESH_TOKEN_MAX_AGE: 'REFRESH_TOKEN_MAX_AGE',
+} as const;
+
+/**
  * 支持的授权类型
  * Supported grant types
  */

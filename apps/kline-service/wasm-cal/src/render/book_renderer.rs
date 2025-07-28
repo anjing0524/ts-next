@@ -1,9 +1,11 @@
 //! 订单簿可视化渲染器 - 在main层右侧20%宽度区域绘制订单簿深度
 
+use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,12 +30,13 @@ impl BookRenderer {
     pub fn draw(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
+        layout: &Rc<RefCell<ChartLayout>>,
         data_manager: &Rc<RefCell<DataManager>>,
         hover_index: Option<usize>,
         mode: RenderMode,
         theme: &ChartTheme,
     ) {
+        let layout_ref = layout.borrow();
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -89,8 +92,8 @@ impl BookRenderer {
         }
 
         // 计算区域
-        let area_x = layout.chart_area_x + layout.main_chart_width;
-        let area_width = layout.book_area_width;
+        let area_x = layout_ref.chart_area_x + layout_ref.main_chart_width;
+        let area_width = layout_ref.book_area_width;
 
         // 使用与heatmap相同的bin索引逻辑聚合成交量
         let mut bins = vec![0.0; num_bins];
@@ -119,7 +122,7 @@ impl BookRenderer {
         }
 
         // 清理订单簿区域
-        self.clear_area(ctx, layout);
+        self.clear_area(ctx, &layout_ref);
 
         // 绘制每个bin，与heatmap的bin遍历逻辑完全一致
         for (bin_idx, &volume) in bins.iter().enumerate() {
@@ -133,8 +136,8 @@ impl BookRenderer {
             let price_mid = (price_low + price_high) / 2.0;
 
             // 使用与heatmap完全相同的Y坐标映射
-            let y_high = layout.map_price_to_y(price_high, min_low, max_high);
-            let y_low = layout.map_price_to_y(price_low, min_low, max_high);
+            let y_high = layout_ref.map_price_to_y(price_high, min_low, max_high);
+            let y_low = layout_ref.map_price_to_y(price_low, min_low, max_high);
             let bar_y = y_high.min(y_low);
             let bar_height = (y_low - y_high).abs().max(1.0); // 确保最小高度为1像素
 
@@ -200,5 +203,38 @@ impl BookRenderer {
         self.last_idx.set(None);
         self.last_mode.set(None);
         self.last_visible_range.set(None);
+    }
+}
+
+impl RenderStrategy for BookRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        // BookRenderer 需要特殊的参数，所以我们需要从 RenderContext 中提取这些参数
+        // 并调用原始的 draw 方法
+        // 注意：BookRenderer 的渲染需要 hover_index，这在 RenderContext 中没有提供
+        // 我们可以暂时使用 None 作为 hover_index
+        let canvas_ref = ctx.canvas_manager.borrow();
+        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        self.draw(
+            main_ctx,
+            ctx.layout,
+            ctx.data_manager,
+            None, // hover_index 需要在其他地方处理
+            ctx.mode,
+            ctx.theme,
+        );
+        Ok(())
+    }
+
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
+        // BookRenderer 支持所有模式
+        true
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Main
+    }
+
+    fn get_priority(&self) -> u32 {
+        30 // 订单簿优先级
     }
 }

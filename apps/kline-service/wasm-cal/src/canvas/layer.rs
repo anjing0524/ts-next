@@ -1,6 +1,7 @@
 //! Canvas层定义
 
 /// Canvas层类型
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CanvasLayerType {
     /// 底层Canvas - 用于绘制静态元素（坐标轴、网格线等）
     Base,

@@ -1,9 +1,12 @@
 //! 线图渲染器 - 负责绘制最新价、买一价、卖一价曲线
 
+use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
+use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -207,5 +210,28 @@ impl LineRenderer {
         }
 
         ctx.stroke();
+    }
+}
+
+impl RenderStrategy for LineRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        let canvas_ref = ctx.canvas_manager.borrow();
+        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        let layout_ref = ctx.layout.borrow();
+        self.draw(main_ctx, &layout_ref, ctx.data_manager, ctx.theme);
+        Ok(())
+    }
+
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
+        // LineRenderer 支持所有模式
+        true
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Main
+    }
+
+    fn get_priority(&self) -> u32 {
+        25 // 线图优先级
     }
 }

@@ -2,9 +2,6 @@
  * 通用中间件导出
  */
 
-// Bearer认证中间件
-export { authenticateBearer, type AuthContext, type AuthOptions } from './bearer-auth';
-
 // CORS中间件
 export {
   withCORS,

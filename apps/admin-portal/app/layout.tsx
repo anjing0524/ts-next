@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { AppProviders } from '../providers/app-providers';
 import './globals.css';
 
+// 强制动态渲染整个应用
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Admin Portal',
   description: '管理员门户',

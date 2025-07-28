@@ -7,6 +7,9 @@ import { useAuth } from '@repo/ui';
 import { apiRequest } from '@/lib/api';
 import { TokenStorage } from '@/lib/auth/token-storage';
 
+// 强制动态渲染，避免预渲染时访问浏览器API
+
+
 /**
  * OAuth2.1授权回调处理页面
  * 处理从OAuth服务返回的授权码，完成令牌交换
@@ -210,3 +213,6 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
+
+// 禁用预渲染，因为组件使用了浏览器专用API
+export const dynamic = 'force-dynamic';

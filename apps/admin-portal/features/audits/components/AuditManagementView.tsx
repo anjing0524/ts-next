@@ -50,7 +50,12 @@ const columns: ColumnDef<AuditLog>[] = [
     header: '详情',
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground truncate max-w-xs">
-        {row.original.details || '无'}
+        {typeof row.original.details === 'string' 
+          ? row.original.details 
+          : row.original.details 
+            ? JSON.stringify(row.original.details) 
+            : '无'
+        }
       </span>
     ),
   },
@@ -90,7 +95,7 @@ export const AuditManagementView = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center text-destructive">
           <p>加载审计日志时出错</p>
-          <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
+          <p className="text-sm text-muted-foreground mt-1">{error instanceof Error ? error.message : String(error)}</p>
         </div>
       </div>
     );

@@ -5,7 +5,9 @@ use crate::config::ChartTheme;
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
+use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use flatbuffers;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,6 +36,7 @@ pub struct DataZoomRenderer {
     drag_handle_type: DragHandleType,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DragResult {
     None,
     NeedRedraw,
@@ -55,10 +58,11 @@ impl DataZoomRenderer {
         &self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> DragHandleType {
-        let layout = canvas_manager.layout.borrow();
+        let canvas_manager_ref = canvas_manager.borrow();
+        let layout = canvas_manager_ref.layout.borrow();
 
         // 如果不在导航器区域内，直接返回None
         if !layout.is_point_in_navigator(x, y) {
@@ -109,7 +113,7 @@ impl DataZoomRenderer {
         &mut self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> bool {
         // 获取当前鼠标位置的手柄类型
@@ -133,7 +137,7 @@ impl DataZoomRenderer {
         &self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> CursorStyle {
         // 如果正在拖动，根据拖动手柄类型返回对应的鼠标样式
@@ -147,7 +151,8 @@ impl DataZoomRenderer {
 
         // 如果没有在拖动，检查鼠标位置对应的手柄类型
         // 确保鼠标在导航器区域内
-        let layout = canvas_manager.layout.borrow();
+        let canvas_manager_ref = canvas_manager.borrow();
+        let layout = canvas_manager_ref.layout.borrow();
         if !layout.is_point_in_navigator(x, y) {
             return CursorStyle::Default;
         }
@@ -194,7 +199,7 @@ impl DataZoomRenderer {
         &mut self,
         x: f64,
         _y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
     ) -> DragResult {
         // 如果没有在拖动，不处理
@@ -203,7 +208,8 @@ impl DataZoomRenderer {
         }
 
         // 检查鼠标是否在导航器区域内
-        let layout = canvas_manager.layout.borrow();
+        let canvas_manager_ref = canvas_manager.borrow();
+        let layout = canvas_manager_ref.layout.borrow();
         // 允许鼠标在拖动状态下不一定在导航器区域内，但不能超出canvas范围
         let is_in_canvas =
             x >= 0.0 && x <= layout.canvas_width && _y >= 0.0 && _y <= layout.canvas_height;
@@ -323,13 +329,14 @@ impl DataZoomRenderer {
     /// 绘制DataZoom导航器
     pub fn draw(
         &self,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         theme: &ChartTheme,
     ) {
         // 获取 上下文和布局
-        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager.layout.borrow();
+        let canvas_manager_ref = canvas_manager.borrow();
+        let ctx = canvas_manager_ref.get_context(CanvasLayerType::Overlay);
+        let layout = canvas_manager_ref.layout.borrow();
 
         // 计算导航器位置
         let nav_x = layout.chart_area_x;
@@ -598,5 +605,46 @@ impl DataZoomRenderer {
 
         // 恢复渲染状态，取消裁剪区域
         ctx.restore();
+    }
+}
+
+impl RenderStrategy for DataZoomRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        self.draw(ctx.canvas_manager, ctx.data_manager, ctx.theme);
+        Ok(())
+    }
+
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
+        // DataZoomRenderer 支持所有模式
+        true
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Base
+    }
+
+    fn get_priority(&self) -> u32 {
+        25 // DataZoom优先级
+    }
+
+    // 实现鼠标事件处理方法
+    fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
+        self.handle_mouse_down(x, y, ctx.canvas_manager, ctx.data_manager)
+    }
+
+    fn handle_mouse_up(&mut self, _x: f64, _y: f64, ctx: &RenderContext) -> bool {
+        self.handle_mouse_up(ctx.data_manager)
+    }
+
+    fn handle_mouse_drag(&mut self, x: f64, y: f64, ctx: &RenderContext) -> DragResult {
+        self.handle_mouse_drag(x, y, ctx.canvas_manager, ctx.data_manager)
+    }
+
+    fn handle_mouse_leave(&mut self, _ctx: &RenderContext) -> bool {
+        self.force_reset_drag_state()
+    }
+
+    fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {
+        self.get_cursor_style(x, y, ctx.canvas_manager, ctx.data_manager)
     }
 }

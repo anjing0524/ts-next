@@ -1,7 +1,10 @@
 //! 热图渲染器 - 专门负责绘制类似Bookmap的热度图
 
+use crate::canvas::CanvasLayerType;
 use crate::data::DataManager;
 use crate::layout::ChartLayout;
+use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -101,7 +104,7 @@ impl HeatRenderer {
         }
 
         // 计算全局最大值的对数，避免在循环中重复计算
-        let global_max_bin_ln = (global_max_bin + 1.0).ln();
+        let global_max_bin_ln = (global_max_bin + 1.0_f64).ln();
         let min_heat_threshold = 0.001; // 最小热度阈值，调低以显示更多小 volume
 
         // 绘制每根K线的tick区间色块
@@ -222,5 +225,28 @@ impl HeatRenderer {
     /// 线性插值 (静态方法)
     fn lerp_static(a: u8, b: u8, t: f64) -> f64 {
         a as f64 * (1.0 - t) + b as f64 * t
+    }
+}
+
+impl RenderStrategy for HeatRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        let canvas_ref = ctx.canvas_manager.borrow();
+        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        let layout_ref = ctx.layout.borrow();
+        self.draw(main_ctx, &layout_ref, ctx.data_manager);
+        Ok(())
+    }
+
+    fn supports_mode(&self, mode: RenderMode) -> bool {
+        // HeatRenderer 只在 Heatmap 模式下使用
+        mode == RenderMode::Heatmap
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Main
+    }
+
+    fn get_priority(&self) -> u32 {
+        15 // 热图优先级
     }
 }

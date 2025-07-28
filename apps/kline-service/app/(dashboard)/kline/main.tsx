@@ -137,6 +137,11 @@ export default function Main() {
             console.log(`渲染时间: ${data.renderTime}ms`);
           }
         },
+        modeChanged: (data) => {
+          // 处理模式切换完成的消息
+          console.log(`模式已切换到: ${data.mode}`);
+          // 可以在这里添加UI状态更新逻辑
+        },
       };
 
       worker.onmessage = (e) => {
@@ -448,7 +453,7 @@ export default function Main() {
         <h2 className="text-xl font-semibold">K 线图 (Web Worker + OffscreenCanvas)</h2>
         <div className="flex space-x-2">
           <button
-            onClick={() => switchMode('kline')}
+            onClick={() => switchMode('kmap')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             K线图

@@ -6,6 +6,7 @@ use crate::data::DataManager;
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use crate::utils::time;
 use flatbuffers;
 use std::cell::RefCell;
@@ -59,14 +60,15 @@ impl AxisRenderer {
     /// 绘制所有坐标轴
     pub fn draw(
         &self,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
         config: &ChartConfig,
         theme: &ChartTheme,
     ) {
-        let ctx = canvas_manager.get_context(CanvasLayerType::Base);
-        let layout_ref = canvas_manager.layout.borrow();
+        let canvas_manager_ref = canvas_manager.borrow();
+        let ctx = canvas_manager_ref.get_context(CanvasLayerType::Base);
+        let layout_ref = canvas_manager_ref.layout.borrow();
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
@@ -400,5 +402,35 @@ impl AxisRenderer {
             let _ = ctx.fill_text(&date_str, x, time_label_y_start);
             let _ = ctx.fill_text(&time_str, x, time_label_y_start + 12.0);
         }
+    }
+}
+
+impl RenderStrategy for AxisRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        // AxisRenderer 需要特殊的参数，所以我们需要从 RenderContext 中提取这些参数
+        // 并调用原始的 draw 方法
+        if let Some(config) = ctx.config {
+            self.draw(
+                ctx.canvas_manager,
+                ctx.data_manager,
+                ctx.mode,
+                config,
+                ctx.theme,
+            );
+        }
+        Ok(())
+    }
+
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
+        // AxisRenderer 支持所有模式
+        true
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Base
+    }
+
+    fn get_priority(&self) -> u32 {
+        5 // 坐标轴优先级（较高，因为它在Base层）
     }
 }

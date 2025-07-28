@@ -5,6 +5,7 @@ use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
 
 /// 数据管理器 - 负责管理K线数据和可见范围
+#[derive(Clone)]
 pub struct DataManager {
     /// K线数据
     items: Option<flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>>,

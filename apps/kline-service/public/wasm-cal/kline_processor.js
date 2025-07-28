@@ -302,10 +302,10 @@ export class KlineProcess {
     }
     /**
      * 设置渲染模式（由React层调用）
-     * @param {string} _mode
+     * @param {string} mode
      */
-    set_render_mode(_mode) {
-        const ptr0 = passStringToWasm0(_mode, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    set_render_mode(mode) {
+        const ptr0 = passStringToWasm0(mode, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.klineprocess_set_render_mode(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
@@ -385,6 +385,9 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_closePath_cf0e7130243e1083 = function(arg0) {
         arg0.closePath();
+    };
+    imports.wbg.__wbg_error_524f506f44df1645 = function(arg0) {
+        console.error(arg0);
     };
     imports.wbg.__wbg_error_7534b8e9a36f1ab4 = function(arg0, arg1) {
         let deferred0_0;

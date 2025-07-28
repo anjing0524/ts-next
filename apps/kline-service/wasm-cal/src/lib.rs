@@ -1,14 +1,15 @@
 use wasm_bindgen::prelude::*;
 
 // 导入模块
-mod canvas;
-mod config;
-mod data;
-mod kline_generated;
-mod kline_process;
-mod layout;
-mod render;
-mod utils;
+pub mod benchmark;
+pub mod canvas;
+pub mod config;
+pub mod data;
+pub mod kline_generated;
+pub mod kline_process;
+pub mod layout;
+pub mod render;
+pub mod utils;
 
 // 重新导出主要类型
 pub use config::{ChartConfig, ChartTheme, ConfigManager, LocaleConfig};

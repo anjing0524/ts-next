@@ -62,17 +62,7 @@ pub struct ChartTheme {
     pub tooltip_border: String,
     /// 提示框文本色
     pub tooltip_text: String,
-    // --- 开关按钮 ---
-    /// 开关按钮背景色
-    pub switch_bg: String,
-    /// 开关按钮激活背景色
-    pub switch_active_bg: String,
-    /// 开关按钮边框色
-    pub switch_border: String,
-    /// 开关按钮文本色
-    pub switch_text: String,
-    /// 开关按钮激活文本色
-    pub switch_active_text: String,
+    // --- 开关按钮样式已移至外部 React 组件 ---
     /// 通用阴影色
     pub shadow: String,
     // --- 订单簿悬浮效果 ---
@@ -87,8 +77,7 @@ pub struct ChartTheme {
     pub font_header: String,
     /// 图例字体
     pub font_legend: String,
-    /// 切换按钮字体
-    pub font_switch: String,
+    // 切换按钮字体已移除
 }
 
 impl Default for ChartTheme {
@@ -117,18 +106,14 @@ impl Default for ChartTheme {
             tooltip_bg: "rgba(255, 255, 255, 0.95)".into(),
             tooltip_border: "#e0e0e0".into(),
             tooltip_text: "#333333".into(),
-            switch_bg: "#f0f0f0".into(),
-            switch_active_bg: "#e0e0e0".into(),
-            switch_border: "#dddddd".into(),
-            switch_text: "#666666".into(),
-            switch_active_text: "#333333".into(),
+            // 切换按钮样式配置已移除
             shadow: "rgba(0, 0, 0, 0.5)".into(),
             book_hover_bg: "rgba(255, 255, 255, 0.2)".into(),
             book_hover_border: "rgba(255, 255, 255, 0.8)".into(),
             font_axis: "10px Arial".into(),
             font_header: "bold 14px Arial".into(),
             font_legend: "12px Arial".into(),
-            font_switch: "14px Arial".into(),
+            // 切换按钮字体配置已移除
         }
     }
 }
@@ -159,18 +144,14 @@ pub struct PartialChartTheme {
     pub tooltip_bg: Option<String>,
     pub tooltip_border: Option<String>,
     pub tooltip_text: Option<String>,
-    pub switch_bg: Option<String>,
-    pub switch_active_bg: Option<String>,
-    pub switch_border: Option<String>,
-    pub switch_text: Option<String>,
-    pub switch_active_text: Option<String>,
+    // 切换按钮样式字段已移除
     pub shadow: Option<String>,
     pub book_hover_bg: Option<String>,
     pub book_hover_border: Option<String>,
     pub font_axis: Option<String>,
     pub font_header: Option<String>,
     pub font_legend: Option<String>,
-    pub font_switch: Option<String>,
+    // 切换按钮字体字段已移除
 }
 
 impl ChartTheme {
@@ -211,18 +192,14 @@ impl ChartTheme {
         merge_field!(tooltip_bg);
         merge_field!(tooltip_border);
         merge_field!(tooltip_text);
-        merge_field!(switch_bg);
-        merge_field!(switch_active_bg);
-        merge_field!(switch_border);
-        merge_field!(switch_text);
-        merge_field!(switch_active_text);
+        // 切换按钮样式合并逻辑已移除
         merge_field!(shadow);
         merge_field!(book_hover_bg);
         merge_field!(book_hover_border);
         merge_field!(font_axis);
         merge_field!(font_header);
         merge_field!(font_legend);
-        merge_field!(font_switch);
+        // 切换按钮字体合并逻辑已移除
     }
 
     /// 从部分 JSON 合并

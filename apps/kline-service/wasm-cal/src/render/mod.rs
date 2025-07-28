@@ -10,7 +10,8 @@ pub mod line_renderer;
 pub mod overlay_renderer;
 pub mod price_renderer;
 pub mod volume_renderer;
-pub mod renderer_factory;  // 新增：工厂模式
+// pub mod renderer_factory;  // 已移除：工厂模式，现在使用策略模式
+pub mod advanced;
+pub mod strategy; // 新增：策略模式 // 新增：高级渲染器架构
 
 pub use chart_renderer::ChartRenderer;
-pub use renderer_factory::{RendererFactory, RenderStrategy, KlineRenderStrategy, HeatmapRenderStrategy};

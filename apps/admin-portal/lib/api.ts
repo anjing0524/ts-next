@@ -329,14 +329,14 @@ export const adminApi = {
   },
 
   // 新增：获取系统配置
-  async getSystemConfig(): Promise<any> {
-    // 获取系统配置，返回 SystemConfig 对象
+  async getSystemConfig(): Promise<any[]> {
+    // 获取系统配置，返回 SystemConfig 数组
     return authenticatedRequest('/system/config');
   },
 
   // 新增：更新系统配置
-  async updateSystemConfig(configData: any): Promise<any> {
-    // 更新系统配置，返回更新后的 SystemConfig 对象
+  async updateSystemConfig(configData: any[]): Promise<any[]> {
+    // 更新系统配置，返回更新后的 SystemConfig 数组
     return authenticatedRequest('/system/config', {
       method: 'PUT',
       body: JSON.stringify(configData),

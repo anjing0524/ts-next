@@ -6,6 +6,7 @@ use crate::kline_generated::kline::KlineItem;
 use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
+use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use crate::utils::time;
 use js_sys;
 use std::cell::RefCell;
@@ -91,12 +92,13 @@ impl OverlayRenderer {
         &mut self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
         theme: &ChartTheme,
     ) {
-        let layout = canvas_manager.layout.borrow();
+        let canvas_ref = canvas_manager.borrow();
+        let layout = canvas_ref.layout.borrow();
 
         // 检查是否在整个图表区域内（包括主图和订单簿区域）
         if !layout.is_point_in_chart_area(x, y) {
@@ -143,9 +145,9 @@ impl OverlayRenderer {
     /// 处理鼠标离开事件
     pub fn handle_mouse_leave(
         &mut self,
-        canvas_manager: &CanvasManager,
-        mode: RenderMode,
-        theme: &ChartTheme,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
+        _mode: RenderMode,
+        _theme: &ChartTheme,
     ) {
         // 重置所有鼠标状态
         self.mouse_in_chart = false;
@@ -159,23 +161,24 @@ impl OverlayRenderer {
         // 重新绘制覆盖层，只显示切换按钮
         // 注意：这里不调用draw方法，因为它会检查mouse_in_chart并可能绘制其他元素
         // 我们只需要确保切换按钮被绘制
-        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager.layout.borrow();
+        let canvas_ref = canvas_manager.borrow();
+        let _ctx = canvas_ref.get_context(CanvasLayerType::Overlay);
+        let _layout = canvas_ref.layout.borrow();
 
-        // 只绘制切换按钮，使用传入的mode参数
-        self.draw_switch_button(ctx, &*layout, mode, theme);
+        // 模式切换按钮已移至外部 React 组件
     }
 
     /// 绘制交互层
     pub fn draw(
         &self,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
         theme: &ChartTheme,
     ) {
-        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager.layout.borrow();
+        let canvas_ref = canvas_manager.borrow();
+        let ctx = canvas_ref.get_context(CanvasLayerType::Overlay);
+        let layout = canvas_ref.layout.borrow();
         self.clear(canvas_manager);
 
         let data_manager_ref = data_manager.borrow();
@@ -186,8 +189,7 @@ impl OverlayRenderer {
             None => return,
         };
 
-        // 绘制切换按钮 - 确保使用传入的mode参数
-        self.draw_switch_button(ctx, &*layout, mode, theme);
+        // 模式切换按钮已移至外部 React 组件
 
         // 如果鼠标不在图表区域内，只显示切换按钮
         if !self.mouse_in_chart {
@@ -411,9 +413,10 @@ impl OverlayRenderer {
     }
 
     /// 清除交互层
-    pub fn clear(&self, canvas_manager: &CanvasManager) {
-        let ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager.layout.borrow();
+    pub fn clear(&self, canvas_manager: &Rc<RefCell<CanvasManager>>) {
+        let canvas_ref = canvas_manager.borrow();
+        let ctx = canvas_ref.get_context(CanvasLayerType::Overlay);
+        let layout = canvas_ref.layout.borrow();
 
         // 只清除非导航器区域，保留DataZoom部分
         ctx.clear_rect(0.0, 0.0, layout.canvas_width, layout.navigator_y);
@@ -848,73 +851,7 @@ impl OverlayRenderer {
         draw_line(ctx, "成交量:", formatted_volume, current_y);
     }
 
-    /// 绘制切换按钮
-    fn draw_switch_button(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mode: RenderMode,
-        theme: &ChartTheme,
-    ) {
-        // 使用布局参数计算按钮位置和尺寸
-        let button_width = layout.switch_btn_width * 2.0;
-        let button_height = layout.switch_btn_height;
-        let button_x = (layout.canvas_width - button_width) / 2.0;
-        let button_y = layout.padding;
-
-        // 绘制按钮背景
-        ctx.set_fill_style_str(&theme.switch_bg);
-        ctx.fill_rect(button_x, button_y, button_width, button_height);
-
-        // 绘制按钮边框
-        ctx.set_stroke_style_str(&theme.switch_border);
-        ctx.set_line_width(1.0);
-        ctx.stroke_rect(button_x, button_y, button_width, button_height);
-
-        // 绘制按钮分隔线
-        ctx.begin_path();
-        ctx.move_to(button_x + layout.switch_btn_width, button_y);
-        ctx.line_to(button_x + layout.switch_btn_width, button_y + button_height);
-        ctx.set_stroke_style_str(&theme.switch_border);
-        ctx.stroke();
-
-        // 设置文本样式
-        ctx.set_font(&theme.font_switch);
-        ctx.set_text_align("center");
-        ctx.set_text_baseline("middle");
-
-        // K线按钮区域
-        let kline_x = button_x + layout.switch_btn_width / 2.0;
-        let kline_y = button_y + button_height / 2.0;
-        // 热力图按钮区域
-        let heatmap_x = button_x + layout.switch_btn_width + layout.switch_btn_width / 2.0;
-        let heatmap_y = button_y + button_height / 2.0;
-
-        // K线按钮样式
-        if mode == RenderMode::Kmap {
-            ctx.set_fill_style_str(&theme.switch_active_bg);
-            ctx.fill_rect(button_x, button_y, layout.switch_btn_width, button_height);
-            ctx.set_fill_style_str(&theme.switch_active_text);
-        } else {
-            ctx.set_fill_style_str(&theme.switch_text);
-        }
-        ctx.fill_text("K线", kline_x, kline_y).unwrap();
-
-        // 热力图按钮样式
-        if mode == RenderMode::Heatmap {
-            ctx.set_fill_style_str(&theme.switch_active_bg);
-            ctx.fill_rect(
-                button_x + layout.switch_btn_width,
-                button_y,
-                layout.switch_btn_width,
-                button_height,
-            );
-            ctx.set_fill_style_str(&theme.switch_active_text);
-        } else {
-            ctx.set_fill_style_str(&theme.switch_text);
-        }
-        ctx.fill_text("热力图", heatmap_x, heatmap_y).unwrap();
-    }
+    // draw_switch_button 方法已删除，模式切换按钮已移至外部 React 组件
 
     /// 热图模式下tooltip：时间、价格、tick区间合并数量
     fn draw_heatmap_tooltip(
@@ -1011,7 +948,7 @@ impl OverlayRenderer {
         &mut self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
         theme: &ChartTheme,
@@ -1024,7 +961,7 @@ impl OverlayRenderer {
         &mut self,
         x: f64,
         y: f64,
-        canvas_manager: &CanvasManager,
+        canvas_manager: &Rc<RefCell<CanvasManager>>,
         data_manager: &Rc<RefCell<DataManager>>,
         mode: RenderMode,
         theme: &ChartTheme,
@@ -1191,5 +1128,78 @@ impl OverlayRenderer {
         ctx.set_stroke_style_str(&theme.book_hover_border);
         ctx.set_line_width(2.0); // 增加边框宽度从1.0到2.0
         ctx.stroke_rect(book_area_x, bar_y, book_area_width, bar_height);
+    }
+}
+
+impl RenderStrategy for OverlayRenderer {
+    fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        self.draw(ctx.canvas_manager, ctx.data_manager, ctx.mode, ctx.theme);
+        Ok(())
+    }
+
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
+        // OverlayRenderer 支持所有模式
+        true
+    }
+
+    fn get_layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Overlay
+    }
+
+    fn get_priority(&self) -> u32 {
+        100 // 交互层优先级（较低，因为它在最上层）
+    }
+
+    // 实现鼠标事件处理方法
+    fn handle_mouse_move(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
+        self.handle_mouse_move(
+            x,
+            y,
+            ctx.canvas_manager,
+            ctx.data_manager,
+            ctx.mode,
+            ctx.theme,
+        );
+        true // 总是处理鼠标移动事件
+    }
+
+    fn handle_mouse_leave(&mut self, ctx: &RenderContext) -> bool {
+        self.handle_mouse_leave(ctx.canvas_manager, ctx.mode, ctx.theme);
+        true // 总是处理鼠标离开事件
+    }
+
+    fn handle_mouse_drag(
+        &mut self,
+        x: f64,
+        y: f64,
+        ctx: &RenderContext,
+    ) -> super::datazoom_renderer::DragResult {
+        self.handle_mouse_drag(
+            x,
+            y,
+            ctx.canvas_manager,
+            ctx.data_manager,
+            ctx.mode,
+            ctx.theme,
+        );
+        super::datazoom_renderer::DragResult::NeedRedraw // 拖动时需要重绘
+    }
+
+    fn handle_wheel(&mut self, x: f64, y: f64, _delta: f64, ctx: &RenderContext) -> bool {
+        self.handle_wheel(
+            x,
+            y,
+            ctx.canvas_manager,
+            ctx.data_manager,
+            ctx.mode,
+            ctx.theme,
+        );
+        true // 总是处理滚轮事件
+    }
+
+    fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {
+        let canvas_ref = ctx.canvas_manager.borrow();
+        let layout_ref = canvas_ref.layout.borrow();
+        self.get_cursor_style(x, y, &layout_ref)
     }
 }

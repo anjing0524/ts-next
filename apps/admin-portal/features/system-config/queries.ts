@@ -16,7 +16,7 @@ const systemConfigKeys = {
  * 获取系统配置的 React Query Hook
  */
 export const useSystemConfigQuery = () => {
-  return useQuery<SystemConfig, Error>({
+  return useQuery<SystemConfig[], Error>({
     queryKey: systemConfigKeys.detail(),
     queryFn: () => systemConfigService.getSystemConfig(),
   });
@@ -27,7 +27,7 @@ export const useSystemConfigQuery = () => {
  */
 export const useUpdateSystemConfigMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<SystemConfig, Error, Partial<SystemConfig>>({
+  return useMutation<SystemConfig[], Error, Partial<SystemConfig>[]>({
     mutationFn: (configData) => systemConfigService.updateSystemConfig(configData),
     onSuccess: (data) => {
       queryClient.setQueryData(systemConfigKeys.detail(), data);
