@@ -249,7 +249,7 @@ function calculateStats(stage: string, nodesCount: number, stageStates: PlanStat
     running: stageStates.filter((s) => ['R', 'S'].includes(s.plan_state || '')).length,
     // 等待中 P, A,
     waiting: stageStates.filter((s) => ['P', 'A'].includes(s.plan_state || '')).length,
-    // 微调度则说明计划配置的有，但是state表里面没有
+    // 未执行则说明计划配置的有，但是state表里面没有
     not_executed: nodesCount - stageStates.length,
   };
 }

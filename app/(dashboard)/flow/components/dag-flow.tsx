@@ -173,7 +173,7 @@ export function DagFlow() {
                 <div className="text-sm text-muted-foreground mt-1">
                   总计划: {stage.stats.total} | 成功: {stage.stats.success} | 失败:{' '}
                   {stage.stats.failed} | 运行中: {stage.stats.running} | 等待中:{' '}
-                  {stage.stats.waiting}
+                  {stage.stats.waiting} | 未执行: {stage.stats.not_executed}
                 </div>
               </div>
 

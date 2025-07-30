@@ -9,6 +9,7 @@ export interface FlowStats {
   failed: number;
   running: number;
   waiting: number;
+  not_executed: number;
 }
 
 export interface FlowStage {

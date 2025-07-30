@@ -225,7 +225,7 @@ export function TaskDetailsDialog() {
           // 运行中状态：R, W
           return state === 'R' || state === 'W';
         case 'not_run':
-          // 未运行状态：N, P
+          // 未执行状态：N, P
           return state === 'N' || state === 'P';
         default:
           return true;
@@ -461,8 +461,8 @@ export function TaskDetailsDialog() {
                         <SelectItem value="all">全部</SelectItem>
                         <SelectItem value="success">成功</SelectItem>
                         <SelectItem value="failed">失败</SelectItem>
-                        <SelectItem value="running">执行中</SelectItem>
-                        <SelectItem value="not_run">未运行</SelectItem>
+                        <SelectItem value="running">运行中</SelectItem>
+                        <SelectItem value="not_run">未执行</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -141,7 +141,7 @@ export function StatsTable() {
       {
         id: 'not_executed',
         accessorKey: 'not_executed',
-        header: '未调度',
+        header: '未执行',
         size: 100,
         cell: ({ row }) => {
           const value = row.getValue('not_executed') as number;
