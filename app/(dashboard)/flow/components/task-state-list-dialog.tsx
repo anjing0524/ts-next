@@ -219,14 +219,14 @@ export function TaskDetailsDialog() {
           // 成功状态：D, K
           return state === 'D' || state === 'K';
         case 'failed':
-          // 失败状态：F, Z, C, T
-          return state === 'F' || state === 'Z' || state === 'C' || state === 'T';
+          // 失败状态：T, F, Z, C
+          return state === 'T' || state === 'F' || state === 'Z';
         case 'running':
-          // 运行中状态：R, W
-          return state === 'R' || state === 'W';
+          // 运行中状态：R
+          return state === 'R';
         case 'not_run':
-          // 未执行状态：N, P
-          return state === 'N' || state === 'P';
+          // 未执行状态：N, P, A, S
+          return state === 'N' || state === 'P' || state === 'A' || state === 'S' || state === 'C';
         default:
           return true;
       }
