@@ -26,6 +26,8 @@ pub enum CursorStyle {
     Help,
     /// 不允许样式
     NotAllowed,
+    /// 十字线样式
+    Crosshair,
 }
 
 impl fmt::Display for CursorStyle {
@@ -49,6 +51,7 @@ impl CursorStyle {
             CursorStyle::Wait => "wait",
             CursorStyle::Help => "help",
             CursorStyle::NotAllowed => "not-allowed",
+            CursorStyle::Crosshair => "crosshair",
         }
     }
 }

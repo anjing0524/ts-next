@@ -14,6 +14,7 @@ import {
 } from '@repo/lib/node';
 import * as crypto from 'crypto'; // 用于哈希计算 (For hash computation)
 import { addDays } from 'date-fns'; // 日期/时间操作库 (Date/time manipulation library)
+import { withRateLimit } from '@repo/lib/middleware';
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
@@ -149,7 +150,13 @@ async function tokenEndpointHandler(req: NextRequest): Promise<NextResponse> {
       );
   }
 }
-export const POST = withErrorHandling(tokenEndpointHandler);
+const rateLimitedHandler = withRateLimit(tokenEndpointHandler, {
+  maxRequests: 10,
+  windowMs: 60 * 1000, // 1 minute
+  keyType: 'ip'
+});
+
+export const POST = withErrorHandling(rateLimitedHandler);
 
 // --- 'authorization_code' 授权类型处理函数 ---
 // --- 'authorization_code' Grant Type Handler ---

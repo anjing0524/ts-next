@@ -3,7 +3,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::ChartLayout;
+use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::Cell;
@@ -14,7 +14,11 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
     last_mode: Cell<Option<RenderMode>>,
-    last_visible_range: Cell<Option<(usize, usize)>>, // 新增：缓存可见范围
+    last_visible_range: Cell<Option<(usize, usize)>>,
+    cached_bins: RefCell<Option<Vec<f64>>>,
+    cached_max_volume: Cell<Option<f64>>,
+    cached_hover_index: Cell<Option<usize>>,
+    cached_data_hash: Cell<u64>,
 }
 
 impl BookRenderer {
@@ -22,211 +26,200 @@ impl BookRenderer {
         Self {
             last_idx: Cell::new(None),
             last_mode: Cell::new(None),
-            last_visible_range: Cell::new(None), // 新增：初始化为None
+            last_visible_range: Cell::new(None),
+            cached_bins: RefCell::new(None),
+            cached_max_volume: Cell::new(None),
+            cached_hover_index: Cell::new(None),
+            cached_data_hash: Cell::new(0),
         }
     }
 
-    /// 在main层右侧20%宽度区域绘制订单簿
     pub fn draw(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &Rc<RefCell<ChartLayout>>,
+        layout: &ChartLayout,
         data_manager: &Rc<RefCell<DataManager>>,
         hover_index: Option<usize>,
-        mode: RenderMode,
+        _mode: RenderMode,
         theme: &ChartTheme,
     ) {
-        let layout_ref = layout.borrow();
         let data_manager_ref = data_manager.borrow();
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
             None => return,
         };
-        let visible_range = data_manager_ref.get_visible_range();
-        let (visible_start, _visible_count, visible_end) = visible_range.get_range();
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
             return;
         }
-        let idx = hover_index.unwrap_or_else(|| visible_end - 1);
+
+        let idx = hover_index.unwrap_or_else(|| visible_end.saturating_sub(1));
         if idx >= items.len() {
             return;
         }
 
-        // 检查是否需要渲染：mode变化、idx变化或可见范围变化
-        let last_mode = self.last_mode.get();
-        let last_idx = self.last_idx.get();
-        let last_visible_range = self.last_visible_range.get();
-        let current_visible_range = (visible_start, visible_end);
+        // 检查是否需要重新计算缓存
+        let should_recalculate = {
+            let current_hover_changed = self.cached_hover_index.get() != Some(idx);
+            let visible_range_changed = self.last_visible_range.get()
+                != Some((visible_start, visible_start + visible_count));
+            let data_changed = self.last_idx.get() != Some(idx);
 
-        let need_render = last_mode != Some(mode)
-            || last_idx != Some(idx)
-            || last_visible_range != Some(current_visible_range);
-
-        if !need_render {
-            return;
-        }
-
-        // 更新缓存
-        self.last_mode.set(Some(mode));
-        self.last_idx.set(Some(idx));
-        self.last_visible_range.set(Some(current_visible_range));
-
-        let item = items.get(idx);
-        let last_price = item.last_price();
-        let volumes = match item.volumes() {
-            Some(vols) => vols,
-            None => return,
+            current_hover_changed
+                || visible_range_changed
+                || data_changed
+                || self.cached_bins.borrow().is_none()
         };
 
-        // 获取可见数据的价格范围和tick，与heatmap保持一致
+        let (bins, max_volume) = if should_recalculate {
+            // 重新计算
+            let item = items.get(idx);
+            let _last_price = item.last_price();
+            let volumes = match item.volumes() {
+                Some(v) => v,
+                None => return,
+            };
+
+            let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
+            let tick = data_manager_ref.get_tick();
+            if tick <= 0.0 || min_low >= max_high {
+                return;
+            }
+
+            let num_bins = ((max_high - min_low) / tick).ceil() as usize;
+            if num_bins == 0 {
+                return;
+            }
+
+            let mut bins = vec![0.0; num_bins];
+            let mut max_volume = 0.0f64;
+            for i in 0..volumes.len() {
+                let pv = volumes.get(i);
+                if pv.price() >= min_low && pv.price() < max_high {
+                    let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
+                    if bin_idx < num_bins {
+                        bins[bin_idx] += pv.volume();
+                        max_volume = max_volume.max(bins[bin_idx]);
+                    }
+                }
+            }
+
+            if max_volume <= 0.0 {
+                return;
+            }
+
+            // 更新缓存
+            *self.cached_bins.borrow_mut() = Some(bins.clone());
+            self.cached_max_volume.set(Some(max_volume));
+            self.cached_hover_index.set(Some(idx));
+            self.last_visible_range
+                .set(Some((visible_start, visible_start + visible_count)));
+            self.last_idx.set(Some(idx));
+
+            (bins, max_volume)
+        } else {
+            // 使用缓存
+            let bins = self.cached_bins.borrow().as_ref().unwrap().clone();
+            let max_volume = self.cached_max_volume.get().unwrap();
+            (bins, max_volume)
+        };
+
+        let book_rect = layout.get_rect(&PaneId::OrderBook);
+        let price_rect = layout.get_rect(&PaneId::HeatmapArea);
         let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
         let tick = data_manager_ref.get_tick();
-        if tick <= 0.0 || min_low >= max_high {
-            return;
-        }
+        let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 0.0);
 
-        // 计算tick区间数量，与heatmap逻辑完全一致
-        let num_bins = ((max_high - min_low) / tick).ceil() as usize;
-        if num_bins == 0 {
-            return;
-        }
+        self.clear_area(ctx, layout);
 
-        // 计算区域
-        let area_x = layout_ref.chart_area_x + layout_ref.main_chart_width;
-        let area_width = layout_ref.book_area_width;
-
-        // 使用与heatmap相同的bin索引逻辑聚合成交量
-        let mut bins = vec![0.0; num_bins];
-        let mut max_volume = 0.0f64;
-
-        for i in 0..volumes.len() {
-            let pv = volumes.get(i);
-            let price = pv.price();
-            let volume = pv.volume();
-
-            // 只处理在可见价格范围内的数据，与heatmap逻辑一致
-            if price < min_low || price >= max_high {
-                continue;
-            }
-
-            // 使用与heatmap完全相同的bin索引计算
-            let bin_idx = ((price - min_low) / tick).floor() as usize;
-            if bin_idx < bins.len() {
-                bins[bin_idx] += volume;
-                max_volume = max_volume.max(bins[bin_idx]);
-            }
-        }
-
-        if max_volume <= 0.0 {
-            return;
-        }
-
-        // 清理订单簿区域
-        self.clear_area(ctx, &layout_ref);
-
-        // 绘制每个bin，与heatmap的bin遍历逻辑完全一致
         for (bin_idx, &volume) in bins.iter().enumerate() {
             if volume <= 0.0 {
-                continue; // 只绘制有成交量的bin
+                continue;
             }
-
-            // 使用与heatmap完全相同的价格计算
-            let price_low = min_low + bin_idx as f64 * tick;
-            let price_high = price_low + tick;
-            let price_mid = (price_low + price_high) / 2.0;
-
-            // 使用与heatmap完全相同的Y坐标映射
-            let y_high = layout_ref.map_price_to_y(price_high, min_low, max_high);
-            let y_low = layout_ref.map_price_to_y(price_low, min_low, max_high);
-            let bar_y = y_high.min(y_low);
-            let bar_height = (y_low - y_high).abs().max(1.0); // 确保最小高度为1像素
-
-            // 根据价格与lastPrice的关系判断买卖盘
-            let is_ask = price_mid > last_price;
-
+            let item = items.get(idx);
+            let _last_price = item.last_price();
+            let price = min_low + bin_idx as f64 * tick;
+            let y = y_mapper.map_y(price);
+            let bar_height = (y_mapper.map_y(price + tick) - y).abs().max(1.0);
             self.draw_level(
-                ctx, area_x, area_width, bar_height, bar_y, volume, max_volume, is_ask, theme,
+                ctx,
+                book_rect.x,
+                book_rect.width,
+                bar_height,
+                y - bar_height,
+                volume,
+                max_volume,
+                price > _last_price,
+                theme,
             );
         }
     }
 
-    /// 绘制单个价格档位
     fn draw_level(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        area_x: f64,
-        area_width: f64,
-        bar_height: f64,
-        bar_y: f64,
-        volume: f64,
-        max_volume: f64,
+        x: f64,
+        w: f64,
+        h: f64,
+        y: f64,
+        vol: f64,
+        max_vol: f64,
         is_ask: bool,
         theme: &ChartTheme,
     ) {
-        let norm = (volume / max_volume).min(1.0);
-        let text_reserved_width = 40.0; // 预留宽度用于显示数量
-        let bar_width = (area_width - text_reserved_width) * norm;
-        let bar_x = area_x;
-
-        // 绘制柱状图
+        let norm = (vol / max_vol).min(1.0);
+        let bar_width = (w - 40.0) * norm;
         ctx.set_fill_style_str(if is_ask {
-            &theme.bearish // 卖单用绿色
+            &theme.bearish
         } else {
-            &theme.bullish // 买单用红色
+            &theme.bullish
         });
-        ctx.fill_rect(bar_x, bar_y, bar_width, bar_height - 1.0);
+        ctx.fill_rect(x, y, bar_width, h - 1.0);
 
-        // 绘制数量文本（右侧）
-        if volume > 0.0 {
-            let volume_text = format!("{}", volume as u64);
-            let volume_x = bar_x + bar_width + 4.0;
-            let volume_y = bar_y + bar_height / 2.0;
+        if vol > 0.0 {
             ctx.set_fill_style_str(&theme.text);
             ctx.set_font(&theme.font_legend);
             ctx.set_text_align("left");
             ctx.set_text_baseline("middle");
-            ctx.fill_text(&volume_text, volume_x, volume_y).ok();
+            ctx.fill_text(&format!("{}", vol as u64), x + bar_width + 4.0, y + h / 2.0)
+                .ok();
         }
     }
 
     pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
-        let area_x = layout.chart_area_x + layout.main_chart_width;
-        let area_y = layout.chart_area_y;
-        let area_width = layout.book_area_width;
-        let area_height = layout.price_chart_height;
-        ctx.clear_rect(area_x, area_y, area_width, area_height);
+        let rect = layout.get_rect(&PaneId::OrderBook);
+        ctx.clear_rect(rect.x, rect.y, rect.width, rect.height);
     }
 
-    /// 重置缓存，强制下次绘制时重新渲染
-    /// 当main canvas被清除时应该调用此方法
     pub fn reset_cache(&self) {
         self.last_idx.set(None);
         self.last_mode.set(None);
         self.last_visible_range.set(None);
+        self.cached_bins.borrow_mut().take();
+        self.cached_max_volume.set(None);
+        self.cached_hover_index.set(None);
+        self.cached_data_hash.set(0);
     }
 }
 
 impl RenderStrategy for BookRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        // BookRenderer 需要特殊的参数，所以我们需要从 RenderContext 中提取这些参数
-        // 并调用原始的 draw 方法
-        // 注意：BookRenderer 的渲染需要 hover_index，这在 RenderContext 中没有提供
-        // 我们可以暂时使用 None 作为 hover_index
-        let canvas_ref = ctx.canvas_manager.borrow();
+        let canvas_ref = ctx.canvas_manager().borrow();
         let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        let layout_ref = ctx.layout().borrow();
         self.draw(
             main_ctx,
-            ctx.layout,
-            ctx.data_manager,
-            None, // hover_index 需要在其他地方处理
+            &layout_ref,
+            ctx.data_manager(),
+            ctx.hover_index,
             ctx.mode,
-            ctx.theme,
+            ctx.theme(),
         );
         Ok(())
     }
 
     fn supports_mode(&self, _mode: RenderMode) -> bool {
-        // BookRenderer 支持所有模式
         true
     }
 
@@ -235,6 +228,6 @@ impl RenderStrategy for BookRenderer {
     }
 
     fn get_priority(&self) -> u32 {
-        30 // 订单簿优先级
+        30
     }
 }

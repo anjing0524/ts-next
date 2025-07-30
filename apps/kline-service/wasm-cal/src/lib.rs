@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 
 // 导入模块
-pub mod benchmark;
 pub mod canvas;
 pub mod config;
 pub mod data;

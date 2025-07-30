@@ -77,29 +77,40 @@ export default function Main() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messageHandlers: Record<string, (data: any) => void> = {
         initialized: () => {
-          if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
-            setError('Canvas元素未找到');
-            setIsLoading(false);
-            return;
-          }
-          // 第二次传输：OffscreenCanvas (无复制)
-          const offscreen = canvasRef.current.transferControlToOffscreen();
-          const mainOffscreen = mainCanvasRef.current.transferControlToOffscreen();
-          const overlayOffscreen = overlayCanvasRef.current.transferControlToOffscreen();
+          // 添加延迟确保Canvas元素完全准备好
+          setTimeout(() => {
+            if (!canvasRef.current || !mainCanvasRef.current || !overlayCanvasRef.current) {
+              setError('Canvas元素未找到');
+              setIsLoading(false);
+              return;
+            }
 
-          [offscreen, mainOffscreen, overlayOffscreen].forEach((canvas) => {
-            canvas.width = CANVAS_WIDTH;
-            canvas.height = CANVAS_HEIGHT;
-          });
-          worker.postMessage(
-            {
-              type: 'draw',
-              canvas: offscreen,
-              mainCanvas: mainOffscreen, // 添加 mainCanvas
-              overlayCanvas: overlayOffscreen, // 添加 overlayCanvas
-            },
-            [offscreen, mainOffscreen, overlayOffscreen] // 标记为Transferable
-          );
+            try {
+              // 第二次传输：OffscreenCanvas (无复制)
+              const offscreen = canvasRef.current.transferControlToOffscreen();
+              const mainOffscreen = mainCanvasRef.current.transferControlToOffscreen();
+              const overlayOffscreen = overlayCanvasRef.current.transferControlToOffscreen();
+
+              [offscreen, mainOffscreen, overlayOffscreen].forEach((canvas) => {
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+              });
+
+              worker.postMessage(
+                {
+                  type: 'draw',
+                  canvas: offscreen,
+                  mainCanvas: mainOffscreen, // 添加 mainCanvas
+                  overlayCanvas: overlayOffscreen, // 添加 overlayCanvas
+                },
+                [offscreen, mainOffscreen, overlayOffscreen] // 标记为Transferable
+              );
+            } catch (error) {
+              console.error('Canvas初始化失败:', error);
+              setError(`Canvas初始化失败: ${error instanceof Error ? error.message : '未知错误'}`);
+              setIsLoading(false);
+            }
+          }, 10); // 延迟10ms确保Canvas元素完全准备好
         },
         drawComplete: () => {
           setIsLoading(false);
@@ -286,7 +297,7 @@ export default function Main() {
     sendMessageToWorker({
       type: 'mouseleave',
     });
-    
+
     // 记录鼠标已离开canvas，但不立即重置isDragging状态
     // 让window事件处理程序来管理拖动结束
   }, [sendMessageToWorker]);
@@ -396,7 +407,7 @@ export default function Main() {
           x: -1, // 使用-1表示canvas外的位置
           y: -1,
         });
-        
+
         // 直接重置拖动状态
         setIsDragging(false);
       }
@@ -407,16 +418,14 @@ export default function Main() {
       if (isDragging && canvasRef.current) {
         // 获取canvas位置
         const rect = canvasRef.current.getBoundingClientRect();
-        
+
         // 计算相对于canvas的坐标
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // 判断鼠标是否在canvas内
-        const isInCanvas = 
-          x >= 0 && x <= rect.width && 
-          y >= 0 && y <= rect.height;
-        
+        const isInCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+
         if (isInCanvas) {
           // 如果在canvas内，发送正常的拖动事件
           sendMessageToWorker({
@@ -439,13 +448,42 @@ export default function Main() {
     };
   }, [isDragging, sendMessageToWorker]);
 
-  // 添加模式切换函数
-  const switchMode = useCallback((mode: string) => {
-    sendMessageToWorker({
-      type: 'switchMode',
-      mode: mode,
-    });
+  // 添加窗口大小改变处理
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 使用防抖处理窗口大小改变事件
+    const handleResize = () => {
+      if (canvasRef.current) {
+        // 获取当前的 canvas 尺寸
+        const width = canvasRef.current.width;
+        const height = canvasRef.current.height;
+        
+        // 通知 Worker 画布大小改变
+        sendMessageToWorker({
+          type: 'resize',
+          width,
+          height,
+        });
+      }
+    }
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, [sendMessageToWorker]);
+
+  // 添加模式切换函数
+  const switchMode = useCallback(
+    (mode: string) => {
+      sendMessageToWorker({
+        type: 'switchMode',
+        mode: mode,
+      });
+    },
+    [sendMessageToWorker]
+  );
 
   return (
     <div className="p-4">
@@ -466,7 +504,7 @@ export default function Main() {
           </button>
         </div>
       </div>
-      
+
       {/* 显示性能指标 */}
       <div className="text-sm text-gray-600 mb-2">性能: {fps} FPS</div>
       {isLoading && (
@@ -476,7 +514,7 @@ export default function Main() {
         </div>
       )}
       {error && <div className="p-4 text-red-600">错误: {error}</div>}
-      
+
       {/* 新增容器并设置固定尺寸 */}
       <div
         className="relative m-0 border-0 p-0"

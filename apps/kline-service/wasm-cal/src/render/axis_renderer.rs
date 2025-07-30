@@ -1,17 +1,12 @@
 //! 坐标轴模块 - 负责绘制X轴和Y轴
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::config::{ChartConfig, ChartTheme};
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::ChartLayout;
+use crate::canvas::CanvasLayerType;
+use crate::config::ChartTheme;
+use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use crate::utils::time;
-use flatbuffers;
-use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 坐标轴绘制器
@@ -20,71 +15,9 @@ pub struct AxisRenderer;
 // ===== 常量定义 =====
 const FONT_HEIGHT: f64 = 12.0; // 10px字体+2px间距
 const MIN_LABEL_SPACING: f64 = 70.0; // X轴最小标签间距
-const MIN_Y_LABEL_DIST: f64 = FONT_HEIGHT * 0.8; // Y轴最小像素间距
-
-/// 简化的Y轴标签参数
-pub struct YAxisLabelParams<'a> {
-    /// 画布上下文
-    pub ctx: &'a OffscreenCanvasRenderingContext2d,
-    /// 图表布局
-    pub layout: &'a ChartLayout,
-    /// 要显示的值
-    pub values: &'a [f64],
-    /// 文本X坐标
-    pub x_text: f64,
-    /// 刻度线X坐标
-    pub x_tick: f64,
-    /// 轴类型 (价格或成交量)
-    pub axis_type: AxisType,
-    /// 主题颜色
-    pub colors: &'a ChartTheme,
-}
-
-/// Y轴类型
-pub enum AxisType {
-    /// 价格轴
-    Price {
-        /// 最低价格
-        min_low: f64,
-        /// 最高价格
-        max_high: f64,
-    },
-    /// 成交量轴
-    Volume {
-        /// 最大成交量
-        max_volume: f64,
-    },
-}
+const MIN_Y_LABEL_DIST: f64 = FONT_HEIGHT * 1.5; // Y轴最小像素间距
 
 impl AxisRenderer {
-    /// 绘制所有坐标轴
-    pub fn draw(
-        &self,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-        mode: RenderMode,
-        config: &ChartConfig,
-        theme: &ChartTheme,
-    ) {
-        let canvas_manager_ref = canvas_manager.borrow();
-        let ctx = canvas_manager_ref.get_context(CanvasLayerType::Base);
-        let layout_ref = canvas_manager_ref.layout.borrow();
-        let data_manager_ref = data_manager.borrow();
-        let items = match data_manager_ref.get_items() {
-            Some(items) => items,
-            None => return,
-        };
-        let (min_low, max_high, max_volume) = data_manager_ref.get_cached_cal();
-        let tick = data_manager_ref.get_tick();
-        self.draw_header(ctx, &layout_ref, mode, config, theme);
-        if mode == RenderMode::Kmap {
-            self.draw_alternating_background(ctx, &layout_ref, theme);
-        }
-        self.draw_price_y_axis(ctx, &layout_ref, min_low, max_high, tick, theme);
-        self.draw_volume_y_axis(ctx, &layout_ref, max_volume, theme);
-        self.draw_x_axis(ctx, &layout_ref, items, data_manager, theme);
-    }
-
     /// 绘制交替背景色
     fn draw_alternating_background(
         &self,
@@ -92,39 +25,33 @@ impl AxisRenderer {
         layout: &ChartLayout,
         theme: &ChartTheme,
     ) {
+        let price_rect = layout.get_rect(&PaneId::HeatmapArea);
+        let volume_rect = layout.get_rect(&PaneId::VolumeChart);
+
         let num_y_bands = 5;
-        let band_height = layout.price_chart_height / num_y_bands as f64;
+        let band_height = price_rect.height / num_y_bands as f64;
         for i in 0..num_y_bands {
-            let band_y = layout.header_height + i as f64 * band_height;
+            let band_y = price_rect.y + i as f64 * band_height;
             let color = if i % 2 == 0 {
                 &theme.background
             } else {
                 &theme.grid
             };
             ctx.set_fill_style_str(color);
-            ctx.fill_rect(
-                layout.chart_area_x,
-                band_y,
-                layout.main_chart_width,
-                band_height,
-            );
+            ctx.fill_rect(price_rect.x, band_y, price_rect.width, band_height);
         }
+
         let vol_num_y_bands = 2;
-        let vol_band_height = layout.volume_chart_height / vol_num_y_bands as f64;
+        let vol_band_height = volume_rect.height / vol_num_y_bands as f64;
         for i in 0..vol_num_y_bands {
-            let band_y = layout.volume_chart_y + i as f64 * vol_band_height;
+            let band_y = volume_rect.y + i as f64 * vol_band_height;
             let color = if i % 2 == 0 {
                 &theme.background
             } else {
                 &theme.grid
             };
             ctx.set_fill_style_str(color);
-            ctx.fill_rect(
-                layout.chart_area_x,
-                band_y,
-                layout.main_chart_width,
-                vol_band_height,
-            );
+            ctx.fill_rect(volume_rect.x, band_y, volume_rect.width, vol_band_height);
         }
     }
 
@@ -136,6 +63,9 @@ impl AxisRenderer {
         tick: f64,
         chart_height: f64,
     ) -> Vec<f64> {
+        if max_high <= min_low || tick <= 0.0 {
+            return Vec::new();
+        }
         let first_tick = (min_low / tick).ceil() * tick;
         let last_tick = (max_high / tick).floor() * tick;
         let mut tick_vec = Vec::new();
@@ -145,19 +75,12 @@ impl AxisRenderer {
             t += tick;
         }
         let max_labels = (chart_height / FONT_HEIGHT).floor() as usize;
-        let tick_count = tick_vec.len();
-        let mut sampled_ticks = Vec::new();
-        if tick_count > max_labels && max_labels > 0 {
-            let step = (tick_count as f64 / max_labels as f64).ceil() as usize;
-            for (i, &v) in tick_vec.iter().enumerate() {
-                if i % step == 0 {
-                    sampled_ticks.push(v);
-                }
-            }
+        if tick_vec.len() > max_labels && max_labels > 0 {
+            let step = (tick_vec.len() as f64 / max_labels as f64).ceil() as usize;
+            tick_vec.into_iter().step_by(step).collect()
         } else {
-            sampled_ticks = tick_vec;
+            tick_vec
         }
-        sampled_ticks
     }
 
     /// 插入极值标签，避免与已有标签重叠
@@ -166,187 +89,179 @@ impl AxisRenderer {
         mut label_points: Vec<(f64, f64)>,
         min_low: f64,
         max_high: f64,
-        layout: &ChartLayout,
+        mapper: &CoordinateMapper,
     ) -> Vec<(f64, f64)> {
-        let min_low_tick = (min_low * 1e8).round() / 1e8;
-        let max_high_tick = (max_high * 1e8).round() / 1e8;
-        let min_low_y = layout.map_price_to_y(min_low_tick, min_low, max_high);
-        let max_high_y = layout.map_price_to_y(max_high_tick, min_low, max_high);
+        let min_low_y = mapper.map_y(min_low);
         if !label_points
             .iter()
             .any(|&(_, y)| (y - min_low_y).abs() < MIN_Y_LABEL_DIST)
         {
-            label_points.push((min_low_tick, min_low_y));
+            label_points.push((min_low, min_low_y));
         }
+        let max_high_y = mapper.map_y(max_high);
         if !label_points
             .iter()
             .any(|&(_, y)| (y - max_high_y).abs() < MIN_Y_LABEL_DIST)
         {
-            label_points.push((max_high_tick, max_high_y));
+            label_points.push((max_high, max_high_y));
         }
-        label_points.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        label_points.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
         label_points
     }
 
-    /// 通用Y轴标签绘制
-    fn draw_y_axis_labels(&self, params: YAxisLabelParams<'_>) {
-        for &v in params.values {
-            let y = match &params.axis_type {
-                AxisType::Price { min_low, max_high } => {
-                    params.layout.map_price_to_y(v, *min_low, *max_high)
-                }
-                AxisType::Volume { max_volume } => {
-                    params.layout.map_volume_to_y(v, *max_volume) - if v == 0.0 { 2.0 } else { 0.0 }
-                }
-            };
-            params.ctx.set_stroke_style_str(&params.colors.border);
-            params.ctx.begin_path();
-            params.ctx.move_to(params.x_tick, y);
-            params.ctx.line_to(params.layout.chart_area_x, y);
-            params.ctx.stroke();
-            let label = match &params.axis_type {
-                AxisType::Price { .. } => {
-                    if v.abs() >= 100.0 {
-                        format!("{:.0}", v)
-                    } else if v.abs() >= 1.0 {
-                        format!("{:.2}", v)
-                    } else {
-                        format!("{:.4}", v)
-                    }
-                }
-                AxisType::Volume { .. } => time::format_volume(v, 1),
-            };
-            if params.ctx.fill_text(&label, params.x_text, y).is_err() {
-                // 可选：记录日志或忽略
-            }
-        }
-    }
-
-    /// 绘制价格Y轴（重构后）
+    /// 绘制价格Y轴
     fn draw_price_y_axis(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        min_low: f64,
-        max_high: f64,
-        tick: f64,
-        theme: &ChartTheme,
+        render_ctx: &RenderContext,
     ) {
+        let layout = render_ctx.layout().borrow();
+        let theme = render_ctx.theme();
+        let data_manager = render_ctx.data_manager().borrow();
+        let (min_low, max_high, _) = data_manager.get_cached_cal();
+        let tick = data_manager.get_tick();
+
+        let y_axis_rect = layout.get_rect(&PaneId::YAxis);
+        let price_rect = layout.get_rect(&PaneId::HeatmapArea);
+        let price_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 8.0);
+
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.set_fill_style_str(&theme.axis_text);
         ctx.set_font(&theme.font_axis);
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
+
         ctx.begin_path();
-        ctx.move_to(layout.chart_area_x, layout.chart_area_y);
+        ctx.move_to(y_axis_rect.x + y_axis_rect.width, price_rect.y);
         ctx.line_to(
-            layout.chart_area_x,
-            layout.chart_area_y + layout.chart_area_height,
+            y_axis_rect.x + y_axis_rect.width,
+            price_rect.y + price_rect.height,
         );
         ctx.stroke();
-        let price_range = max_high - min_low;
-        if price_range <= 0.0 || tick <= 0.0 {
-            return;
-        }
-        let sampled_ticks =
-            self.sample_price_ticks(min_low, max_high, tick, layout.price_chart_height);
+
+        let sampled_ticks = self.sample_price_ticks(min_low, max_high, tick, price_rect.height);
         let label_points: Vec<(f64, f64)> = sampled_ticks
             .iter()
-            .map(|&price| {
-                let y = layout.map_price_to_y(price, min_low, max_high);
-                (price, y)
-            })
+            .map(|&price| (price, price_mapper.map_y(price)))
             .collect();
-        let label_points =
-            self.insert_extreme_price_labels(label_points, min_low, max_high, layout);
-        self.draw_y_axis_labels(YAxisLabelParams {
-            ctx,
-            layout,
-            values: &label_points.iter().map(|&(p, _)| p).collect::<Vec<_>>(),
-            x_text: layout.chart_area_x - 5.0,
-            x_tick: layout.chart_area_x - 3.0,
-            axis_type: AxisType::Price { min_low, max_high },
-            colors: theme,
-        });
+
+        let final_labels =
+            self.insert_extreme_price_labels(label_points, min_low, max_high, &price_mapper);
+
+        for (price, y) in final_labels {
+            ctx.begin_path();
+            ctx.move_to(y_axis_rect.x + y_axis_rect.width - 3.0, y);
+            ctx.line_to(y_axis_rect.x + y_axis_rect.width, y);
+            ctx.stroke();
+
+            let label = if price.abs() >= 100.0 {
+                format!("{:.0}", price)
+            } else if price.abs() >= 1.0 {
+                format!("{:.2}", price)
+            } else {
+                format!("{:.4}", price)
+            };
+            let _ = ctx.fill_text(&label, y_axis_rect.x + y_axis_rect.width - 5.0, y);
+        }
     }
 
-    /// 绘制成交量Y轴（重构后）
+    /// 绘制成交量Y轴
     fn draw_volume_y_axis(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        max_volume: f64,
-        theme: &ChartTheme,
+        render_ctx: &RenderContext,
     ) {
+        let layout = render_ctx.layout().borrow();
+        let theme = render_ctx.theme();
+        let data_manager = render_ctx.data_manager().borrow();
+        let (_, _, max_volume) = data_manager.get_cached_cal();
+
+        let y_axis_rect = layout.get_rect(&PaneId::YAxis);
+        let volume_rect = layout.get_rect(&PaneId::VolumeChart);
+        let volume_mapper = CoordinateMapper::new_for_y_axis(volume_rect, 0.0, max_volume, 2.0);
+
         ctx.set_fill_style_str(&theme.header_bg);
         ctx.fill_rect(
-            0.0,
-            layout.volume_chart_y,
-            layout.y_axis_width,
-            layout.volume_chart_height,
+            y_axis_rect.x,
+            volume_rect.y,
+            y_axis_rect.width,
+            volume_rect.height,
         );
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        ctx.move_to(layout.y_axis_width, layout.volume_chart_y);
+        ctx.move_to(y_axis_rect.x + y_axis_rect.width, volume_rect.y);
         ctx.line_to(
-            layout.y_axis_width,
-            layout.volume_chart_y + layout.volume_chart_height,
+            y_axis_rect.x + y_axis_rect.width,
+            volume_rect.y + volume_rect.height,
         );
         ctx.stroke();
+
         ctx.set_fill_style_str(&theme.axis_text);
         ctx.set_font(&theme.font_axis);
         ctx.set_text_align("right");
         ctx.set_text_baseline("middle");
+
         let num_y_labels = 2;
-        let values: Vec<f64> = (0..=num_y_labels)
-            .map(|i| max_volume * i as f64 / num_y_labels as f64)
-            .filter(|v| v.is_finite())
-            .collect();
-        self.draw_y_axis_labels(YAxisLabelParams {
-            ctx,
-            layout,
-            values: &values,
-            x_text: layout.y_axis_width - 5.0,
-            x_tick: layout.y_axis_width - 3.0,
-            axis_type: AxisType::Volume { max_volume },
-            colors: theme,
-        });
+        for i in 0..=num_y_labels {
+            let volume = max_volume * i as f64 / num_y_labels as f64;
+            let y = volume_mapper.map_y(volume);
+
+            ctx.begin_path();
+            ctx.move_to(y_axis_rect.x + y_axis_rect.width - 3.0, y);
+            ctx.line_to(y_axis_rect.x + y_axis_rect.width, y);
+            ctx.stroke();
+
+            let label = time::format_volume(volume, 1);
+            let _ = ctx.fill_text(&label, y_axis_rect.x + y_axis_rect.width - 5.0, y);
+        }
     }
 
     /// 绘制标题和图例
-    fn draw_header(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        mode: RenderMode,
-        config: &ChartConfig,
-        theme: &ChartTheme,
-    ) {
+    fn draw_header(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
+        let layout = render_ctx.layout().borrow();
+        let theme = render_ctx.theme();
+        let config = render_ctx.config_ref().unwrap();
+        let header_rect = layout.get_rect(&PaneId::Header);
+
         ctx.set_fill_style_str(&theme.header_bg);
-        ctx.fill_rect(0.0, 0.0, layout.canvas_width, layout.header_height);
-        if mode == RenderMode::Kmap {
+        ctx.fill_rect(
+            header_rect.x,
+            header_rect.y,
+            header_rect.width,
+            header_rect.height,
+        );
+
+        if render_ctx.mode == RenderMode::Kmap {
             ctx.set_stroke_style_str(&theme.border);
             ctx.set_line_width(1.0);
             ctx.begin_path();
-            ctx.move_to(0.0, layout.header_height);
-            ctx.line_to(layout.canvas_width, layout.header_height);
+            ctx.move_to(header_rect.x, header_rect.y + header_rect.height);
+            ctx.line_to(
+                header_rect.x + header_rect.width,
+                header_rect.y + header_rect.height,
+            );
             ctx.stroke();
         }
+
         ctx.set_fill_style_str(&theme.text);
         ctx.set_font(&theme.font_header);
         ctx.set_text_align("left");
         ctx.set_text_baseline("middle");
         let symbol = config.title.as_ref().unwrap_or(&config.symbol);
-        let _ = ctx.fill_text(symbol, layout.padding, layout.header_height / 2.0);
-        let legend_x = layout.canvas_width - 120.0;
-        let legend_y = layout.header_height / 2.0;
+        let _ = ctx.fill_text(
+            symbol,
+            header_rect.x + 8.0,
+            header_rect.y + header_rect.height / 2.0,
+        );
+
+        let legend_x = header_rect.x + header_rect.width - 120.0;
+        let legend_y = header_rect.y + header_rect.height / 2.0;
         ctx.set_fill_style_str(&theme.bullish);
         ctx.fill_rect(legend_x, legend_y - 5.0, 10.0, 10.0);
         ctx.set_fill_style_str(&theme.text);
         ctx.set_font(&theme.font_legend);
-        ctx.set_text_align("left");
         let _ = ctx.fill_text("上涨", legend_x + 15.0, legend_y);
         ctx.set_fill_style_str(&theme.bearish);
         ctx.fill_rect(legend_x + 60.0, legend_y - 5.0, 10.0, 10.0);
@@ -355,74 +270,87 @@ impl AxisRenderer {
     }
 
     /// 绘制X轴 (时间轴)
-    fn draw_x_axis(
-        &self,
-        ctx: &OffscreenCanvasRenderingContext2d,
-        layout: &ChartLayout,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-        theme: &ChartTheme,
-    ) {
-        let data_manager_ref = data_manager.borrow();
-        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
+    fn draw_x_axis(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
+        let layout = render_ctx.layout().borrow();
+        let theme = render_ctx.theme();
+        let data_manager = render_ctx.data_manager().borrow();
+        let items = match data_manager.get_items() {
+            Some(items) => items,
+            None => return,
+        };
+        let (visible_start, visible_count, visible_end) = data_manager.get_visible();
         if visible_start >= visible_end {
             return;
         }
-        let x_axis_y = layout.header_height + layout.chart_area_height;
-        let time_label_y_start = x_axis_y + 5.0;
+
+        let time_axis_rect = layout.get_rect(&PaneId::TimeAxis);
+        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
+
         ctx.set_fill_style_str(&theme.header_bg);
-        ctx.fill_rect(0.0, x_axis_y, layout.canvas_width, layout.time_axis_height);
+        ctx.fill_rect(
+            time_axis_rect.x,
+            time_axis_rect.y,
+            time_axis_rect.width,
+            time_axis_rect.height,
+        );
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        ctx.move_to(layout.chart_area_x, x_axis_y);
-        ctx.line_to(layout.chart_area_x + layout.main_chart_width, x_axis_y);
+        ctx.move_to(time_axis_rect.x, time_axis_rect.y);
+        ctx.line_to(time_axis_rect.x + time_axis_rect.width, time_axis_rect.y);
         ctx.stroke();
-        let max_labels = (layout.main_chart_width / MIN_LABEL_SPACING).floor() as usize;
+
+        let max_labels = (main_chart_rect.width / MIN_LABEL_SPACING).floor() as usize;
         let candle_interval = (visible_count as f64 / max_labels as f64).ceil().max(1.0) as usize;
+
         ctx.set_fill_style_str(&theme.axis_text);
         ctx.set_font(&theme.font_axis);
         ctx.set_text_align("center");
         ctx.set_text_baseline("top");
+
         for i in (0..visible_count).step_by(candle_interval) {
             let data_idx = visible_start + i;
             if data_idx >= items.len() {
                 break;
             }
-            let x = layout.chart_area_x
+
+            let x = main_chart_rect.x
                 + (i as f64 * layout.total_candle_width)
                 + layout.candle_width / 2.0;
-            if x > layout.chart_area_x + layout.main_chart_width {
+            if x > main_chart_rect.x + main_chart_rect.width {
                 break;
             }
+
             let item = items.get(data_idx);
             let timestamp_secs = item.timestamp() as i64;
             let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
             let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
-            let _ = ctx.fill_text(&date_str, x, time_label_y_start);
-            let _ = ctx.fill_text(&time_str, x, time_label_y_start + 12.0);
+
+            let _ = ctx.fill_text(&date_str, x, time_axis_rect.y + 5.0);
+            let _ = ctx.fill_text(&time_str, x, time_axis_rect.y + 17.0);
         }
     }
 }
 
 impl RenderStrategy for AxisRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        // AxisRenderer 需要特殊的参数，所以我们需要从 RenderContext 中提取这些参数
-        // 并调用原始的 draw 方法
-        if let Some(config) = ctx.config {
-            self.draw(
-                ctx.canvas_manager,
-                ctx.data_manager,
-                ctx.mode,
-                config,
-                ctx.theme,
-            );
+        let canvas_manager = ctx.canvas_manager().borrow();
+        let base_ctx = canvas_manager.get_context(CanvasLayerType::Base);
+        let layout = ctx.layout().borrow();
+        let theme = ctx.theme();
+
+        if ctx.mode == RenderMode::Kmap {
+            self.draw_alternating_background(base_ctx, &layout, theme);
         }
+        self.draw_header(base_ctx, ctx);
+        self.draw_price_y_axis(base_ctx, ctx);
+        self.draw_volume_y_axis(base_ctx, ctx);
+        self.draw_x_axis(base_ctx, ctx);
+
         Ok(())
     }
 
     fn supports_mode(&self, _mode: RenderMode) -> bool {
-        // AxisRenderer 支持所有模式
         true
     }
 
@@ -431,6 +359,6 @@ impl RenderStrategy for AxisRenderer {
     }
 
     fn get_priority(&self) -> u32 {
-        5 // 坐标轴优先级（较高，因为它在Base层）
+        5
     }
 }

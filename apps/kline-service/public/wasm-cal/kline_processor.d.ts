@@ -49,6 +49,11 @@ export class KlineProcess {
    * 设置配置JSON（动态切换主题/配色等）
    */
   set_config_json(json: string): void;
+  /**
+   * 处理画布大小改变
+   * 当窗口大小改变时调用此方法，需要重新初始化可见范围
+   */
+  handle_canvas_resize(width: number, height: number): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -69,6 +74,7 @@ export interface InitOutput {
   readonly klineprocess_set_render_mode: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_click: (a: number, b: number, c: number) => number;
   readonly klineprocess_set_config_json: (a: number, b: number, c: number) => [number, number];
+  readonly klineprocess_handle_canvas_resize: (a: number, b: number, c: number) => void;
   readonly start: () => void;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;

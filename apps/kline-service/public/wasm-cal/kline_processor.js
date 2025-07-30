@@ -334,6 +334,15 @@ export class KlineProcess {
             throw takeFromExternrefTable0(ret[0]);
         }
     }
+    /**
+     * 处理画布大小改变
+     * 当窗口大小改变时调用此方法，需要重新初始化可见范围
+     * @param {number} width
+     * @param {number} height
+     */
+    handle_canvas_resize(width, height) {
+        wasm.klineprocess_handle_canvas_resize(this.__wbg_ptr, width, height);
+    }
 }
 
 async function __wbg_load(module, imports) {
@@ -379,9 +388,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_clearRect_4790e3611b42f068 = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.clearRect(arg1, arg2, arg3, arg4);
-    };
-    imports.wbg.__wbg_clip_005815dea515e201 = function(arg0) {
-        arg0.clip();
     };
     imports.wbg.__wbg_closePath_cf0e7130243e1083 = function(arg0) {
         arg0.closePath();
@@ -447,6 +453,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_log_b46a0b216df7cf84 = function(arg0, arg1) {
         console.log(getStringFromWasm0(arg0, arg1));
     };
+    imports.wbg.__wbg_measureText_f0f078704231c37f = function() { return handleError(function (arg0, arg1, arg2) {
+        const ret = arg0.measureText(getStringFromWasm0(arg1, arg2));
+        return ret;
+    }, arguments) };
     imports.wbg.__wbg_moveTo_1e871c64cf5d1fc1 = function(arg0, arg1, arg2) {
         arg0.moveTo(arg1, arg2);
     };
@@ -488,12 +498,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_rect_00c560f0cc92818c = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.rect(arg1, arg2, arg3, arg4);
     };
-    imports.wbg.__wbg_restore_1ef50af0835a4649 = function(arg0) {
-        arg0.restore();
-    };
-    imports.wbg.__wbg_save_5f563096e64939da = function(arg0) {
-        arg0.save();
-    };
     imports.wbg.__wbg_setLineDash_0e3f3e194352a774 = function() { return handleError(function (arg0, arg1) {
         arg0.setLineDash(arg1);
     }, arguments) };
@@ -523,18 +527,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_setlineWidth_3c8b7156949a9f4b = function(arg0, arg1) {
         arg0.lineWidth = arg1;
-    };
-    imports.wbg.__wbg_setshadowBlur_55636e14cc608483 = function(arg0, arg1) {
-        arg0.shadowBlur = arg1;
-    };
-    imports.wbg.__wbg_setshadowColor_6e6d8ffdd901b1b4 = function(arg0, arg1, arg2) {
-        arg0.shadowColor = getStringFromWasm0(arg1, arg2);
-    };
-    imports.wbg.__wbg_setshadowOffsetX_a2bf8df2ff417742 = function(arg0, arg1) {
-        arg0.shadowOffsetX = arg1;
-    };
-    imports.wbg.__wbg_setshadowOffsetY_3a6168755a1f2781 = function(arg0, arg1) {
-        arg0.shadowOffsetY = arg1;
     };
     imports.wbg.__wbg_setstrokeStyle_070920f27992b9a6 = function(arg0, arg1, arg2) {
         arg0.strokeStyle = getStringFromWasm0(arg1, arg2);
@@ -566,6 +558,10 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_time_7aaed348524f10df = function(arg0, arg1) {
         console.time(getStringFromWasm0(arg0, arg1));
+    };
+    imports.wbg.__wbg_width_2fafd30484634e26 = function(arg0) {
+        const ret = arg0.width;
+        return ret;
     };
     imports.wbg.__wbg_width_8fe4e8f77479c2a6 = function(arg0) {
         const ret = arg0.width;

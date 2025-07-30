@@ -1,7 +1,6 @@
 //! KlineProcess模块 - 持有K线数据和三层Canvas，提供统一的绘制函数
 use crate::ChartRenderer;
 use crate::kline_generated::kline::{KlineData, root_as_kline_data_with_opts};
-use crate::layout::ChartLayout;
 use crate::utils::WasmError;
 
 use wasm_bindgen::JsCast;
@@ -23,7 +22,8 @@ extern "C" {
 #[wasm_bindgen]
 pub struct KlineProcess {
     // 数据相关
-    data: Vec<u8>,                           // 原始FlatBuffer数据，拥有所有权
+    #[allow(dead_code)]
+    data: Vec<u8>, // 原始FlatBuffer数据，拥有所有权
     parsed_data: Option<KlineData<'static>>, // 解析后的数据，生命周期与data绑定
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
@@ -94,15 +94,11 @@ impl KlineProcess {
         main_canvas.set_height(height);
         overlay_canvas.set_height(height);
 
-        // 创建布局
-        let layout = ChartLayout::new(width as f64, height as f64);
-
         // 创建渲染器，并传入数据管理器引用
         let chart_renderer = ChartRenderer::new(
             &base_canvas,
             &main_canvas,
             &overlay_canvas,
-            layout,
             self.parsed_data,
         )?;
 
@@ -118,10 +114,11 @@ impl KlineProcess {
         // 使用ChartRenderer绘制所有图表
         match &self.chart_renderer {
             Some(chart_renderer) => {
-                chart_renderer.render();
+                // 使用force_render确保初始渲染不被节流机制阻止
+                chart_renderer.force_render();
             }
             None => {
-                return Err(WasmError::Render("未设置Canvas".into()).into());
+                return Err(WasmError::render("未设置Canvas").into());
             }
         }
         time_end("KlineProcess::draw_all");
@@ -137,9 +134,7 @@ impl KlineProcess {
         // Cast JsValue to WebAssembly::Memory
         let memory = memory_val
             .dyn_into::<js_sys::WebAssembly::Memory>()
-            .map_err(|_| {
-                WasmError::Buffer("无法将提供的 JSValue 转换为 WebAssembly.Memory".into())
-            })?;
+            .map_err(|_| WasmError::buffer("无法将提供的 JSValue 转换为 WebAssembly.Memory"))?;
 
         let buffer = memory.buffer();
         let memory_view = js_sys::Uint8Array::new_with_byte_offset_and_length(
@@ -150,7 +145,7 @@ impl KlineProcess {
 
         let data = memory_view.to_vec();
         if data.len() != data_length {
-            return Err(WasmError::Buffer("Memory copy length mismatch".into()).into());
+            return Err(WasmError::buffer("Memory copy length mismatch").into());
         }
 
         Ok(data)
@@ -159,12 +154,12 @@ impl KlineProcess {
     /// 验证FlatBuffer数据
     fn verify_kline_data_slice(bytes: &[u8]) -> Result<(), WasmError> {
         if bytes.len() < 8 {
-            return Err(WasmError::Validation("FlatBuffer数据长度不足".into()));
+            return Err(WasmError::validation("FlatBuffer数据长度不足"));
         }
 
         let identifier = String::from_utf8_lossy(&bytes[4..8]);
         if identifier != crate::kline_generated::kline::KLINE_DATA_IDENTIFIER {
-            return Err(WasmError::Validation(format!(
+            return Err(WasmError::validation(&format!(
                 "无效的FlatBuffer标识符, 期望: {}, 实际: {}",
                 crate::kline_generated::kline::KLINE_DATA_IDENTIFIER,
                 identifier
@@ -180,12 +175,12 @@ impl KlineProcess {
         let mut opts = flatbuffers::VerifierOptions::default();
         opts.max_tables = 1_000_000_000;
         root_as_kline_data_with_opts(&opts, data)
-            .map_err(|e| WasmError::Parse(format!("Flatbuffer 解析失败: {}", e)))
+            .map_err(|e| WasmError::other(&format!("Flatbuffer 解析失败: {}", e)))
     }
 
     #[wasm_bindgen]
-    pub fn handle_mouse_move(&self, x: f64, y: f64) {
-        let chart_renderer = match &self.chart_renderer {
+    pub fn handle_mouse_move(&mut self, x: f64, y: f64) {
+        let chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
             None => {
                 return;
@@ -206,8 +201,8 @@ impl KlineProcess {
     }
 
     #[wasm_bindgen]
-    pub fn handle_mouse_leave(&self) -> bool {
-        let chart_renderer = match &self.chart_renderer {
+    pub fn handle_mouse_leave(&mut self) -> bool {
+        let chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
             None => {
                 return false;
@@ -218,8 +213,8 @@ impl KlineProcess {
     }
 
     #[wasm_bindgen]
-    pub fn handle_wheel(&self, delta: f64, x: f64, y: f64) {
-        let chart_renderer = match &self.chart_renderer {
+    pub fn handle_wheel(&mut self, delta: f64, x: f64, y: f64) {
+        let chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
             None => return,
         };
@@ -253,8 +248,8 @@ impl KlineProcess {
 
     /// 处理鼠标拖动事件
     #[wasm_bindgen]
-    pub fn handle_mouse_drag(&self, x: f64, y: f64) {
-        let chart_renderer = match &self.chart_renderer {
+    pub fn handle_mouse_drag(&mut self, x: f64, y: f64) {
+        let chart_renderer = match &mut self.chart_renderer {
             Some(renderer) => renderer,
             None => {
                 return;
@@ -298,6 +293,15 @@ impl KlineProcess {
                 .load_config_from_json(json)
                 .map_err(|e| JsValue::from_str(&e)),
             None => Err(JsValue::from_str("ChartRenderer not initialized")),
+        }
+    }
+
+    /// 处理画布大小改变
+    /// 当窗口大小改变时调用此方法，需要重新初始化可见范围
+    #[wasm_bindgen]
+    pub fn handle_canvas_resize(&mut self, width: f64, height: f64) {
+        if let Some(renderer) = &mut self.chart_renderer {
+            renderer.handle_canvas_resize(width, height);
         }
     }
 }

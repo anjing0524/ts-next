@@ -1,52 +1,20 @@
 //! 渲染策略 trait 定义
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::config::{ChartConfig, ChartTheme};
-use crate::data::DataManager;
-use crate::layout::ChartLayout;
+use crate::canvas::CanvasLayerType;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::datazoom_renderer::DragResult;
-use std::cell::RefCell;
-use std::rc::Rc;
-use wasm_bindgen::JsValue;
+use crate::render::render_context::UnifiedRenderContext;
+use crate::utils::error::WasmCalError;
 
-/// 渲染上下文
-pub struct RenderContext<'a> {
-    pub canvas_manager: &'a Rc<RefCell<CanvasManager>>,
-    pub data_manager: &'a Rc<RefCell<DataManager>>,
-    pub layout: &'a Rc<RefCell<ChartLayout>>,
-    pub theme: &'a ChartTheme,
-    pub config: Option<&'a ChartConfig>, // 可选的配置信息
-    pub mode: RenderMode,
-}
+/// 渲染上下文类型别名，使用新的统一渲染上下文
+pub type RenderContext = UnifiedRenderContext;
 
-/// 渲染错误类型
-#[derive(Debug)]
-pub enum RenderError {
-    JsError(JsValue),
-    Custom(String),
-}
-
-impl From<JsValue> for RenderError {
-    fn from(err: JsValue) -> Self {
-        RenderError::JsError(err)
-    }
-}
-
-impl std::fmt::Display for RenderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RenderError::JsError(_) => write!(f, "JavaScript error"),
-            RenderError::Custom(msg) => write!(f, "Custom error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RenderError {}
+/// 渲染错误类型别名，使用统一的错误类型
+pub type RenderError = WasmCalError;
 
 /// 渲染策略 trait
-pub trait RenderStrategy {
+pub trait RenderStrategy: 'static {
     /// 执行渲染操作
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError>;
 

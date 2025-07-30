@@ -7,8 +7,9 @@ use crate::render::cursor_style::CursorStyle;
 use crate::render::datazoom_renderer::DragResult;
 use crate::render::{
     axis_renderer::AxisRenderer, book_renderer::BookRenderer, datazoom_renderer::DataZoomRenderer,
-    heat_renderer::HeatRenderer, line_renderer::LineRenderer, overlay_renderer::OverlayRenderer,
-    price_renderer::PriceRenderer, volume_renderer::VolumeRenderer,
+    header_renderer::HeaderRenderer, heat_renderer::HeatRenderer, line_renderer::LineRenderer,
+    overlay_renderer::OverlayRenderer, price_renderer::PriceRenderer,
+    volume_renderer::VolumeRenderer,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ use std::collections::HashMap;
 /// 策略类型枚举
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum StrategyType {
+    Header,
     Price,
     Volume,
     Heatmap,
@@ -47,6 +49,7 @@ impl RenderStrategyFactory {
 
     /// 注册默认渲染策略
     fn register_default_strategies(&mut self) {
+        self.register_strategy(StrategyType::Header, Box::new(HeaderRenderer::new()));
         self.register_strategy(StrategyType::Axis, Box::new(AxisRenderer {}));
         self.register_strategy(StrategyType::Price, Box::new(PriceRenderer {}));
         self.register_strategy(StrategyType::Volume, Box::new(VolumeRenderer {}));
@@ -222,6 +225,49 @@ impl RenderStrategyFactory {
         }
 
         handled
+    }
+
+    /// 处理鼠标移动事件并获取hover索引
+    pub fn handle_mouse_move_with_hover(
+        &self,
+        x: f64,
+        y: f64,
+        ctx: &RenderContext,
+        mode: RenderMode,
+    ) -> (bool, Option<usize>) {
+        let strategies = self.get_strategies_for_mode(mode);
+        let mut handled = false;
+        let mut hover_index = None;
+
+        // 计算hover索引基于鼠标位置和当前可见范围
+        let layout = ctx.layout().borrow();
+        let data_manager = ctx.data_manager().borrow();
+        let (visible_start, visible_count, _) = data_manager.get_visible();
+
+        if visible_count > 0 {
+            let main_chart_rect = layout.get_rect(&crate::layout::PaneId::HeatmapArea);
+            if main_chart_rect.contains(x, y) {
+                let relative_x = x - main_chart_rect.x;
+                let idx_in_visible = (relative_x / layout.total_candle_width).floor() as usize;
+                let calculated_index = visible_start + idx_in_visible;
+                let max_index = data_manager
+                    .get_items()
+                    .map_or(0, |i| i.len().saturating_sub(1));
+
+                if calculated_index <= max_index {
+                    hover_index = Some(calculated_index);
+                }
+            }
+        }
+
+        for strategy_cell in strategies {
+            let mut strategy = strategy_cell.borrow_mut();
+            if strategy.handle_mouse_move(x, y, ctx) {
+                handled = true;
+            }
+        }
+
+        (handled, hover_index)
     }
 
     /// 处理鼠标按下事件

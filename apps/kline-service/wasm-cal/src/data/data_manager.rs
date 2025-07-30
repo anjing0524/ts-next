@@ -13,10 +13,8 @@ pub struct DataManager {
     tick: f64,
     /// 可见数据范围
     visible_range: VisibleRange,
-    /// 缓存的数据范围
+    /// 缓存的数据范围 - None表示无缓存，Some(data)表示有效缓存
     cached_data_range: Option<DataRange>,
-    /// 数据范围是否有效
-    cached_range_valid: bool,
 }
 
 impl DataManager {
@@ -27,7 +25,6 @@ impl DataManager {
             tick: 1.0,
             visible_range: VisibleRange::new(0, 0, 0),
             cached_data_range: None,
-            cached_range_valid: false,
         }
     }
 
@@ -92,13 +89,12 @@ impl DataManager {
     /// 无效化缓存的范围计算
     pub fn invalidate_cache(&mut self) {
         self.cached_data_range = None;
-        self.cached_range_valid = false;
     }
 
     /// 获取缓存的计算结果
     pub fn get_cached_cal(&self) -> (f64, f64, f64) {
-        if self.cached_range_valid && self.cached_data_range.is_some() {
-            return self.cached_data_range.unwrap().get();
+        if let Some(data_range) = &self.cached_data_range {
+            return data_range.get();
         }
         (0.0, 0.0, 0.0)
     }
@@ -106,8 +102,8 @@ impl DataManager {
     /// 计算可见区域的价格范围和最大成交量
     pub fn calculate_data_ranges(&mut self) -> (f64, f64, f64) {
         // 如果缓存有效，直接返回
-        if self.cached_range_valid && self.cached_data_range.is_some() {
-            return self.cached_data_range.unwrap().get();
+        if let Some(data_range) = &self.cached_data_range {
+            return data_range.get();
         }
 
         // 获取数据
@@ -117,7 +113,6 @@ impl DataManager {
 
             // 缓存计算结果
             self.cached_data_range = Some(data_range);
-            self.cached_range_valid = true;
 
             return data_range.get();
         }
@@ -135,7 +130,6 @@ impl DataManager {
         chart_area_width: f64,
         is_in_chart: bool,
     ) -> bool {
-        // 如果没有数据或不在图表区域内，则不处理
         if !is_in_chart || self.items.is_none() {
             return false;
         }
@@ -145,25 +139,20 @@ impl DataManager {
             return false;
         }
 
-        // 使用VisibleRange的handle_wheel方法计算新的可见范围
         let (new_visible_start, new_visible_count) =
             self.visible_range
                 .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
 
-        // 无论是否更新可见范围，都无效化缓存
-        // 这确保即使可见范围不变，也会重新计算数据范围
-        self.invalidate_cache();
-
-        // 更新可见范围并返回结果
         let range_updated = self
             .visible_range
             .update(new_visible_start, new_visible_count);
 
-        // 始终重新计算数据范围，确保使用最新的数据边界
-        self.calculate_data_ranges();
+        if range_updated {
+            self.invalidate_cache();
+            self.calculate_data_ranges();
+        }
 
-        // 如果发生了更新，或者Delta很大（表示快速缩放），则返回需要重绘
-        range_updated || delta.abs() > 5.0
+        range_updated
     }
 
     /// 获取 tick 值的方法

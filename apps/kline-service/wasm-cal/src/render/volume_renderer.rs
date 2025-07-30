@@ -3,7 +3,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::ChartLayout;
+use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::RefCell;
@@ -14,7 +14,7 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 pub struct VolumeRenderer;
 
 impl VolumeRenderer {
-    /// 绘制成交量图使用DataManager获取所有数据
+    /// 绘制成交量图
     pub fn draw(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
@@ -23,97 +23,70 @@ impl VolumeRenderer {
         theme: &ChartTheme,
     ) {
         let data_manager_ref = data_manager.borrow();
-        // 获取数据
         let items = match data_manager_ref.get_items() {
             Some(items) => items,
             None => return,
         };
 
-        // 获取可见范围
-        let visible_range = data_manager_ref.get_visible_range();
-        let (visible_start, visible_count, visible_end) = visible_range.get_range();
-
+        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
             return;
         }
 
-        // 获取成交量范围
         let (_, _, max_volume) = data_manager_ref.get_cached_cal();
+        let volume_rect = layout.get_rect(&PaneId::VolumeChart);
+        let y_mapper = CoordinateMapper::new_for_y_axis(volume_rect, 0.0, max_volume, 2.0);
 
-        // 预先计算所有可见K线的X坐标
-        let x_coordinates = visible_range.precompute_x_coordinates(layout);
+        let mut bullish_rects = Vec::new();
+        let mut bearish_rects = Vec::new();
 
-        // 优化：使用临时数组收集所有绘制操作，减少绘制调用次数
-        let mut bullish_rects = Vec::with_capacity(visible_count);
-        let mut bearish_rects = Vec::with_capacity(visible_count);
-
-        // 遍历所有可见的K线数据
-        for (rel_idx, global_idx) in (visible_start..visible_end).enumerate() {
-            if global_idx >= items.len() || rel_idx >= x_coordinates.len() {
-                break;
-            }
-
-            let item = items.get(global_idx);
-            let x_center = x_coordinates[rel_idx];
-
-            // 计算成交量矩形的参数
-            let candle_x = x_center - (layout.candle_width / 2.0);
-            let candle_width = layout.candle_width.max(1.0);
-
-            // 计算成交量对应的高度
+        for i in visible_start..visible_end {
+            let item = items.get(i);
+            let x = volume_rect.x + ((i - visible_start) as f64 * layout.total_candle_width);
             let volume = item.b_vol() + item.s_vol();
-            let height = if max_volume > 0.0 {
-                (volume / max_volume) * layout.volume_chart_height
-            } else {
-                0.0
-            };
+            let y = y_mapper.map_y(volume);
+            let height = volume_rect.y + volume_rect.height - y;
 
-            // Y坐标需要从底部开始计算
-            let volume_y = layout.volume_chart_y + layout.volume_chart_height - height;
-
-            // 根据价格变化收集矩形信息
             if item.close() >= item.open() {
-                // 上涨K线
-                bullish_rects.push((candle_x, volume_y, candle_width, height));
+                bullish_rects.push((x, y, layout.candle_width, height));
             } else {
-                // 下跌K线
-                bearish_rects.push((candle_x, volume_y, candle_width, height));
+                bearish_rects.push((x, y, layout.candle_width, height));
             }
         }
 
-        // 批量绘制所有上涨成交量矩形
-        if !bullish_rects.is_empty() {
-            ctx.set_fill_style_str(&theme.bullish);
-            ctx.begin_path();
-            for (x, y, width, height) in bullish_rects {
-                ctx.rect(x, y, width, height);
-            }
-            ctx.fill();
-        }
+        self.batch_draw_rects(ctx, &bullish_rects, &theme.bullish);
+        self.batch_draw_rects(ctx, &bearish_rects, &theme.bearish);
+    }
 
-        // 批量绘制所有下跌成交量矩形
-        if !bearish_rects.is_empty() {
-            ctx.set_fill_style_str(&theme.bearish);
-            ctx.begin_path();
-            for (x, y, width, height) in bearish_rects {
-                ctx.rect(x, y, width, height);
-            }
-            ctx.fill();
+    fn batch_draw_rects(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        rects: &[(f64, f64, f64, f64)],
+        color: &str,
+    ) {
+        if rects.is_empty() {
+            return;
         }
+        ctx.set_fill_style_str(color);
+        ctx.begin_path();
+        for (x, y, width, height) in rects {
+            ctx.rect(*x, *y, *width, *height);
+        }
+        ctx.fill();
     }
 }
 
 impl RenderStrategy for VolumeRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_ref = ctx.canvas_manager.borrow();
+        let canvas_ref = ctx.canvas_manager().borrow();
         let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
-        let layout_ref = ctx.layout.borrow();
-        self.draw(main_ctx, &layout_ref, ctx.data_manager, ctx.theme);
+        let layout_ref = ctx.layout().borrow();
+        self.draw(main_ctx, &layout_ref, ctx.data_manager(), ctx.theme());
         Ok(())
     }
 
     fn supports_mode(&self, _mode: RenderMode) -> bool {
-        // VolumeRenderer 支持所有模式
         true
     }
 
@@ -122,6 +95,6 @@ impl RenderStrategy for VolumeRenderer {
     }
 
     fn get_priority(&self) -> u32 {
-        20 // 成交量图优先级
+        20
     }
 }

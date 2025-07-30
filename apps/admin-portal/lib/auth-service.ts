@@ -3,14 +3,13 @@ import { adminApi, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
 import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@repo/lib/browser';
 
-// OAuth配置 - 使用相对路径，通过pingora-proxy路由
-const OAuthConfig = {
-  clientId: 'admin-portal-client',
-  redirectUri: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+// OAuth配置 - 使用环境变量进行标准化配置
+export const OAuthConfig = {
+  clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
+  redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
   authorizationEndpoint: '/api/v2/oauth/authorize',
   tokenEndpoint: '/api/v2/oauth/token',
-  scope:
-    'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
+  scope: 'openid profile offline_access admin:full_access',
 };
 
 export const authService: AuthProviderInterface = {

@@ -18,6 +18,7 @@ import {
   PKCEUtils,
   ScopeUtils,
   withErrorHandling,
+  withRateLimit,
 } from '@repo/lib/node';
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
@@ -392,6 +393,12 @@ async function authorizeHandlerInternal(req: NextRequest): Promise<NextResponse>
   return NextResponse.redirect(successRedirectUrl.toString(), 302);
 }
 
-// 使用 withErrorHandling 包装 authorizeHandlerInternal
-// Wrap authorizeHandlerInternal with withErrorHandling
-export const GET = withErrorHandling(authorizeHandlerInternal);
+// 使用速率限制和错误处理包装 authorizeHandlerInternal
+// Wrap authorizeHandlerInternal with rate limiting and error handling
+const rateLimitedHandler = withRateLimit(authorizeHandlerInternal, {
+  maxRequests: 30,
+  windowMs: 60 * 1000, // 1 minute
+  keyType: 'ip'
+});
+
+export const GET = withErrorHandling(rateLimitedHandler);

@@ -1,10 +1,7 @@
 //! Canvas管理器 - 管理多层Canvas
 
 use super::{get_canvas_context, layer::CanvasLayerType};
-use crate::layout::ChartLayout;
 use crate::utils::WasmError;
-use std::cell::RefCell;
-use std::rc::Rc;
 use web_sys::{OffscreenCanvas, OffscreenCanvasRenderingContext2d};
 
 /// Canvas管理器 - 管理三层Canvas
@@ -15,8 +12,6 @@ pub struct CanvasManager {
     pub main_ctx: OffscreenCanvasRenderingContext2d,
     /// 顶层Canvas上下文 - 用于绘制交互元素
     pub overlay_ctx: OffscreenCanvasRenderingContext2d,
-    /// 图表布局
-    pub layout: Rc<RefCell<ChartLayout>>,
 }
 
 impl CanvasManager {
@@ -25,7 +20,6 @@ impl CanvasManager {
         base_canvas: &OffscreenCanvas,
         main_canvas: &OffscreenCanvas,
         overlay_canvas: &OffscreenCanvas,
-        layout: ChartLayout,
     ) -> Result<Self, WasmError> {
         // 获取Canvas上下文
         let base_ctx = get_canvas_context(base_canvas)?;
@@ -36,7 +30,6 @@ impl CanvasManager {
             base_ctx,
             main_ctx,
             overlay_ctx,
-            layout: Rc::new(RefCell::new(layout)),
         })
     }
 

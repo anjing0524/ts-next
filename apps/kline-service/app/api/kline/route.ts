@@ -257,7 +257,7 @@ export async function POST(request: Request) {
 
   // 生成数据
   const genStart = performance.now();
-  const klineData = generateKlineData(10_000, options); // 使用可选参数
+  const klineData = generateKlineData(1000, options); // 使用可选参数
   console.log('生成数据示例:', klineData[0]);
   console.log(`档位数: ${klineData[0]!.volumes.length}`);
   const genEnd = performance.now();

@@ -64,6 +64,12 @@ interface SwitchModeMessage {
   mode: string;
 }
 
+interface ResizeMessage {
+  type: 'resize';
+  width: number;
+  height: number;
+}
+
 type WorkerMessage =
   | InitMessage
   | DrawMessage
@@ -74,7 +80,8 @@ type WorkerMessage =
   | MouseLeaveMessage
   | WheelMessage
   | GetCursorStyleMessage
-  | SwitchModeMessage;
+  | SwitchModeMessage
+  | ResizeMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -184,6 +191,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           });
         } catch (err) {
           console.error('[Worker] 切换模式失败:', err);
+        }
+        break;
+      case 'resize':
+        if (!processorRef) return;
+        try {
+          processorRef.handle_canvas_resize(data.width, data.height);
+        } catch (err) {
+          console.error('[Worker] 处理画布大小改变失败:', err);
         }
         break;
       default:

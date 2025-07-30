@@ -52,9 +52,9 @@ export const authApi = {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: 'auth-center-admin-client',
+        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
         code: code,
-        redirect_uri: 'http://localhost:3000/auth/callback',
+        redirect_uri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
         code_verifier: codeVerifier,
       }),
     });
@@ -77,7 +77,7 @@ export const authApi = {
       },
       body: new URLSearchParams({
         grant_type: credentials.grant_type,
-        client_id: 'auth-center-admin-client',
+        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
         username: credentials.username,
         password: credentials.password,
       }),

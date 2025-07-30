@@ -424,3 +424,7 @@ console.log = wasm_bindgen::console_log!;
 - [Rust WASM Book](https://rustwasm.github.io/docs/book/)
 - [OffscreenCanvas API](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas)
 - [FlatBuffers指南](https://google.github.io/flatbuffers/)
+
+## 沟通指南
+
+- 保持对话为中文，不确定的内容要向我确认

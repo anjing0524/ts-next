@@ -1,39 +1,30 @@
 //! DataZoom导航器模块 - 负责绘制和处理数据缩放导航器
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
-use crate::layout::ChartLayout;
+
+use crate::layout::{ChartLayout, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
-use flatbuffers;
-use std::cell::RefCell;
-use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 导航器拖动手柄类型
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DragHandleType {
-    /// 左侧手柄
     Left,
-    /// 右侧手柄
     Right,
-    /// 中间区域
     Middle,
-    /// 非拖动区域
     None,
 }
 
 /// DataZoom导航器绘制器
 pub struct DataZoomRenderer {
-    /// 当前拖动状态
     is_dragging: bool,
-    /// 拖动开始的X坐标
     drag_start_x: f64,
-    /// 当前拖动的手柄类型
     drag_handle_type: DragHandleType,
+    drag_start_visible_range: (usize, usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,607 +35,454 @@ pub enum DragResult {
 }
 
 impl DataZoomRenderer {
-    /// 创建新的DataZoom导航器渲染器
     pub fn new() -> Self {
         Self {
             is_dragging: false,
             drag_start_x: 0.0,
             drag_handle_type: DragHandleType::None,
+            drag_start_visible_range: (0, 0),
         }
     }
 
-    /// 判断鼠标是否在导航器手柄上
     pub fn get_handle_at_position(
         &self,
         x: f64,
         y: f64,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
+        layout: &ChartLayout,
+        data_manager: &DataManager,
     ) -> DragHandleType {
-        let canvas_manager_ref = canvas_manager.borrow();
-        let layout = canvas_manager_ref.layout.borrow();
-
-        // 如果不在导航器区域内，直接返回None
-        if !layout.is_point_in_navigator(x, y) {
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+        if !nav_rect.contains(x, y) {
             return DragHandleType::None;
         }
 
-        // 获取数据
-        let data_manager_ref = data_manager.borrow();
-        let items_opt = data_manager_ref.get_items();
-        let items = match items_opt {
-            Some(items) => items,
+        let items_len = match data_manager.get_items() {
+            Some(items) => items.len(),
             None => return DragHandleType::None,
         };
-
-        let items_len = items.len();
         if items_len == 0 {
             return DragHandleType::None;
         }
 
-        // 获取可见范围
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let (visible_start, visible_count, _) = data_manager.get_visible();
+        let (start_x, end_x) =
+            self.calculate_visible_range_coords(layout, items_len, visible_start, visible_count);
 
-        // 计算可见区域的坐标
-        let (visible_start_x, visible_end_x) =
-            layout.calculate_visible_range_coordinates(items_len, visible_start, visible_count);
-
-        // 判断是否在左侧手柄上
-        let handle_width = layout.navigator_handle_width * 3.0; // 增加手柄的可点击区域
-        if x >= visible_start_x - handle_width && x <= visible_start_x + handle_width {
-            return DragHandleType::Left;
+        let handle_width = 10.0; // 增加手柄的可点击区域
+        if (x - start_x).abs() < handle_width {
+            DragHandleType::Left
+        } else if (x - end_x).abs() < handle_width {
+            DragHandleType::Right
+        } else if x > start_x && x < end_x {
+            DragHandleType::Middle
+        } else {
+            DragHandleType::None
         }
-
-        // 判断是否在右侧手柄上
-        if x >= visible_end_x - handle_width && x <= visible_end_x + handle_width {
-            return DragHandleType::Right;
-        }
-
-        // 判断是否在中间区域
-        if x > visible_start_x && x < visible_end_x {
-            return DragHandleType::Middle;
-        }
-
-        DragHandleType::None
     }
 
-    /// 处理鼠标按下事件
-    pub fn handle_mouse_down(
-        &mut self,
-        x: f64,
-        y: f64,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-    ) -> bool {
-        // 获取当前鼠标位置的手柄类型
-        let handle_type = self.get_handle_at_position(x, y, canvas_manager, data_manager);
+    pub fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
+        let layout = ctx.layout().borrow();
+        let data_manager = ctx.data_manager().borrow();
+        let handle_type = self.get_handle_at_position(x, y, &layout, &data_manager);
 
-        // 如果不在任何手柄上，不处理
         if handle_type == DragHandleType::None {
             return false;
         }
 
-        // 记录拖动开始状态
         self.is_dragging = true;
         self.drag_start_x = x;
         self.drag_handle_type = handle_type;
+        let (start, count, _) = data_manager.get_visible();
+        self.drag_start_visible_range = (start, count); // 记录拖动开始时的可见范围
 
         true
     }
 
-    /// 获取鼠标在当前位置应该显示的样式
-    pub fn get_cursor_style(
-        &self,
-        x: f64,
-        y: f64,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-    ) -> CursorStyle {
-        // 如果正在拖动，根据拖动手柄类型返回对应的鼠标样式
-        if self.is_dragging {
-            return match self.drag_handle_type {
-                DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize, // 东西方向调整大小
-                DragHandleType::Middle => CursorStyle::Grabbing,                       // 抓取中样式
-                DragHandleType::None => CursorStyle::Default, // 不应该发生，但为了安全起见
-            };
-        }
-
-        // 如果没有在拖动，检查鼠标位置对应的手柄类型
-        // 确保鼠标在导航器区域内
-        let canvas_manager_ref = canvas_manager.borrow();
-        let layout = canvas_manager_ref.layout.borrow();
-        if !layout.is_point_in_navigator(x, y) {
-            return CursorStyle::Default;
-        }
-
-        let handle_type = self.get_handle_at_position(x, y, canvas_manager, data_manager);
-        match handle_type {
-            DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize, // 东西方向调整大小
-            DragHandleType::Middle => CursorStyle::Grab,                           // 抓取样式
-            DragHandleType::None => CursorStyle::Default,
-        }
-    }
-
-    /// 处理鼠标释放事件
-    /// 当用户释放鼠标按钮时调用此函数，结束拖动操作
-    /// 返回一个布尔值，表示之前是否处于拖动状态
-    pub fn handle_mouse_up(&mut self, _data_manager: &Rc<RefCell<DataManager>>) -> bool {
-        let was_dragging = self.is_dragging;
-
-        // 重置拖动状态
-        self.is_dragging = false;
-        self.drag_handle_type = DragHandleType::None;
-
-        // 返回之前是否在拖动，调用者可以据此决定是否需要重绘
-        was_dragging
-    }
-
-    /// 强制重置拖动状态
-    /// 在特殊情况下（如鼠标离开图表区域）调用此函数，确保拖动状态被正确重置
-    pub fn force_reset_drag_state(&mut self) -> bool {
+    pub fn handle_mouse_up(&mut self) -> bool {
         let was_dragging = self.is_dragging;
         self.is_dragging = false;
         self.drag_handle_type = DragHandleType::None;
         was_dragging
     }
 
-    /// 处理鼠标拖动事件
-    /// 当用户拖动鼠标时调用此函数，更新导航器的位置
-    /// 与handle_mouse_move类似，但专门用于拖动状态
-    /// 允许左侧拖动手柄向右拖动以及交换手柄
-    /// 允许右侧拖动手柄向左拖动以及交换手柄
-    /// 两侧的手柄均支持 左右两个方向拖动
-    /// 拖动中间区域实现平移
-    pub fn handle_mouse_drag(
-        &mut self,
-        x: f64,
-        _y: f64,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-    ) -> DragResult {
-        // 如果没有在拖动，不处理
+    pub fn handle_mouse_drag(&mut self, x: f64, ctx: &RenderContext) -> DragResult {
         if !self.is_dragging {
             return DragResult::None;
         }
 
-        // 检查鼠标是否在导航器区域内
-        let canvas_manager_ref = canvas_manager.borrow();
-        let layout = canvas_manager_ref.layout.borrow();
-        // 允许鼠标在拖动状态下不一定在导航器区域内，但不能超出canvas范围
-        let is_in_canvas =
-            x >= 0.0 && x <= layout.canvas_width && _y >= 0.0 && _y <= layout.canvas_height;
-        if !is_in_canvas {
-            // 如果鼠标不在canvas范围内，不触发重置，但继续处理拖动
-            // 允许用户拖动到canvas外部并返回时继续控制
-            return DragResult::None;
-        }
-
-        // 计算拖动距离
-        let drag_distance = x - self.drag_start_x;
-
-        // 获取布局和数据
-        let mut data_manager_ref = data_manager.borrow_mut();
-
-        // 获取数据总量
-        let items_len = match data_manager_ref.get_items() {
+        let layout = ctx.layout().borrow();
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+        let mut data_manager = ctx.data_manager().borrow_mut();
+        let items_len = match data_manager.get_items() {
             Some(items) => items.len(),
             None => return DragResult::None,
         };
-
         if items_len == 0 {
             return DragResult::None;
         }
 
-        // 计算拖动距离对应的索引变化
-        let index_change = if layout.chart_area_width > 0.0 {
-            (drag_distance / layout.chart_area_width * items_len as f64).round() as isize
-        } else {
-            0
-        };
+        let dx = x - self.drag_start_x;
+        let index_change = (dx / nav_rect.width * items_len as f64).round() as isize;
 
-        // 如果没有明显变化，不需要处理
-        if index_change == 0 {
-            return DragResult::None;
-        }
+        let (initial_start, initial_count) = self.drag_start_visible_range;
+        const MIN_VISIBLE_COUNT: usize = 5;
 
-        // 获取当前可见范围
-        let (visible_start, visible_count, visible_end) = data_manager_ref.get_visible();
-
-        // 根据拖动手柄类型计算新的可见范围
-        let (new_start, new_end) = match self.drag_handle_type {
+        let (new_start, new_count) = match self.drag_handle_type {
             DragHandleType::Left => {
-                let new_start = (visible_start as isize + index_change)
+                let new_start = (initial_start as isize + index_change)
                     .max(0)
-                    .min((items_len - 1) as isize) as usize;
-                if new_start == 0 {
-                    // 重置拖动状态，确保光标样式被正确更新
-                    self.is_dragging = false;
-                    self.drag_handle_type = DragHandleType::None;
-                    return DragResult::Released;
-                } else if new_start >= visible_end {
-                    // 如果左侧手柄超过了右侧手柄，交换手柄类型
-                    self.drag_handle_type = DragHandleType::Right;
-                    (visible_end, visible_end)
-                } else {
-                    (new_start, visible_end)
-                }
+                    .min((initial_start + initial_count - MIN_VISIBLE_COUNT) as isize)
+                    as usize;
+                let new_count = (initial_start + initial_count) - new_start;
+                (new_start, new_count)
             }
             DragHandleType::Right => {
-                let new_end = ((visible_end as isize + index_change) as usize)
-                    .max(1)
-                    .min(items_len - 1);
-                if new_end == items_len - 1 {
-                    // 重置拖动状态，确保光标样式被正确更新
-                    self.is_dragging = false;
-                    self.drag_handle_type = DragHandleType::None;
-                    return DragResult::Released;
-                } else if new_end <= visible_start {
-                    // 如果右侧手柄超过了左侧手柄，交换手柄类型
-                    self.drag_handle_type = DragHandleType::Left;
-                    (visible_start, visible_start)
-                } else {
-                    (visible_start, new_end)
-                }
+                let new_end = (initial_start as isize + initial_count as isize + index_change)
+                    .max((initial_start + MIN_VISIBLE_COUNT) as isize)
+                    .min(items_len as isize) as usize;
+                (initial_start, new_end - initial_start)
             }
             DragHandleType::Middle => {
-                let new_start = (visible_start as isize + index_change)
+                let new_start = (initial_start as isize + index_change)
                     .max(0)
-                    .min((items_len - visible_count) as isize)
+                    .min((items_len - initial_count) as isize)
                     as usize;
-                (new_start, new_start + visible_count)
+                (new_start, initial_count)
             }
-            DragHandleType::None => {
-                return DragResult::None;
-            }
+            DragHandleType::None => return DragResult::None,
         };
 
-        // 检查是否有显著变化
-        let start_diff = (visible_start as isize - new_start as isize).abs();
-        let end_diff = (visible_end as isize - new_end as isize).abs();
+        let final_start = new_start.min(items_len.saturating_sub(MIN_VISIBLE_COUNT));
+        let final_count = new_count
+            .min(items_len - final_start)
+            .max(MIN_VISIBLE_COUNT);
 
-        let has_significant_change = start_diff > 0 || end_diff > 0;
-
-        // 如果有显著变化，无效化缓存并更新可见范围
-        if has_significant_change {
-            // 无效化缓存
-            data_manager_ref.invalidate_cache();
-
-            // 更新可见范围
-            data_manager_ref.update_visible_range(new_start, new_end - new_start);
-
-            // 如果拖动距离较大，更新起始拖动位置以提供更好的用户体验
-            if start_diff > 10 || end_diff > 10 {
-                self.drag_start_x = x;
-            }
-
-            // 重新计算数据范围
-            data_manager_ref.calculate_data_ranges();
-
+        let (current_start, current_count, _) = data_manager.get_visible();
+        if current_start != final_start || current_count != final_count {
+            data_manager.update_visible_range(final_start, final_count);
             return DragResult::NeedRedraw;
         }
 
         DragResult::None
     }
 
-    /// 绘制DataZoom导航器
-    pub fn draw(
-        &self,
-        canvas_manager: &Rc<RefCell<CanvasManager>>,
-        data_manager: &Rc<RefCell<DataManager>>,
-        theme: &ChartTheme,
-    ) {
-        // 获取 上下文和布局
-        let canvas_manager_ref = canvas_manager.borrow();
-        let ctx = canvas_manager_ref.get_context(CanvasLayerType::Overlay);
-        let layout = canvas_manager_ref.layout.borrow();
-
-        // 计算导航器位置
-        let nav_x = layout.chart_area_x;
-        let nav_y = layout.canvas_height - layout.navigator_height;
-        let nav_width = layout.main_chart_width; // 只用主图宽度
-        let nav_height = layout.navigator_height;
-
-        // 绘制前清除整个DataZoom区域及周围
-        let padding = 10.0; // 额外清除周围区域以防阴影溢出
-        ctx.clear_rect(
-            nav_x - padding,
-            nav_y - padding,
-            nav_width + padding * 2.0,
-            nav_height + padding * 2.0,
-        );
-
-        // 绘制导航器背景
-        ctx.set_fill_style_str(&theme.navigator_bg);
-        ctx.fill_rect(nav_x, nav_y, nav_width, nav_height);
-
-        let items_opt = data_manager.borrow().get_items();
-        let items = match items_opt {
-            Some(items) => items,
-            None => return,
-        };
-
-        // 如果数据为空，直接返回
-        if items.is_empty() {
-            return;
-        }
-
-        // 绘制成交量曲线作为背景
-        self.draw_volume_area(ctx, &layout, items, nav_x, nav_y, nav_height, theme);
-
-        // 绘制当前可见区域指示器
-        self.draw_visible_range_indicator(
-            ctx,
-            &layout,
-            items,
-            nav_x,
-            nav_y,
-            nav_width,
-            nav_height,
-            data_manager,
-            theme,
-        );
-    }
-
-    /// 在导航器上绘制成交量区域图
     fn draw_volume_area(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        nav_x: f64,
-        nav_y: f64,
-        nav_height: f64,
+        data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items_len = items.len();
-        if items_len == 0 {
+        let items = match data_manager.get_items() {
+            Some(i) => i,
+            None => return,
+        };
+        if items.is_empty() {
             return;
         }
 
-        // 使用ChartLayout中的方法计算导航器中每个K线的宽度（基于main_chart_width）
-        let nav_candle_width = layout.main_chart_width / items_len as f64;
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
-        // 找出最大成交量，用于缩放
-        let mut max_volume: f64 = 0.0;
-        // 使用步进采样来减少计算量，对于大数据集特别有效
-        let step = (items_len / 100).max(1); // 至少每100个点采样一次
+        // 使用收盘价数据创建平滑面积图，更符合金融图表惯例
+        let prices: Vec<f64> = items.iter().map(|item| item.close()).collect();
+        let min_price = prices.iter().fold(f64::MAX, |min, &p| f64::min(min, p));
+        let max_price = prices.iter().fold(f64::MIN, |max, &p| f64::max(max, p));
 
-        // 对于大数据集，使用稀疏采样提高性能
-        for i in (0..items_len).step_by(step) {
-            let item = items.get(i);
-            let volume = item.b_vol() + item.s_vol();
-            max_volume = max_volume.max(volume);
+        if min_price >= max_price {
+            return;
         }
 
-        // 如果采样没有找到有效值，使用默认值
-        if max_volume <= 0.0 {
-            max_volume = 1.0;
+        let num_points = nav_rect.width.floor() as usize;
+        if num_points == 0 {
+            return;
         }
 
-        // 绘制成交量曲线
+        // 使用平滑的贝塞尔曲线创建面积图
         ctx.begin_path();
-        ctx.set_stroke_style_str(&theme.navigator_border);
-        ctx.set_line_width(1.0);
         ctx.set_fill_style_str(&theme.volume_area);
+        ctx.set_global_alpha(0.3); // 设置透明度使背景更柔和
 
-        // 对于大数据集，使用自适应采样提高性能
-        // 最大采样200个点，确保不会有性能问题
-        let draw_step = if items_len > 200 {
-            (items_len as f64 / 200.0).ceil() as usize
-        } else {
-            1
-        };
+        let mut points: Vec<(f64, f64)> = Vec::with_capacity(num_points);
 
-        // 移动到第一个点
-        let first_item = items.get(0);
-        let first_volume = first_item.b_vol() + first_item.s_vol();
-        let first_y = nav_y + nav_height - (first_volume / max_volume) * nav_height * 0.8;
-        ctx.move_to(nav_x, first_y);
+        // 采样点并计算平滑曲线
+        for i in 0..num_points {
+            let start_idx = (i as f64 / num_points as f64 * items.len() as f64).floor() as usize;
+            let end_idx =
+                ((i + 1) as f64 / num_points as f64 * items.len() as f64).floor() as usize;
+            let sub_slice = &prices[start_idx..end_idx.min(prices.len())];
 
-        // 减少绘制的点数量
-        for i in (0..items_len).step_by(draw_step) {
-            let item = items.get(i);
-            let volume = item.b_vol() + item.s_vol();
-            let x = nav_x + i as f64 * nav_candle_width;
-            let y = nav_y + nav_height - (volume / max_volume) * nav_height * 0.8;
-            ctx.line_to(x, y);
+            let avg_price = if sub_slice.is_empty() {
+                prices[0]
+            } else {
+                sub_slice.iter().sum::<f64>() / sub_slice.len() as f64
+            };
+
+            let x = nav_rect.x + i as f64;
+            let normalized_price = (avg_price - min_price) / (max_price - min_price);
+            let y = nav_rect.y + nav_rect.height * (1.0 - normalized_price);
+            points.push((x, y));
         }
 
-        // 确保绘制最后一个点
-        if items_len > 1 && draw_step > 1 {
-            let last_idx = items_len - 1;
-            let last_item = items.get(last_idx);
-            let last_volume = last_item.b_vol() + last_item.s_vol();
-            let last_x = nav_x + last_idx as f64 * nav_candle_width;
-            let last_y = nav_y + nav_height - (last_volume / max_volume) * nav_height * 0.8;
-            ctx.line_to(last_x, last_y);
+        if points.is_empty() {
+            return;
         }
 
-        // 完成路径，回到底部形成闭合区域
-        let last_x = nav_x + (items_len - 1) as f64 * nav_candle_width;
-        ctx.line_to(last_x, nav_y + nav_height);
-        ctx.line_to(nav_x, nav_y + nav_height);
+        // 绘制平滑的贝塞尔曲线面积图
+        ctx.move_to(nav_rect.x, nav_rect.y + nav_rect.height);
+        ctx.line_to(points[0].0, points[0].1);
+
+        // 使用二次贝塞尔曲线创建平滑过渡
+        for i in 1..points.len() {
+            let prev = points[i - 1];
+            let curr = points[i];
+            let ctrl_x = (prev.0 + curr.0) / 2.0;
+            let ctrl_y = (prev.1 + curr.1) / 2.0;
+            ctx.quadratic_curve_to(ctrl_x, ctrl_y, curr.0, curr.1);
+        }
+
+        ctx.line_to(nav_rect.x + nav_rect.width, points.last().unwrap().1);
+        ctx.line_to(nav_rect.x + nav_rect.width, nav_rect.y + nav_rect.height);
         ctx.close_path();
-
-        // 填充区域
         ctx.fill();
-        // 描边曲线 - 省略描边可进一步提高性能
-        // ctx.stroke();
+
+        // 重置透明度
+        ctx.set_global_alpha(1.0);
     }
 
-    /// 绘制可见范围指示器
+    fn calculate_visible_range_coords(
+        &self,
+        layout: &ChartLayout,
+        items_len: usize,
+        start: usize,
+        count: usize,
+    ) -> (f64, f64) {
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+        let start_x = nav_rect.x + (start as f64 / items_len as f64) * nav_rect.width;
+        let end_x = nav_rect.x + ((start + count) as f64 / items_len as f64) * nav_rect.width;
+        (start_x, end_x)
+    }
+
     fn draw_visible_range_indicator(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: flatbuffers::Vector<flatbuffers::ForwardsUOffset<KlineItem>>,
-        nav_x: f64,
-        nav_y: f64,
-        nav_width: f64,
-        nav_height: f64,
-        data_manager: &Rc<RefCell<DataManager>>,
+        data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items_len = items.len();
+        let items_len = match data_manager.get_items() {
+            Some(i) => i.len(),
+            None => return,
+        };
         if items_len == 0 {
             return;
         }
 
-        // 获取可见范围对象
-        let data_manager_ref = data_manager.borrow();
-        let visible_range = data_manager_ref.get_visible_range();
+        let (start, count, _) = data_manager.get_visible();
+        let (start_x, end_x) = self.calculate_visible_range_coords(layout, items_len, start, count);
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
-        // 获取当前可见范围
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
-
-        // 检查是否显示全部数据（缩放到最大）
-        let is_showing_all = visible_start == 0 && visible_count >= items_len;
-
-        // 如果是显示全部数据，就不需要绘制任何可见区域指示器
-        if is_showing_all {
-            return;
-        }
-
-        // 使用VisibleRange的get_screen_coordinates方法获取可见区域的坐标
-        let (visible_start_x, visible_end_x) = visible_range.get_screen_coordinates(layout);
-
-        // 确保手柄位置在datazoom区域内
-        let clamped_start_x = visible_start_x.max(nav_x).min(nav_x + nav_width);
-        let clamped_end_x = visible_end_x.max(nav_x).min(nav_x + nav_width);
-
-        // 保存当前渲染状态
-        ctx.save();
-
-        // 设置裁剪区域为导航器区域，防止任何绘制超出此区域
-        ctx.begin_path();
-        ctx.rect(nav_x, nav_y, nav_width, nav_height);
-        ctx.clip();
-
-        // 绘制半透明遮罩 (左侧不可见区域)
+        // 绘制半透明遮罩，表示不可见区域
         ctx.set_fill_style_str(&theme.navigator_mask);
-        ctx.fill_rect(nav_x, nav_y, clamped_start_x - nav_x, nav_height);
-
-        // 绘制半透明遮罩 (右侧不可见区域)
+        ctx.set_global_alpha(0.3); // 提高透明度以更清晰地显示范围
         ctx.fill_rect(
-            clamped_end_x,
-            nav_y,
-            nav_x + nav_width - clamped_end_x,
-            nav_height,
+            nav_rect.x,
+            nav_rect.y,
+            start_x - nav_rect.x,
+            nav_rect.height,
+        );
+        ctx.fill_rect(
+            end_x,
+            nav_rect.y,
+            nav_rect.x + nav_rect.width - end_x,
+            nav_rect.height,
+        );
+        ctx.set_global_alpha(1.0);
+
+        // 绘制选中区域的边框
+        ctx.set_stroke_style_str(&theme.navigator_border);
+        ctx.set_line_width(2.0); // 增加边框宽度以提高可见性
+        ctx.stroke_rect(start_x, nav_rect.y, end_x - start_x, nav_rect.height);
+
+        // 绘制拖拽手柄，区分不同状态
+        let handle_width = 6.0; // 增加手柄宽度以提高可点击性
+        let active_color = if self.is_dragging {
+            &theme.navigator_active_handle
+        } else {
+            &theme.navigator_handle
+        };
+
+        ctx.set_fill_style_str(active_color);
+
+        // 左侧手柄
+        ctx.fill_rect(
+            start_x - handle_width / 2.0,
+            nav_rect.y + 2.0,
+            handle_width,
+            nav_rect.height - 4.0,
         );
 
-        // 绘制可见区域边框
-        let border_left = clamped_start_x;
-        let border_width = clamped_end_x - clamped_start_x;
+        // 右侧手柄
+        ctx.fill_rect(
+            end_x - handle_width / 2.0,
+            nav_rect.y + 2.0,
+            handle_width,
+            nav_rect.height - 4.0,
+        );
 
-        if border_width > 0.0 {
-            ctx.set_stroke_style_str(&theme.navigator_border);
-            ctx.set_line_width(1.0);
-            ctx.stroke_rect(border_left, nav_y, border_width, nav_height);
-        }
-
-        let handle_width = if self.is_dragging {
-            // 拖动时增加手柄宽度，提供更明显的视觉反馈
-            layout.navigator_handle_width * 1.5
-        } else {
-            layout.navigator_handle_width
-        };
-
-        // 设置拖动时的阴影效果
-        let shadow_blur = if self.is_dragging {
-            // 根据手柄位置调整阴影模糊半径
-            // 当手柄靠近边缘时，降低阴影模糊半径
-            let left_edge_distance = clamped_start_x - nav_x;
-            let right_edge_distance = nav_x + nav_width - clamped_end_x;
-            let min_distance = left_edge_distance.min(right_edge_distance);
-
-            // 如果接近边缘，逐渐减小阴影
-            if min_distance < 10.0 {
-                4.0 * (min_distance / 10.0)
-            } else {
-                4.0
-            }
-        } else {
-            0.0
-        };
-
-        let shadow_color = if self.is_dragging {
-            theme.navigator_active_handle_shadow.clone()
-        } else {
-            String::from("rgba(0,0,0,0)")
-        };
-
-        // 绘制左侧手柄
-        if clamped_start_x >= nav_x && clamped_start_x <= nav_x + nav_width {
-            ctx.set_fill_style_str(&theme.navigator_handle);
-            ctx.set_shadow_blur(shadow_blur);
-            ctx.set_shadow_color(&shadow_color);
-            ctx.begin_path();
-            // 绘制矩形作为左侧手柄
-            ctx.fill_rect(
-                clamped_start_x - handle_width / 2.0,
-                nav_y + nav_height / 4.0,
-                handle_width,
-                nav_height / 2.0,
-            );
-        }
-
-        // 绘制右侧手柄
-        if clamped_end_x >= nav_x && clamped_end_x <= nav_x + nav_width {
-            ctx.set_fill_style_str(&theme.navigator_handle);
-            ctx.set_shadow_blur(shadow_blur);
-            ctx.set_shadow_color(&shadow_color);
-            ctx.begin_path();
-            // 绘制矩形作为右侧手柄
-            ctx.fill_rect(
-                clamped_end_x - handle_width / 2.0,
-                nav_y + nav_height / 4.0,
-                handle_width,
-                nav_height / 2.0,
-            );
-        }
-
-        // 恢复渲染状态，取消裁剪区域
-        ctx.restore();
+        // 绘制选中区域的高亮背景
+        ctx.set_fill_style_str(&theme.navigator_active_handle);
+        ctx.set_global_alpha(0.1);
+        ctx.fill_rect(start_x, nav_rect.y, end_x - start_x, nav_rect.height);
+        ctx.set_global_alpha(1.0);
     }
 }
 
 impl RenderStrategy for DataZoomRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        self.draw(ctx.canvas_manager, ctx.data_manager, ctx.theme);
+        let canvas_manager = ctx.canvas_manager().borrow();
+        let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
+        let layout = ctx.layout().borrow();
+        let data_manager = ctx.data_manager().borrow();
+        let theme = ctx.theme();
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+
+        // 清理datazoom区域，扩大清理范围以确保手柄完全清除
+        let clear_padding = 20.0; // 增加清理边距，确保手柄完全清除
+        overlay_ctx.clear_rect(
+            nav_rect.x - clear_padding,
+            nav_rect.y - clear_padding,
+            nav_rect.width + clear_padding * 2.0,
+            nav_rect.height + clear_padding * 2.0,
+        );
+
+        overlay_ctx.set_fill_style_str(&theme.navigator_bg);
+        overlay_ctx.fill_rect(nav_rect.x, nav_rect.y, nav_rect.width, nav_rect.height);
+
+        let items_len = data_manager.get_items().map_or(0, |items| items.len());
+
+        if items_len > 0 {
+            self.draw_volume_area(overlay_ctx, &layout, &data_manager, theme);
+            self.draw_visible_range_indicator(overlay_ctx, &layout, &data_manager, theme);
+        } else {
+        }
+
         Ok(())
     }
 
     fn supports_mode(&self, _mode: RenderMode) -> bool {
-        // DataZoomRenderer 支持所有模式
         true
     }
-
     fn get_layer_type(&self) -> CanvasLayerType {
-        CanvasLayerType::Base
+        CanvasLayerType::Overlay // 使用overlay层，支持交互
     }
-
     fn get_priority(&self) -> u32 {
-        25 // DataZoom优先级
+        100 // 高优先级，确保在其他overlay元素之上
     }
 
-    // 实现鼠标事件处理方法
     fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
-        self.handle_mouse_down(x, y, ctx.canvas_manager, ctx.data_manager)
+        self.handle_mouse_down(x, y, ctx)
     }
 
-    fn handle_mouse_up(&mut self, _x: f64, _y: f64, ctx: &RenderContext) -> bool {
-        self.handle_mouse_up(ctx.data_manager)
+    fn handle_mouse_up(&mut self, _x: f64, _y: f64, _ctx: &RenderContext) -> bool {
+        self.handle_mouse_up()
     }
 
-    fn handle_mouse_drag(&mut self, x: f64, y: f64, ctx: &RenderContext) -> DragResult {
-        self.handle_mouse_drag(x, y, ctx.canvas_manager, ctx.data_manager)
+    fn handle_mouse_drag(&mut self, x: f64, _y: f64, ctx: &RenderContext) -> DragResult {
+        self.handle_mouse_drag(x, ctx)
     }
 
     fn handle_mouse_leave(&mut self, _ctx: &RenderContext) -> bool {
-        self.force_reset_drag_state()
+        self.is_dragging = false;
+        self.drag_handle_type = DragHandleType::None;
+        true
+    }
+
+    /// 处理鼠标滚轮事件 - 在导航器区域进行缩放
+    fn handle_wheel(&mut self, x: f64, y: f64, delta: f64, ctx: &RenderContext) -> bool {
+        let layout = ctx.layout().borrow();
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+
+        // 只有在导航器区域内才处理滚轮事件
+        if !nav_rect.contains(x, y) {
+            return false;
+        }
+
+        let mut data_manager = ctx.data_manager().borrow_mut();
+        let items_len = match data_manager.get_items() {
+            Some(items) => items.len(),
+            None => return false,
+        };
+
+        if items_len == 0 {
+            return false;
+        }
+
+        let (current_start, current_count, _) = data_manager.get_visible();
+
+        // 计算相对位置（鼠标在导航器中的相对位置）
+        let relative_position = if nav_rect.width > 0.0 {
+            ((x - nav_rect.x) / nav_rect.width).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+
+        // 计算缩放因子
+        const WHEEL_ZOOM_FACTOR: f64 = 1.2; // 滚轮缩放灵敏度
+        let zoom_factor = if delta > 0.0 {
+            WHEEL_ZOOM_FACTOR // 放大
+        } else {
+            1.0 / WHEEL_ZOOM_FACTOR // 缩小
+        };
+
+        // 计算新的可见范围
+        let visible_center_idx = current_start as f64 + (current_count as f64 * relative_position);
+        const MIN_VISIBLE_COUNT: usize = 5;
+        const MAX_VISIBLE_RATIO: f64 = 0.8;
+
+        let max_visible_count =
+            ((items_len as f64 * MAX_VISIBLE_RATIO) as usize).max(MIN_VISIBLE_COUNT);
+        let new_visible_count = ((current_count as f64 * zoom_factor).round() as usize)
+            .max(MIN_VISIBLE_COUNT)
+            .min(max_visible_count)
+            .min(items_len);
+
+        // 计算新的起始位置，保持相对位置点不变
+        let new_start = ((visible_center_idx - (new_visible_count as f64 * relative_position))
+            .round() as isize)
+            .max(0)
+            .min((items_len - new_visible_count) as isize) as usize;
+
+        // 更新可见范围
+        data_manager.update_visible_range(new_start, new_visible_count);
+
+        true
     }
 
     fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {
-        self.get_cursor_style(x, y, ctx.canvas_manager, ctx.data_manager)
+        if self.is_dragging {
+            return match self.drag_handle_type {
+                DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize,
+                DragHandleType::Middle => CursorStyle::Grabbing,
+                _ => CursorStyle::Default,
+            };
+        }
+
+        // 检查是否在导航器区域内
+        let layout = ctx.layout().borrow();
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+        if !nav_rect.contains(x, y) {
+            return CursorStyle::Default;
+        }
+
+        match self.get_handle_at_position(
+            x,
+            y,
+            &ctx.layout().borrow(),
+            &ctx.data_manager().borrow(),
+        ) {
+            DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize,
+            DragHandleType::Middle => CursorStyle::Grab,
+            _ => CursorStyle::Default,
+        }
     }
 }

@@ -1,7 +1,14 @@
 //! 可见数据范围模块 - 封装可见数据范围的计算和管理
 
 use crate::kline_generated::kline::KlineItem;
-use crate::layout::ChartLayout;
+use crate::layout::{ChartLayout, PaneId};
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(message: &str);
+}
 
 /// 可见数据范围结构体
 ///
@@ -83,16 +90,39 @@ impl VisibleRange {
             return Self::new(0, 0, 0);
         }
 
-        // 计算一屏可以显示的K线数量
-        let initial_visible_count = ((layout.chart_area_width / layout.total_candle_width).floor()
-            as usize)
-            .max(1) // 确保至少显示1根K线
-            .min(items_len); // 不能超过总数据量
+        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
+
+        // 优化可见数量计算 - 根据数据密度动态调整
+        let effective_width = main_chart_rect.width.max(100.0);
+        let data_density = if items_len > 5000 {
+            8.0 // 大数据量时更密集
+        } else if items_len > 1000 {
+            6.0 // 中等数据量
+        } else {
+            4.0 // 小数据量时更宽松
+        };
+
+        // 计算初始可见数量，最少显示50根，最多显示300根
+        let calculated_count = (effective_width / data_density).floor() as usize;
+        let initial_visible_count = calculated_count
+            .clamp(50, 300) // 限制在50-300之间
+            .min(items_len)
+            .max(1);
 
         // 默认显示末尾的数据，而不是从0开始
         let start = items_len.saturating_sub(initial_visible_count);
 
-        Self::new(start, initial_visible_count, items_len)
+        log(&format!(
+            "[VisibleRange] 最终可见范围: start={}, count={}, total={}",
+            start, initial_visible_count, items_len
+        ));
+
+        let result = Self::new(start, initial_visible_count, items_len);
+        log(&format!(
+            "[VisibleRange] 创建完成: {:?}",
+            result.get_range()
+        ));
+        result
     }
 
     /// 更新可见范围
@@ -187,9 +217,17 @@ impl VisibleRange {
         let visible_count = self.count.max(1);
         let visible_center_idx = self.start as f64 + (visible_count as f64 * relative_position);
 
+        // 定义缩放限制
+        const MIN_VISIBLE_COUNT: usize = 5; // 最少显示5个K线
+        const MAX_VISIBLE_RATIO: f64 = 0.8; // 最多显示总数据的80%
+
+        let max_visible_count =
+            ((self.total_len as f64 * MAX_VISIBLE_RATIO) as usize).max(MIN_VISIBLE_COUNT);
+
         // 计算新的可见数量，并确保在有效范围内
         let new_visible_count = ((visible_count as f64 * zoom_factor).round() as usize)
-            .max(1)
+            .max(MIN_VISIBLE_COUNT)
+            .min(max_visible_count)
             .min(self.total_len);
 
         // 计算新的起始位置，保持相对位置点不变
@@ -225,11 +263,33 @@ impl VisibleRange {
             0.5
         };
 
-        // 计算缩放因子
-        let zoom_factor = if delta > 0.0 { 0.8 } else { 1.25 };
+        // 优化缩放因子，使缩放更平滑
+        // 根据当前可见数量调整缩放速度，可见数量越少缩放越慢
+        let base_zoom_factor = if delta > 0.0 { 0.9 } else { 1.1 };
+        let visible_count = self.count.max(1);
 
-        // 调用通用缩放方法
-        self.zoom_with_relative_position(zoom_factor, relative_position)
+        // 当可见数量较少时，减小缩放幅度
+        let zoom_factor = if visible_count <= 10 {
+            if delta > 0.0 { 0.95 } else { 1.05 }
+        } else {
+            base_zoom_factor
+        };
+
+        // 调用通用缩放方法，并确保边界检查
+        let (mut new_start, mut new_count) =
+            self.zoom_with_relative_position(zoom_factor, relative_position);
+
+        // 确保新的范围在有效数据范围内，防止空白区域
+        new_start = new_start.min(self.total_len.saturating_sub(new_count));
+        new_count = new_count.min(self.total_len - new_start);
+
+        // 确保至少显示1个数据点
+        if new_count == 0 {
+            new_count = 1;
+            new_start = new_start.min(self.total_len.saturating_sub(1));
+        }
+
+        (new_start, new_count)
     }
 
     /// 计算可见区域的数据范围
@@ -290,7 +350,8 @@ impl VisibleRange {
     /// 返回包含所有可见项X坐标的向量（仅限主图区域）
     pub fn precompute_x_coordinates(&self, layout: &ChartLayout) -> Vec<f64> {
         let mut x_coords = Vec::with_capacity(self.count);
-        let x_max = layout.chart_area_x + layout.main_chart_width;
+        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
+        let x_max = main_chart_rect.x + main_chart_rect.width;
         for global_index in self.start..self.end {
             let x = layout.map_index_to_x(global_index, self.start);
             if x <= x_max {

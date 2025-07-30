@@ -23,6 +23,10 @@ pub struct ChartTheme {
     pub text: String,
     /// 坐标轴文本颜色
     pub axis_text: String,
+    /// 主要文本颜色（用于标题等）
+    pub text_primary: String,
+    /// 次要文本颜色（用于副标题等）
+    pub text_secondary: String,
     // --- K线颜色 ---
     /// 上涨K线颜色
     pub bullish: String,
@@ -75,8 +79,12 @@ pub struct ChartTheme {
     pub font_axis: String,
     /// 标题字体
     pub font_header: String,
+    /// 副标题字体
+    pub font_subtitle: String,
     /// 图例字体
     pub font_legend: String,
+    /// 标题字体（加粗）
+    pub font_title: String,
     // 切换按钮字体已移除
 }
 
@@ -89,6 +97,8 @@ impl Default for ChartTheme {
             grid: "#eeeeee".into(),
             text: "#333333".into(),
             axis_text: "#666666".into(),
+            text_primary: "#333333".into(),
+            text_secondary: "#666666".into(),
             bullish: "#ef5350".into(),
             bearish: "#26a69a".into(),
             last_price_line: "#FF9800".into(),
@@ -112,7 +122,9 @@ impl Default for ChartTheme {
             book_hover_border: "rgba(255, 255, 255, 0.8)".into(),
             font_axis: "10px Arial".into(),
             font_header: "bold 14px Arial".into(),
+            font_subtitle: "12px Arial".into(),
             font_legend: "12px Arial".into(),
+            font_title: "bold 16px Arial".into(),
             // 切换按钮字体配置已移除
         }
     }
@@ -127,6 +139,8 @@ pub struct PartialChartTheme {
     pub grid: Option<String>,
     pub text: Option<String>,
     pub axis_text: Option<String>,
+    pub text_primary: Option<String>,
+    pub text_secondary: Option<String>,
     pub bullish: Option<String>,
     pub bearish: Option<String>,
     pub last_price_line: Option<String>,
@@ -150,7 +164,9 @@ pub struct PartialChartTheme {
     pub book_hover_border: Option<String>,
     pub font_axis: Option<String>,
     pub font_header: Option<String>,
+    pub font_subtitle: Option<String>,
     pub font_legend: Option<String>,
+    pub font_title: Option<String>,
     // 切换按钮字体字段已移除
 }
 
@@ -175,6 +191,8 @@ impl ChartTheme {
         merge_field!(grid);
         merge_field!(text);
         merge_field!(axis_text);
+        merge_field!(text_primary);
+        merge_field!(text_secondary);
         merge_field!(bullish);
         merge_field!(bearish);
         merge_field!(last_price_line);
@@ -198,7 +216,9 @@ impl ChartTheme {
         merge_field!(book_hover_border);
         merge_field!(font_axis);
         merge_field!(font_header);
+        merge_field!(font_subtitle);
         merge_field!(font_legend);
+        merge_field!(font_title);
         // 切换按钮字体合并逻辑已移除
     }
 

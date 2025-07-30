@@ -1,47 +1,129 @@
 # ts-next-template-monorepo
 
-这是一个基于 Next.js 和 TypeScript 的全栈 Monorepo 项目模板，集成了完整的开发、测试、部署和运维工具链。
+这是一个基于 Next.js 15 和 TypeScript 的全栈 Monorepo 项目，实现了完整的 OAuth 2.1 认证授权中心与微服务架构。
 
-## 项目架构
+## 🏗️ 项目架构
 
-本项目采用 Monorepo 架构，代码库中包含多个相互独立又可共享代码的应用（apps）和包（packages）。
+本项目采用 Monorepo 架构，使用 Turborepo 进行高效管理，包含 OAuth 2.1 认证服务和金融数据服务等核心组件。
 
-- **`apps/`**: 存放各个独立的应用服务。
-  - **`admin-portal`**: 管理后台前端，基于 Next.js 和 shadcn/ui，提供系统管理、用户管理、权限控制等功能。
-  - **`flow-service`**: 可视化流程编排服务，基于 Next.js 和 shadcn/ui，提供流程设计、执行、监控等功能。
-  - **`kline-service`**: K线图服务，基于 Next.js 和 WebAssembly，提供高性能的 K 线图展示和数据分析功能。
-  - **`oauth-service`**: OAuth 2.0 认证服务，基于 Next.js 和 shadcn/ui，提供用户认证、授权、令牌管理等功能。
-  - **`pingora-proxy`**: 基于 Pingora 的高性能反向代理服务，负责流量转发、负载均衡、安全防护等。
-  - **`test-service`**: 用于测试和演示的服务。
-- **`packages/`**: 存放共享的模块和配置。
-  - **`cache`**: 缓存模块，提供 Redis 和内存缓存。
-  - **`database`**: 数据库模块，使用 Prisma ORM，支持 SQLite。
-  - **`eslint-config`**: 共享的 ESLint 配置。
-  - **`jest-config`**: 共享的 Jest 配置。
-  - **`lib`**: 共享的工具库，包含认证、中间件、服务等。
-  - **`next-config`**: 共享的 Next.js 配置。
-  - **`prettier-config`**: 共享的 Prettier 配置。
-  - **`tailwind-config`**: 共享的 Tailwind CSS 配置。
-  - **`typescript-config`**: 共享的 TypeScript 配置。
-  - **`ui`**: 共享的 UI 组件库，基于 shadcn/ui。
+### 📱 应用服务 (apps/)
 
-## 技术栈
+| 服务 | 端口 | 功能描述 | 技术栈 |
+|------|------|----------|--------|
+| **oauth-service** | 3001 | OAuth 2.1 认证授权服务，提供完整的授权码流程 + PKCE 支持 | Next.js 15 + Jose + Prisma |
+| **admin-portal** | 3002 | 管理后台 + 认证中心 UI，处理所有用户交互页面 | Next.js 15 + shadcn/ui + React Query |
+| **kline-service** | 3003 | 金融数据可视化服务，WebAssembly 高性能图表渲染 | Next.js 15 + Rust/WASM |
+| **pingora-proxy** | 6188 | 基于 Rust 的高性能反向代理和负载均衡 | Rust + Pingora |
+| **test-service** | 动态 | 测试服务，用于集成测试和演示 | Next.js 15 |
 
-- **前端**: Next.js, React, TypeScript, Tailwind CSS, shadcn/ui
-- **后端**: Next.js, Pingora, Rust
-- **数据库**: SQLite, Prisma
-- **测试**: Jest, Playwright
-- **工具**: pnpm, Turbo, Docker, Kubernetes, ESLint, Prettier, Commitizen, Husky, lint-staged
+### 📦 共享包 (packages/)
 
-## 环境准备
+| 包名 | 功能描述 |
+|------|----------|
+| **@repo/ui** | 基于 shadcn/ui 的共享 UI 组件库 |
+| **@repo/lib** | 认证工具、JWT 处理、权限管理等核心功能库 |
+| **@repo/database** | Prisma ORM 数据库模型和客户端 |
+| **@repo/cache** | Redis 和内存缓存抽象层 |
+| **@repo/eslint-config** | 共享 ESLint 配置 |
+| **@repo/jest-config** | 共享 Jest 测试配置 |
+| **@repo/typescript-config** | 共享 TypeScript 配置 |
+| **@repo/tailwind-config** | 共享 Tailwind CSS 配置 |
+| **@repo/next-config** | 共享 Next.js 配置 |
+| **@repo/prettier-config** | 共享 Prettier 配置 |
 
-在开始之前，请确保您已安装以下软件：
+## 🚀 技术栈
+
+- **前端框架**: Next.js 15.3.2 + React 19
+- **认证授权**: OAuth 2.1 + PKCE + JWT (Jose库)
+- **数据库**: Prisma ORM + SQLite (开发) / PostgreSQL (生产)
+- **样式**: Tailwind CSS 4 + shadcn/ui
+- **性能**: Rust/WASM (kline-service) + Pingora代理
+- **测试**: Jest + Playwright (E2E)
+- **构建**: Turborepo + pnpm workspaces
+
+## 🛠️ 环境准备
+
+### 必需软件
 
 - [Node.js](https://nodejs.org/) (v20.x 或更高版本)
 - [pnpm](https://pnpm.io/) (v10.x 或更高版本)
-- [Rust](https://www.rust-lang.org/) (最新稳定版)
+- [Rust](https://www.rust-lang.org/) (最新稳定版) - 用于 pingora-proxy 和 WASM 构建
 - [Docker](https://www.docker.com/) (最新稳定版)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) (最新稳定版)
+
+### 可选软件
+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) - 用于 Kubernetes 部署
+- [Redis](https://redis.io/) - 用于缓存服务 (开发环境可选)
+
+## 🚀 快速开始
+
+### 1. 安装依赖
+
+```bash
+# 克隆项目
+git clone <repository-url>
+cd ts-next-template
+
+# 安装所有依赖
+pnpm install
+```
+
+### 2. 环境配置
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，配置以下关键变量:
+# DATABASE_URL="file:./dev.db"
+# JWT_PRIVATE_KEY_PATH="./keys/private.pem"
+# JWT_PUBLIC_KEY_PATH="./keys/public.pem"
+# REDIS_URL="redis://localhost:6379"
+```
+
+### 3. 初始化数据库
+
+```bash
+# 生成 Prisma 客户端
+pnpm db:generate
+
+# 创建数据库表结构
+pnpm db:push
+
+# 初始化测试数据
+pnpm db:seed
+```
+
+### 4. 构建 WASM 模块 (kline-service)
+
+```bash
+# 构建金融图表 WASM 模块
+cd apps/kline-service/wasm-cal
+./build.sh
+```
+
+### 5. 启动开发环境
+
+```bash
+# 启动所有服务
+pnpm dev
+
+# 或者分别启动特定服务
+pnpm --filter=oauth-service dev      # 认证服务 (3001)
+pnpm --filter=admin-portal dev       # 管理后台 (3002)
+pnpm --filter=kline-service dev      # 金融数据服务 (3003)
+pnpm --filter=pingora-proxy dev      # 反向代理 (6188)
+
+# 仅启动认证相关服务 (推荐)
+pnpm start:e2e  # 并行启动 admin-portal 与 oauth-service
+```
+
+### 6. 访问系统
+
+- **管理后台**: http://localhost:3002
+- **认证服务**: http://localhost:3001
+- **金融数据服务**: http://localhost:3003
+- **默认管理员**: admin@example.com / admin123
 
 ## 本地开发
 
