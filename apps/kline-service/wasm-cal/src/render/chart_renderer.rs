@@ -296,7 +296,21 @@ impl ChartRenderer {
             // --- 借用作用域开始 ---
             let layout = self.chart_layout.borrow();
             let drawing_area = layout.get_rect(&PaneId::DrawingArea);
-            let is_currently_in_chart = drawing_area.contains(x, y);
+            let order_book_rect = layout.get_rect(&PaneId::OrderBook);
+
+            // 获取K线/热图和成交量图的区域
+            let heatmap_area_rect = layout.get_rect(&PaneId::HeatmapArea);
+            let volume_chart_rect = layout.get_rect(&PaneId::VolumeChart);
+
+            // 计算有效交互区域的底部边界
+            let valid_interaction_bottom =
+                heatmap_area_rect.y() + heatmap_area_rect.height() + volume_chart_rect.height();
+
+            // 检查是否在订单簿区域内，并且在K线图+成交量图的垂直范围内
+            let is_in_order_book = order_book_rect.contains(x, y) && y < valid_interaction_bottom;
+
+            // 只有在主图形区域（非订单簿区域）时才认为在图表内
+            let is_currently_in_chart = drawing_area.contains(x, y) && !is_in_order_book;
 
             let mut new_idx = None;
             if is_currently_in_chart {
@@ -447,6 +461,7 @@ impl ChartRenderer {
             let is_in_chart = main_chart_rect.contains(x, y);
 
             if is_in_chart {
+                // 主图区域的缩放
                 let mut data_manager = self.data_manager.borrow_mut();
                 data_manager.handle_wheel(
                     x,
@@ -457,8 +472,31 @@ impl ChartRenderer {
                     is_in_chart,
                 )
             } else {
-                // 未来可以在此处理导航器或其他区域的滚轮事件
-                false
+                // 检查是否在导航器区域
+                let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+                let is_in_nav = nav_rect.contains(x, y);
+
+                if is_in_nav {
+                    // 导航器区域的滚轮缩放由 DataZoomRenderer 处理
+                    if let Some(datazoom_renderer) = self.strategy_factory.get_datazoom_renderer() {
+                        // 创建 SharedRenderState
+                        let shared_state = SharedRenderState::new(
+                            self.canvas_manager.clone(),
+                            self.data_manager.clone(),
+                            self.chart_layout.clone(),
+                            Rc::new(self.config_manager.get_theme().clone()),
+                            None,
+                        );
+                        let ctx = RenderContext::new(shared_state, None, self.mode);
+                        datazoom_renderer
+                            .borrow_mut()
+                            .handle_wheel(x, y, delta, &ctx)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             }
         };
 

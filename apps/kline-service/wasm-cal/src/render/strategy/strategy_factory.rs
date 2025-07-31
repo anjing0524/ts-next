@@ -97,6 +97,11 @@ impl RenderStrategyFactory {
             .and_then(|strategies| strategies.get(index))
     }
 
+    /// 获取 DataZoom 渲染器的引用
+    pub fn get_datazoom_renderer(&self) -> Option<&RefCell<Box<dyn RenderStrategy>>> {
+        self.get_strategy(&StrategyType::DataZoom, 0)
+    }
+
     /// 获取指定类型的所有渲染策略
     pub fn get_strategies_by_type(
         &self,

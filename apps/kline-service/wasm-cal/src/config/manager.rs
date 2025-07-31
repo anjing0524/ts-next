@@ -47,6 +47,11 @@ impl ConfigManager {
         // 如需其它主题，可在此插入
     }
 
+    /// 获取当前主题的引用
+    pub fn get_theme(&self) -> &ChartTheme {
+        &self.theme
+    }
+
     /// 更新当前主题
     pub fn update_theme(&mut self) {
         if let Some(custom_theme) = &self.config.custom_theme {

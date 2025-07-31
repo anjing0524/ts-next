@@ -26,8 +26,8 @@ impl AxisRenderer {
         theme: &ChartTheme,
     ) {
         let price_rect = layout.get_rect(&PaneId::HeatmapArea);
-        let volume_rect = layout.get_rect(&PaneId::VolumeChart);
 
+        // 仅在K线区域绘制背景条纹
         let num_y_bands = 5;
         let band_height = price_rect.height / num_y_bands as f64;
         for i in 0..num_y_bands {
@@ -39,19 +39,6 @@ impl AxisRenderer {
             };
             ctx.set_fill_style_str(color);
             ctx.fill_rect(price_rect.x, band_y, price_rect.width, band_height);
-        }
-
-        let vol_num_y_bands = 2;
-        let vol_band_height = volume_rect.height / vol_num_y_bands as f64;
-        for i in 0..vol_num_y_bands {
-            let band_y = volume_rect.y + i as f64 * vol_band_height;
-            let color = if i % 2 == 0 {
-                &theme.background
-            } else {
-                &theme.grid
-            };
-            ctx.set_fill_style_str(color);
-            ctx.fill_rect(volume_rect.x, band_y, volume_rect.width, vol_band_height);
         }
     }
 
@@ -181,13 +168,7 @@ impl AxisRenderer {
         let volume_rect = layout.get_rect(&PaneId::VolumeChart);
         let volume_mapper = CoordinateMapper::new_for_y_axis(volume_rect, 0.0, max_volume, 2.0);
 
-        ctx.set_fill_style_str(&theme.header_bg);
-        ctx.fill_rect(
-            y_axis_rect.x,
-            volume_rect.y,
-            y_axis_rect.width,
-            volume_rect.height,
-        );
+        // 移除Y轴背景填充，保持透明
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.begin_path();
@@ -225,13 +206,7 @@ impl AxisRenderer {
         let config = render_ctx.config_ref().unwrap();
         let header_rect = layout.get_rect(&PaneId::Header);
 
-        ctx.set_fill_style_str(&theme.header_bg);
-        ctx.fill_rect(
-            header_rect.x,
-            header_rect.y,
-            header_rect.width,
-            header_rect.height,
-        );
+        // 移除头部背景填充，保持透明
 
         if render_ctx.mode == RenderMode::Kmap {
             ctx.set_stroke_style_str(&theme.border);
@@ -286,13 +261,7 @@ impl AxisRenderer {
         let time_axis_rect = layout.get_rect(&PaneId::TimeAxis);
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
 
-        ctx.set_fill_style_str(&theme.header_bg);
-        ctx.fill_rect(
-            time_axis_rect.x,
-            time_axis_rect.y,
-            time_axis_rect.width,
-            time_axis_rect.height,
-        );
+        // 移除时间轴背景填充，保持透明
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.begin_path();

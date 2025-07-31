@@ -48,15 +48,29 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                                 id: PaneId::DrawingArea,
                                 constraint: Constraint::Fill,
                                 children: vec![
-                                    // 新增一个VBox来容纳可变高度的图表
+                                    // 主图表区域: 包含图表和订单簿
                                     LayoutNode::VBox {
                                         id: PaneId::Custom("ChartsContainer".to_string()),
                                         constraint: Constraint::Fill,
                                         children: vec![
-                                            // 主图表（K线/热图）
-                                            LayoutNode::Pane {
-                                                id: PaneId::HeatmapArea,
+                                            // 主图表（K线/热图）和订单簿
+                                            LayoutNode::HBox {
+                                                id: PaneId::Custom(
+                                                    "HeatmapWithOrderBook".to_string(),
+                                                ),
                                                 constraint: main_chart_constraint,
+                                                children: vec![
+                                                    // 左侧K线/热图区域
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::HeatmapArea,
+                                                        constraint: Constraint::Percent(80.0),
+                                                    },
+                                                    // 右侧订单簿: 只与HeatmapArea等高
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::OrderBook,
+                                                        constraint: Constraint::Percent(20.0),
+                                                    },
+                                                ],
                                             },
                                             // 成交量图（与HeatmapArea同宽）
                                             LayoutNode::Pane {
@@ -70,19 +84,35 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                                         id: PaneId::TimeAxis,
                                         constraint: Constraint::Fixed(30.0),
                                     },
-                                    // 导航器（固定高度）
-                                    LayoutNode::Pane {
-                                        id: PaneId::NavigatorContainer,
+                                    // 导航器（固定高度）- 与主图等宽
+                                    LayoutNode::HBox {
+                                        id: PaneId::Custom("NavigatorWrapper".to_string()),
                                         constraint: Constraint::Fixed(40.0),
+                                        children: vec![
+                                            // 左侧空白区域（与YAxis对齐）
+                                            LayoutNode::Pane {
+                                                id: PaneId::Custom(
+                                                    "NavigatorLeftSpacer".to_string(),
+                                                ),
+                                                constraint: Constraint::Fixed(60.0),
+                                            },
+                                            // 中间导航器主体
+                                            LayoutNode::Pane {
+                                                id: PaneId::NavigatorContainer,
+                                                constraint: Constraint::Fill,
+                                            },
+                                            // 右侧空白区域（与OrderBook对齐）
+                                            LayoutNode::Pane {
+                                                id: PaneId::Custom(
+                                                    "NavigatorRightSpacer".to_string(),
+                                                ),
+                                                constraint: Constraint::Percent(20.0),
+                                            },
+                                        ],
                                     },
                                 ],
                             },
                         ],
-                    },
-                    // 右侧订单簿: 固定宽度20%
-                    LayoutNode::Pane {
-                        id: PaneId::OrderBook,
-                        constraint: Constraint::Percent(20.0),
                     },
                 ],
             },

@@ -70,10 +70,24 @@ impl DataZoomRenderer {
         let (start_x, end_x) =
             self.calculate_visible_range_coords(layout, items_len, visible_start, visible_count);
 
-        let handle_width = 10.0; // 增加手柄的可点击区域
-        if (x - start_x).abs() < handle_width {
+        // 优化手柄检测 - 考虑边界情况
+        let handle_width: f64 = 10.0;
+        let min_distance = handle_width.min(nav_rect.width * 0.05); // 相对手柄大小
+
+        // 处理手柄重叠或接近的情况
+        let left_dist = (x - start_x).abs();
+        let right_dist = (x - end_x).abs();
+
+        if left_dist < min_distance && right_dist < min_distance {
+            // 手柄重叠，根据鼠标位置决定优先级
+            if x - start_x < end_x - x {
+                DragHandleType::Left
+            } else {
+                DragHandleType::Right
+            }
+        } else if left_dist < min_distance {
             DragHandleType::Left
-        } else if (x - end_x).abs() < handle_width {
+        } else if right_dist < min_distance {
             DragHandleType::Right
         } else if x > start_x && x < end_x {
             DragHandleType::Middle
@@ -129,32 +143,59 @@ impl DataZoomRenderer {
         let (initial_start, initial_count) = self.drag_start_visible_range;
         const MIN_VISIBLE_COUNT: usize = 5;
 
-        let (new_start, new_count) = match self.drag_handle_type {
+        let (new_start, new_count, new_handle_type) = match self.drag_handle_type {
             DragHandleType::Left => {
-                // 允许左移手柄越过右边界，但保持最小可见数量
                 let new_start = (initial_start as isize + index_change)
                     .max(0)
                     .min((initial_start + initial_count - MIN_VISIBLE_COUNT) as isize)
                     as usize;
-                let new_count = (initial_start + initial_count) - new_start;
-                (new_start, new_count)
+
+                // 检查是否需要交换手柄
+                if new_start >= (initial_start + initial_count) {
+                    // 左手柄超过右手柄，交换为右手柄
+                    let new_end = new_start;
+                    let new_count = new_end - initial_start;
+                    (initial_start, new_count, DragHandleType::Right)
+                } else {
+                    let new_count = (initial_start + initial_count) - new_start;
+                    (new_start, new_count, DragHandleType::Left)
+                }
             }
             DragHandleType::Right => {
-                // 允许右移手柄越过左边界，但保持最小可见数量
                 let new_end = (initial_start as isize + initial_count as isize + index_change)
                     .max((initial_start + MIN_VISIBLE_COUNT) as isize)
                     .min(items_len as isize) as usize;
-                (initial_start, new_end - initial_start)
+
+                // 检查是否需要交换手柄
+                if new_end <= initial_start {
+                    // 右手柄超过左手柄，交换为左手柄
+                    let new_start = new_end;
+                    let new_count = (initial_start + initial_count) - new_start;
+                    (new_start, new_count, DragHandleType::Left)
+                } else {
+                    let new_count = new_end - initial_start;
+                    (initial_start, new_count, DragHandleType::Right)
+                }
             }
             DragHandleType::Middle => {
                 let new_start = (initial_start as isize + index_change)
                     .max(0)
                     .min((items_len - initial_count) as isize)
                     as usize;
-                (new_start, initial_count)
+                (new_start, initial_count, DragHandleType::Middle)
             }
             DragHandleType::None => return DragResult::None,
         };
+
+        // 更新手柄类型（如果发生交换）
+        self.drag_handle_type = new_handle_type;
+
+        // 更新拖动起始位置和范围，以支持连续拖动
+        if new_handle_type != self.drag_handle_type {
+            // 手柄类型发生交换，更新拖动起始位置
+            self.drag_start_x = x;
+            self.drag_start_visible_range = (new_start, new_count);
+        }
 
         let final_start = new_start.min(items_len.saturating_sub(MIN_VISIBLE_COUNT));
         let final_count = new_count
@@ -186,87 +227,104 @@ impl DataZoomRenderer {
         }
 
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+        let nav_width = nav_rect.width;
+        let nav_height = nav_rect.height;
 
-        // 使用成交量数据创建渐变面积图
-        let volumes: Vec<f64> = items
-            .iter()
-            .map(|item| item.b_vol() + item.s_vol())
-            .collect();
-        let max_volume = volumes.iter().fold(f64::MIN, |max, &v| f64::max(max, v));
+        // 智能采样算法：根据像素密度动态调整采样点
+        let items_len = items.len();
+        let max_pixels = nav_width as usize;
+
+        // 确保采样点不超过像素数量，同时保持数据特征
+        let target_points = max_pixels.min(400); // 限制最大采样点以提高性能
+        let step = (items_len as f64 / target_points as f64).max(1.0) as usize;
+
+        // 快速找到最大成交量 - 使用稀疏采样
+        let mut max_volume: f64 = 0.0;
+        let volume_sample_step = (items_len / 100).max(1);
+        for i in (0..items_len).step_by(volume_sample_step) {
+            let item = items.get(i);
+            max_volume = max_volume.max(item.b_vol() + item.s_vol());
+        }
 
         if max_volume <= 0.0 {
-            return;
+            max_volume = 1.0;
         }
 
-        let num_points = nav_rect.width.floor() as usize;
-        if num_points == 0 {
-            return;
-        }
-
-        // 使用纯色填充
+        // 使用高效的面积图算法
         ctx.begin_path();
         ctx.set_fill_style_str(&theme.volume_area);
-        ctx.set_global_alpha(0.6); // 增加不透明度使背景更明显
+        ctx.set_global_alpha(0.6);
 
-        let mut points: Vec<(f64, f64)> = Vec::with_capacity(num_points);
+        // 预计算采样点坐标
+        let mut sampled_heights = Vec::with_capacity(target_points + 2);
 
-        // 采样点并计算平滑曲线
-        for i in 0..num_points {
-            let start_idx = (i as f64 / num_points as f64 * items.len() as f64).floor() as usize;
-            let end_idx =
-                ((i + 1) as f64 / num_points as f64 * items.len() as f64).floor() as usize;
-            let sub_slice = &volumes[start_idx..end_idx.min(volumes.len())];
+        // 起点
+        sampled_heights.push(nav_rect.y + nav_height);
 
-            let avg_volume = if sub_slice.is_empty() {
-                volumes[0]
+        // 采样并计算平均成交量
+        let _pixel_step = nav_width / target_points as f64;
+
+        for pixel_idx in 0..=target_points {
+            let data_start =
+                ((pixel_idx as f64 / target_points as f64) * items_len as f64) as usize;
+            let data_end =
+                (((pixel_idx + 1) as f64 / target_points as f64) * items_len as f64) as usize;
+
+            let mut volume_sum = 0.0;
+            let mut count = 0;
+
+            // 在数据范围内采样
+            for data_idx in (data_start..data_end.min(items_len)).step_by(step) {
+                let item = items.get(data_idx);
+                volume_sum += item.b_vol() + item.s_vol();
+                count += 1;
+            }
+
+            let avg_volume = if count > 0 {
+                volume_sum / count as f64
             } else {
-                sub_slice.iter().sum::<f64>() / sub_slice.len() as f64
+                0.0
             };
+            let normalized_height = (avg_volume / max_volume).min(0.9); // 顶部留10%边距
+            let y = nav_rect.y + nav_height * (1.0 - normalized_height);
 
-            let x = nav_rect.x + i as f64;
-            // 成交量高度标准化（0到1之间）
-            let normalized_volume = avg_volume / max_volume;
-            // 成交量越大，Y坐标越小（越靠近顶部）
-            let y = nav_rect.y + nav_rect.height * (1.0 - normalized_volume);
-            points.push((x, y));
+            sampled_heights.push(y);
         }
 
-        if points.is_empty() {
-            return;
+        // 终点
+        sampled_heights.push(nav_rect.y + nav_height);
+
+        // 高效绘制面积图 - 使用直线连接
+        let x_step = nav_width / target_points as f64;
+        ctx.move_to(nav_rect.x, sampled_heights[0]);
+
+        for i in 0..=target_points {
+            let x = nav_rect.x + i as f64 * x_step;
+            ctx.line_to(x, sampled_heights[i + 1]);
         }
 
-        // 绘制平滑的贝塞尔曲线面积图
-        ctx.move_to(nav_rect.x, nav_rect.y + nav_rect.height);
-        ctx.line_to(points[0].0, points[0].1);
-
-        // 使用二次贝塞尔曲线创建平滑过渡
-        for i in 1..points.len() {
-            let prev = points[i - 1];
-            let curr = points[i];
-            let ctrl_x = (prev.0 + curr.0) / 2.0;
-            let ctrl_y = (prev.1 + curr.1) / 2.0;
-            ctx.quadratic_curve_to(ctrl_x, ctrl_y, curr.0, curr.1);
-        }
-
-        ctx.line_to(nav_rect.x + nav_rect.width, points.last().unwrap().1);
-        ctx.line_to(nav_rect.x + nav_rect.width, nav_rect.y + nav_rect.height);
+        ctx.line_to(nav_rect.x + nav_width, *sampled_heights.last().unwrap());
+        ctx.line_to(nav_rect.x + nav_width, nav_rect.y + nav_height);
         ctx.close_path();
         ctx.fill();
 
-        // 绘制顶部线条
-        ctx.begin_path();
-        ctx.set_stroke_style_str(&theme.volume_line);
-        ctx.set_line_width(1.0);
-        ctx.set_global_alpha(0.8);
-        ctx.move_to(points[0].0, points[0].1);
-        for i in 1..points.len() {
-            let prev = points[i - 1];
-            let curr = points[i];
-            let ctrl_x = (prev.0 + curr.0) / 2.0;
-            let ctrl_y = (prev.1 + curr.1) / 2.0;
-            ctx.quadratic_curve_to(ctrl_x, ctrl_y, curr.0, curr.1);
+        // 仅在采样点较少时绘制顶部线条
+        if target_points <= 200 {
+            ctx.begin_path();
+            ctx.set_stroke_style_str(&theme.volume_line);
+            ctx.set_line_width(1.0);
+            ctx.set_global_alpha(0.8);
+
+            for i in 0..=target_points {
+                let x = nav_rect.x + i as f64 * x_step;
+                if i == 0 {
+                    ctx.move_to(x, sampled_heights[i + 1]);
+                } else {
+                    ctx.line_to(x, sampled_heights[i + 1]);
+                }
+            }
+            ctx.stroke();
         }
-        ctx.stroke();
 
         // 重置透明度
         ctx.set_global_alpha(1.0);
@@ -551,15 +609,27 @@ impl RenderStrategy for DataZoomRenderer {
             return CursorStyle::Default;
         }
 
-        match self.get_handle_at_position(
-            x,
-            y,
-            &ctx.layout().borrow(),
-            &ctx.data_manager().borrow(),
-        ) {
+        // 优化鼠标样式检测，使用缓存布局避免重复计算
+        let handle_type = self.get_handle_at_position(x, y, &layout, &ctx.data_manager().borrow());
+
+        // 根据手柄位置和状态提供清晰的视觉反馈
+        match handle_type {
             DragHandleType::Left | DragHandleType::Right => CursorStyle::EwResize,
             DragHandleType::Middle => CursorStyle::Grab,
-            _ => CursorStyle::Default,
+            DragHandleType::None => {
+                // 当鼠标在导航器区域但不在任何手柄上时，检查是否在可点击区域
+                let items_len = ctx
+                    .data_manager()
+                    .borrow()
+                    .get_items()
+                    .map_or(0, |items| items.len());
+                if items_len > 0 {
+                    // 提供点击提示光标
+                    CursorStyle::Pointer
+                } else {
+                    CursorStyle::Default
+                }
+            }
         }
     }
 }
