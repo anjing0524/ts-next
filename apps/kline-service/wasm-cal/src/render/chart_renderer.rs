@@ -304,7 +304,7 @@ impl ChartRenderer {
 
             // 计算有效交互区域的底部边界
             let valid_interaction_bottom =
-                heatmap_area_rect.y() + heatmap_area_rect.height() + volume_chart_rect.height();
+                heatmap_area_rect.y + heatmap_area_rect.height + volume_chart_rect.height;
 
             // 检查是否在订单簿区域内，并且在K线图+成交量图的垂直范围内
             let is_in_order_book = order_book_rect.contains(x, y) && y < valid_interaction_bottom;

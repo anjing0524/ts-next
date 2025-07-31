@@ -3,7 +3,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::data::DataManager;
-use crate::layout::{ChartLayout, CoordinateMapper, PaneId, Rect};
+use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use std::cell::Cell;
@@ -75,7 +75,7 @@ impl BookRenderer {
         let (bins, max_volume) = if should_recalculate {
             // 重新计算
             let item = items.get(idx);
-            let last_price = item.last_price();
+            let _last_price = item.last_price();
             let volumes = match item.volumes() {
                 Some(v) => v,
                 None => return,
@@ -226,29 +226,6 @@ impl BookRenderer {
     pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
         let rect = layout.get_rect(&PaneId::OrderBook);
         ctx.clear_rect(rect.x, rect.y, rect.width, rect.height);
-    }
-
-    /// 检查价格是否在OrderBook可见区域内
-    fn is_price_visible_in_book_area(
-        &self,
-        price: f64,
-        book_rect: &Rect,
-        price_rect: &Rect,
-        min_low: f64,
-        max_high: f64,
-    ) -> bool {
-        // 计算价格在主图中的相对位置（0-1）
-        let relative_pos = if max_high > min_low {
-            ((price - min_low) / (max_high - min_low)).clamp(0.0, 1.0)
-        } else {
-            0.5
-        };
-
-        // 映射到OrderBook区域的Y坐标
-        let y_in_book = book_rect.y + relative_pos * book_rect.height;
-
-        // 检查是否在OrderBook区域内
-        y_in_book >= book_rect.y && y_in_book <= book_rect.y + book_rect.height
     }
 
     pub fn reset_cache(&self) {
