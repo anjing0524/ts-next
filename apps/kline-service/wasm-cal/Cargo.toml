@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 web-sys = { version = "0.3.77", features = [
   "OffscreenCanvas",
-  "OffscreenCanvasRenderingContext2d",  
+  "OffscreenCanvasRenderingContext2d",
   "CanvasRenderingContext2d",
   "HtmlCanvasElement",
   "console",
@@ -20,8 +20,8 @@ web-sys = { version = "0.3.77", features = [
   "WheelEvent",
   "TextMetrics",
   "Performance",
-  "Window"
-]}
+  "Window",
+] }
 js-sys = "0.3.77"
 wasm-bindgen = "0.2.100"
 flatbuffers = "25.2.10"
@@ -32,7 +32,7 @@ console_error_panic_hook = "0.1.7"
 chrono = { version = "0.4.40" }
 ordered-float = "5.0.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1.0.141"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.39"

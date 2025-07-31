@@ -1,4 +1,6 @@
 //! DataZoom导航器模块 - 负责绘制和处理数据缩放导航器
+//!
+//! 导航器显示成交量面积图作为背景，帮助用户快速识别成交量密集区域。
 
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
@@ -129,6 +131,7 @@ impl DataZoomRenderer {
 
         let (new_start, new_count) = match self.drag_handle_type {
             DragHandleType::Left => {
+                // 允许左移手柄越过右边界，但保持最小可见数量
                 let new_start = (initial_start as isize + index_change)
                     .max(0)
                     .min((initial_start + initial_count - MIN_VISIBLE_COUNT) as isize)
@@ -137,6 +140,7 @@ impl DataZoomRenderer {
                 (new_start, new_count)
             }
             DragHandleType::Right => {
+                // 允许右移手柄越过左边界，但保持最小可见数量
                 let new_end = (initial_start as isize + initial_count as isize + index_change)
                     .max((initial_start + MIN_VISIBLE_COUNT) as isize)
                     .min(items_len as isize) as usize;
@@ -183,12 +187,14 @@ impl DataZoomRenderer {
 
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
-        // 使用收盘价数据创建平滑面积图，更符合金融图表惯例
-        let prices: Vec<f64> = items.iter().map(|item| item.close()).collect();
-        let min_price = prices.iter().fold(f64::MAX, |min, &p| f64::min(min, p));
-        let max_price = prices.iter().fold(f64::MIN, |max, &p| f64::max(max, p));
+        // 使用成交量数据创建渐变面积图
+        let volumes: Vec<f64> = items
+            .iter()
+            .map(|item| item.b_vol() + item.s_vol())
+            .collect();
+        let max_volume = volumes.iter().fold(f64::MIN, |max, &v| f64::max(max, v));
 
-        if min_price >= max_price {
+        if max_volume <= 0.0 {
             return;
         }
 
@@ -197,10 +203,10 @@ impl DataZoomRenderer {
             return;
         }
 
-        // 使用平滑的贝塞尔曲线创建面积图
+        // 使用纯色填充
         ctx.begin_path();
         ctx.set_fill_style_str(&theme.volume_area);
-        ctx.set_global_alpha(0.3); // 设置透明度使背景更柔和
+        ctx.set_global_alpha(0.6); // 增加不透明度使背景更明显
 
         let mut points: Vec<(f64, f64)> = Vec::with_capacity(num_points);
 
@@ -209,17 +215,19 @@ impl DataZoomRenderer {
             let start_idx = (i as f64 / num_points as f64 * items.len() as f64).floor() as usize;
             let end_idx =
                 ((i + 1) as f64 / num_points as f64 * items.len() as f64).floor() as usize;
-            let sub_slice = &prices[start_idx..end_idx.min(prices.len())];
+            let sub_slice = &volumes[start_idx..end_idx.min(volumes.len())];
 
-            let avg_price = if sub_slice.is_empty() {
-                prices[0]
+            let avg_volume = if sub_slice.is_empty() {
+                volumes[0]
             } else {
                 sub_slice.iter().sum::<f64>() / sub_slice.len() as f64
             };
 
             let x = nav_rect.x + i as f64;
-            let normalized_price = (avg_price - min_price) / (max_price - min_price);
-            let y = nav_rect.y + nav_rect.height * (1.0 - normalized_price);
+            // 成交量高度标准化（0到1之间）
+            let normalized_volume = avg_volume / max_volume;
+            // 成交量越大，Y坐标越小（越靠近顶部）
+            let y = nav_rect.y + nav_rect.height * (1.0 - normalized_volume);
             points.push((x, y));
         }
 
@@ -244,6 +252,21 @@ impl DataZoomRenderer {
         ctx.line_to(nav_rect.x + nav_rect.width, nav_rect.y + nav_rect.height);
         ctx.close_path();
         ctx.fill();
+
+        // 绘制顶部线条
+        ctx.begin_path();
+        ctx.set_stroke_style_str(&theme.volume_line);
+        ctx.set_line_width(1.0);
+        ctx.set_global_alpha(0.8);
+        ctx.move_to(points[0].0, points[0].1);
+        for i in 1..points.len() {
+            let prev = points[i - 1];
+            let curr = points[i];
+            let ctrl_x = (prev.0 + curr.0) / 2.0;
+            let ctrl_y = (prev.1 + curr.1) / 2.0;
+            ctx.quadratic_curve_to(ctrl_x, ctrl_y, curr.0, curr.1);
+        }
+        ctx.stroke();
 
         // 重置透明度
         ctx.set_global_alpha(1.0);
@@ -281,59 +304,113 @@ impl DataZoomRenderer {
         let (start_x, end_x) = self.calculate_visible_range_coords(layout, items_len, start, count);
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
-        // 绘制半透明遮罩，表示不可见区域
-        ctx.set_fill_style_str(&theme.navigator_mask);
-        ctx.set_global_alpha(0.3); // 提高透明度以更清晰地显示范围
+        // 绘制半透明遮罩，使用纯色
+        ctx.set_fill_style_str("rgba(180, 180, 180, 0.3)");
         ctx.fill_rect(
             nav_rect.x,
             nav_rect.y,
             start_x - nav_rect.x,
             nav_rect.height,
         );
+
+        ctx.set_fill_style_str("rgba(180, 180, 180, 0.3)");
         ctx.fill_rect(
             end_x,
             nav_rect.y,
             nav_rect.x + nav_rect.width - end_x,
             nav_rect.height,
         );
-        ctx.set_global_alpha(1.0);
 
         // 绘制选中区域的边框
         ctx.set_stroke_style_str(&theme.navigator_border);
-        ctx.set_line_width(2.0); // 增加边框宽度以提高可见性
+        ctx.set_line_width(2.0);
         ctx.stroke_rect(start_x, nav_rect.y, end_x - start_x, nav_rect.height);
 
-        // 绘制拖拽手柄，区分不同状态
-        let handle_width = 6.0; // 增加手柄宽度以提高可点击性
-        let active_color = if self.is_dragging {
+        // 绘制拖拽手柄，使用纯色
+        let handle_width = 8.0;
+        let handle_height = nav_rect.height - 8.0;
+        let handle_y = nav_rect.y + 4.0;
+
+        let handle_color = if self.is_dragging {
             &theme.navigator_active_handle
         } else {
             &theme.navigator_handle
         };
 
-        ctx.set_fill_style_str(active_color);
+        ctx.set_fill_style_str(handle_color);
 
-        // 左侧手柄
-        ctx.fill_rect(
+        // 左侧手柄（圆角矩形）
+        self.draw_rounded_rect(
+            ctx,
             start_x - handle_width / 2.0,
-            nav_rect.y + 2.0,
+            handle_y,
             handle_width,
-            nav_rect.height - 4.0,
+            handle_height,
+            2.0,
         );
+        ctx.fill();
 
-        // 右侧手柄
-        ctx.fill_rect(
+        // 右侧手柄（圆角矩形）
+        self.draw_rounded_rect(
+            ctx,
             end_x - handle_width / 2.0,
-            nav_rect.y + 2.0,
+            handle_y,
             handle_width,
-            nav_rect.height - 4.0,
+            handle_height,
+            2.0,
         );
+        ctx.fill();
 
-        // 绘制选中区域的高亮背景
-        ctx.set_fill_style_str(&theme.navigator_active_handle);
-        ctx.set_global_alpha(0.1);
+        // 绘制选中区域的高亮背景，使用纯色
+        ctx.set_fill_style_str("rgba(92, 124, 250, 0.1)");
+        ctx.set_global_alpha(0.8);
         ctx.fill_rect(start_x, nav_rect.y, end_x - start_x, nav_rect.height);
         ctx.set_global_alpha(1.0);
+
+        // 绘制手柄边框
+        ctx.set_stroke_style_str(&theme.navigator_border);
+        ctx.set_line_width(1.0);
+        self.draw_rounded_rect(
+            ctx,
+            start_x - handle_width / 2.0,
+            handle_y,
+            handle_width,
+            handle_height,
+            2.0,
+        );
+        ctx.stroke();
+        self.draw_rounded_rect(
+            ctx,
+            end_x - handle_width / 2.0,
+            handle_y,
+            handle_width,
+            handle_height,
+            2.0,
+        );
+        ctx.stroke();
+    }
+
+    /// 绘制圆角矩形的辅助函数
+    fn draw_rounded_rect(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        radius: f64,
+    ) {
+        ctx.begin_path();
+        ctx.move_to(x + radius, y);
+        ctx.line_to(x + width - radius, y);
+        ctx.quadratic_curve_to(x + width, y, x + width, y + radius);
+        ctx.line_to(x + width, y + height - radius);
+        ctx.quadratic_curve_to(x + width, y + height, x + width - radius, y + height);
+        ctx.line_to(x + radius, y + height);
+        ctx.quadratic_curve_to(x, y + height, x, y + height - radius);
+        ctx.line_to(x, y + radius);
+        ctx.quadratic_curve_to(x, y, x + radius, y);
+        ctx.close_path();
     }
 }
 
