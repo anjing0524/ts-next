@@ -295,7 +295,6 @@ impl ChartRenderer {
         let (needs_render, hover_changed, is_in_chart, new_hover_index) = {
             // --- 借用作用域开始 ---
             let layout = self.chart_layout.borrow();
-            let drawing_area = layout.get_rect(&PaneId::DrawingArea);
             let order_book_rect = layout.get_rect(&PaneId::OrderBook);
 
             // 获取K线/热图和成交量图的区域
@@ -309,8 +308,10 @@ impl ChartRenderer {
             // 检查是否在订单簿区域内，并且在K线图+成交量图的垂直范围内
             let is_in_order_book = order_book_rect.contains(x, y) && y < valid_interaction_bottom;
 
-            // 只有在主图形区域（非订单簿区域）时才认为在图表内
-            let is_currently_in_chart = drawing_area.contains(x, y) && !is_in_order_book;
+            // 只有在主图或成交量图区域时才认为在图表内（用于计算hover_index）
+            let is_in_main_or_volume =
+                heatmap_area_rect.contains(x, y) || volume_chart_rect.contains(x, y);
+            let is_currently_in_chart = is_in_main_or_volume && !is_in_order_book;
 
             let mut new_idx = None;
             if is_currently_in_chart {
