@@ -192,6 +192,10 @@ pub struct UnifiedRenderContext {
     pub viewport: ViewportInfo,
     /// 鼠标悬浮的K线索引（用于订单簿等需要悬浮状态的渲染器）
     pub hover_index: Option<usize>,
+    /// 鼠标X坐标
+    pub mouse_x: f64,
+    /// 鼠标Y坐标
+    pub mouse_y: f64,
 }
 
 impl UnifiedRenderContext {
@@ -208,6 +212,8 @@ impl UnifiedRenderContext {
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
             hover_index: None,
+            mouse_x: 0.0,
+            mouse_y: 0.0,
         }
     }
 
@@ -225,6 +231,8 @@ impl UnifiedRenderContext {
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
             hover_index,
+            mouse_x: 0.0,
+            mouse_y: 0.0,
         }
     }
 
@@ -236,6 +244,12 @@ impl UnifiedRenderContext {
     /// 设置悬浮索引
     pub fn set_hover_index(&mut self, hover_index: Option<usize>) {
         self.hover_index = hover_index;
+    }
+
+    /// 设置鼠标位置
+    pub fn set_mouse_position(&mut self, x: f64, y: f64) {
+        self.mouse_x = x;
+        self.mouse_y = y;
     }
 
     /// 获取绘制上下文

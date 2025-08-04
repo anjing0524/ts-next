@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateBearer, type AuthContext } from './lib/auth/bearer-auth';
 import { permissionMap } from './lib/permission-map';
+// 确保应用初始化模块被加载
+import './lib/app-init';
 
 export const config = {
   matcher: '/api/v2/:path*',

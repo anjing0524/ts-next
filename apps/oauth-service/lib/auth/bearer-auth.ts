@@ -3,7 +3,11 @@
 
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
-// import { RBACService } from './services/rbac-service'; // 临时注释，Edge Runtime 不兼容
+import { prisma } from '@repo/database';
+
+// 简单的内存缓存（仅用于请求级别）
+const permissionCache = new Map<string, { permissions: string[]; timestamp: number }>();
+const CACHE_TTL = 60000; // 1分钟缓存
 
 /**
  * 认证上下文接口
@@ -110,15 +114,60 @@ export async function authenticateBearer(
   const clientId = jwtValidatedPayload.client_id as string;
   const scopes = (jwtValidatedPayload.scope as string)?.split(' ') || [];
 
-  // 获取用户权限 (临时注释 RBACService 调用，Edge Runtime 不兼容)
+  // 获取用户权限（带简单缓存）
   const permissions: string[] = [];
-  // try {
-  //   const userPermissions = await RBACService.getUserPermissions(userId);
-  //   permissions = userPermissions ? userPermissions.permissions : [];
-  // } catch (error) {
-  //   console.error('Failed to get user permissions:', error);
-  //   // 在权限获取失败时，继续处理但权限为空
-  // }
+  if (userId) {
+    try {
+      // 检查缓存
+      const cached = permissionCache.get(userId);
+      const now = Date.now();
+      
+      if (cached && now - cached.timestamp < CACHE_TTL) {
+        permissions.push(...cached.permissions);
+      } else {
+        // 直接使用 Prisma 查询用户权限
+        const user = await prisma.user.findUnique({
+          where: { id: userId, isActive: true },
+          include: {
+            userRoles: {
+              include: {
+                role: {
+                  include: {
+                    rolePermissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (user) {
+          // 收集所有权限（去重）
+          const permissionSet = new Set<string>();
+          user.userRoles.forEach((userRole) => {
+            userRole.role.rolePermissions.forEach((rolePermission) => {
+              permissionSet.add(rolePermission.permission.name);
+            });
+          });
+          const userPermissions = Array.from(permissionSet);
+          permissions.push(...userPermissions);
+          
+          // 更新缓存
+          permissionCache.set(userId, {
+            permissions: userPermissions,
+            timestamp: now,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get user permissions:', error);
+      // 在权限获取失败时，继续处理但权限为空
+    }
+  }
 
   // 检查所需权限
   if (options.requiredPermissions && options.requiredPermissions.length > 0) {

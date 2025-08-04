@@ -97,13 +97,44 @@ export class RBACService {
     return result;
   }
 
-  /** 获取用户权限 */
+  /** 获取用户权限（优化版本，避免缓存依赖） */
   static async getUserPermissionsArr(userId: string): Promise<string[]> {
     try {
-      const userPermissions = await RBACService.getUserPermissions(userId);
-      const permissions = userPermissions?.permissions || [];
-      const permissionsSet = new Set(permissions.filter((p): p is string => typeof p === 'string'));
-      return Array.from(permissionsSet);
+      // 直接查询数据库，避免缓存层的问题
+      const user = await prisma.user.findUnique({
+        where: { id: userId, isActive: true },
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return [];
+      }
+
+      // 收集所有权限（去重）
+      const permissionSet = new Set<string>();
+      user.userRoles.forEach((userRole) => {
+        userRole.role.rolePermissions.forEach((rolePermission) => {
+          if (rolePermission.permission && rolePermission.permission.name) {
+            permissionSet.add(rolePermission.permission.name);
+          }
+        });
+      });
+
+      return Array.from(permissionSet);
     } catch (error) {
       console.error('Error getting user permissions:', error);
       return [];

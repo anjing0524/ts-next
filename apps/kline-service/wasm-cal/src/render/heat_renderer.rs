@@ -98,12 +98,23 @@ impl HeatRenderer {
                 }
 
                 let price_low = min_low + bin_idx as f64 * tick;
-                let y = y_mapper.map_y(price_low);
-                let rect_height = (y_mapper.map_y(price_low + tick) - y).abs();
+                let price_high = price_low + tick;
 
-                ctx.set_global_alpha(0.25 + 0.75 * norm);
-                ctx.set_fill_style_str(self.get_cached_color(norm));
-                ctx.fill_rect(x, y - rect_height, layout.total_candle_width, rect_height);
+                // --- FIX START: Calculate and clamp coordinates precisely ---
+                let y_bottom = y_mapper.map_y(price_low);
+                let y_top = y_mapper.map_y(price_high);
+
+                let draw_y_top = y_top.max(price_rect.y);
+                let draw_y_bottom = y_bottom.min(price_rect.y + price_rect.height);
+
+                let draw_height = draw_y_bottom - draw_y_top;
+
+                if draw_height > 0.0 {
+                    ctx.set_global_alpha(0.25 + 0.75 * norm);
+                    ctx.set_fill_style_str(self.get_cached_color(norm));
+                    ctx.fill_rect(x, draw_y_top, layout.total_candle_width, draw_height);
+                }
+                // --- FIX END ---
             }
         }
         ctx.set_global_alpha(1.0);

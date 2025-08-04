@@ -43,6 +43,10 @@ pub struct ChartRenderer {
     hover_candle_index: Option<usize>,
     /// 鼠标是否在图表区域内
     mouse_in_chart: bool,
+    /// 鼠标X坐标
+    mouse_x: f64,
+    /// 鼠标Y坐标
+    mouse_y: f64,
 }
 
 impl ChartRenderer {
@@ -86,6 +90,8 @@ impl ChartRenderer {
             canvas_size,
             hover_candle_index: None,
             mouse_in_chart: false,
+            mouse_x: 0.0,
+            mouse_y: 0.0,
         };
 
         if let Some(_data) = parsed_data {
@@ -236,6 +242,7 @@ impl ChartRenderer {
 
         let mut render_context = RenderContext::new(self.shared_state.clone(), None, self.mode);
         render_context.set_hover_index(self.hover_candle_index);
+        render_context.set_mouse_position(self.mouse_x, self.mouse_y);
 
         if let Err(e) =
             self.strategy_factory
@@ -259,6 +266,9 @@ impl ChartRenderer {
 
     /// 处理鼠标移动
     pub fn handle_mouse_move(&mut self, x: f64, y: f64) {
+        self.mouse_x = x;
+        self.mouse_y = y;
+
         let (needs_overlay_render, hover_changed, is_in_chart, new_hover_index) = {
             let layout = self.shared_state.layout.borrow();
             let heatmap_area_rect = layout.get_rect(&PaneId::HeatmapArea);

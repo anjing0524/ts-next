@@ -148,13 +148,13 @@ export function GlobalErrorHandler() {
   const getErrorIcon = (type: ErrorInfo['type']) => {
     switch (type) {
       case 'auth':
-        return <XCircle className=\"h-5 w-5 text-red-500\" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
       case 'network':
-        return <WifiOff className=\"h-5 w-5 text-orange-500\" />;
+        return <WifiOff className="h-5 w-5 text-orange-500" />;
       case 'api':
-        return <AlertTriangle className=\"h-5 w-5 text-yellow-500\" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       default:
-        return <XCircle className=\"h-5 w-5 text-red-500\" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
     }
   };
 
@@ -180,14 +180,14 @@ export function GlobalErrorHandler() {
   }
 
   return (
-    <div className=\"fixed top-4 right-4 z-50 space-y-2 max-w-md\">
+    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
       {visibleErrors.map((error) => (
         <Card key={error.timestamp} className={`${getErrorColor(error.type)} shadow-lg`}>
-          <CardHeader className=\"pb-2\">
-            <div className=\"flex items-center justify-between\">
-              <div className=\"flex items-center space-x-2\">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
                 {getErrorIcon(error.type)}
-                <CardTitle className=\"text-sm font-medium\">
+                <CardTitle className="text-sm font-medium">
                   {error.type === 'auth' && '认证错误'}
                   {error.type === 'network' && '网络错误'}
                   {error.type === 'api' && 'API 错误'}
@@ -196,32 +196,32 @@ export function GlobalErrorHandler() {
               </div>
               <button
                 onClick={() => dismissError(error.timestamp)}
-                className=\"text-gray-400 hover:text-gray-600 transition-colors\"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <XCircle className=\"h-4 w-4\" />
+                <XCircle className="h-4 w-4" />
               </button>
             </div>
-            <CardDescription className=\"text-xs\">
+            <CardDescription className="text-xs">
               {error.message}
             </CardDescription>
           </CardHeader>
           {error.details && (
-            <CardContent className=\"pt-0\">
-              <div className=\"text-xs text-gray-600 bg-white p-2 rounded border\"
+            <CardContent className="pt-0">
+              <div className="text-xs text-gray-600 bg-white p-2 rounded border"
                    style={{ maxHeight: '100px', overflowY: 'auto' }}>
                 {error.details}
               </div>
             </CardContent>
           )}
           {error.retryable && (
-            <CardContent className=\"pt-0\">
+            <CardContent className="pt-0">
               <Button
                 onClick={() => retryError(error)}
-                size=\"sm\"
-                className=\"w-full\"
-                variant=\"outline\"
+                size="sm"
+                className="w-full"
+                variant="outline"
               >
-                <RefreshCw className=\"h-3 w-3 mr-1\" />
+                <RefreshCw className="h-3 w-3 mr-1" />
                 重试
               </Button>
             </CardContent>

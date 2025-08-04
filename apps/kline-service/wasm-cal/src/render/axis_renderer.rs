@@ -268,8 +268,10 @@ impl AxisRenderer {
         ctx.set_stroke_style_str(&theme.border);
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        ctx.move_to(time_axis_rect.x, time_axis_rect.y);
-        ctx.line_to(time_axis_rect.x + time_axis_rect.width, time_axis_rect.y);
+        // --- FIX START: Align X-axis line with the main chart area ---
+        ctx.move_to(main_chart_rect.x, time_axis_rect.y);
+        ctx.line_to(main_chart_rect.x + main_chart_rect.width, time_axis_rect.y);
+        // --- FIX END ---
         ctx.stroke();
 
         let max_labels = (main_chart_rect.width / MIN_LABEL_SPACING).floor() as usize;

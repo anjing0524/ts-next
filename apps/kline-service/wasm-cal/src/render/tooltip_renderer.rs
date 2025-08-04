@@ -86,6 +86,10 @@ impl TooltipRenderer {
         theme: &ChartTheme,
         layout: &ChartLayout,
     ) {
+        if lines.is_empty() {
+            return;
+        }
+
         let line_height = 18.0;
         let padding = 10.0;
         let mut max_width = 0.0;
@@ -104,21 +108,30 @@ impl TooltipRenderer {
         let box_height = lines.len() as f64 * line_height + padding * 2.0;
 
         let root_rect = layout.get_rect(&PaneId::Root);
-        let mut box_x = x + 15.0;
-        let mut box_y = y + 15.0;
+        let mut box_x = x + 20.0; // 增加与光标的距离
+        let mut box_y = y + 20.0;
 
+        // 确保Tooltip不会超出画布边界
         if box_x + box_width > root_rect.x + root_rect.width {
-            box_x = x - box_width - 15.0;
+            box_x = x - box_width - 20.0;
         }
         if box_y + box_height > root_rect.y + root_rect.height {
-            box_y = y - box_height - 15.0;
+            box_y = y - box_height - 20.0;
+        }
+        // 确保不会绘制到画布左侧或顶部之外
+        if box_x < root_rect.x {
+            box_x = root_rect.x;
+        }
+        if box_y < root_rect.y {
+            box_y = root_rect.y;
         }
 
         ctx.set_fill_style_str(&theme.tooltip_bg);
         ctx.set_stroke_style_str(&theme.tooltip_border);
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        ctx.rect(box_x, box_y, box_width, box_height);
+        // 使用圆角矩形，更美观
+        self.draw_rounded_rect(ctx, box_x, box_y, box_width, box_height, 5.0);
         ctx.fill();
         ctx.stroke();
 
@@ -133,6 +146,28 @@ impl TooltipRenderer {
                 box_y + padding + i as f64 * line_height,
             );
         }
+    }
+
+    /// 绘制圆角矩形
+    fn draw_rounded_rect(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        radius: f64,
+    ) {
+        ctx.move_to(x + radius, y);
+        ctx.line_to(x + width - radius, y);
+        ctx.quadratic_curve_to(x + width, y, x + width, y + radius);
+        ctx.line_to(x + width, y + height - radius);
+        ctx.quadratic_curve_to(x + width, y + height, x + width - radius, y + height);
+        ctx.line_to(x + radius, y + height);
+        ctx.quadratic_curve_to(x, y + height, x, y + height - radius);
+        ctx.line_to(x, y + radius);
+        ctx.quadratic_curve_to(x, y, x + radius, y);
+        ctx.close_path();
     }
 
     /// 获取K线图模式的Tooltip文本

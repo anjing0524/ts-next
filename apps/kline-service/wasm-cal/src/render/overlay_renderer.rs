@@ -20,12 +20,6 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 交互层渲染器 - 只负责十字线绘制和鼠标事件处理
 pub struct OverlayRenderer {
-    // 鼠标是否在图表区域内
-    mouse_in_chart: bool,
-    // 当前鼠标X坐标
-    mouse_x: f64,
-    // 当前鼠标Y坐标
-    mouse_y: f64,
     // Tooltip渲染器
     tooltip_renderer: TooltipRenderer,
     dash_array: Option<js_sys::Array>,
@@ -44,9 +38,6 @@ impl OverlayRenderer {
         let dash_array = js_sys::Array::of2(&4.0.into(), &4.0.into());
         let empty_array = js_sys::Array::new();
         Self {
-            mouse_in_chart: false,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
             tooltip_renderer: TooltipRenderer::new(),
             dash_array: Some(dash_array),
             empty_array: Some(empty_array),
@@ -55,7 +46,8 @@ impl OverlayRenderer {
 
     /// 绘制交互层 - 只绘制十字线和tooltip
     pub fn draw(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
-        if self.mouse_in_chart {
+        // 仅当有有效的悬浮索引时才绘制
+        if render_ctx.hover_index.is_some() {
             self.draw_crosshair_with_labels(ctx, render_ctx);
             self.draw_tooltip(ctx, render_ctx);
         }
@@ -75,44 +67,43 @@ impl OverlayRenderer {
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
         let book_rect = layout.get_rect(&PaneId::OrderBook);
 
-        if main_chart_rect.contains(self.mouse_x, self.mouse_y) {
-            self.tooltip_renderer.draw_main_chart_tooltip(
-                ctx,
-                &layout,
-                items,
-                render_ctx.hover_index, // 使用来自RenderContext的hover_index
-                self.mouse_x,
-                self.mouse_y,
-                render_ctx.mode,
-                min_low,
-                max_high,
-                tick,
-                render_ctx.theme_ref(),
-            );
-        }
+        if let Some(hover_index) = render_ctx.hover_index {
+            if hover_index >= items.len() {
+                return;
+            }
 
-        if book_rect.contains(self.mouse_x, self.mouse_y) {
-            if let Some(hover_index) = render_ctx.hover_index {
-                // 使用来自RenderContext的hover_index
-                if hover_index < items.len() {
-                    let item = items.get(hover_index);
-                    let price_mapper =
-                        CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 0.0);
-                    let price = price_mapper.unmap_y(self.mouse_y);
-                    if let Some(volume) =
-                        self.calculate_volume_for_price(&item, price, min_low, tick)
-                    {
-                        self.tooltip_renderer.draw_book_tooltip(
-                            ctx,
-                            &layout,
-                            item.timestamp().into(),
-                            price,
-                            volume,
-                            self.mouse_x,
-                            self.mouse_y,
-                            render_ctx.theme_ref(),
-                        );
-                    }
+            if main_chart_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
+                self.tooltip_renderer.draw_main_chart_tooltip(
+                    ctx,
+                    &layout,
+                    items,
+                    Some(hover_index),
+                    render_ctx.mouse_x,
+                    render_ctx.mouse_y,
+                    render_ctx.mode,
+                    min_low,
+                    max_high,
+                    tick,
+                    render_ctx.theme_ref(),
+                );
+            }
+
+            if book_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
+                let item = items.get(hover_index);
+                let price_mapper =
+                    CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 0.0);
+                let price = price_mapper.unmap_y(render_ctx.mouse_y);
+                if let Some(volume) = self.calculate_volume_for_price(&item, price, min_low, tick) {
+                    self.tooltip_renderer.draw_book_tooltip(
+                        ctx,
+                        &layout,
+                        item.timestamp().into(),
+                        price,
+                        volume,
+                        render_ctx.mouse_x,
+                        render_ctx.mouse_y,
+                        render_ctx.theme_ref(),
+                    );
                 }
             }
         }
@@ -164,7 +155,7 @@ impl OverlayRenderer {
         let time_axis_rect = layout.get_rect(&PaneId::TimeAxis);
 
         // 水平线
-        let mouse_y_constrained = self
+        let mouse_y_constrained = render_ctx
             .mouse_y
             .max(main_chart_rect.y)
             .min(_volume_rect.y + _volume_rect.height);
@@ -177,7 +168,7 @@ impl OverlayRenderer {
         ctx.stroke();
 
         // 垂直线
-        let mouse_x_constrained = self
+        let mouse_x_constrained = render_ctx
             .mouse_x
             .max(main_chart_rect.x)
             .min(main_chart_rect.x + main_chart_rect.width);
@@ -206,7 +197,7 @@ impl OverlayRenderer {
         );
 
         // 绘制成交量轴标签
-        if _volume_rect.contains(self.mouse_x, self.mouse_y) {
+        if _volume_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
             let volume_mapper =
                 CoordinateMapper::new_for_y_axis(_volume_rect, 0.0, max_volume, 2.0);
             let volume = volume_mapper.unmap_y(mouse_y_constrained);
@@ -293,26 +284,16 @@ impl RenderStrategy for OverlayRenderer {
         90
     }
 
-    fn handle_mouse_move(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
-        let layout = ctx.layout_ref();
-        let drawing_area = layout.get_rect(&PaneId::DrawingArea);
-
-        let is_in_chart = drawing_area.contains(x, y);
-        let needs_redraw = self.mouse_in_chart != is_in_chart;
-
-        self.mouse_x = x;
-        self.mouse_y = y;
-        self.mouse_in_chart = is_in_chart;
-
-        needs_redraw || is_in_chart // 如果在图表内移动，也需要重绘十字线
+    fn handle_mouse_move(&mut self, _x: f64, _y: f64, _ctx: &RenderContext) -> bool {
+        // 状态管理已移至ChartRenderer，此渲染器仅负责绘制
+        // 返回true表示鼠标移动时总是需要检查重绘（由ChartRenderer决定）
+        true
     }
 
     fn handle_mouse_leave(&mut self, _ctx: &RenderContext) -> bool {
-        if self.mouse_in_chart {
-            self.mouse_in_chart = false;
-            return true; // 需要重绘以清除十字线
-        }
-        false
+        // 状态管理已移至ChartRenderer，此渲染器仅负责绘制
+        // 返回true以确保清除十字线
+        true
     }
 
     fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {

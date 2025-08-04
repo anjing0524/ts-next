@@ -1,8 +1,11 @@
-const nextJest = require('next/jest');
+/**
+ * Jest configuration for admin-portal
+ */
 
-/** @type {import('jest').Config} */
+const nextJest = require('next/jest.js');
+
 const createJestConfig = nextJest({
-  // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
+  // Provide the path to your Next.js app to load next.config.js and .env files
   dir: './',
 });
 
@@ -10,30 +13,44 @@ const createJestConfig = nextJest({
 const config = {
   coverageProvider: 'v8',
   testEnvironment: 'jsdom',
-  testPathIgnorePatterns: ['<rootDir>/tests/e2e/'],
-  // Add more setup options before each test is run
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   moduleNameMapper: {
-    // Force module uuid to resolve with the CJS entry point
-    uuid: require.resolve('uuid'),
-    // Mock lucide-react icons
-    '^lucide-react$': '<rootDir>/__mocks__/lucide-react.js',
-    '^lucide-react/dynamicIconImports$': '<rootDir>/__mocks__/lucide-react.js',
-    // Path aliases
     '^@/(.*)$': '<rootDir>/$1',
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(lucide-react|@repo|@radix-ui)/)',
+  testMatch: [
+    '<rootDir>/test/**/*.{test,spec}.{js,jsx,ts,tsx}',
+    '<rootDir>/components/**/*.{test,spec}.{js,jsx,ts,tsx}',
+    '<rootDir>/hooks/**/*.{test,spec}.{js,jsx,ts,tsx}',
+    '<rootDir>/lib/**/*.{test,spec}.{js,jsx,ts,tsx}',
   ],
-  transform: {
-    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['babel-jest', {
-      presets: [
-        ['@babel/preset-env', { targets: { node: 'current' } }],
-        ['@babel/preset-react', { runtime: 'automatic' }],
-        '@babel/preset-typescript'
-      ]
-    }]
+  collectCoverageFrom: [
+    'components/**/*.{js,jsx,ts,tsx}',
+    'hooks/**/*.{js,jsx,ts,tsx}',
+    'lib/**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
   },
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+  },
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/',
+    '<rootDir>/node_modules/',
+    '<rootDir>/test/setup.ts',
+  ],
+  verbose: true,
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'clover'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
