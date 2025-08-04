@@ -12,6 +12,11 @@
 import { TokenStorage } from './token-storage';
 import { TokenPayload } from '@/types/auth';
 
+// 事件监听器接口
+interface AuthEventListener {
+  (event: string, data?: any): void;
+}
+
 export class TokenRefreshManager {
   private static readonly REFRESH_ENDPOINT = '/api/auth/refresh';
   private static readonly DEFAULT_REFRESH_THRESHOLD = 300; // 5 minutes
@@ -21,6 +26,7 @@ export class TokenRefreshManager {
   private refreshTimer: NodeJS.Timeout | null = null;
   private refreshPromise: Promise<TokenPayload> | null = null;
   private isDestroyed = false;
+  private eventListeners: AuthEventListener[] = [];
 
   /**
    * Checks if the current access token is about to expire
@@ -96,18 +102,25 @@ export class TokenRefreshManager {
     }
 
     try {
-      const response = await fetch(TokenRefreshManager.REFRESH_ENDPOINT, {
+      // 使用统一的API客户端
+      const response = await fetch('/api/v2/oauth/token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({ refreshToken }),
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal-client',
+        }),
       });
 
       if (!response.ok) {
         // Handle authentication failures
         if (response.status === 401) {
           TokenStorage.clearTokens();
+          // 触发全局登出事件
+          this.emitAuthEvent('session_expired');
           throw new Error('Token refresh failed: 401 - Invalid refresh token');
         }
 
@@ -116,14 +129,14 @@ export class TokenRefreshManager {
 
       const data = await response.json();
       
-      if (!data.accessToken || !data.refreshToken || !data.expiresIn) {
+      if (!data.access_token || !data.refresh_token || !data.expires_in) {
         throw new Error('Invalid response format from refresh endpoint');
       }
 
       const tokenPayload: TokenPayload = {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        expiresIn: data.expiresIn,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
       };
 
       // Update stored tokens
@@ -132,10 +145,15 @@ export class TokenRefreshManager {
       // Restart auto refresh with new token
       this.startAutoRefresh();
 
+      // 触发令牌刷新成功事件
+      this.emitAuthEvent('token_refreshed', tokenPayload);
+
       return tokenPayload;
     } catch (error) {
       // Network errors or other unexpected errors
       if (error instanceof Error) {
+        // 触发令牌刷新失败事件
+        this.emitAuthEvent('token_refresh_failed', error);
         throw error;
       }
       throw new Error('Unknown error during token refresh');
@@ -232,5 +250,92 @@ export class TokenRefreshManager {
    */
   isAutoRefreshActive(): boolean {
     return this.refreshTimer !== null;
+  }
+
+  /**
+   * 添加事件监听器
+   */
+  addEventListener(listener: AuthEventListener): void {
+    this.eventListeners.push(listener);
+  }
+
+  /**
+   * 移除事件监听器
+   */
+  removeEventListener(listener: AuthEventListener): void {
+    const index = this.eventListeners.indexOf(listener);
+    if (index > -1) {
+      this.eventListeners.splice(index, 1);
+    }
+  }
+
+  /**
+   * 触发认证事件
+   */
+  private emitAuthEvent(event: string, data?: any): void {
+    this.eventListeners.forEach(listener => {
+      try {
+        listener(event, data);
+      } catch (error) {
+        console.error('Auth event listener error:', error);
+      }
+    });
+  }
+
+  /**
+   * 获取令牌状态信息
+   */
+  getTokenStatus(): {
+    hasAccessToken: boolean;
+    hasRefreshToken: boolean;
+    isExpiringSoon: boolean;
+    isExpired: boolean;
+    timeUntilExpiration: number;
+    autoRefreshActive: boolean;
+  } {
+    const accessToken = TokenStorage.getAccessToken();
+    const refreshToken = TokenStorage.getRefreshToken();
+    
+    return {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      isExpiringSoon: this.isTokenExpiringSoon(),
+      isExpired: this.isTokenExpired(accessToken || ''),
+      timeUntilExpiration: this.getTimeUntilExpiration(accessToken || ''),
+      autoRefreshActive: this.isAutoRefreshActive(),
+    };
+  }
+
+  /**
+   * 检查令牌是否已过期
+   */
+  private isTokenExpired(token: string): boolean {
+    if (!token) return true;
+    
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+      const payload = JSON.parse(atob(parts[1]!));
+      return payload.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * 获取令牌剩余有效时间
+   */
+  private getTimeUntilExpiration(token: string): number {
+    if (!token) return 0;
+    
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return 0;
+      const payload = JSON.parse(atob(parts[1]!));
+      const expirationTime = payload.exp * 1000;
+      return Math.max(0, expirationTime - Date.now());
+    } catch {
+      return 0;
+    }
   }
 }

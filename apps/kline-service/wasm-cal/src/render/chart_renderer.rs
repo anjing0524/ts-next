@@ -144,10 +144,12 @@ impl ChartRenderer {
             .borrow_mut()
             .initialize_visible_range(&self.shared_state.layout.borrow());
         self.update_layout();
-        self.shared_state
-            .canvas_manager
-            .borrow_mut()
-            .set_all_dirty();
+        {
+            self.shared_state
+                .canvas_manager
+                .borrow_mut()
+                .set_all_dirty();
+        }
         self.force_render();
     }
 
@@ -156,10 +158,12 @@ impl ChartRenderer {
         if self.mode != mode {
             self.mode = mode;
             self.update_layout();
-            self.shared_state
-                .canvas_manager
-                .borrow_mut()
-                .set_all_dirty();
+            {
+                self.shared_state
+                    .canvas_manager
+                    .borrow_mut()
+                    .set_all_dirty();
+            }
             self.force_render();
         }
     }
@@ -194,33 +198,39 @@ impl ChartRenderer {
 
     /// 内部渲染方法
     fn render_internal(&self) {
-        let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
-        if canvas_manager.is_dirty(CanvasLayerType::Main) {
+        let layers_to_render = {
+            let canvas_manager = self.shared_state.canvas_manager.borrow();
+            let mut layers = Vec::new();
+            if canvas_manager.is_dirty(CanvasLayerType::Base) {
+                layers.push(CanvasLayerType::Base);
+            }
+            if canvas_manager.is_dirty(CanvasLayerType::Main) {
+                layers.push(CanvasLayerType::Main);
+            }
+            if canvas_manager.is_dirty(CanvasLayerType::Overlay) {
+                layers.push(CanvasLayerType::Overlay);
+            }
+            layers
+        };
+
+        if layers_to_render.is_empty() {
+            return;
+        }
+
+        if layers_to_render.contains(&CanvasLayerType::Main) {
             self.shared_state
                 .data_manager
                 .borrow_mut()
                 .calculate_data_ranges();
         }
 
-        let mut layers_to_render = Vec::new();
-        if canvas_manager.is_dirty(CanvasLayerType::Base) {
-            layers_to_render.push(CanvasLayerType::Base);
-        }
-        if canvas_manager.is_dirty(CanvasLayerType::Main) {
-            layers_to_render.push(CanvasLayerType::Main);
-        }
-        if canvas_manager.is_dirty(CanvasLayerType::Overlay) {
-            layers_to_render.push(CanvasLayerType::Overlay);
-        }
-
-        if layers_to_render.is_empty() {
-            return;
-        }
-
-        for &layer_type in &layers_to_render {
-            let ctx = canvas_manager.get_context(layer_type);
-            if layer_type != CanvasLayerType::Overlay {
-                ctx.clear_rect(0.0, 0.0, self.canvas_size.0, self.canvas_size.1);
+        {
+            let canvas_manager = self.shared_state.canvas_manager.borrow();
+            for &layer_type in &layers_to_render {
+                let ctx = canvas_manager.get_context(layer_type);
+                if layer_type != CanvasLayerType::Overlay {
+                    ctx.clear_rect(0.0, 0.0, self.canvas_size.0, self.canvas_size.1);
+                }
             }
         }
 
@@ -234,7 +244,10 @@ impl ChartRenderer {
             web_sys::console::error_1(&format!("渲染错误: {e:?}").into());
         }
 
-        canvas_manager.clear_all_dirty_flags();
+        self.shared_state
+            .canvas_manager
+            .borrow_mut()
+            .clear_all_dirty_flags();
     }
 
     /// 获取光标样式
@@ -281,10 +294,12 @@ impl ChartRenderer {
         self.hover_candle_index = new_hover_index;
 
         if needs_overlay_render {
-            let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
-            canvas_manager.set_dirty(CanvasLayerType::Overlay, true);
-            if hover_changed {
-                canvas_manager.set_dirty(CanvasLayerType::Main, true);
+            {
+                let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
+                canvas_manager.set_dirty(CanvasLayerType::Overlay, true);
+                if hover_changed {
+                    canvas_manager.set_dirty(CanvasLayerType::Main, true);
+                }
             }
             self.render();
         }
@@ -315,9 +330,11 @@ impl ChartRenderer {
             super::datazoom_renderer::DragResult::Released
             | super::datazoom_renderer::DragResult::NeedRedraw => {
                 self.update_layout();
-                let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
-                canvas_manager.set_dirty(CanvasLayerType::Main, true);
-                canvas_manager.set_dirty(CanvasLayerType::Base, true);
+                {
+                    let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
+                    canvas_manager.set_dirty(CanvasLayerType::Main, true);
+                    canvas_manager.set_dirty(CanvasLayerType::Base, true);
+                }
                 self.force_render();
                 true
             }
@@ -335,10 +352,12 @@ impl ChartRenderer {
             self.strategy_factory
                 .handle_mouse_leave(&render_context, self.mode);
 
-            self.shared_state
-                .canvas_manager
-                .borrow_mut()
-                .set_dirty(CanvasLayerType::Overlay, true);
+            {
+                self.shared_state
+                    .canvas_manager
+                    .borrow_mut()
+                    .set_dirty(CanvasLayerType::Overlay, true);
+            }
             self.force_render();
             return true;
         }
@@ -381,9 +400,11 @@ impl ChartRenderer {
 
         if handled {
             self.update_layout();
-            let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
-            canvas_manager.set_dirty(CanvasLayerType::Base, true);
-            canvas_manager.set_dirty(CanvasLayerType::Main, true);
+            {
+                let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
+                canvas_manager.set_dirty(CanvasLayerType::Base, true);
+                canvas_manager.set_dirty(CanvasLayerType::Main, true);
+            }
             self.force_render();
         }
     }
