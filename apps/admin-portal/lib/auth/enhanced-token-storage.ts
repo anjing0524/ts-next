@@ -158,9 +158,11 @@ export class EnhancedTokenStorage {
     
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
-      const [cookieName, cookieValue] = cookie.trim().split('=');
-      if (cookieName === name) {
-        return decodeURIComponent(cookieValue) || null;
+      const parts = cookie.trim().split('=');
+      const cookieName = parts[0];
+      const cookieValue = parts[1];
+      if (cookieName === name && cookieValue !== undefined) {
+        return decodeURIComponent(cookieValue);
       }
     }
     return null;

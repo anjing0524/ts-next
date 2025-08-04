@@ -102,9 +102,9 @@ impl AxisRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         render_ctx: &RenderContext,
     ) {
-        let layout = render_ctx.layout().borrow();
-        let theme = render_ctx.theme();
-        let data_manager = render_ctx.data_manager().borrow();
+        let layout = render_ctx.layout_ref();
+        let theme = render_ctx.theme_ref();
+        let data_manager = render_ctx.data_manager_ref();
         let (min_low, max_high, _) = data_manager.get_cached_cal();
         let tick = data_manager.get_tick();
 
@@ -143,11 +143,11 @@ impl AxisRenderer {
             ctx.stroke();
 
             let label = if price.abs() >= 100.0 {
-                format!("{:.0}", price)
+                format!("{price:.0}")
             } else if price.abs() >= 1.0 {
-                format!("{:.2}", price)
+                format!("{price:.2}")
             } else {
-                format!("{:.4}", price)
+                format!("{price:.4}")
             };
             let _ = ctx.fill_text(&label, y_axis_rect.x + y_axis_rect.width - 5.0, y);
         }
@@ -159,9 +159,9 @@ impl AxisRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         render_ctx: &RenderContext,
     ) {
-        let layout = render_ctx.layout().borrow();
-        let theme = render_ctx.theme();
-        let data_manager = render_ctx.data_manager().borrow();
+        let layout = render_ctx.layout_ref();
+        let theme = render_ctx.theme_ref();
+        let data_manager = render_ctx.data_manager_ref();
         let (_, _, max_volume) = data_manager.get_cached_cal();
 
         let y_axis_rect = layout.get_rect(&PaneId::YAxis);
@@ -201,9 +201,12 @@ impl AxisRenderer {
 
     /// 绘制标题和图例
     fn draw_header(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
-        let layout = render_ctx.layout().borrow();
-        let theme = render_ctx.theme();
-        let config = render_ctx.config_ref().unwrap();
+        let layout = render_ctx.layout_ref();
+        let theme = render_ctx.theme_ref();
+        let config = match render_ctx.config_ref() {
+            Some(config) => config,
+            None => return, // 如果没有配置，则不绘制标题
+        };
         let header_rect = layout.get_rect(&PaneId::Header);
 
         // 移除头部背景填充，保持透明
@@ -246,9 +249,9 @@ impl AxisRenderer {
 
     /// 绘制X轴 (时间轴)
     fn draw_x_axis(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
-        let layout = render_ctx.layout().borrow();
-        let theme = render_ctx.theme();
-        let data_manager = render_ctx.data_manager().borrow();
+        let layout = render_ctx.layout_ref();
+        let theme = render_ctx.theme_ref();
+        let data_manager = render_ctx.data_manager_ref();
         let items = match data_manager.get_items() {
             Some(items) => items,
             None => return,
@@ -303,10 +306,10 @@ impl AxisRenderer {
 
 impl RenderStrategy for AxisRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_manager = ctx.canvas_manager().borrow();
+        let canvas_manager = ctx.canvas_manager_ref();
         let base_ctx = canvas_manager.get_context(CanvasLayerType::Base);
-        let layout = ctx.layout().borrow();
-        let theme = ctx.theme();
+        let layout = ctx.layout_ref();
+        let theme = ctx.theme_ref();
 
         if ctx.mode == RenderMode::Kmap {
             self.draw_alternating_background(base_ctx, &layout, theme);

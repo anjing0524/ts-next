@@ -9,7 +9,7 @@ import { CookieSecurityConfig } from './constants';
 export interface TokenCookieOptions {
   httpOnly?: boolean;
   secure?: boolean;
-  sameSite?: 'Strict' | 'Lax' | 'None';
+  sameSite?: 'strict' | 'lax' | 'none';
   maxAge?: number;
   path?: string;
   domain?: string;

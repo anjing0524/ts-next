@@ -23,6 +23,7 @@ export class KeyService {
   private maxVersions: number;
   private enableAutoRotation: boolean;
   private rotationTimer: NodeJS.Timeout | null = null;
+  private static instance: KeyService | null = null;
 
   constructor(config: KeyRotationConfig = {}) {
     this.rotationInterval = config.rotationInterval || 24 * 60 * 60 * 1000; // 24小时
@@ -30,6 +31,13 @@ export class KeyService {
     this.enableAutoRotation = config.enableAutoRotation !== false;
 
     this.loadKeys();
+  }
+
+  public static getInstance(): KeyService {
+    if (!KeyService.instance) {
+      KeyService.instance = new KeyService();
+    }
+    return KeyService.instance;
   }
 
   private loadKeys(): void {
@@ -245,6 +253,75 @@ export class KeyService {
       createdAt: key.createdAt,
       isActive: key.isActive,
       keyId: crypto.createHash('sha256').update(key.publicKey).digest('hex').substring(0, 16)
+    };
+  }
+
+  public async signToken(payload: any, options: any = {}): Promise<string> {
+    const privateKey = this.getCurrentPrivateKey();
+    const jwt = await import('jose');
+    
+    const privateKeyObj = await jwt.importPKCS8(privateKey, 'RS256');
+    
+    const tokenOptions: any = {
+      algorithm: 'RS256',
+      ...options
+    };
+    
+    if (options.expiresIn) {
+      tokenOptions.expiresIn = options.expiresIn;
+    }
+    
+    return await new jwt.SignJWT(payload)
+      .setProtectedHeader({ alg: 'RS256' })
+      .sign(privateKeyObj);
+  }
+
+  public async verifyToken(token: string): Promise<any> {
+    const publicKey = this.getCurrentPublicKey();
+    const jwt = await import('jose');
+    
+    try {
+      const publicKeyObj = await jwt.importSPKI(publicKey, 'RS256');
+      const { payload } = await jwt.jwtVerify(token, publicKeyObj, {
+        algorithms: ['RS256']
+      });
+      
+      return {
+        valid: true,
+        payload,
+        version: this.currentVersion
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error : new Error('Token verification failed')
+      };
+    }
+  }
+
+  public async getJWK(): Promise<any> {
+    const publicKey = this.getCurrentPublicKey();
+    const jwt = await import('jose');
+    const publicKeyObj = await jwt.importSPKI(publicKey, 'RS256');
+    return await jwt.exportJWK(publicKeyObj);
+  }
+
+  public async getOldJWK(): Promise<any> {
+    const oldVersion = this.getAvailableVersions().find(v => v !== this.currentVersion);
+    if (!oldVersion) return undefined;
+    
+    const publicKey = this.getPublicKey(oldVersion);
+    const jwt = await import('jose');
+    const publicKeyObj = await jwt.importSPKI(publicKey, 'RS256');
+    return await jwt.exportJWK(publicKeyObj);
+  }
+
+  public async getCurrentKey(): Promise<any> {
+    const jwt = await import('jose');
+    return {
+      publicKey: await jwt.importSPKI(this.getCurrentPublicKey(), 'RS256'),
+      privateKey: await jwt.importPKCS8(this.getCurrentPrivateKey(), 'RS256'),
+      version: this.currentVersion
     };
   }
 }

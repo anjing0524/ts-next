@@ -137,14 +137,14 @@ export async function middleware(request: NextRequest) {
     
     // 获取当前页面所需权限
     const requiredPermissions =
-      Object.entries(routePermissionMap).find(([route]) =
+      Object.entries(routePermissionMap).find(([route]) =>
         pathname.startsWith(route)
       )?.[1] || [];
     
     // 权限不足，重定向/unauthorized
     const hasPermission =
       requiredPermissions.length === 0 ||
-      requiredPermissions.some((p) =
+      requiredPermissions.some((p) =>
         userPermissions.includes(p)
       );
     

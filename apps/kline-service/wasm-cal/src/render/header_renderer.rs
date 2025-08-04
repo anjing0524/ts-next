@@ -13,6 +13,12 @@ pub struct HeaderRenderer {
     subtitle: String,
 }
 
+impl Default for HeaderRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HeaderRenderer {
     pub fn new() -> Self {
         Self {
@@ -76,7 +82,7 @@ impl HeaderRenderer {
         let header_rect = layout.get_rect(&PaneId::Header);
 
         // 图例项
-        let legend_items = vec![
+        let legend_items = [
             ("K线", &theme.bullish),
             ("成交量", &theme.volume_area),
             ("热图", &theme.last_price_line),
@@ -90,7 +96,7 @@ impl HeaderRenderer {
         let mut legend_x = header_rect.x + header_rect.width - 10.0;
 
         // 绘制图例
-        for (_i, (label, color)) in legend_items.iter().enumerate() {
+        for (label, color) in legend_items.iter() {
             // 计算文本宽度
             if let Ok(text_metrics) = ctx.measure_text(label) {
                 let text_width = text_metrics.width();
@@ -118,10 +124,10 @@ impl HeaderRenderer {
 
 impl RenderStrategy for HeaderRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_manager = ctx.canvas_manager().borrow();
+        let canvas_manager = ctx.canvas_manager_ref();
         let base_ctx = canvas_manager.get_context(CanvasLayerType::Base);
-        let layout = ctx.layout().borrow();
-        let theme = ctx.theme();
+        let layout = ctx.layout_ref();
+        let theme = ctx.theme_ref();
 
         // 绘制标题
         self.draw_title(base_ctx, &layout, theme);

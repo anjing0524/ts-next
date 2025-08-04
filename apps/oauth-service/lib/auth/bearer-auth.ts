@@ -111,7 +111,7 @@ export async function authenticateBearer(
   const scopes = (jwtValidatedPayload.scope as string)?.split(' ') || [];
 
   // 获取用户权限 (临时注释 RBACService 调用，Edge Runtime 不兼容)
-  let permissions: string[] = [];
+  const permissions: string[] = [];
   // try {
   //   const userPermissions = await RBACService.getUserPermissions(userId);
   //   permissions = userPermissions ? userPermissions.permissions : [];

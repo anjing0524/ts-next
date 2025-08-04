@@ -38,6 +38,12 @@ pub struct DataRange {
     pub max_volume: f64,
 }
 
+impl Default for DataRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataRange {
     /// 创建新的数据范围
     pub fn new() -> Self {
@@ -113,8 +119,7 @@ impl VisibleRange {
         let start = items_len.saturating_sub(initial_visible_count);
 
         log(&format!(
-            "[VisibleRange] 最终可见范围: start={}, count={}, total={}",
-            start, initial_visible_count, items_len
+            "[VisibleRange] 最终可见范围: start={start}, count={initial_visible_count}, total={items_len}"
         ));
 
         let result = Self::new(start, initial_visible_count, items_len);

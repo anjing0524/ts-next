@@ -35,6 +35,12 @@ pub struct RenderStrategyFactory {
     strategies: HashMap<StrategyType, Vec<RefCell<Box<dyn RenderStrategy>>>>,
 }
 
+impl Default for RenderStrategyFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RenderStrategyFactory {
     /// 创建新的渲染策略工厂
     pub fn new() -> Self {
@@ -68,7 +74,7 @@ impl RenderStrategyFactory {
     ) {
         self.strategies
             .entry(strategy_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(RefCell::new(strategy));
     }
 
@@ -164,16 +170,28 @@ impl RenderStrategyFactory {
     /// 执行渲染操作（按图层分别渲染）
     pub fn render_all(&self, ctx: &RenderContext, mode: RenderMode) -> Result<(), RenderError> {
         // 按图层顺序渲染：Base -> Main -> Overlay
-        let layers = [
+        let all_layers = [
             CanvasLayerType::Base,
             CanvasLayerType::Main,
             CanvasLayerType::Overlay,
         ];
+        self.render_layers(ctx, mode, &all_layers)
+    }
 
-        for layer in &layers {
-            self.render_layer(ctx, mode, *layer)?;
+    /// 渲染指定图层的策略
+    pub fn render_layers(
+        &self,
+        ctx: &RenderContext,
+        mode: RenderMode,
+        layers: &[CanvasLayerType],
+    ) -> Result<(), RenderError> {
+        for &layer in layers {
+            let strategies = self.get_strategies_by_layer(mode, layer);
+            for strategy_cell in strategies {
+                let strategy = strategy_cell.borrow();
+                strategy.render(ctx)?;
+            }
         }
-
         Ok(())
     }
 
@@ -245,8 +263,8 @@ impl RenderStrategyFactory {
         let mut hover_index = None;
 
         // 计算hover索引基于鼠标位置和当前可见范围
-        let layout = ctx.layout().borrow();
-        let data_manager = ctx.data_manager().borrow();
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
         let (visible_start, visible_count, _) = data_manager.get_visible();
 
         if visible_count > 0 {

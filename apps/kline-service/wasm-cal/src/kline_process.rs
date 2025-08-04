@@ -39,8 +39,7 @@ impl KlineProcess {
         data_length: usize,
     ) -> Result<KlineProcess, JsValue> {
         log(&format!(
-            "KlineProcess::new - Reading WASM memory: offset={}, length={}",
-            ptr_offset, data_length
+            "KlineProcess::new - Reading WASM memory: offset={ptr_offset}, length={data_length}"
         ));
 
         // 1. 从WASM内存中读取数据
@@ -159,7 +158,7 @@ impl KlineProcess {
 
         let identifier = String::from_utf8_lossy(&bytes[4..8]);
         if identifier != crate::kline_generated::kline::KLINE_DATA_IDENTIFIER {
-            return Err(WasmError::validation(&format!(
+            return Err(WasmError::validation(format!(
                 "无效的FlatBuffer标识符, 期望: {}, 实际: {}",
                 crate::kline_generated::kline::KLINE_DATA_IDENTIFIER,
                 identifier
@@ -175,7 +174,7 @@ impl KlineProcess {
         let mut opts = flatbuffers::VerifierOptions::default();
         opts.max_tables = 1_000_000_000;
         root_as_kline_data_with_opts(&opts, data)
-            .map_err(|e| WasmError::other(&format!("Flatbuffer 解析失败: {}", e)))
+            .map_err(|e| WasmError::other(format!("Flatbuffer 解析失败: {e}")))
     }
 
     #[wasm_bindgen]
@@ -271,7 +270,7 @@ impl KlineProcess {
         let render_mode = match mode {
             "kmap" => crate::render::chart_renderer::RenderMode::Kmap,
             "heatmap" => crate::render::chart_renderer::RenderMode::Heatmap,
-            _ => return Err(JsValue::from_str(&format!("Unknown render mode: {}", mode))),
+            _ => return Err(JsValue::from_str(&format!("Unknown render mode: {mode}"))),
         };
 
         chart_renderer.set_mode(render_mode);

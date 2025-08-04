@@ -40,6 +40,7 @@ export class TokenRefreshManager {
 
       // Decode the payload (second part) - handle base64url encoding
       const base64Url = parts[1];
+      if (!base64Url) return false;
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const payload = JSON.parse(atob(base64));
       
@@ -179,7 +180,7 @@ export class TokenRefreshManager {
       const parts = token.split('.');
       if (parts.length !== 3) return TokenRefreshManager.DEFAULT_REFRESH_THRESHOLD * 1000;
 
-      const payload = JSON.parse(atob(parts[1]));
+      const payload = JSON.parse(atob(parts[1]!));
       const expirationTime = payload.exp * 1000;
       const now = Date.now();
       const timeUntilExpiration = expirationTime - now;

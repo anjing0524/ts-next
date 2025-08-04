@@ -64,19 +64,12 @@ export default function AuthCallbackPage() {
       }
 
       // 交换授权码获取令牌
-      const response = await apiRequest<{
+      const tokenResponse = await apiRequest<{
         access_token: string;
         refresh_token: string;
         expires_in: number;
         token_type: string;
         scope: string;
-        user: {
-          id: string;
-          username: string;
-          email: string;
-          roles: string[];
-          permissions: string[];
-        };
       }>(
         // 统一使用OAuth服务API标准路径
         '/api/v2/oauth/token',
@@ -85,8 +78,8 @@ export default function AuthCallbackPage() {
           body: JSON.stringify({
             grant_type: 'authorization_code',
             code,
-            redirect_uri: `${window.location.origin}/auth/callback`,
-            client_id: 'admin-portal-client',
+            redirect_uri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`,
+            client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal-client',
             code_verifier: codeVerifier,
           }),
         }
@@ -98,14 +91,28 @@ export default function AuthCallbackPage() {
       sessionStorage.removeItem('oauth_nonce');
 
       // 统一使用TokenStorage存储令牌
-      TokenStorage.setTokens(response.access_token, response.refresh_token);
+      TokenStorage.setTokens(tokenResponse.access_token, tokenResponse.refresh_token);
       localStorage.setItem(
         'token_expires_at',
-        (Date.now() + response.expires_in * 1000).toString()
+        (Date.now() + tokenResponse.expires_in * 1000).toString()
       );
 
-      // 更新认证状态 - 修复类型错误
-      login(JSON.stringify(response.user));
+      // 获取用户信息
+      const userResponse = await fetch(`${process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001'}/api/v2/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${tokenResponse.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new Error('Failed to fetch user information');
+      }
+
+      const userData = await userResponse.json();
+
+      // 更新认证状态
+      login(userData);
 
       // 重定向到原始页面或首页
       const redirectPath = sessionStorage.getItem('redirect_after_login') || '/dashboard';

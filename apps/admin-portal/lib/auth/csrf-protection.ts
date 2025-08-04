@@ -45,7 +45,7 @@ export class CSRFProtection {
   /**
    * 验证HTTP请求的CSRF令牌
    */
-  static validateHTTPRequest(request: Request): boolean {
+  static async validateHTTPRequest(request: Request): Promise<boolean> {
     try {
       // 跳过安全方法
       if (this.config.allowedMethods.includes(request.method)) {
@@ -53,7 +53,7 @@ export class CSRFProtection {
       }
 
       // 获取CSRF令牌
-      const csrfToken = this.extractCSRFToken(request);
+      const csrfToken = await this.extractCSRFToken(request);
       if (!csrfToken) {
         this.logSecurityEvent('Missing CSRF token', request);
         return false;
@@ -93,7 +93,7 @@ export class CSRFProtection {
   /**
    * 从请求中提取CSRF令牌
    */
-  private static extractCSRFToken(request: Request): string | null {
+  private static async extractCSRFToken(request: Request): Promise<string | null> {
     // 从请求头获取
     const headerToken = request.headers.get(this.config.tokenHeader);
     if (headerToken) {
@@ -217,7 +217,7 @@ export class CSRFProtection {
       });
 
       // 设置CSRF Cookie
-      const cookieValue = `${this.config.cookieName}=${token}; Max-Age=${this.config.maxAge}; Path=/`;
+      let cookieValue = `${this.config.cookieName}=${token}; Max-Age=${this.config.maxAge}; Path=/`;
       if (process.env.NODE_ENV === 'production') {
         cookieValue += '; Secure; SameSite=Lax';
       } else {
@@ -291,13 +291,13 @@ export class CSRFProtection {
   /**
    * 获取当前请求的安全上下文
    */
-  static getSecurityContext(request: Request): {
+  static async getSecurityContext(request: Request): Promise<{
     hasValidToken: boolean;
     origin: string | null;
     method: string;
     isSafeMethod: boolean;
-  } {
-    const token = this.extractCSRFToken(request);
+  }> {
+    const token = await this.extractCSRFToken(request);
     const origin = request.headers.get('origin') || request.headers.get('referer');
     const method = request.method;
     const isSafeMethod = this.config.allowedMethods.includes(method);

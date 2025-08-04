@@ -12,6 +12,12 @@ pub struct CanvasManager {
     pub main_ctx: OffscreenCanvasRenderingContext2d,
     /// 顶层Canvas上下文 - 用于绘制交互元素
     pub overlay_ctx: OffscreenCanvasRenderingContext2d,
+    /// 底层是否需要重绘
+    base_dirty: bool,
+    /// 中间层是否需要重绘
+    main_dirty: bool,
+    /// 顶层是否需要重绘
+    overlay_dirty: bool,
 }
 
 impl CanvasManager {
@@ -30,6 +36,10 @@ impl CanvasManager {
             base_ctx,
             main_ctx,
             overlay_ctx,
+            // 初始状态下，所有层都需要绘制
+            base_dirty: true,
+            main_dirty: true,
+            overlay_dirty: true,
         })
     }
 
@@ -40,5 +50,37 @@ impl CanvasManager {
             CanvasLayerType::Main => &self.main_ctx,
             CanvasLayerType::Overlay => &self.overlay_ctx,
         }
+    }
+
+    /// 检查指定层是否需要重绘
+    pub fn is_dirty(&self, layer_type: CanvasLayerType) -> bool {
+        match layer_type {
+            CanvasLayerType::Base => self.base_dirty,
+            CanvasLayerType::Main => self.main_dirty,
+            CanvasLayerType::Overlay => self.overlay_dirty,
+        }
+    }
+
+    /// 标记指定层需要重绘
+    pub fn set_dirty(&mut self, layer_type: CanvasLayerType, is_dirty: bool) {
+        match layer_type {
+            CanvasLayerType::Base => self.base_dirty = is_dirty,
+            CanvasLayerType::Main => self.main_dirty = is_dirty,
+            CanvasLayerType::Overlay => self.overlay_dirty = is_dirty,
+        }
+    }
+
+    /// 标记所有层都需要重绘
+    pub fn set_all_dirty(&mut self) {
+        self.base_dirty = true;
+        self.main_dirty = true;
+        self.overlay_dirty = true;
+    }
+
+    /// 清除所有层的重绘标记
+    pub fn clear_all_dirty_flags(&mut self) {
+        self.base_dirty = false;
+        self.main_dirty = false;
+        self.overlay_dirty = false;
     }
 }

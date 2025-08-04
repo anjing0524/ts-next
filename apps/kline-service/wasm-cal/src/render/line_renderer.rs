@@ -8,8 +8,6 @@ use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use flatbuffers;
-use std::cell::RefCell;
-use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 #[derive(Default)]
@@ -32,13 +30,12 @@ impl LineRenderer {
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        data_manager: &Rc<RefCell<DataManager>>,
+        data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let data_manager_ref = data_manager.borrow();
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
-        let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
-        let items = match data_manager_ref.get_items() {
+        let (visible_start, visible_count, _) = data_manager.get_visible();
+        let (min_low, max_high, _) = data_manager.get_cached_cal();
+        let items = match data_manager.get_items() {
             Some(items) => items,
             None => return,
         };
@@ -119,10 +116,10 @@ impl LineRenderer {
 
         if dashed {
             ctx.set_line_dash(&js_sys::Float64Array::from(&[5.0, 5.0][..]))
-                .unwrap();
+                .ok();
         } else {
             ctx.set_line_dash(&js_sys::Float64Array::new_with_length(0))
-                .unwrap();
+                .ok();
         }
 
         let points: Vec<(f64, f64)> = (start..end)
@@ -146,17 +143,21 @@ impl LineRenderer {
             let p2 = points[i + 1];
             ctx.quadratic_curve_to(p1.0, p1.1, (p1.0 + p2.0) / 2.0, (p1.1 + p2.1) / 2.0);
         }
-        ctx.line_to(points.last().unwrap().0, points.last().unwrap().1);
+        if let Some(last_point) = points.last() {
+            ctx.line_to(last_point.0, last_point.1);
+        }
         ctx.stroke();
     }
 }
 
 impl RenderStrategy for LineRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_ref = ctx.canvas_manager().borrow();
-        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
-        let layout_ref = ctx.layout().borrow();
-        self.draw(main_ctx, &layout_ref, ctx.data_manager(), ctx.theme());
+        let canvas = ctx.canvas_manager_ref();
+        let main_ctx = canvas.get_context(CanvasLayerType::Main);
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
+        let theme = ctx.theme_ref();
+        self.draw(main_ctx, &layout, &data_manager, theme);
         Ok(())
     }
 

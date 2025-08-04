@@ -34,7 +34,7 @@ export class SecurityMiddleware {
       response = this.setSecurityHeaders(response, options);
 
       // 跳过API路由的某些检查
-      if (request.nextpathname?.startsWith('/api/auth')) {
+      if (request.nextUrl.pathname?.startsWith('/api/auth')) {
         return response;
       }
 
@@ -104,7 +104,7 @@ export class SecurityMiddleware {
     }
 
     // 内容安全策略
-    const csp = this.generateCSP(request?.url || '', options.customCSP);
+    const csp = this.generateCSP('', options.customCSP);
     headers.set('Content-Security-Policy', csp);
 
     // 严格传输安全（生产环境）

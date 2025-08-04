@@ -18,8 +18,8 @@ import { getUserProfileData } from '@/lib/user-utils';
 async function userInfoHandlerInternal(request: NextRequest): Promise<NextResponse> {
   // --- 步骤1: JWT令牌认证 (使用Jose库) ---
   // --- Step 1: JWT Token Authentication (using Jose library) ---
-  // 使用恢复的认证中间件逻辑
-  const { authenticateBearer } = await import('@repo/lib/middleware');
+  // 使用本地认证逻辑
+  const { authenticateBearer } = await import('@/lib/auth/bearer-auth');
 
   // 执行Bearer令牌认证
   const authResult = await authenticateBearer(request);

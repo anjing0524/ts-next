@@ -12,6 +12,7 @@ export { PKCEUtils } from './pkce-utils';
 export { ScopeUtils } from './scope-utils';
 export { AuthorizationUtils } from './authorization-utils';
 export { getUserIdFromRequest } from './jwt-utils';
+export { KeyService } from './key-service';
 
 // 密码工具函数 (Password utility functions)
 export * from './password-utils';

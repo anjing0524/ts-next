@@ -112,7 +112,7 @@ impl DataContext {
             .data_manager
             .try_borrow()
             .map_err(|_| WasmCalError::data("Data manager is already borrowed"))?;
-        Ok(f(&*data_manager))
+        Ok(f(&data_manager))
     }
 
     /// 安全地修改数据管理器
@@ -125,7 +125,7 @@ impl DataContext {
             .data_manager
             .try_borrow_mut()
             .map_err(|_| WasmCalError::data("Data manager is already borrowed mutably"))?;
-        Ok(f(&mut *data_manager))
+        Ok(f(&mut data_manager))
     }
 }
 
@@ -161,7 +161,7 @@ impl ConfigContext {
             .layout
             .try_borrow()
             .map_err(|_| WasmCalError::config("Layout is already borrowed"))?;
-        Ok(f(&*layout))
+        Ok(f(&layout))
     }
 
     /// 安全地修改布局
@@ -174,7 +174,7 @@ impl ConfigContext {
             .layout
             .try_borrow_mut()
             .map_err(|_| WasmCalError::config("Layout is already borrowed mutably"))?;
-        Ok(f(&mut *layout))
+        Ok(f(&mut layout))
     }
 }
 
@@ -253,29 +253,34 @@ impl UnifiedRenderContext {
         ConfigContext::new(self.shared.clone())
     }
 
-    /// 兼容性方法：获取 canvas_manager
-    pub fn canvas_manager(&self) -> &Rc<RefCell<CanvasManager>> {
-        &self.shared.canvas_manager
+    /// 获取 Canvas 管理器的不可变借用
+    pub fn canvas_manager_ref(&self) -> std::cell::Ref<CanvasManager> {
+        self.shared.canvas_manager.borrow()
     }
 
-    /// 兼容性方法：获取 data_manager
-    pub fn data_manager(&self) -> &Rc<RefCell<DataManager>> {
-        &self.shared.data_manager
+    /// 获取数据管理器的不可变借用
+    pub fn data_manager_ref(&self) -> std::cell::Ref<DataManager> {
+        self.shared.data_manager.borrow()
     }
 
-    /// 兼容性方法：获取 layout
-    pub fn layout(&self) -> &Rc<RefCell<ChartLayout>> {
-        &self.shared.layout
+    /// 获取数据管理器的可变借用
+    pub fn data_manager_mut_ref(&self) -> std::cell::RefMut<'_, DataManager> {
+        self.shared.data_manager.borrow_mut()
     }
 
-    /// 兼容性方法：获取 theme
-    pub fn theme(&self) -> &ChartTheme {
+    /// 获取图表布局的不可变借用
+    pub fn layout_ref(&self) -> std::cell::Ref<ChartLayout> {
+        self.shared.layout.borrow()
+    }
+
+    /// 获取图表主题
+    pub fn theme_ref(&self) -> &ChartTheme {
         &self.shared.theme
     }
 
-    /// 兼容性方法：获取 config
-    pub fn config_ref(&self) -> Option<&ChartConfig> {
-        self.shared.config.as_deref()
+    /// 获取图表配置
+    pub fn config_ref(&self) -> Option<Rc<ChartConfig>> {
+        self.shared.config.clone()
     }
 }
 

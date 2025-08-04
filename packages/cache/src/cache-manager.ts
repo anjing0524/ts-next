@@ -126,7 +126,10 @@ export class CacheManager {
   private redisClient?: any; // 使用any类型避免Edge Runtime中的导入问题
 
   private constructor() {
-    this.initializeCache();
+    this.initializeCache().catch(error => {
+      logger.error('Failed to initialize cache:', error);
+      this.fallbackToLRU();
+    });
   }
 
   static getInstance(): CacheManager {
@@ -136,7 +139,7 @@ export class CacheManager {
     return CacheManager.instance;
   }
 
-  private initializeCache(): void {
+  private async initializeCache(): Promise<void> {
     // 在Edge Runtime环境中，强制使用LRU缓存
     if (isEdgeRuntime()) {
       logger.info('Edge Runtime detected, using LRU cache only');
@@ -149,8 +152,8 @@ export class CacheManager {
     if (redisUrl) {
       try {
         // 动态导入Redis，避免在Edge Runtime中加载
-        const Redis = require('ioredis');
-        this.redisClient = new Redis(redisUrl, {
+        const Redis = await import('ioredis');
+        this.redisClient = new Redis.default(redisUrl, {
           maxRetriesPerRequest: 3,
           lazyConnect: true,
         });

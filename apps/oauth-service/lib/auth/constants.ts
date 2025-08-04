@@ -24,7 +24,7 @@ export const DefaultConfig = {
 export const CookieSecurityConfig = {
   HTTP_ONLY: true, // 防止XSS攻击
   SECURE: process.env.NODE_ENV === 'production', // 生产环境强制HTTPS
-  SAME_SITE: 'Lax' as const, // CSRF防护
+  SAME_SITE: 'lax' as const, // CSRF防护
   ACCESS_TOKEN_MAX_AGE: 3600, // 1小时
   REFRESH_TOKEN_MAX_AGE: 2592000, // 30天
   PATH: '/',

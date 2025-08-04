@@ -90,7 +90,8 @@ export class JWTUtils {
    */
   static async getPublicKey(): Promise<jose.KeyLike> {
     const keyService = await KeyService.getInstance();
-    return keyService.getCurrentKey().publicKey;
+    const currentKey = await keyService.getCurrentKey();
+    return currentKey.publicKey;
   }
 
   /**
@@ -139,7 +140,7 @@ export async function getUserIdFromRequest(req: NextRequest): Promise<string | n
   const token = authHeader.substring(7);
 
   try {
-    const publicKey = await getPublicKey();
+    const publicKey = await JWTUtils.getPublicKey();
     const { payload } = await jose.jwtVerify(token, publicKey);
     return payload.sub || null;
   } catch (error) {

@@ -17,6 +17,12 @@ pub struct DataManager {
     cached_data_range: Option<DataRange>,
 }
 
+impl Default for DataManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataManager {
     /// 创建新的数据管理器
     pub fn new() -> Self {
@@ -130,29 +136,32 @@ impl DataManager {
         chart_area_width: f64,
         is_in_chart: bool,
     ) -> bool {
-        if !is_in_chart || self.items.is_none() {
+        if !is_in_chart {
             return false;
         }
 
-        let items = self.items.unwrap();
-        if items.is_empty() {
-            return false;
+        if let Some(items) = self.items {
+            if items.is_empty() {
+                return false;
+            }
+
+            let (new_visible_start, new_visible_count) =
+                self.visible_range
+                    .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
+
+            let range_updated = self
+                .visible_range
+                .update(new_visible_start, new_visible_count);
+
+            if range_updated {
+                self.invalidate_cache();
+                self.calculate_data_ranges();
+            }
+
+            range_updated
+        } else {
+            false
         }
-
-        let (new_visible_start, new_visible_count) =
-            self.visible_range
-                .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
-
-        let range_updated = self
-            .visible_range
-            .update(new_visible_start, new_visible_count);
-
-        if range_updated {
-            self.invalidate_cache();
-            self.calculate_data_ranges();
-        }
-
-        range_updated
     }
 
     /// 获取 tick 值的方法

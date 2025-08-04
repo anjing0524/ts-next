@@ -36,6 +36,12 @@ pub enum DragResult {
     Released,
 }
 
+impl Default for DataZoomRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataZoomRenderer {
     pub fn new() -> Self {
         Self {
@@ -97,8 +103,8 @@ impl DataZoomRenderer {
     }
 
     pub fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
-        let layout = ctx.layout().borrow();
-        let data_manager = ctx.data_manager().borrow();
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
         let handle_type = self.get_handle_at_position(x, y, &layout, &data_manager);
 
         if handle_type == DragHandleType::None {
@@ -126,9 +132,9 @@ impl DataZoomRenderer {
             return DragResult::None;
         }
 
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
-        let mut data_manager = ctx.data_manager().borrow_mut();
+        let mut data_manager = ctx.data_manager_mut_ref();
         let items_len = match data_manager.get_items() {
             Some(items) => items.len(),
             None => return DragResult::None,
@@ -303,7 +309,9 @@ impl DataZoomRenderer {
             ctx.line_to(x, sampled_heights[i + 1]);
         }
 
-        ctx.line_to(nav_rect.x + nav_width, *sampled_heights.last().unwrap());
+        if let Some(last_height) = sampled_heights.last() {
+            ctx.line_to(nav_rect.x + nav_width, *last_height);
+        }
         ctx.line_to(nav_rect.x + nav_width, nav_rect.y + nav_height);
         ctx.close_path();
         ctx.fill();
@@ -474,11 +482,11 @@ impl DataZoomRenderer {
 
 impl RenderStrategy for DataZoomRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_manager = ctx.canvas_manager().borrow();
+        let canvas_manager = ctx.canvas_manager_ref();
         let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = ctx.layout().borrow();
-        let data_manager = ctx.data_manager().borrow();
-        let theme = ctx.theme();
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
+        let theme = ctx.theme_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
         // 清理datazoom区域，扩大清理范围以确保手柄完全清除
@@ -498,7 +506,6 @@ impl RenderStrategy for DataZoomRenderer {
         if items_len > 0 {
             self.draw_volume_area(overlay_ctx, &layout, &data_manager, theme);
             self.draw_visible_range_indicator(overlay_ctx, &layout, &data_manager, theme);
-        } else {
         }
 
         Ok(())
@@ -534,7 +541,7 @@ impl RenderStrategy for DataZoomRenderer {
 
     /// 处理鼠标滚轮事件 - 在导航器区域进行缩放
     fn handle_wheel(&mut self, x: f64, y: f64, delta: f64, ctx: &RenderContext) -> bool {
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
         // 只有在导航器区域内才处理滚轮事件
@@ -542,7 +549,7 @@ impl RenderStrategy for DataZoomRenderer {
             return false;
         }
 
-        let mut data_manager = ctx.data_manager().borrow_mut();
+        let mut data_manager = ctx.data_manager_mut_ref();
         let items_len = match data_manager.get_items() {
             Some(items) => items.len(),
             None => return false,
@@ -603,14 +610,14 @@ impl RenderStrategy for DataZoomRenderer {
         }
 
         // 检查是否在导航器区域内
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
         if !nav_rect.contains(x, y) {
             return CursorStyle::Default;
         }
 
         // 优化鼠标样式检测，使用缓存布局避免重复计算
-        let handle_type = self.get_handle_at_position(x, y, &layout, &ctx.data_manager().borrow());
+        let handle_type = self.get_handle_at_position(x, y, &layout, &ctx.data_manager_ref());
 
         // 根据手柄位置和状态提供清晰的视觉反馈
         match handle_type {
@@ -619,8 +626,7 @@ impl RenderStrategy for DataZoomRenderer {
             DragHandleType::None => {
                 // 当鼠标在导航器区域但不在任何手柄上时，检查是否在可点击区域
                 let items_len = ctx
-                    .data_manager()
-                    .borrow()
+                    .data_manager_ref()
                     .get_items()
                     .map_or(0, |items| items.len());
                 if items_len > 0 {

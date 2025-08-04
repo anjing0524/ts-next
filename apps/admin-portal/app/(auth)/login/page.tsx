@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@repo/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { generateCodeVerifier, generateCodeChallenge } from '@repo/lib/browser';
+import { generateCodeVerifier, generateCodeChallenge, generateState, generateNonce } from '@repo/lib/browser';
 
 // 强制动态渲染，避免预渲染时访问浏览器API
 
@@ -47,15 +47,17 @@ function LoginForm() {
       // 生成PKCE参数
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
-      const state = generateCodeVerifier();
+      const state = generateState();
+      const nonce = generateNonce();
 
       // 存储PKCE参数到sessionStorage
       sessionStorage.setItem('oauth_code_verifier', codeVerifier);
       sessionStorage.setItem('oauth_state', state);
+      sessionStorage.setItem('oauth_nonce', nonce);
 
       // 准备OAuth参数
-      const clientId = 'admin-portal-client';
-      const redirectUri = `${window.location.origin}/auth/callback`;
+      const clientId = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal-client';
+      const redirectUri = process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`;
 
       // 验证用户凭据并获取授权URL
       const oauthServiceUrl = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
@@ -74,6 +76,7 @@ function LoginForm() {
           state: state,
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',
+          nonce: nonce,
         }),
       });
 
@@ -101,15 +104,17 @@ function LoginForm() {
       // 生成PKCE参数
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await generateCodeChallenge(codeVerifier);
-      const state = generateCodeVerifier();
+      const state = generateState();
+      const nonce = generateNonce();
 
       // 存储PKCE参数到sessionStorage
       sessionStorage.setItem('oauth_code_verifier', codeVerifier);
       sessionStorage.setItem('oauth_state', state);
+      sessionStorage.setItem('oauth_nonce', nonce);
 
       // 准备OAuth参数
-      const clientId = 'admin-portal-client';
-      const redirectUri = `${window.location.origin}/auth/callback`;
+      const clientId = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal-client';
+      const redirectUri = process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`;
       const oauthServiceUrl = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
 
       // 构建授权URL
@@ -122,6 +127,7 @@ function LoginForm() {
         state: state,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
+        nonce: nonce,
       });
 
       authorizeUrl.search = authParams.toString();

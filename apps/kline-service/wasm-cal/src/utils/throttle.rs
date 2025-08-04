@@ -4,8 +4,8 @@ use std::cell::Cell;
 
 // 使用 thread_local 存储计数器，避免频繁重绘
 thread_local! {
-    static RENDER_COUNTER: Cell<u32> = Cell::new(0);
-    static MOUSE_MOVE_COUNTER: Cell<u32> = Cell::new(0);
+    static RENDER_COUNTER: Cell<u32> = const { Cell::new(0) };
+    static MOUSE_MOVE_COUNTER: Cell<u32> = const { Cell::new(0) };
 }
 
 /// 渲染节流配置
@@ -139,14 +139,14 @@ mod tests {
         RenderThrottle::force_reset_render_counter();
 
         // 前两次调用应该返回 false
-        assert_eq!(RenderThrottle::should_render(&config), false);
-        assert_eq!(RenderThrottle::should_render(&config), false);
+        assert!(!RenderThrottle::should_render(&config));
+        assert!(!RenderThrottle::should_render(&config));
         // 第三次调用应该返回 true
-        assert_eq!(RenderThrottle::should_render(&config), true);
+        assert!(RenderThrottle::should_render(&config));
         // 循环重复
-        assert_eq!(RenderThrottle::should_render(&config), false);
-        assert_eq!(RenderThrottle::should_render(&config), false);
-        assert_eq!(RenderThrottle::should_render(&config), true);
+        assert!(!RenderThrottle::should_render(&config));
+        assert!(!RenderThrottle::should_render(&config));
+        assert!(RenderThrottle::should_render(&config));
     }
 
     #[test]
@@ -160,12 +160,12 @@ mod tests {
         RenderThrottle::force_reset_mouse_counter();
 
         // 第一次调用应该返回 false
-        assert_eq!(RenderThrottle::should_handle_mouse_move(&config), false);
+        assert!(!RenderThrottle::should_handle_mouse_move(&config));
         // 第二次调用应该返回 true
-        assert_eq!(RenderThrottle::should_handle_mouse_move(&config), true);
+        assert!(RenderThrottle::should_handle_mouse_move(&config));
         // 循环重复
-        assert_eq!(RenderThrottle::should_handle_mouse_move(&config), false);
-        assert_eq!(RenderThrottle::should_handle_mouse_move(&config), true);
+        assert!(!RenderThrottle::should_handle_mouse_move(&config));
+        assert!(RenderThrottle::should_handle_mouse_move(&config));
     }
 
     #[test]

@@ -41,6 +41,22 @@ export function generateCodeVerifier(): string {
 }
 
 /**
+ * 生成OAuth state参数
+ * @returns state字符串
+ */
+export function generateState(): string {
+  return generateRandomString(32);
+}
+
+/**
+ * 生成OAuth nonce参数
+ * @returns nonce字符串
+ */
+export function generateNonce(): string {
+  return generateRandomString(32);
+}
+
+/**
  * 安全的URL编码
  * @param str 要编码的字符串
  * @returns 编码后的字符串

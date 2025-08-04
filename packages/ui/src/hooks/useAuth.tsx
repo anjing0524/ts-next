@@ -37,7 +37,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (username?: string) => void;
+  login: (user?: AuthUser | string) => void;
   logout: () => void;
   handleCallback: (code: string, state: string | null) => Promise<void>;
   hasPermission: (permission: string | string[]) => boolean;
@@ -73,11 +73,18 @@ export function AuthProvider({ children, authService }: AuthProviderProps) {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  const login = async (username?: string) => {
+  const login = async (user?: AuthUser | string) => {
     setIsLoading(true);
     try {
-      await authService.login(username);
-      // Page will be redirected by the authService
+      if (typeof user === 'object' && user !== null) {
+        // 如果直接传入了用户对象，直接设置用户状态
+        setUser(user);
+        setIsLoading(false);
+      } else {
+        // 否则调用 authService.login 进行 OAuth 流程
+        await authService.login(user);
+        // Page will be redirected by the authService
+      }
     } catch (err: any) {
       setError(err.message);
       setIsLoading(false);

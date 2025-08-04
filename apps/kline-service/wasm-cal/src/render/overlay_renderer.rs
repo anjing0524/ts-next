@@ -63,7 +63,7 @@ impl OverlayRenderer {
 
     /// 绘制Tooltip
     fn draw_tooltip(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
-        let data_manager = render_ctx.data_manager().borrow();
+        let data_manager = render_ctx.data_manager_ref();
         let (min_low, max_high, _) = data_manager.get_cached_cal();
         let tick = data_manager.get_tick();
         let items = match data_manager.get_items() {
@@ -71,7 +71,7 @@ impl OverlayRenderer {
             None => return,
         };
 
-        let layout = render_ctx.layout().borrow();
+        let layout = render_ctx.layout_ref();
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
         let book_rect = layout.get_rect(&PaneId::OrderBook);
 
@@ -87,7 +87,7 @@ impl OverlayRenderer {
                 min_low,
                 max_high,
                 tick,
-                render_ctx.theme(),
+                render_ctx.theme_ref(),
             );
         }
 
@@ -110,7 +110,7 @@ impl OverlayRenderer {
                             volume,
                             self.mouse_x,
                             self.mouse_y,
-                            render_ctx.theme(),
+                            render_ctx.theme_ref(),
                         );
                     }
                 }
@@ -150,8 +150,8 @@ impl OverlayRenderer {
         ctx: &OffscreenCanvasRenderingContext2d,
         render_ctx: &RenderContext,
     ) {
-        let layout = render_ctx.layout().borrow();
-        let theme = render_ctx.theme();
+        let layout = render_ctx.layout_ref();
+        let theme = render_ctx.theme_ref();
         ctx.set_stroke_style_str(&theme.crosshair);
         ctx.set_line_width(1.0);
         if let Some(dash_array) = &self.dash_array {
@@ -191,14 +191,14 @@ impl OverlayRenderer {
         }
 
         // 绘制Y轴标签
-        let data_manager = render_ctx.data_manager().borrow();
+        let data_manager = render_ctx.data_manager_ref();
         let (min_low, max_high, max_volume) = data_manager.get_cached_cal();
         let price_mapper =
             CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 8.0);
         let price = price_mapper.unmap_y(mouse_y_constrained);
         self.draw_axis_label(
             ctx,
-            &format!("{:.2}", price),
+            &format!("{price:.2}"),
             y_axis_rect.x,
             mouse_y_constrained,
             y_axis_rect.width,
@@ -265,9 +265,9 @@ impl OverlayRenderer {
 
 impl RenderStrategy for OverlayRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_manager = ctx.canvas_manager().borrow();
+        let canvas_manager = ctx.canvas_manager_ref();
         let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
 
         // 根据用户建议，我们只清理DataZoom导航器上方的区域。
         // 这可以防止重影，同时避免干扰DataZoom本身的渲染。
@@ -294,7 +294,7 @@ impl RenderStrategy for OverlayRenderer {
     }
 
     fn handle_mouse_move(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
         let drawing_area = layout.get_rect(&PaneId::DrawingArea);
 
         let is_in_chart = drawing_area.contains(x, y);
@@ -316,7 +316,7 @@ impl RenderStrategy for OverlayRenderer {
     }
 
     fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {
-        let layout = ctx.layout().borrow();
+        let layout = ctx.layout_ref();
         if layout.get_rect(&PaneId::DrawingArea).contains(x, y) {
             return CursorStyle::Crosshair;
         }

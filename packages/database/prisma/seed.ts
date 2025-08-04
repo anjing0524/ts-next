@@ -603,6 +603,16 @@ async function main() {
       action: 'interact', // 交互动作 (Interaction action)
       isActive: true,
     },
+    // 新增客户端密钥重置权限
+    {
+      name: 'client:secret:reset',
+      displayName: '重置客户端密钥',
+      description: '重置OAuth客户端的密钥',
+      type: PermissionType.API,
+      resource: '/api/v2/clients/{clientId}/secret',
+      action: 'POST',
+      isActive: true,
+    },
   ];
 
   const seededPermissions: Record<string, Prisma.PermissionGetPayload<true>> = {};
@@ -671,6 +681,7 @@ async function main() {
       'client:read',
       'client:update',
       'client:delete',
+      'client:secret:reset',
     ],
     AUDIT_ADMIN: ['menu:system:audit:view', 'audit:list', 'audit:read'],
     USER: [

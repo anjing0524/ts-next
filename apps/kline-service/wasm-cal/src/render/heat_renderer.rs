@@ -5,8 +5,6 @@ use crate::data::DataManager;
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
-use std::cell::RefCell;
-use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 热图渲染器
@@ -33,22 +31,21 @@ impl HeatRenderer {
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        data_manager: &Rc<RefCell<DataManager>>,
+        data_manager: &DataManager,
     ) {
-        let data_manager_ref = data_manager.borrow();
-        let items = match data_manager_ref.get_items() {
+        let items = match data_manager.get_items() {
             Some(items) => items,
             None => return,
         };
 
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
             return;
         }
 
-        let (min_low, max_high, _) = data_manager_ref.get_cached_cal();
-        let tick = data_manager_ref.get_tick();
+        let (min_low, max_high, _) = data_manager.get_cached_cal();
+        let tick = data_manager.get_tick();
         if tick <= 0.0 || min_low >= max_high {
             return;
         }
@@ -105,7 +102,7 @@ impl HeatRenderer {
                 let rect_height = (y_mapper.map_y(price_low + tick) - y).abs();
 
                 ctx.set_global_alpha(0.25 + 0.75 * norm);
-                ctx.set_fill_style_str(&self.get_cached_color(norm));
+                ctx.set_fill_style_str(self.get_cached_color(norm));
                 ctx.fill_rect(x, y - rect_height, layout.total_candle_width, rect_height);
             }
         }
@@ -145,7 +142,7 @@ impl HeatRenderer {
         let r = (r1 as f64 * (1.0 - t) + r2 as f64 * t) as u8;
         let g = (g1 as f64 * (1.0 - t) + g2 as f64 * t) as u8;
         let b = (b1 as f64 * (1.0 - t) + b2 as f64 * t) as u8;
-        format!("rgb({},{},{})", r, g, b)
+        format!("rgb({r},{g},{b})")
     }
 
     fn parse_rgb_static(c: &str) -> (u8, u8, u8) {
@@ -159,10 +156,11 @@ impl HeatRenderer {
 
 impl RenderStrategy for HeatRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_ref = ctx.canvas_manager().borrow();
+        let canvas_ref = ctx.canvas_manager_ref();
         let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
-        let layout_ref = ctx.layout().borrow();
-        self.draw(main_ctx, &layout_ref, ctx.data_manager());
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
+        self.draw(main_ctx, &layout, &data_manager);
         Ok(())
     }
 

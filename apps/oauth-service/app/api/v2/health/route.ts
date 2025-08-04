@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@repo/database';
-import { redis } from '@repo/cache';
+import { cacheManager } from '@repo/cache';
 
 /**
  * Enhanced Health Check API
@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     versions: {
       node: process.version,
       api: process.env.npm_package_version || '1.0.0',
+      database: '',
+      redis: '',
     },
     metrics: {
       memory: {
@@ -52,20 +54,31 @@ export async function GET(req: NextRequest) {
 
     // Check Redis connectivity
     const redisStartTime = Date.now();
-    const redisResponse = await redis.ping();
-    if (redisResponse === 'PONG') {
-      healthStatus.services.redis = 'healthy';
+    const redisClient = cacheManager.getRedisClient();
+    if (redisClient) {
+      try {
+        const redisResponse = await redisClient.ping();
+        if (redisResponse === 'PONG') {
+          healthStatus.services.redis = 'healthy';
+        } else {
+          healthStatus.services.redis = 'unhealthy';
+        }
+        healthStatus.response_time.redis = Date.now() - redisStartTime;
+
+        // Get Redis version
+        try {
+          const redisInfo = await redisClient.info('server');
+          const versionMatch = redisInfo.match(/redis_version:(\d+\.\d+\.\d+)/);
+          healthStatus.versions.redis = versionMatch ? `Redis ${versionMatch[1]}` : 'Redis';
+        } catch {
+          healthStatus.versions.redis = 'Redis';
+        }
+      } catch (error) {
+        healthStatus.services.redis = 'unhealthy';
+        healthStatus.versions.redis = 'Redis';
+      }
     } else {
       healthStatus.services.redis = 'unhealthy';
-    }
-    healthStatus.response_time.redis = Date.now() - redisStartTime;
-
-    // Get Redis version
-    try {
-      const redisInfo = await redis.info('server');
-      const versionMatch = redisInfo.match(/redis_version:(\d+\.\d+\.\d+)/);
-      healthStatus.versions.redis = versionMatch ? `Redis ${versionMatch[1]}` : 'Redis';
-    } catch {
       healthStatus.versions.redis = 'Redis';
     }
 

@@ -6,8 +6,6 @@ use crate::data::DataManager;
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
-use std::cell::RefCell;
-use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 成交量图绘制器
@@ -19,22 +17,21 @@ impl VolumeRenderer {
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        data_manager: &Rc<RefCell<DataManager>>,
+        data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let data_manager_ref = data_manager.borrow();
-        let items = match data_manager_ref.get_items() {
+        let items = match data_manager.get_items() {
             Some(items) => items,
             None => return,
         };
 
-        let (visible_start, visible_count, _) = data_manager_ref.get_visible();
+        let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
             return;
         }
 
-        let (_, _, max_volume) = data_manager_ref.get_cached_cal();
+        let (_, _, max_volume) = data_manager.get_cached_cal();
         let volume_rect = layout.get_rect(&PaneId::VolumeChart);
         let y_mapper = CoordinateMapper::new_for_y_axis(volume_rect, 0.0, max_volume, 2.0);
 
@@ -79,10 +76,13 @@ impl VolumeRenderer {
 
 impl RenderStrategy for VolumeRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        let canvas_ref = ctx.canvas_manager().borrow();
-        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
-        let layout_ref = ctx.layout().borrow();
-        self.draw(main_ctx, &layout_ref, ctx.data_manager(), ctx.theme());
+        let canvas_manager = ctx.canvas_manager_ref();
+        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        let layout = ctx.layout_ref();
+        let data_manager = ctx.data_manager_ref();
+        let theme = ctx.theme_ref();
+
+        self.draw(main_ctx, &layout, &data_manager, theme);
         Ok(())
     }
 

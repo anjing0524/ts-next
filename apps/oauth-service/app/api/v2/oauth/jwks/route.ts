@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KeyService } from '@repo/lib/src/auth/key-service';
-import { rsaPublicKeyToJwk, isValidRsaPublicKey } from '@/lib/auth/jwk-utils';
-
-// Initialize key service
-const keyService = new KeyService();
+import { KeyService } from '@repo/lib/node';
+import { rsaPublicKeyToJwk, isValidRsaPublicKey, JWK } from '@/lib/auth/jwk-utils';
 
 /**
  * JWKS (JSON Web Key Set) endpoint
@@ -13,8 +10,10 @@ const keyService = new KeyService();
  */
 export async function GET(request: NextRequest) {
   try {
+    // Initialize key service at request time to avoid build-time issues
+    const keyService = new KeyService();
     const availableVersions = keyService.getAvailableVersions();
-    const jwks = { keys: [] };
+    const jwks = { keys: [] as JWK[] };
 
     for (const version of availableVersions) {
       try {
