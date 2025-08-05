@@ -17,4 +17,3 @@ spec:
                 name: ts-next-template-service
                 port:
                   number: 3000
-       

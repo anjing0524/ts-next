@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Login</title>
+</head>
+<body>
+    <h1>Test Login Page</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            try {
+                // Test the direct auth endpoint
+                const response = await fetch('http://localhost:3001/api/v2/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'adminpassword',
+                        client_id: 'auth-center-admin-client',
+                        redirect_uri: 'http://localhost:3002/auth/callback',
+                        response_type: 'code',
+                        scope: 'openid profile email user:read user:write role:read role:write permission:read permission:write client:read client:write audit:read',
+                        state: 'test-state',
+                        code_challenge: 'test-challenge',
+                        code_challenge_method: 'S256',
+                        nonce: 'test-nonce'
+                    })
+                });
+
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `
+                    <h2>Response:</h2>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h2>Error:</h2>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

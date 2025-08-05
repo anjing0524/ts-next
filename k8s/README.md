@@ -168,4 +168,4 @@ kubectl get ingress
 
 1. MySQL Pod 是否正常运行
 2. MySQL 服务是否可访问
-3. 环境变量配置是否正确 
+3. 环境变量配置是否正确

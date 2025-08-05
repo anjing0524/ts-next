@@ -66,13 +66,8 @@ ENV NODE_ENV=production \
     # 添加调试环境变量
     DEBUG="next:*"
 
-# 声明可注入的环境变量（用于数据库连接）
-ENV MYSQL_HOST="" \
-    MYSQL_USER="" \
-    MYSQL_PASSWORD="" \
-    MYSQL_DATABASE="" \
-    MYSQL_PORT=3306 \
-    SCHEDULER_API_URL=""
+# 声明可注入的环境变量
+ENV SCHEDULER_API_URL=""
 
 # 创建非特权用户
 RUN addgroup --system --gid 1001 nodejs && \

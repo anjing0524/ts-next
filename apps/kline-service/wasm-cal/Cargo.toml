@@ -1,0 +1,43 @@
+[package]
+name = "kline-processor"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+web-sys = { version = "0.3.77", features = [
+  "OffscreenCanvas",
+  "OffscreenCanvasRenderingContext2d",
+  "CanvasRenderingContext2d",
+  "HtmlCanvasElement",
+  "console",
+  "MouseEvent",
+  "WheelEvent",
+  "TextMetrics",
+  "Performance",
+  "Window",
+] }
+js-sys = "0.3.77"
+wasm-bindgen = "0.2.100"
+flatbuffers = "25.2.10"
+lazy_static = "1.5.0"
+anyhow = "1.0.97"
+thiserror = "2.0.12"
+console_error_panic_hook = "0.1.7"
+chrono = { version = "0.4.40" }
+ordered-float = "5.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.141"
+serde-wasm-bindgen = "0.6"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.39"
+
+[profile.release]
+opt-level = 3
+lto = true

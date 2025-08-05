@@ -1,0 +1,14 @@
+services:
+  - name: 'admin-portal'
+    bind_address: '0.0.0.0:6188'
+    upstreams:
+      - '127.0.0.1:3002'
+    tls: false
+    health_check:
+      timeout_ms: 500
+      frequency_secs: 5
+  - name: 'oauth-service'
+    bind_address: '0.0.0.0:6189'
+    upstreams:
+      - '127.0.0.1:3001'
+    tls: false

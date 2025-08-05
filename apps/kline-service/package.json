@@ -1,0 +1,38 @@
+{
+  "name": "kline-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3003 --turbopack",
+    "build": "next build",
+    "start": "next start -p 3003",
+    "flatc:generate": "flatc -o ./src/generated --ts ./schemas/kline.fbs && flatc -o ./src/wasm-cal/src --rust ./schemas/kline.fbs"
+  },
+  "dependencies": {
+    "next": "^15.4.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@repo/ui": "workspace:*",
+    "@repo/lib": "workspace:*",
+    "flatbuffers": "^25.2.10",
+    "lightweight-charts": "^5.0.4"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
+    "@repo/tailwind-config": "workspace:*",
+    "@repo/next-config": "workspace:*",
+    "@repo/jest-config": "workspace:*",
+    "typescript": "^5.9.2",
+    "@types/react": "^19.1.9",
+    "@types/node": "^20.19.1",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.5",
+    "tailwindcss": "^4.1.11",
+    "@tailwindcss/postcss": "^4.1.11",
+    "postcss": "^8.5.3"
+  },
+  "prettier": "@repo/prettier-config"
+}

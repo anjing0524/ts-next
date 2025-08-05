@@ -1,0 +1,8 @@
+{
+  "api": {
+    "baseUrl": "https://api.example.com"
+  },
+  "database": {
+    "name": "prod.db"
+  }
+}

@@ -9,6 +9,6 @@ data:
   MYSQL_PORT: '3306'
   MYSQL_USER: 'root'
   NEXT_TELEMETRY_DISABLED: '1'
-  NODE_ENV: "production"
+  NODE_ENV: 'production'
   PORT: '3000'
   SCHEDULER_API_URL: 'http://scheduler-service:8080'
