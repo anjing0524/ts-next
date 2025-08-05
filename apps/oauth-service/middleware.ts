@@ -6,7 +6,8 @@ import { permissionMap } from './lib/permission-map';
 import './lib/app-init';
 
 export const config = {
-  matcher: '/api/v2/:path*',
+  matcher: ['/api/v2/((?!health$).*)'],
+  runtime: 'nodejs',
 };
 
 /**

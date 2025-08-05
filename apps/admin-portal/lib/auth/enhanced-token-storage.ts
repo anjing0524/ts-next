@@ -72,9 +72,20 @@ export class EnhancedTokenStorage {
   static setTokens(options: TokenStorageOptions): void {
     const { accessToken, refreshToken, csrfToken, expiresIn = 3600, refreshTokenExpiresIn = 30 * 24 * 60 * 60 } = options;
 
-    // 客户端环境 - 使用document.cookie
-    if (typeof window !== 'undefined') {
-      this.setClientTokens({ accessToken, refreshToken, csrfToken, expiresIn, refreshTokenExpiresIn });
+    // 开发环境或E2E测试：使用sessionStorage以兼容测试
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      sessionStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
+      if (refreshToken) {
+        sessionStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
+      }
+      if (csrfToken) {
+        sessionStorage.setItem(this.CSRF_TOKEN_KEY, csrfToken);
+      }
+    } else {
+      // 生产环境：使用HttpOnly Cookie
+      if (typeof window !== 'undefined') {
+        this.setClientTokens({ accessToken, refreshToken, csrfToken, expiresIn, refreshTokenExpiresIn });
+      }
     }
 
     // 设置过期时间（客户端存储）
@@ -131,6 +142,13 @@ export class EnhancedTokenStorage {
    */
   static getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
+    
+    // 开发环境：优先检查sessionStorage
+    if (process.env.NODE_ENV === 'development') {
+      const token = sessionStorage.getItem(this.ACCESS_TOKEN_KEY);
+      if (token) return token;
+    }
+    
     return this.getCookieValue(this.ACCESS_TOKEN_KEY);
   }
 
@@ -139,6 +157,13 @@ export class EnhancedTokenStorage {
    */
   static getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
+    
+    // 开发环境：优先检查sessionStorage
+    if (process.env.NODE_ENV === 'development') {
+      const token = sessionStorage.getItem(this.REFRESH_TOKEN_KEY);
+      if (token) return token;
+    }
+    
     return this.getCookieValue(this.REFRESH_TOKEN_KEY);
   }
 
@@ -147,6 +172,13 @@ export class EnhancedTokenStorage {
    */
   static getCSRFToken(): string | null {
     if (typeof window === 'undefined') return null;
+    
+    // 开发环境：优先检查sessionStorage
+    if (process.env.NODE_ENV === 'development') {
+      const token = sessionStorage.getItem(this.CSRF_TOKEN_KEY);
+      if (token) return token;
+    }
+    
     return this.getCookieValue(this.CSRF_TOKEN_KEY);
   }
 
@@ -181,7 +213,11 @@ export class EnhancedTokenStorage {
 
     // 清除sessionStorage
     if (typeof Storage !== 'undefined') {
+      sessionStorage.removeItem(this.ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(this.REFRESH_TOKEN_KEY);
+      sessionStorage.removeItem(this.CSRF_TOKEN_KEY);
       sessionStorage.removeItem(this.TOKEN_EXPIRES_AT_KEY);
+      sessionStorage.removeItem('access_token'); // 向后兼容
       sessionStorage.removeItem('refresh_token'); // 向后兼容
     }
   }

@@ -98,10 +98,10 @@ export async function POST(req: NextRequest) {
     // Prisma unique constraint violation (P2002) is handled by the findUnique check above.
     // This catch block is for other unexpected errors.
     console.error('Error blacklisting JTI:', error);
-    let errorMessage = 'Failed to blacklist JTI due to an unexpected error.';
+    // Failed to blacklist JTI due to an unexpected error.
     if (error.code === 'P2002' && error.meta?.target?.includes('jti')) {
       // This case should ideally be caught by the findUnique check, but as a fallback:
-      errorMessage = 'JTI已在黑名单';
+      // JTI已在黑名单
       return errorResponse({
         message: 'JTI已在黑名单',
         statusCode: 409,

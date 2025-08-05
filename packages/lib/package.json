@@ -42,7 +42,7 @@
     "@repo/ui": "workspace:*",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
-    "jose": "^5.2.3",
+    "jose": "^6.0.12",
     "bcryptjs": "^2.4.3",
     "bcrypt": "^6.0.0",
     "nanoid": "^5.0.0",
@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "typescript": "^5.4.3",
+    "typescript": "^5.9.2",
     "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.5",

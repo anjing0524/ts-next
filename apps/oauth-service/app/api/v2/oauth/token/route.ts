@@ -18,7 +18,7 @@ import { withRateLimit } from '@repo/lib/middleware';
 
 // 从专用的模式文件导入 Zod 模式
 // Import Zod schemas from the dedicated schema file
-import { RBACService } from '@/lib/auth/services/rbac-service';
+import { getServiceContainer } from '@/lib/auth/service-container';
 import { z } from 'zod'; // Keep z import if used directly for type inference like z.infer
 import {
   // tokenRequestSchema, // 这是可区分联合类型 (This is the discriminated union) - Not directly used after individual parsing
@@ -46,13 +46,13 @@ async function validateRefreshToken(
   try {
     const payload = await JWTUtils.verifyAndDecodeRefreshToken(refreshToken, client);
     return payload;
-  } catch (error) {
+  } catch (_error) {
     throw new OAuth2Error('Invalid refresh token.', OAuth2ErrorCode.InvalidGrant);
   }
 }
 
 // 辅助函数：获取客户端权限
-async function getClientPermissions(clientId: string): Promise<string[]> {
+async function getClientPermissions(_clientId: string): Promise<string[]> {
   // 这里可以根据需要实现客户端权限获取逻辑
   // 目前返回空数组，表示客户端没有特殊权限
   return [];
@@ -193,7 +193,9 @@ async function handleAuthorizationCodeGrant(
   );
 
   // 获取用户权限
-  const userPermissions = await RBACService.getUserPermissionsArr(validatedAuthCode.userId);
+  const container = getServiceContainer();
+  const rbacService = container.getRBACService();
+  const userPermissions = await rbacService.getUserPermissionsArr(validatedAuthCode.userId);
 
   // 获取用户信息（用于可能的ID令牌）
   const user = await prisma.user.findUnique({
@@ -236,7 +238,7 @@ async function handleAuthorizationCodeGrant(
     : 30; // 默认30天 (Default 30 days)
 
   // 存储刷新令牌到数据库 (Store refresh token to database)
-  const refreshTokenRecord = await prisma.refreshToken.create({
+  await prisma.refreshToken.create({
     data: {
       token: refreshTokenString, // 添加原始令牌
       tokenHash: await hashToken(refreshTokenString),
@@ -317,7 +319,9 @@ async function handleRefreshTokenGrant(
   }
 
   // 获取用户权限 (Get user permissions)
-  const userPermissions = await RBACService.getUserPermissionsArr(
+  const container = getServiceContainer();
+  const rbacService = container.getRBACService();
+  const userPermissions = await rbacService.getUserPermissionsArr(
     refreshTokenPayload.user_id as string
   );
 

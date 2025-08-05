@@ -6,7 +6,7 @@ import { cacheManager } from '@repo/cache';
  * Enhanced Health Check API
  * Comprehensive health check with database and Redis connectivity
  */
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const startTime = Date.now();
   const healthStatus = {
     status: 'healthy',
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
         } catch {
           healthStatus.versions.redis = 'Redis';
         }
-      } catch (error) {
+      } catch (_error) {
         healthStatus.services.redis = 'unhealthy';
         healthStatus.versions.redis = 'Redis';
       }
@@ -82,12 +82,12 @@ export async function GET(req: NextRequest) {
       healthStatus.versions.redis = 'Redis';
     }
 
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('database')) {
+  } catch (_error) {
+    if (_error instanceof Error) {
+      if (_error.message.includes('database')) {
         healthStatus.services.database = 'unhealthy';
       }
-      if (error.message.includes('redis')) {
+      if (_error.message.includes('redis')) {
         healthStatus.services.redis = 'unhealthy';
       }
     }

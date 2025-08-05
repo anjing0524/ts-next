@@ -24,9 +24,9 @@ export const useOAuthLogin = (config: OAuthConfig) => {
     error: null,
   });
 
-  const generatePKCEParams = () => {
+  const generatePKCEParams = async () => {
     const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
     const state = generateState();
     const nonce = generateNonce();
 
@@ -42,7 +42,7 @@ export const useOAuthLogin = (config: OAuthConfig) => {
     setState({ isLoading: true, error: null });
 
     try {
-      const { codeChallenge, state, nonce } = generatePKCEParams();
+      const { codeChallenge, state, nonce } = await generatePKCEParams();
       
       if (useDirectAuth && credentials) {
         // Username/password flow

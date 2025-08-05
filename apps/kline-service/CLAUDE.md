@@ -1,4 +1,8 @@
-# Kline-Service 开发者指南
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Kline-Service 开发者指南
 
 ## 服务概述
 
@@ -35,7 +39,7 @@ Kline-Service 是一个基于 Next.js 和 WebAssembly 的高性能金融图表�
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 核心目录结构
+### 核心目录结构
 
 ```
 kline-service/
@@ -63,8 +67,7 @@ kline-service/
 │   └── Cargo.toml               # Rust依赖配置
 ├── schemas/
 │   └── kline.fbs                # FlatBuffers模式定义
-├── generated/                   # FlatBuffers生成代码
-└── docs/                        # 架构文档
+└── generated/                   # FlatBuffers生成代码
 ```
 
 ## 技术特性
@@ -87,9 +90,9 @@ kline-service/
 - **多模式切换**: K线图 ↔ 热图显示
 - **60FPS性能**: 优化的渲染管线确保流畅交互
 
-## 开发命令
+## 核心命令
 
-### 快速开始
+### 开发环境
 ```bash
 # 安装依赖
 pnpm install
@@ -99,33 +102,35 @@ pnpm dev
 
 # 或启动特定服务
 pnpm --filter=kline-service dev
+
+# 构建项目
+pnpm build
+
+# 启动生产服务
+pnpm start
 ```
 
-### WASM构建
+### WASM 构建
 ```bash
-# 进入WASM目录
+# 进入 WASM 目录
 cd wasm-cal
 
-# 构建WASM模块并复制到public
-devbox ./build.sh
+# 构建并复制到 public 目录
+./build.sh
 
-# 单独构建WASM（调试模式）
-wasm-pack build --target web --out-dir pkg --dev
+# 或手动构建
+wasm-pack build --target web --out-dir pkg --release
 ```
 
-### 数据生成与测试
+### 数据生成
 ```bash
-# 生成FlatBuffers模式代码
+# 生成 FlatBuffers 代码
 pnpm flatc:generate
 
-# 运行单元测试
-pnpm test
-
-# 运行端到端测试
-pnpm e2e
-
-# 性能基准测试
-pnpm bench
+# 代码检查和格式化
+pnpm lint
+pnpm type-check
+pnpm format
 ```
 
 ## 数据格式与API
@@ -424,6 +429,47 @@ console.log = wasm_bindgen::console_log!;
 - [Rust WASM Book](https://rustwasm.github.io/docs/book/)
 - [OffscreenCanvas API](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas)
 - [FlatBuffers指南](https://google.github.io/flatbuffers/)
+
+## 开发注意事项
+
+1. **性能优化**: 
+   - 使用Transferable对象避免内存复制
+   - Web Worker处理计算密集型任务
+   - OffscreenCanvas实现独立渲染
+
+2. **内存管理**:
+   - WASM内存预分配和共享
+   - 及时释放KlineProcess实例
+   - 避免内存泄漏
+
+3. **调试技巧**:
+   - 使用Chrome DevTools Performance面板
+   - 检查WASM内存使用
+   - 监控FPS和渲染时间
+
+4. **错误处理**:
+   - 全局错误捕获
+   - Worker错误边界
+   - Canvas兼容性检查
+
+### 环境配置
+
+```bash
+# .env.local
+NEXT_PUBLIC_BASE_PATH=""  # 部署路径前缀
+```
+
+### 性能指标目标
+- 数据加载: 10,000条记录 < 100ms
+- 渲染性能: 60FPS @ 1920x1080
+- 内存使用: < 50MB (10K条数据)
+- 交互延迟: < 16ms
+
+### 常见问题排查
+
+1. **WASM加载失败**: 检查public/wasm-cal/目录文件
+2. **Canvas渲染异常**: 验证OffscreenCanvas支持
+3. **性能问题**: 使用DevTools监控Web Worker消息频率
 
 ## 沟通指南
 

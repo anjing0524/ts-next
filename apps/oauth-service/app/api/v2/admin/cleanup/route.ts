@@ -10,7 +10,7 @@ import { withErrorHandling } from '@repo/lib/node';
 /**
  * 手动触发清理的内部处理函数
  */
-async function cleanupHandlerInternal(request: NextRequest): Promise<NextResponse> {
+async function cleanupHandlerInternal(_request: NextRequest): Promise<NextResponse> {
   // 执行清理操作
   const result = await CleanupService.performCleanup();
   

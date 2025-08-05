@@ -214,7 +214,8 @@ impl DataZoomRenderer {
             return DragResult::NeedRedraw;
         }
 
-        DragResult::None
+        // 即使可见范围未发生改变，为了确保拖动手柄位置实时更新，也需要重绘
+        DragResult::NeedRedraw
     }
 
     fn draw_volume_area(

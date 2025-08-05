@@ -293,7 +293,7 @@ export async function POST(request: Request) {
     throw new Error(`FlatBuffers标识符验证失败，期望: ${FILE_IDENTIFIER}，实际: ${identifier}`);
   }
 
-  return new NextResponse(buf, {
+  return new NextResponse(buf as unknown as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',

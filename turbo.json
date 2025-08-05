@@ -27,7 +27,8 @@
         "JWT_PUBLIC_KEY_PATH",
         "AUTH_CENTER_LOGIN_PAGE_URL",
         "AUTH_CENTER_UI_AUDIENCE",
-        "AUTH_CENTER_UI_CLIENT_ID"
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
       ]
     },
     "start": {
@@ -46,26 +47,27 @@
       ]
     },
     "lint": {
-      "dependsOn": ["^build"],
-      "inputs": ["**/*.{ts,tsx,js,jsx,mjs}"],
+      "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml}"],
       "outputs": []
     },
     "type-check": {
-      "dependsOn": ["^build"],
+      "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx}", "tsconfig.json", "**/tsconfig.*.json"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "outputs": ["coverage/**"],
-      "inputs": ["**/*.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"]
+      "inputs": ["**/*.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}", "jest.config.{js,ts}"]
     },
     "test:integration": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "outputs": [],
       "cache": false
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "outputs": ["coverage/**"]
     },
     "db:generate": {
@@ -90,6 +92,7 @@
     },
     "format": {
       "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml,md}"],
       "outputs": []
     },
     "flatc:generate": {

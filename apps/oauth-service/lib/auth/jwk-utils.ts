@@ -88,7 +88,7 @@ export function isValidRsaPublicKey(pem: string): boolean {
       type: 'spki'
     });
     return true;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

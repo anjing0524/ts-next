@@ -147,9 +147,9 @@ export function SecurityEnhancer() {
   // 安全状态图标
   const SecurityIcon = ({ enabled }: { enabled: boolean }) => (
     enabled ? (
-      <CheckCircle className=\"h-4 w-4 text-green-500\" />
+      <CheckCircle className="h-4 w-4 text-green-500" />
     ) : (
-      <XCircle className=\"h-4 w-4 text-red-500\" />
+      <XCircle className="h-4 w-4 text-red-500" />
     )
   );
 
@@ -162,29 +162,29 @@ export function SecurityEnhancer() {
   }
 
   return (
-    <div className=\"fixed top-4 left-4 z-50\">
-      <Card className=\"w-80 shadow-xl border border-gray-200\">
-        <CardHeader className=\"pb-2\">
-          <div className=\"flex items-center space-x-2\">
-            <Shield className=\"h-4 w-4\" />
-            <CardTitle className=\"text-sm font-medium\">安全状态</CardTitle>
+    <div className="fixed top-4 left-4 z-50">
+      <Card className="w-80 shadow-xl border border-gray-200">
+        <CardHeader className="pb-2">
+          <div className="flex items-center space-x-2">
+            <Shield className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium">安全状态</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className=\"space-y-3\">
+        <CardContent className="space-y-3">
           {/* 安全评分 */}
-          <div className=\"text-center space-y-1\">
+          <div className="text-center space-y-1">
             <div className={`text-2xl font-bold ${securityColor}`}>
               {securityScore}%
             </div>
-            <div className=\"text-xs text-gray-500 capitalize\">
+            <div className="text-xs text-gray-500 capitalize">
               {securityLevel} security
             </div>
           </div>
 
           {/* 安全检查项 */}
-          <div className=\"space-y-2\">
-            <div className=\"flex items-center justify-between text-xs\">
-              <div className=\"flex items-center space-x-2\">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
                 <SecurityIcon enabled={securityStatus.httpsEnabled} />
                 <span>HTTPS 加密</span>
               </div>
@@ -193,8 +193,8 @@ export function SecurityEnhancer() {
               </span>
             </div>
 
-            <div className=\"flex items-center justify-between text-xs\">
-              <div className=\"flex items-center space-x-2\">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
                 <SecurityIcon enabled={securityStatus.csrfProtection} />
                 <span>CSRF 保护</span>
               </div>
@@ -203,8 +203,8 @@ export function SecurityEnhancer() {
               </span>
             </div>
 
-            <div className=\"flex items-center justify-between text-xs\">
-              <div className=\"flex items-center space-x-2\">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
                 <SecurityIcon enabled={securityStatus.xssProtection} />
                 <span>XSS 保护</span>
               </div>
@@ -213,8 +213,8 @@ export function SecurityEnhancer() {
               </span>
             </div>
 
-            <div className=\"flex items-center justify-between text-xs\">
-              <div className=\"flex items-center space-x-2\">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
                 <SecurityIcon enabled={securityStatus.cspEnabled} />
                 <span>内容安全策略</span>
               </div>
@@ -223,8 +223,8 @@ export function SecurityEnhancer() {
               </span>
             </div>
 
-            <div className=\"flex items-center justify-between text-xs\">
-              <div className=\"flex items-center space-x-2\">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
                 <SecurityIcon enabled={securityStatus.secureHeaders} />
                 <span>安全头</span>
               </div>
@@ -236,12 +236,12 @@ export function SecurityEnhancer() {
 
           {/* 安全建议 */}
           {securityScore < 100 && (
-            <div className=\"bg-yellow-50 border border-yellow-200 rounded p-2\">
-              <div className=\"flex items-center space-x-1 mb-1\">
-                <AlertTriangle className=\"h-3 w-3 text-yellow-600\" />
-                <span className=\"text-xs font-medium text-yellow-800\">安全建议</span>
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+              <div className="flex items-center space-x-1 mb-1">
+                <AlertTriangle className="h-3 w-3 text-yellow-600" />
+                <span className="text-xs font-medium text-yellow-800">安全建议</span>
               </div>
-              <div className=\"text-xs text-yellow-700 space-y-1\">
+              <div className="text-xs text-yellow-700 space-y-1">
                 {!securityStatus.httpsEnabled && (
                   <div>• 启用HTTPS加密传输</div>
                 )}
@@ -259,7 +259,7 @@ export function SecurityEnhancer() {
           )}
 
           {/* 最后更新时间 */}
-          <div className=\"text-xs text-gray-400 text-center pt-2 border-t\">
+          <div className="text-xs text-gray-400 text-center pt-2 border-t">
             最后更新: {new Date(securityStatus.lastUpdated).toLocaleTimeString()}
           </div>
         </CardContent>
@@ -310,7 +310,7 @@ export const CSRFUtils = {
       const csrfToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('csrf_token='));
-      return csrfToken ? csrfToken.split('=')[1] : null;
+      return csrfToken ? csrfToken.split('=')[1] || null : null;
     } catch {
       return null;
     }
@@ -336,7 +336,7 @@ export const XSSUtils = {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/\"/g, '&quot;')
+      .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   },
 
@@ -346,7 +346,7 @@ export const XSSUtils = {
   sanitizeInput(input: string): string {
     // 移除潜在的恶意字符
     return input
-      .replace(/[<>\"']/g, '')
+      .replace(/[<>"']/g, '')
       .replace(/javascript:/gi, '')
       .replace(/on\w+\s*=/gi, '');
   },

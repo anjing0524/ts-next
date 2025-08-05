@@ -12,11 +12,9 @@ pub mod overlay_renderer;
 pub mod price_renderer;
 pub mod render_context; // 新增：统一渲染上下文
 pub mod renderer_traits;
+pub mod strategy;
 pub mod tooltip_renderer; // 新增：Tooltip渲染器
-pub mod volume_renderer;
-// pub mod renderer_factory;  // 已移除：工厂模式，现在使用策略模式
-pub mod advanced;
-pub mod strategy; // 新增：策略模式 // 新增：高级渲染器架构
+pub mod volume_renderer; // 新增：策略模式 // 新增：高级渲染器架构
 
 pub use chart_renderer::ChartRenderer;
 pub use render_context::{

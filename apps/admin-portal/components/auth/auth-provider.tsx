@@ -45,7 +45,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const { login: baseLogin, logout: baseLogout, user: baseUser } = useBaseAuth();
-  const [user, setUser] = useState<User | null>(baseUser);
+  const [user, setUser] = useState<User | null>(baseUser as User | null);
   const [isLoading, setIsLoading] = useState(true);
   const [tokenStatus, setTokenStatus] = useState<ReturnType<TokenRefreshManager['getTokenStatus']>>({
     hasAccessToken: false,

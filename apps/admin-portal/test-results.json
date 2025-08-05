@@ -48,34 +48,2799 @@
     "workers": 4,
     "webServer": null
   },
-  "suites": [],
-  "errors": [
+  "suites": [
     {
-      "message": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.",
-      "stack": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.\n    at Object.<anonymous> (/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-setup.ts:9:6)",
-      "location": {
-        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-setup.ts",
-        "column": 6,
-        "line": 9
-      },
-      "snippet": "\u001b[90m   at \u001b[39mglobal-setup.ts:9\n\n   7 |  * 在E2E测试开始前初始化测试环境\n   8 |  */\n>  9 | setup('全局测试设置', async () => {\n     |      ^\n  10 |   console.log('🚀 开始全局测试设置...');\n  11 |\n  12 |   // 1. 确保数据库已初始化"
+      "title": "specs/01-authentication.spec.ts",
+      "file": "specs/01-authentication.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "OAuth 2.1 Authentication Flow",
+          "file": "specs/01-authentication.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "Direct Authentication",
+              "file": "specs/01-authentication.spec.ts",
+              "line": 19,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should login successfully with admin credentials",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-a4d0033756ec8eb097ea",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 20,
+                  "column": 9
+                },
+                {
+                  "title": "should handle invalid credentials",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-92327e998f90b14f046b",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 53,
+                  "column": 9
+                },
+                {
+                  "title": "should validate required fields",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-5330b91c5b3d9150e240",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 74,
+                  "column": 9
+                },
+                {
+                  "title": "should handle session expiration",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-c18efce21fc3e825f3df",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 91,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "OAuth Authorization Code Flow",
+              "file": "specs/01-authentication.spec.ts",
+              "line": 113,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should initiate OAuth flow correctly",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-2eee0644d664096b7099",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 114,
+                  "column": 9
+                },
+                {
+                  "title": "should complete OAuth authorization flow",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-33f6ba88875a96da16c3",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 144,
+                  "column": 9
+                },
+                {
+                  "title": "should handle OAuth authorization denial",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-ab8efd4e0da7f4d5c6df",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 189,
+                  "column": 9
+                },
+                {
+                  "title": "should validate OAuth state parameter for CSRF protection",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-ea4981dff65b290faf24",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 219,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Token Management",
+              "file": "specs/01-authentication.spec.ts",
+              "line": 243,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle token refresh",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-15fe1dc4a1f75af12837",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 244,
+                  "column": 9
+                },
+                {
+                  "title": "should clear tokens on logout",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-5a1ed43fe5db8b612407",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 266,
+                  "column": 9
+                },
+                {
+                  "title": "should handle invalid tokens",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-29db72073af93ee4af5b",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 292,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Error Handling",
+              "file": "specs/01-authentication.spec.ts",
+              "line": 313,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle network errors during login",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-6b1e1e4b24f16bb825e8",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 314,
+                  "column": 9
+                },
+                {
+                  "title": "should handle OAuth service unavailable",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-f663a7d8e8da6736cc3e",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 335,
+                  "column": 9
+                },
+                {
+                  "title": "should handle invalid redirect URI",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-9f01d6d5e2cab2ed8195",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 354,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Session Persistence",
+              "file": "specs/01-authentication.spec.ts",
+              "line": 378,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should maintain session across page reloads",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-403c94c0fe31407fa277",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 379,
+                  "column": 9
+                },
+                {
+                  "title": "should handle session timeout",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "9b36bdc0ba64410d8c8a-aa4893efc81d2b557488",
+                  "file": "specs/01-authentication.spec.ts",
+                  "line": 396,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
-      "message": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.",
-      "stack": "Error: Playwright Test did not expect test() to be called here.\nMost common reasons include:\n- You are calling test() in a configuration file.\n- You are calling test() in a file that is imported by the configuration file.\n- You have two different versions of @playwright/test. This usually happens\n  when one of the dependencies in your package.json depends on @playwright/test.\n    at Object.<anonymous> (/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-teardown.ts:9:9)",
-      "location": {
-        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/global-teardown.ts",
-        "column": 9,
-        "line": 9
-      },
-      "snippet": "\u001b[90m   at \u001b[39mglobal-teardown.ts:9\n\n   7 |  * 在E2E测试完成后清理测试环境\n   8 |  */\n>  9 | teardown('全局测试清理', async () => {\n     |         ^\n  10 |   console.log('🧹 开始全局测试清理...');\n  11 |\n  12 |   try {"
+      "title": "specs/02-permissions.spec.ts",
+      "file": "specs/02-permissions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "RBAC Permission System",
+          "file": "specs/02-permissions.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "System Administrator Permissions",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 22,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should have access to all management features",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-8a6bc98c11a01681fcb6",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 23,
+                  "column": 9
+                },
+                {
+                  "title": "should be able to create, read, update, delete users",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-955147c8aa4f6764f2c9",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 59,
+                  "column": 9
+                },
+                {
+                  "title": "should have access to audit logs",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-9b35ab8d83f25d9a50fc",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 106,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "User Administrator Permissions",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 123,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should have limited access to user and role management",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-800d0c07d8678bdd8add",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 124,
+                  "column": 9
+                },
+                {
+                  "title": "should not have access to system configuration",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-5392d52cb470eabc7e3e",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 153,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Regular User Permissions",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 171,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should have minimal access",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-79fe569f622cb2f20e35",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 172,
+                  "column": 9
+                },
+                {
+                  "title": "should only access own profile",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-82d970a878432cbe5be7",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 196,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Permission Inheritance and Overrides",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 213,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should respect role hierarchy",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-9453370b6f7c3237da44",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 214,
+                  "column": 9
+                },
+                {
+                  "title": "should handle permission changes dynamically",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-1b45f3db0c2787ee3aa1",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 234,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "API Level Permission Checks",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 243,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should enforce permissions at API level",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-6cdec91881268d1de54b",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 244,
+                  "column": 9
+                },
+                {
+                  "title": "should allow authorized API access",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-359fa0e9d69a1c990d8d",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 263,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Button Level Permission Control",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 279,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should show/hide action buttons based on permissions",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-3838567aa3e32d1b638d",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 280,
+                  "column": 9
+                },
+                {
+                  "title": "should disable actions based on resource permissions",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-6b7dec0a516cfefab095",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 300,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Permission Caching and Performance",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 321,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should cache permissions efficiently",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-edf5fb47ef29fc9085dd",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 322,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Edge Cases and Error Handling",
+              "file": "specs/02-permissions.spec.ts",
+              "line": 348,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle users with no roles",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-7cce52cd020896f40759",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 349,
+                  "column": 9
+                },
+                {
+                  "title": "should handle deleted roles gracefully",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-7c8e5bbae4c533bb063d",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 354,
+                  "column": 9
+                },
+                {
+                  "title": "should handle permission conflicts",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a601be2c5a7876d5cac2-d90e12b801f2632ed69a",
+                  "file": "specs/02-permissions.spec.ts",
+                  "line": 360,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs/03-user-management.spec.ts",
+      "file": "specs/03-user-management.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "User Management",
+          "file": "specs/03-user-management.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "User CRUD Operations",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 26,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should create new user successfully",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-d76d6de4a6cca741fff2",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 27,
+                  "column": 9
+                },
+                {
+                  "title": "should validate user input fields",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-d0607584ea4e4f8d8136",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 54,
+                  "column": 9
+                },
+                {
+                  "title": "should update existing user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-58b11a4e977fcab8c2c0",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 95,
+                  "column": 9
+                },
+                {
+                  "title": "should delete user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-a921058745f1977cc600",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 135,
+                  "column": 9
+                },
+                {
+                  "title": "should prevent deleting admin user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-bc183725ba988f35d5f8",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 163,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "User Search and Filter",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 184,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should search users by username",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-c976bc1c25316dd72348",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 209,
+                  "column": 9
+                },
+                {
+                  "title": "should search users by email",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-75a1b1af629f1f8edbaf",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 223,
+                  "column": 9
+                },
+                {
+                  "title": "should filter users by role",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-e1f6b4028f5cb9c5e323",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 234,
+                  "column": 9
+                },
+                {
+                  "title": "should filter users by status",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-9b36561aa11aec6cb587",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 253,
+                  "column": 9
+                },
+                {
+                  "title": "should clear search and filters",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-202d3e1bb4d6287d6547",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 265,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "User Status Management",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 284,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should toggle user active status",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-50e411091c632870cd57",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 285,
+                  "column": 9
+                },
+                {
+                  "title": "should prevent login for inactive users",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-11a183cbd25843da93fb",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 321,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "User Role Management",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 356,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should assign multiple roles to user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-98b9ad5134c3bc647cac",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 357,
+                  "column": 9
+                },
+                {
+                  "title": "should update user roles",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-82eac42ed60c211f3c50",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 381,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Bulk Operations",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 410,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should export user list",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-f08a05ca1e65ae41bb7c",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 411,
+                  "column": 9
+                },
+                {
+                  "title": "should bulk delete users",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-4bb865f5ba0818b8ef30",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 429,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Performance and Pagination",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 476,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle large user list",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-7332dd365bd7951e923d",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 477,
+                  "column": 9
+                },
+                {
+                  "title": "should load users efficiently",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-3d95526d12ee013cf3f4",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 503,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Error Handling",
+              "file": "specs/03-user-management.spec.ts",
+              "line": 516,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle duplicate username",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-d498f4a47cd157af67d5",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 517,
+                  "column": 9
+                },
+                {
+                  "title": "should handle network errors gracefully",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "b3f0cd749fd88626fcfc-628329665ce502a98954",
+                  "file": "specs/03-user-management.spec.ts",
+                  "line": 547,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs/04-role-management.spec.ts",
+      "file": "specs/04-role-management.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Role Management",
+          "file": "specs/04-role-management.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "Role CRUD Operations",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 23,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should create new role successfully",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-c1a2444bbfa5959d9749",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 24,
+                  "column": 9
+                },
+                {
+                  "title": "should validate role input fields",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-3b9909718c82e749224d",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 57,
+                  "column": 9
+                },
+                {
+                  "title": "should update existing role",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-509aaa8b132cc6a46894",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 94,
+                  "column": 9
+                },
+                {
+                  "title": "should delete role",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-7c2974761cb487a596ef",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 132,
+                  "column": 9
+                },
+                {
+                  "title": "should prevent deleting system roles",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-2d79876f54fbf0174e24",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 159,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Permission Management",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 178,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should assign permissions to role",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-f8ebb46d436a54901bc7",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 179,
+                  "column": 9
+                },
+                {
+                  "title": "should group permissions by category",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-c43f7b1a8f62044a1f3e",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 219,
+                  "column": 9
+                },
+                {
+                  "title": "should show permission descriptions",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-3fb3861cc1966fa3e187",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 255,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Role-User Assignment",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 276,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should assign role to user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-9b4e4fe82b1b1fafa9f2",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 277,
+                  "column": 9
+                },
+                {
+                  "title": "should show users assigned to role",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-e254a102297f8edbf45d",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 314,
+                  "column": 9
+                },
+                {
+                  "title": "should remove role from user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-eaa07134865ae194e215",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 327,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Role Hierarchy and Inheritance",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 354,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should display role hierarchy",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-dec1ed027096321dddc2",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 355,
+                  "column": 9
+                },
+                {
+                  "title": "should inherit permissions from parent roles",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-9682375ce35092f7a73c",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 370,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Bulk Operations",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 376,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should export roles list",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-7b3510c6cb126055e07a",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 377,
+                  "column": 9
+                },
+                {
+                  "title": "should bulk assign permissions",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-ce1f44494913f247fad1",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 394,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Search and Filter",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 422,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should search roles by name",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-9683d163696747407f61",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 423,
+                  "column": 9
+                },
+                {
+                  "title": "should filter roles by permission",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-e3816ceac5b3c9eb6171",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 440,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Error Handling",
+              "file": "specs/04-role-management.spec.ts",
+              "line": 445,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should handle concurrent role editing",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-85e6dc8910eb58c3e1f8",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 446,
+                  "column": 9
+                },
+                {
+                  "title": "should handle role with assigned users deletion",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "5b3d5de19fea8012fa78-d99e2bbd9076d7e78b21",
+                  "file": "specs/04-role-management.spec.ts",
+                  "line": 451,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs/05-client-management.spec.ts",
+      "file": "specs/05-client-management.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "OAuth Client Management Tests",
+          "file": "specs/05-client-management.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "Client CRUD Operations",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 23,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should create new OAuth client successfully",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-abd796315b147988fbd2",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 24,
+                  "column": 9
+                },
+                {
+                  "title": "should edit existing OAuth client",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-9e7a3ce6ef173982c6d9",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 86,
+                  "column": 9
+                },
+                {
+                  "title": "should delete OAuth client with confirmation",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-8d69de15c0fbee57adf9",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 115,
+                  "column": 9
+                },
+                {
+                  "title": "should handle client status toggle",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-0d81e048f60a9f5d38df",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 138,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Client Secret Management",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 161,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should regenerate client secret",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-b1f64c71f83feb37375b",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 162,
+                  "column": 9
+                },
+                {
+                  "title": "should view client secret securely",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-555dd408b191e0aefaf1",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 192,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Client Configuration Validation",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 219,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should validate required client fields",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-e31c18370a9f0a30c6fa",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 220,
+                  "column": 9
+                },
+                {
+                  "title": "should validate redirect URI format",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-935494a9bb7bfe78d15c",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 241,
+                  "column": 9
+                },
+                {
+                  "title": "should validate TTL values",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-1e781970addb7c93179a",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 263,
+                  "column": 9
+                },
+                {
+                  "title": "should prevent duplicate client names",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-8fd40bfb6f3ee1c4f574",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 286,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Client Security Configuration",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 312,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should configure PKCE requirements",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-160412f707971086a0a4",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 313,
+                  "column": 9
+                },
+                {
+                  "title": "should configure IP whitelist",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-2b18c022726ec11a17c0",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 342,
+                  "column": 9
+                },
+                {
+                  "title": "should configure token endpoint authentication",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-37d5912ae1e21a9ac1d7",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 361,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Client Testing and Validation",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 381,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should test client configuration",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-7a30bfb4af97d90cbce1",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 382,
+                  "column": 9
+                },
+                {
+                  "title": "should validate client connectivity",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-cbefcc603727028ce591",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 406,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Client Documentation and Export",
+              "file": "specs/05-client-management.spec.ts",
+              "line": 431,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should generate client documentation",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-b90550a32584878f943e",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 432,
+                  "column": 9
+                },
+                {
+                  "title": "should export client configuration",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "1578e3eb21c93e17ad61-f81d588ebd62e6b8bafb",
+                  "file": "specs/05-client-management.spec.ts",
+                  "line": 460,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs/06-audit-logs.spec.ts",
+      "file": "specs/06-audit-logs.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Audit Logging and Security Monitoring Tests",
+          "file": "specs/06-audit-logs.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "Audit Log Viewing",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 23,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view audit log entries",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-7dc22a75d4648915ddfc",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 24,
+                  "column": 9
+                },
+                {
+                  "title": "should filter audit logs by date range",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-15bbd9e4e00eb6e02f66",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 47,
+                  "column": 9
+                },
+                {
+                  "title": "should filter audit logs by user",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-5cd6d84cb6a7dc7aa06d",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 67,
+                  "column": 9
+                },
+                {
+                  "title": "should filter audit logs by action type",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-6e1d610b08361de919a3",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 85,
+                  "column": 9
+                },
+                {
+                  "title": "should search audit logs",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-bc0397b90f2d4104a662",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 103,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Audit Log Details",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 122,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view audit log details",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-b37a18549a2767ed09ee",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 123,
+                  "column": 9
+                },
+                {
+                  "title": "should export audit logs",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-242b02df535eb5fc5980",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 151,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Security Event Monitoring",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 171,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view security events dashboard",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-b5688bc96552e56a3dbc",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 172,
+                  "column": 9
+                },
+                {
+                  "title": "should handle failed login attempts tracking",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-aa6b8f045bab0606de1c",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 194,
+                  "column": 9
+                },
+                {
+                  "title": "should detect suspicious activities",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-8cb26461da08e3f7debf",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 218,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Real-time Security Alerts",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 239,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should display security alerts",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-5417d4303dc3fcfc2f5c",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 240,
+                  "column": 9
+                },
+                {
+                  "title": "should handle alert acknowledgment",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-5e34ca1dd4987e6c190b",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 259,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "IP Address Monitoring",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 278,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view IP address monitoring",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-62939f87526b365c500f",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 279,
+                  "column": 9
+                },
+                {
+                  "title": "should block suspicious IP addresses",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-f345a5789a1af7cc33c6",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 302,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Audit Log Analytics",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 323,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view audit log analytics",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-7cc8f168ed6a51e10d2a",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 324,
+                  "column": 9
+                },
+                {
+                  "title": "should generate audit reports",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-bd3263a9b86f73e590e7",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 345,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "Compliance Monitoring",
+              "file": "specs/06-audit-logs.spec.ts",
+              "line": 370,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should view compliance dashboard",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-c8de546e0b2c0b4aedea",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 371,
+                  "column": 9
+                },
+                {
+                  "title": "should handle compliance violations",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "Desktop Chrome",
+                      "projectName": "Desktop Chrome",
+                      "results": [],
+                      "status": "skipped"
+                    }
+                  ],
+                  "id": "a24fca60cbcdd5646e4c-4e267bf1210d9e019d8e",
+                  "file": "specs/06-audit-logs.spec.ts",
+                  "line": 393,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "specs/07-error-handling.spec.ts",
+      "file": "specs/07-error-handling.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Error Handling",
+          "file": "specs/07-error-handling.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display appropriate error for invalid credentials",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-156307dc5946df51bfb6",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 14,
+              "column": 7
+            },
+            {
+              "title": "should handle network errors gracefully",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-e07727283b7c14b1d447",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 23,
+              "column": 7
+            },
+            {
+              "title": "should redirect to login on session expiry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-952383c4fba921fe9b53",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 35,
+              "column": 7
+            },
+            {
+              "title": "should handle OAuth service unavailability",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-caa7032329013cf40d86",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 51,
+              "column": 7
+            },
+            {
+              "title": "should validate required form fields",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-1bf57d91ed70b149170a",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 63,
+              "column": 7
+            },
+            {
+              "title": "should handle invalid redirect URIs",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-b81e7ca376335b872e3a",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 74,
+              "column": 7
+            },
+            {
+              "title": "should handle permission denied scenarios",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-31b87f187dbadd33a22a",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 82,
+              "column": 7
+            },
+            {
+              "title": "should handle invalid JWT tokens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-15a72ab13c0699f73e49",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 94,
+              "column": 7
+            },
+            {
+              "title": "should display 404 for non-existent routes",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-a4a9d848db2581dd037e",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 110,
+              "column": 7
+            },
+            {
+              "title": "should handle rate limiting",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d594bcb2eeeaef5973e0-e37c14ae2f1bc6b62218",
+              "file": "specs/07-error-handling.spec.ts",
+              "line": 117,
+              "column": 7
+            }
+          ]
+        }
+      ]
     }
   ],
+  "errors": [],
   "stats": {
-    "startTime": "2025-07-25T03:05:39.037Z",
-    "duration": 107.67399999999998,
+    "startTime": "2025-08-05T01:57:54.622Z",
+    "duration": 287.32400000000007,
     "expected": 0,
-    "skipped": 0,
+    "skipped": 117,
     "unexpected": 0,
     "flaky": 0
   }

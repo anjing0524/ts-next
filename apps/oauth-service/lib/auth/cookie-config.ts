@@ -77,6 +77,6 @@ export function getRefreshTokenCookieConfig(): CookieConfig {
  */
 export function getSessionCookieConfig(): Omit<CookieConfig, 'maxAge'> {
   const baseConfig = getCookieConfig();
-  const { maxAge, ...sessionConfig } = baseConfig;
+  const { ...sessionConfig } = baseConfig;
   return sessionConfig;
 }

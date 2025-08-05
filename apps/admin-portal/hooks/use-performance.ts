@@ -4,7 +4,7 @@
  * Provides performance metrics collection and analysis
  */
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/store';
 
 interface PerformanceMetric {
@@ -190,7 +190,7 @@ export function usePerformance(options: UsePerformanceOptions = {}) {
     try {
       // Group metrics by type
       const groupedMetrics = metricsRef.current.reduce((acc, metric) => {
-        const type = metric.name.split('_')[0];
+        const type = metric.name.split('_')[0] || 'unknown';
         if (!acc[type]) {
           acc[type] = [];
         }
@@ -227,9 +227,10 @@ export function usePerformance(options: UsePerformanceOptions = {}) {
   };
 
   const calculatePercentile = (values: number[], percentile: number): number => {
+    if (values.length === 0) return 0;
     const sorted = values.slice().sort((a, b) => a - b);
     const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-    return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
+    return sorted[Math.max(0, Math.min(index, sorted.length - 1))] || 0;
   };
 
   const clearMetrics = () => {

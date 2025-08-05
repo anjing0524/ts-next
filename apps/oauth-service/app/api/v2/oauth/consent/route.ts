@@ -5,7 +5,6 @@
 // (For detailed responsibilities, see original comments - preserved below)
 
 import { prisma } from '@repo/database';
-import type { ApiResponse } from '@repo/lib/node';
 import {
   AuthorizationUtils,
   ConfigurationError,

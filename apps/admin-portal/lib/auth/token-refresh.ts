@@ -13,7 +13,7 @@ import { TokenStorage } from './token-storage';
 import { TokenPayload } from '@/types/auth';
 
 // 事件监听器接口
-interface AuthEventListener {
+export interface AuthEventListener {
   (event: string, data?: any): void;
 }
 

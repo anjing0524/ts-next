@@ -307,7 +307,9 @@ impl ChartRenderer {
             {
                 let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
                 canvas_manager.set_dirty(CanvasLayerType::Overlay, true);
-                if hover_changed {
+
+                // 仅当新的 hover 索引有效时才刷新主画布，避免在空白区域移动鼠标时仍然触发订单簿重绘
+                if hover_changed && new_hover_index.is_some() {
                     canvas_manager.set_dirty(CanvasLayerType::Main, true);
                 }
             }
@@ -344,6 +346,7 @@ impl ChartRenderer {
                     let mut canvas_manager = self.shared_state.canvas_manager.borrow_mut();
                     canvas_manager.set_dirty(CanvasLayerType::Main, true);
                     canvas_manager.set_dirty(CanvasLayerType::Base, true);
+                    canvas_manager.set_dirty(CanvasLayerType::Overlay, true); // 新增：拖动时也更新Overlay层
                 }
                 self.force_render();
                 true
@@ -353,25 +356,26 @@ impl ChartRenderer {
     }
 
     /// 处理鼠标离开
+    /// 鼠标离开整个图表容器后，立即清理交互层显示（主图与成交量图均离开时）
     pub fn handle_mouse_leave(&mut self) -> bool {
-        if self.mouse_in_chart {
-            self.mouse_in_chart = false;
-            self.hover_candle_index = None;
+        // 将状态重置为“已离开图表区域”
+        self.mouse_in_chart = false;
+        self.hover_candle_index = None;
 
-            let render_context = RenderContext::new(self.shared_state.clone(), None, self.mode);
-            self.strategy_factory
-                .handle_mouse_leave(&render_context, self.mode);
+        // 让各渲染策略执行必要的离开清理逻辑
+        let render_context = RenderContext::new(self.shared_state.clone(), None, self.mode);
+        self.strategy_factory
+            .handle_mouse_leave(&render_context, self.mode);
 
-            {
-                self.shared_state
-                    .canvas_manager
-                    .borrow_mut()
-                    .set_dirty(CanvasLayerType::Overlay, true);
-            }
-            self.force_render();
-            return true;
+        // 标记 Overlay 图层为脏，强制重新渲染以清理十字线、浮框等交互元素
+        {
+            self.shared_state
+                .canvas_manager
+                .borrow_mut()
+                .set_dirty(CanvasLayerType::Overlay, true);
         }
-        false
+        self.force_render();
+        true
     }
 
     // 处理鼠标滚轮
