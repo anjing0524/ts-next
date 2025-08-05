@@ -82,7 +82,7 @@ async function globalSetup() {
   const oauthHealth = await checkServiceHealth('http://localhost:3001/api/v2/health', 'OAuth服务');
   
   // 等待Admin门户启动 - 使用页面健康检查
-  const adminHealth = await checkServiceHealth('http://localhost:3002/health', 'Admin门户');
+  const adminHealth = await checkServiceHealth('http://localhost:3002/api/health', 'Admin门户');
 
   // 5. 验证数据库连接
   console.log('🔍 验证数据库连接...');

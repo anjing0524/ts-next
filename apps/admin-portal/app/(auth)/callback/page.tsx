@@ -91,7 +91,11 @@ export default function AuthCallbackPage() {
       sessionStorage.removeItem('oauth_nonce');
 
       // 统一使用TokenStorage存储令牌
-      TokenStorage.setTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+      TokenStorage.setTokens({
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token,
+        expiresIn: tokenResponse.expires_in
+      });
       localStorage.setItem(
         'token_expires_at',
         (Date.now() + tokenResponse.expires_in * 1000).toString()

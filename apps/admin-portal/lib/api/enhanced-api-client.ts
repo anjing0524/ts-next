@@ -9,7 +9,7 @@
  * - Request deduplication
  */
 
-import { TokenStorage } from '../auth/token-storage';
+import { TokenStorage } from '../auth/token-storage-consolidated';
 import { TokenRefreshManager } from '../auth/token-refresh';
 import { triggerAuthError, triggerNetworkError, triggerApiError } from '@/components/error/global-error-handler';
 
@@ -197,7 +197,7 @@ export class EnhancedAPIClient {
     } catch (error) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timeout');
       }
       
@@ -213,7 +213,7 @@ export class EnhancedAPIClient {
       const csrfToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('csrf_token='));
-      return csrfToken ? csrfToken.split('=')[1] : null;
+      return csrfToken ? csrfToken.split('=')[1] || null : null;
     } catch {
       return null;
     }

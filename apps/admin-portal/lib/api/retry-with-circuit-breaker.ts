@@ -164,7 +164,7 @@ export class RetryWithCircuitBreaker {
         
         // Check if we should retry
         const shouldRetry = attempt < config.maxAttempts! && 
-          this.shouldRetry(error, attempt, config);
+          this.defaultRetryCondition(error, attempt);
         
         if (!shouldRetry) {
           break;

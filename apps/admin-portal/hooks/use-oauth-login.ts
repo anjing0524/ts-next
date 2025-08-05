@@ -102,9 +102,17 @@ export const useOAuthLogin = (config: OAuthConfig) => {
 };
 
 export const useDefaultOAuthConfig = (): OAuthConfig => {
+  // Safe SSR handling - use server-safe fallback
+  const getSafeRedirectUri = () => {
+    if (typeof window === 'undefined') {
+      return process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback';
+    }
+    return process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`;
+  };
+
   return {
     clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal-client',
-    redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`,
+    redirectUri: getSafeRedirectUri(),
     oauthServiceUrl: process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001',
     scopes: [
       'openid',

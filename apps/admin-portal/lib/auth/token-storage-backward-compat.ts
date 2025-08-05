@@ -5,7 +5,7 @@
  */
 
 import { EnhancedTokenStorage } from './enhanced-token-storage';
-import { TokenStorage as LegacyTokenStorage } from './token-storage';
+import { TokenStorage as LegacyTokenStorage } from './token-storage-consolidated';
 
 /**
  * 向后兼容的TokenStorage类

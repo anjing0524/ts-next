@@ -77,7 +77,11 @@ export const authService: AuthProviderInterface = {
     sessionStorage.removeItem('oauth_state');
 
     const tokens: AuthTokens = await authApi.exchangeCodeForToken(code, codeVerifier);
-    TokenStorage.setTokens(tokens.accessToken, tokens.refreshToken);
+    TokenStorage.setTokens({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: 3600 // Default 1 hour
+    });
 
     return this.fetchUser();
   },

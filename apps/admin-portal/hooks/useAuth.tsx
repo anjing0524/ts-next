@@ -80,7 +80,11 @@ export function useAuth(): AuthContextValue {
    */
   const login = useCallback(async (tokens: TokenPayload, user?: User) => {
     try {
-      TokenStorage.setTokens(tokens.accessToken, tokens.refreshToken, tokens.expiresIn);
+      TokenStorage.setTokens({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn
+      });
       
       setAuthState(prev => ({
         ...prev,

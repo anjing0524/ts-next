@@ -1,4 +1,4 @@
-import { TokenStorage } from './token-storage';
+import { TokenStorage } from './token-storage-consolidated';
 
 export interface AuthEventListener {
   onTokenExpired?: () => void;
