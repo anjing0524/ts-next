@@ -4,18 +4,12 @@ use super::cursor_style::CursorStyle;
 use super::render_context::SharedRenderState;
 use super::strategy::{RenderContext, RenderStrategyFactory};
 use crate::canvas::{CanvasLayerType, CanvasManager};
-use crate::config::ConfigManager;
+use crate::config::{ChartConfig, ChartTheme, ConfigManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-}
 use crate::layout::{self, ChartLayout, LayoutEngine, PaneId, Rect};
-use crate::utils::{RenderThrottle, ThrottleConfig, WasmError};
+use crate::utils::{RenderThrottle, ThrottleConfig, WasmCalError};
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::OffscreenCanvas;
@@ -56,7 +50,7 @@ impl ChartRenderer {
         main_canvas: &OffscreenCanvas,
         overlay_canvas: &OffscreenCanvas,
         parsed_data: Option<KlineData<'static>>,
-    ) -> Result<Self, WasmError> {
+    ) -> Result<Self, WasmCalError> {
         let canvas_size = (base_canvas.width() as f64, base_canvas.height() as f64);
         let canvas_manager = CanvasManager::new(base_canvas, main_canvas, overlay_canvas)?;
         let data_manager = DataManager::new();
@@ -175,11 +169,9 @@ impl ChartRenderer {
     }
 
     /// 从JSON字符串加载配置
-    pub fn load_config_from_json(&mut self, json: &str) -> Result<(), String> {
+    pub fn load_config_from_json(&mut self, json: &str) -> Result<(), WasmCalError> {
         let mut config_manager = ConfigManager::new();
-        config_manager
-            .load_from_json(json)
-            .map_err(|e| e.to_string())?;
+        config_manager.load_from_json(json)?;
         self.shared_state.theme = Rc::new(config_manager.theme);
         self.shared_state.config = Some(Rc::new(config_manager.config));
         self.shared_state
@@ -200,6 +192,13 @@ impl ChartRenderer {
     /// 强制渲染图表
     pub fn force_render(&self) {
         self.render_internal();
+    }
+
+    /// 更新配置（供 KlineProcess 使用）
+    pub fn update_config(&mut self, config: &ChartConfig, theme: &ChartTheme) {
+        // 更新共享状态中的配置
+        self.shared_state.theme = std::rc::Rc::new(theme.clone());
+        self.shared_state.config = Some(std::rc::Rc::new(config.clone()));
     }
 
     /// 内部渲染方法

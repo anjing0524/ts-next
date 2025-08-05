@@ -1,33 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, successResponse } from '@repo/lib/node';
+import { authenticateBearer } from '@/lib/auth/bearer-auth';
 import { getServiceContainer } from '@/lib/auth/service-container';
 
 export async function GET(req: NextRequest) {
   try {
-    const authorization = req.headers.get('Authorization');
-    if (!authorization?.startsWith('Bearer ')) {
-      return errorResponse({
-        message: '未提供访问令牌',
+    const authResult = await authenticateBearer(req, {
+      requireUserContext: true,
+    });
+
+    if (!authResult.success) {
+      return authResult.response || errorResponse({
+        message: '认证失败',
         statusCode: 401,
-        details: { code: 'missing_token' },
+        details: { code: 'authentication_failed' },
       });
     }
 
-    const token = authorization.substring(7);
+    const { context } = authResult;
+    if (!context?.user_id) {
+      return errorResponse({
+        message: '用户上下文缺失',
+        statusCode: 401,
+        details: { code: 'user_context_missing' },
+      });
+    }
+
     const container = getServiceContainer();
-    const tokenService = container.getTokenService();
-    
-    const payload = await tokenService.validateAccessToken(token);
-    if (!payload) {
-      return errorResponse({
-        message: '无效的访问令牌',
-        statusCode: 401,
-        details: { code: 'invalid_token' },
-      });
-    }
-
     const userService = container.getUserService();
-    const user = await userService.getUserById(payload.user_id);
+    const user = await userService.getUserById(context.user_id);
+    
     if (!user) {
       return errorResponse({
         message: '用户不存在',
@@ -41,8 +43,8 @@ export async function GET(req: NextRequest) {
       username: user.username,
       displayName: user.displayName,
       email: user.email,
-      permissions: payload.permissions || [],
-      scope: payload.scope || '',
+      permissions: context.permissions || [],
+      scope: context.scopes.join(' '),
     });
   } catch (error) {
     console.error('获取当前用户信息失败:', error);

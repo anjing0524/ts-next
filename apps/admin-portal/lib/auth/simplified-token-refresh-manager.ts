@@ -171,6 +171,14 @@ export class SimplifiedTokenRefreshManager {
   }
 
   /**
+   * 检查令牌是否即将过期
+   */
+  isTokenExpiringSoon(threshold: number = 300): boolean {
+    const remainingTime = SimplifiedTokenStorage.getTokenRemainingTime();
+    return remainingTime <= threshold;
+  }
+
+  /**
    * 获取令牌状态信息
    */
   getTokenStatus(): {

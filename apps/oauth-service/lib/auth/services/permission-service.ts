@@ -1,5 +1,5 @@
 import { PermissionType, Prisma } from '@repo/database';
-import { CacheInterface, CacheManager } from '@repo/cache/src/cache-manager';
+import { CacheInterface, CacheManager } from '@repo/cache';
 import { prisma } from '@repo/database';
 import { logger } from '@repo/lib/node';
 

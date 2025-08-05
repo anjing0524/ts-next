@@ -16,6 +16,9 @@ pub use kline_process::KlineProcess;
 pub use layout::ChartLayout;
 pub use render::ChartRenderer;
 
+// 导出 serde-wasm-bindgen 以便其他模块使用
+pub use serde_wasm_bindgen;
+
 // 设置panic钩子
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {

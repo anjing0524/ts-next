@@ -37,7 +37,7 @@ export class EnhancedAPIClientWithStore {
     } = options;
 
     const store = useAppStore.getState();
-    const apiStore = useAPI.getState();
+    const { getCache, setCache, setAPIError, setLoadingState, clearLoadingState } = store;
 
     // Check cache first
     if (!skipCache && cacheKey) {

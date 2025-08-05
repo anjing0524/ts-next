@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/components/auth/auth-provider';
-import { TokenRefreshManager } from '@/lib/auth/token-refresh';
+import { TokenRefreshManager, AuthEventListener } from '@/lib/auth/token-refresh';
 import { TokenStorage } from '@/lib/auth/token-storage';
 
 export interface UseAuthHookReturn {
@@ -95,9 +95,9 @@ export function useAuthHook(): UseAuthHookReturn {
 
   // 监听令牌刷新事件
   const onTokenRefreshed = useCallback((callback: (tokens: any) => void) => {
-    const listener = (event: string, data?: any) => {
-      if (event === 'token_refreshed' && data) {
-        callback(data);
+    const listener: AuthEventListener = {
+      onTokenRefreshed: (newToken: string) => {
+        callback(newToken);
       }
     };
     
@@ -110,8 +110,8 @@ export function useAuthHook(): UseAuthHookReturn {
 
   // 监听会话过期事件
   const onSessionExpired = useCallback((callback: () => void) => {
-    const listener = (event: string) => {
-      if (event === 'session_expired') {
+    const listener: AuthEventListener = {
+      onTokenExpired: () => {
         callback();
       }
     };
@@ -125,9 +125,9 @@ export function useAuthHook(): UseAuthHookReturn {
 
   // 监听认证错误事件
   const onAuthError = useCallback((callback: (error: Error) => void) => {
-    const listener = (event: string, data?: any) => {
-      if (event === 'token_refresh_failed' && data instanceof Error) {
-        callback(data);
+    const listener: AuthEventListener = {
+      onRefreshFailed: (error: Error) => {
+        callback(error);
       }
     };
     

@@ -1,4 +1,5 @@
 use super::{ChartConfig, ChartTheme, LocaleConfig};
+use crate::utils::WasmCalError;
 use std::collections::HashMap;
 
 pub struct ConfigManager {
@@ -23,7 +24,7 @@ impl ConfigManager {
     }
 
     /// 从JSON字符串加载配置
-    pub fn load_from_json(&mut self, json: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_from_json(&mut self, json: &str) -> Result<(), WasmCalError> {
         let new_config: ChartConfig = serde_json::from_str(json)?;
         // 合并 custom_theme
         if let Some(ref new_theme) = new_config.custom_theme {
@@ -63,6 +64,9 @@ impl ConfigManager {
         }
     }
 }
+
+// WASM 绑定的实现块
+// 注意：这些方法将通过 KlineProcess 调用，而不是直接导出 ConfigManager
 
 impl Default for ConfigManager {
     fn default() -> Self {

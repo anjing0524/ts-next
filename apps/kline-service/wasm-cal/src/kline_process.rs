@@ -1,8 +1,10 @@
 //! KlineProcess模块 - 持有K线数据和三层Canvas，提供统一的绘制函数
 use crate::ChartRenderer;
+use crate::config::{ChartConfig, ConfigManager};
 use crate::kline_generated::kline::{KlineData, root_as_kline_data_with_opts};
-use crate::utils::WasmError;
+use crate::utils::WasmCalError;
 
+use js_sys;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::OffscreenCanvas;
@@ -25,6 +27,8 @@ pub struct KlineProcess {
     #[allow(dead_code)]
     data: Vec<u8>, // 原始FlatBuffer数据，拥有所有权
     parsed_data: Option<KlineData<'static>>, // 解析后的数据，生命周期与data绑定
+    // 配置管理
+    config_manager: ConfigManager,
     // 渲染器
     chart_renderer: Option<ChartRenderer>,
 }
@@ -63,6 +67,7 @@ impl KlineProcess {
         Ok(KlineProcess {
             data,
             parsed_data: Some(parsed_data),
+            config_manager: ConfigManager::new(),
             chart_renderer: None,
         })
     }
@@ -117,7 +122,7 @@ impl KlineProcess {
                 chart_renderer.force_render();
             }
             None => {
-                return Err(WasmError::render("未设置Canvas").into());
+                return Err(WasmCalError::render("未设置Canvas").into());
             }
         }
         time_end("KlineProcess::draw_all");
@@ -133,7 +138,7 @@ impl KlineProcess {
         // Cast JsValue to WebAssembly::Memory
         let memory = memory_val
             .dyn_into::<js_sys::WebAssembly::Memory>()
-            .map_err(|_| WasmError::buffer("无法将提供的 JSValue 转换为 WebAssembly.Memory"))?;
+            .map_err(|_| WasmCalError::buffer("无法将提供的 JSValue 转换为 WebAssembly.Memory"))?;
 
         let buffer = memory.buffer();
         let memory_view = js_sys::Uint8Array::new_with_byte_offset_and_length(
@@ -144,21 +149,21 @@ impl KlineProcess {
 
         let data = memory_view.to_vec();
         if data.len() != data_length {
-            return Err(WasmError::buffer("Memory copy length mismatch").into());
+            return Err(WasmCalError::buffer("Memory copy length mismatch").into());
         }
 
         Ok(data)
     }
 
     /// 验证FlatBuffer数据
-    fn verify_kline_data_slice(bytes: &[u8]) -> Result<(), WasmError> {
+    fn verify_kline_data_slice(bytes: &[u8]) -> Result<(), WasmCalError> {
         if bytes.len() < 8 {
-            return Err(WasmError::validation("FlatBuffer数据长度不足"));
+            return Err(WasmCalError::validation("FlatBuffer数据长度不足"));
         }
 
         let identifier = String::from_utf8_lossy(&bytes[4..8]);
         if identifier != crate::kline_generated::kline::KLINE_DATA_IDENTIFIER {
-            return Err(WasmError::validation(format!(
+            return Err(WasmCalError::validation(format!(
                 "无效的FlatBuffer标识符, 期望: {}, 实际: {}",
                 crate::kline_generated::kline::KLINE_DATA_IDENTIFIER,
                 identifier
@@ -169,12 +174,12 @@ impl KlineProcess {
     }
 
     // Helper function to parse from a slice
-    fn parse_kline_data_from_slice(data: &[u8]) -> Result<KlineData, WasmError> {
+    fn parse_kline_data_from_slice(data: &[u8]) -> Result<KlineData, WasmCalError> {
         Self::verify_kline_data_slice(data)?;
         let mut opts = flatbuffers::VerifierOptions::default();
         opts.max_tables = 1_000_000_000;
         root_as_kline_data_with_opts(&opts, data)
-            .map_err(|e| WasmError::other(format!("Flatbuffer 解析失败: {e}")))
+            .map_err(|e| WasmCalError::other(format!("Flatbuffer 解析失败: {e}")))
     }
 
     #[wasm_bindgen]
@@ -288,9 +293,7 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn set_config_json(&mut self, json: &str) -> Result<(), JsValue> {
         match &mut self.chart_renderer {
-            Some(renderer) => renderer
-                .load_config_from_json(json)
-                .map_err(|e| JsValue::from_str(&e)),
+            Some(renderer) => renderer.load_config_from_json(json).map_err(JsValue::from),
             None => Err(JsValue::from_str("ChartRenderer not initialized")),
         }
     }
@@ -302,5 +305,50 @@ impl KlineProcess {
         if let Some(renderer) = &mut self.chart_renderer {
             renderer.handle_canvas_resize(width, height);
         }
+    }
+
+    /// 使用 serde-wasm-bindgen 直接从 JsValue 更新配置
+    /// 比 set_config_json 更高效，避免 JSON 字符串解析
+    #[wasm_bindgen]
+    pub fn update_config(&mut self, js_config: JsValue) -> Result<(), JsValue> {
+        // 使用 serde-wasm-bindgen 直接从 JsValue 反序列化
+        let config: ChartConfig = serde_wasm_bindgen::from_value(js_config)
+            .map_err(|e| JsValue::from_str(&format!("配置解析失败: {}", e)))?;
+
+        // 更新配置管理器
+        self.config_manager.config = config;
+
+        // 同步更新主题
+        self.config_manager.update_theme();
+
+        // 如果渲染器已初始化，更新渲染器的配置
+        if let Some(renderer) = &mut self.chart_renderer {
+            // 更新共享状态中的配置
+            renderer.update_config(&self.config_manager.config, self.config_manager.get_theme());
+
+            // 触发重新渲染
+            renderer.force_render();
+        }
+
+        log(&format!(
+            "配置已更新: symbol={}, theme={}",
+            self.config_manager.config.symbol, self.config_manager.config.theme
+        ));
+
+        Ok(())
+    }
+
+    /// 使用 serde-wasm-bindgen 获取当前配置为 JsValue
+    #[wasm_bindgen]
+    pub fn get_config(&self) -> Result<JsValue, JsValue> {
+        crate::serde_wasm_bindgen::to_value(&self.config_manager.config)
+            .map_err(|e| JsValue::from_str(&format!("配置序列化失败: {}", e)))
+    }
+
+    /// 获取当前主题为 JsValue
+    #[wasm_bindgen]
+    pub fn get_theme(&self) -> Result<JsValue, JsValue> {
+        crate::serde_wasm_bindgen::to_value(self.config_manager.get_theme())
+            .map_err(|e| JsValue::from_str(&format!("主题序列化失败: {}", e)))
     }
 }

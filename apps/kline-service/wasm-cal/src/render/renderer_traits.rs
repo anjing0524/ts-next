@@ -109,32 +109,6 @@ pub struct CacheStats {
     pub last_update: f64,
 }
 
-/// 性能监控渲染器trait - 支持性能监控的渲染器
-pub trait PerformanceMonitoredRenderer: Renderer {
-    /// 开始性能监控
-    fn start_timing(&mut self, label: &str);
-
-    /// 结束性能监控并记录
-    fn end_timing(&mut self, label: &str) -> f64;
-
-    /// 获取性能统计
-    fn performance_stats(&self) -> &PerformanceStats;
-
-    /// 重置性能统计
-    fn reset_performance_stats(&mut self);
-}
-
-/// 性能统计结构
-#[derive(Debug, Default)]
-pub struct PerformanceStats {
-    pub total_render_time: f64,
-    pub average_frame_time: f64,
-    pub cache_hit_rate: f64,
-    pub memory_usage: usize,
-    pub draw_calls: usize,
-    pub batch_count: usize,
-}
-
 /// 数据预处理渲染器trait - 支持数据预处理的渲染器
 pub trait DataPreprocessingRenderer: Renderer {
     /// 预处理数据以提高渲染效率

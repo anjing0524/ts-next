@@ -260,5 +260,12 @@ impl From<JsValue> for WasmCalError {
     }
 }
 
+/// 从 serde_json::Error 转换为 WasmCalError
+impl From<serde_json::Error> for WasmCalError {
+    fn from(err: serde_json::Error) -> Self {
+        WasmCalError::parse(format!("JSON parsing error: {}", err))
+    }
+}
+
 /// 兼容性别名，保持向后兼容
 pub type WasmError = WasmCalError;

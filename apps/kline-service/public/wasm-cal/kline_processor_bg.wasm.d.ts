@@ -16,12 +16,15 @@ export const klineprocess_set_render_mode: (a: number, b: number, c: number) => 
 export const klineprocess_handle_click: (a: number, b: number, c: number) => number;
 export const klineprocess_set_config_json: (a: number, b: number, c: number) => [number, number];
 export const klineprocess_handle_canvas_resize: (a: number, b: number, c: number) => void;
+export const klineprocess_update_config: (a: number, b: any) => [number, number];
+export const klineprocess_get_config: (a: number) => [number, number, number];
+export const klineprocess_get_theme: (a: number) => [number, number, number];
 export const start: () => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_exn_store: (a: number) => void;
 export const __externref_table_alloc: () => number;
-export const __wbindgen_export_3: WebAssembly.Table;
-export const __wbindgen_malloc: (a: number, b: number) => number;
-export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_export_5: WebAssembly.Table;
 export const __externref_table_dealloc: (a: number) => void;
 export const __wbindgen_start: () => void;

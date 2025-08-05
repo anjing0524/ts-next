@@ -13,7 +13,7 @@ import { TokenStorage } from '../auth/token-storage';
 import { TokenRefreshManager } from '../auth/token-refresh';
 import { triggerAuthError, triggerNetworkError, triggerApiError } from '@/components/error/global-error-handler';
 
-interface RequestOptions extends RequestInit {
+export interface RequestOptions extends RequestInit {
   retries?: number;
   retryDelay?: number;
   skipAuthRefresh?: boolean;

@@ -13,9 +13,9 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth as useBaseAuth } from '@repo/ui';
-import { TokenRefreshManager, AuthEventListener } from '../../lib/auth/token-refresh';
-import { TokenStorage } from '../../lib/auth/token-storage';
-import { User } from '../../types/auth';
+import { TokenRefreshManager, AuthEventListener } from '@/lib/auth/token-refresh';
+import { TokenStorage } from '@/lib/auth/token-storage';
+import { User } from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -101,12 +101,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       tokenRefreshManager.current = new TokenRefreshManager();
       
       // 添加内部事件监听器
-      const internalListener: AuthEventListener = {
-        onTokenRefreshed: () => {
-          updateTokenStatus();
-        },
-        onRefreshFailed: (error) => {
-          console.warn('Token refresh failed:', error);
+      const internalListener: AuthEventListener = (event, data) => {
+        console.log('Auth event:', event, data);
+        
+        switch (event) {
+          case 'token_refreshed':
+            // 令牌刷新成功，更新状态
+            updateTokenStatus();
+            break;
+          case 'session_expired':
+            // 会话过期，执行登出
+            handleLogout();
+            break;
+          case 'token_refresh_failed':
+            // 令牌刷新失败，可以添加重试逻辑
+            console.warn('Token refresh failed:', data);
+            break;
         }
       };
 

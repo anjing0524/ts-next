@@ -238,8 +238,11 @@ export class APICacheLayer {
 
     // Remove 25% of entries
     const removeCount = Math.ceil(entries.length * 0.25);
-    for (let i = 0; i < removeCount; i++) {
-      storage.removeItem(entries[i].key);
+    for (let i = 0; i < removeCount && i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry && entry.key) {
+        storage.removeItem(entry.key);
+      }
     }
   }
 

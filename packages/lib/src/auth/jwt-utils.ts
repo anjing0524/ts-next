@@ -88,7 +88,7 @@ export class JWTUtils {
   /**
    * 获取公钥
    */
-  static async getPublicKey(): Promise<jose.KeyLike> {
+  static async getPublicKey(): Promise<CryptoKey> {
     const keyService = await KeyService.getInstance();
     const currentKey = await keyService.getCurrentKey();
     return currentKey.publicKey;
@@ -97,7 +97,7 @@ export class JWTUtils {
   /**
    * 导出公钥为JWK格式
    */
-  static async exportPublicKeyAsJWK(publicKey?: jose.KeyLike): Promise<jose.JWK> {
+  static async exportPublicKeyAsJWK(publicKey?: CryptoKey): Promise<jose.JWK> {
     if (publicKey) {
       return await jose.exportJWK(publicKey);
     }

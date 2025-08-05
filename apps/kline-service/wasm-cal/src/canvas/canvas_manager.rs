@@ -1,7 +1,7 @@
 //! Canvas管理器 - 管理多层Canvas
 
 use super::{get_canvas_context, layer::CanvasLayerType};
-use crate::utils::WasmError;
+use crate::utils::WasmCalError;
 use web_sys::{OffscreenCanvas, OffscreenCanvasRenderingContext2d};
 
 /// Canvas管理器 - 管理三层Canvas
@@ -26,7 +26,7 @@ impl CanvasManager {
         base_canvas: &OffscreenCanvas,
         main_canvas: &OffscreenCanvas,
         overlay_canvas: &OffscreenCanvas,
-    ) -> Result<Self, WasmError> {
+    ) -> Result<Self, WasmCalError> {
         // 获取Canvas上下文
         let base_ctx = get_canvas_context(base_canvas)?;
         let main_ctx = get_canvas_context(main_canvas)?;

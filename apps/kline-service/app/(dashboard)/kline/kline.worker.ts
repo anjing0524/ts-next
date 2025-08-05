@@ -70,6 +70,16 @@ interface ResizeMessage {
   height: number;
 }
 
+interface UpdateConfigMessage {
+  type: 'updateConfig';
+  config: any;
+}
+
+interface GetConfigMessage {
+  type: 'getConfig';
+}
+
+
 type WorkerMessage =
   | InitMessage
   | DrawMessage
@@ -81,7 +91,9 @@ type WorkerMessage =
   | WheelMessage
   | GetCursorStyleMessage
   | SwitchModeMessage
-  | ResizeMessage;
+  | ResizeMessage
+  | UpdateConfigMessage
+  | GetConfigMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
@@ -199,6 +211,32 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           processorRef.handle_canvas_resize(data.width, data.height);
         } catch (err) {
           console.error('[Worker] 处理画布大小改变失败:', err);
+        }
+        break;
+      case 'updateConfig':
+        if (!processorRef) return;
+        try {
+          // 使用新的 update_config 方法（serde-wasm-bindgen）
+          processorRef.update_config(data.config);
+          self.postMessage({
+            type: 'configUpdated',
+            config: data.config,
+          });
+        } catch (err) {
+          console.error('[Worker] 更新配置失败:', err);
+        }
+        break;
+      case 'getConfig':
+        if (!processorRef) return;
+        try {
+          // 使用新的 get_config 方法，直接返回 JavaScript 对象
+          const config = processorRef.get_config();
+          self.postMessage({
+            type: 'configUpdated',
+            config: config, // 已经是 JavaScript 对象，无需 JSON.parse
+          });
+        } catch (err) {
+          console.error('[Worker] 获取配置失败:', err);
         }
         break;
       default:

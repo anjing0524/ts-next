@@ -277,7 +277,7 @@ export function withPerformanceMonitoring<P extends object>(
       measure.end();
     });
 
-    return <Component {...props} />;
+    return React.createElement(Component, props);
   };
 }
 

@@ -141,10 +141,9 @@ export function useAuth(): AuthContextValue {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      const tokens = await refreshManagerRef.current.refreshTokens();
+      await refreshManagerRef.current.refreshTokens();
       
-      // Update stored tokens
-      TokenStorage.setTokens(tokens.accessToken, tokens.refreshToken, tokens.expiresIn);
+      // Tokens are updated internally by TokenRefreshManager
       
       setAuthState(prev => ({
         ...prev,

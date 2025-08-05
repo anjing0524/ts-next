@@ -33,20 +33,14 @@ export default function Main() {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
 
-  // 性能监控引用
-  const perfRef = useRef<{
-    lastFrameTime: number;
-    frameCount: number;
-    fps: number;
-  }>({ lastFrameTime: 0, frameCount: 0, fps: 0 });
-
+  
   // 状态管理
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cursorStyle, setCursorStyle] = useState<string>('default');
   const [isDragging, setIsDragging] = useState(false);
-  const [fps, setFps] = useState(0); // 添加FPS状态
-
+  const [config, setConfig] = useState<any>(null); // 存储当前配置
+  
   // 定义画布尺寸常量
   const CANVAS_HEIGHT = 800; // 可见高度
   const CANVAS_WIDTH = 1800; // 可见宽度
@@ -142,16 +136,10 @@ export default function Main() {
             setIsDragging(false);
           }
         },
-        performanceMetrics: (data) => {
-          // 可以添加从Worker接收性能指标的处理
-          if (data.renderTime) {
-            console.log(`渲染时间: ${data.renderTime}ms`);
-          }
-        },
-        modeChanged: (data) => {
-          // 处理模式切换完成的消息
-          console.log(`模式已切换到: ${data.mode}`);
-          // 可以在这里添加UI状态更新逻辑
+        configUpdated: (data) => {
+          // 处理配置更新
+          setConfig(data.config);
+          console.log('配置已更新:', data.config);
         },
       };
 
@@ -173,29 +161,10 @@ export default function Main() {
     [CANVAS_WIDTH, CANVAS_HEIGHT]
   );
 
-  // 添加性能监控函数
-  const updatePerformanceMetrics = useCallback(() => {
-    const now = performance.now();
-    const perf = perfRef.current;
-
-    perf.frameCount++;
-
-    // 每秒更新一次FPS
-    if (now - perf.lastFrameTime >= 1000) {
-      perf.fps = Math.round((perf.frameCount * 1000) / (now - perf.lastFrameTime));
-      perf.frameCount = 0;
-      perf.lastFrameTime = now;
-      setFps(perf.fps);
-    }
-
-    // 请求下一帧更新
-    requestAnimationFrame(updatePerformanceMetrics);
-  }, []);
-
+  
   // 合并数据获取和Worker初始化到一个useEffect中
   useEffect(() => {
     const controller = new AbortController();
-    const animationFrameId = requestAnimationFrame(updatePerformanceMetrics);
     let wasmPath = '';
 
     // 在客户端设置 wasmPath
@@ -262,12 +231,8 @@ export default function Main() {
           console.error('终止Worker时出错:', err);
         }
       }
-      // 取消性能监控
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
     };
-  }, [setupWorkerMessageHandler, updatePerformanceMetrics]);
+  }, [setupWorkerMessageHandler]);
 
   // 使用useCallback优化鼠标移动事件处理函数，移除防抖以提高响应速度
   const handleMouseMove = useCallback(
@@ -485,10 +450,46 @@ export default function Main() {
     [sendMessageToWorker]
   );
 
+  // 使用新的 serde-wasm-bindgen API 更新配置
+  const updateChartConfig = useCallback(
+    (newConfig: any) => {
+      if (workerRef.current) {
+        // 直接发送配置对象，无需 JSON.stringify
+        workerRef.current.postMessage({
+          type: 'updateConfig',
+          config: newConfig,
+        });
+      }
+    },
+    []
+  );
+
+  // 获取当前配置
+  const getCurrentConfig = useCallback(() => {
+    if (workerRef.current) {
+      workerRef.current.postMessage({
+        type: 'getConfig',
+      });
+    }
+  }, []);
+
+  
+  // 示例：切换主题
+  const switchTheme = useCallback(
+    (themeName: string) => {
+      const newConfig = {
+        ...(config || {}),
+        theme: themeName,
+      };
+      updateChartConfig(newConfig);
+    },
+    [config, updateChartConfig]
+  );
+
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">K 线图 (Web Worker + OffscreenCanvas)</h2>
+        <h2 className="text-xl font-semibold">K 线图 (Web Worker + OffscreenCanvas + serde-wasm-bindgen)</h2>
         <div className="flex space-x-2">
           <button
             onClick={() => switchMode('kmap')}
@@ -505,8 +506,38 @@ export default function Main() {
         </div>
       </div>
 
-      {/* 显示性能指标 */}
-      <div className="text-sm text-gray-600 mb-2">性能: {fps} FPS</div>
+    
+      {/* 新增控制面板 */}
+      <div className="mb-4 p-4 bg-gray-100 rounded">
+        <h3 className="text-lg font-medium mb-2">配置管理 (serde-wasm-bindgen)</h3>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={getCurrentConfig}
+            className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm"
+          >
+            获取配置
+          </button>
+            <button
+            onClick={() => switchTheme('light')}
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+          >
+            亮色主题
+          </button>
+          <button
+            onClick={() => updateChartConfig({ symbol: 'ETH/USDT', theme: 'dark' })}
+            className="px-3 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
+          >
+            ETH/暗色主题
+          </button>
+        </div>
+        
+        {/* 显示当前配置 */}
+        {config && (
+          <div className="mt-2 text-xs bg-white p-2 rounded">
+            <strong>当前配置:</strong> {JSON.stringify(config, null, 2)}
+          </div>
+        )}
+      </div>
       {isLoading && (
         <div className="p-4 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mr-2" />

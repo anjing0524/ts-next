@@ -54,6 +54,19 @@ export class KlineProcess {
    * 当窗口大小改变时调用此方法，需要重新初始化可见范围
    */
   handle_canvas_resize(width: number, height: number): void;
+  /**
+   * 使用 serde-wasm-bindgen 直接从 JsValue 更新配置
+   * 比 set_config_json 更高效，避免 JSON 字符串解析
+   */
+  update_config(js_config: any): void;
+  /**
+   * 使用 serde-wasm-bindgen 获取当前配置为 JsValue
+   */
+  get_config(): any;
+  /**
+   * 获取当前主题为 JsValue
+   */
+  get_theme(): any;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -75,13 +88,16 @@ export interface InitOutput {
   readonly klineprocess_handle_click: (a: number, b: number, c: number) => number;
   readonly klineprocess_set_config_json: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_canvas_resize: (a: number, b: number, c: number) => void;
+  readonly klineprocess_update_config: (a: number, b: any) => [number, number];
+  readonly klineprocess_get_config: (a: number) => [number, number, number];
+  readonly klineprocess_get_theme: (a: number) => [number, number, number];
   readonly start: () => void;
+  readonly __wbindgen_malloc: (a: number, b: number) => number;
+  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_3: WebAssembly.Table;
-  readonly __wbindgen_malloc: (a: number, b: number) => number;
-  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_export_5: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
   readonly __wbindgen_start: () => void;
 }

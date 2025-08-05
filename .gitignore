@@ -100,3 +100,6 @@ packages/**/dist
 apps/kline-service/wasm-cal/target/*
 
 .kiro
+
+
+.claude
