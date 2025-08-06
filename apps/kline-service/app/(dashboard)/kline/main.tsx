@@ -7,22 +7,9 @@ import {
   WheelEvent as ReactWheelEvent,
   useCallback,
 } from 'react';
+import { createPerformanceMonitor, PerformanceMonitor } from './performance-monitor';
+import { PerformancePanel } from './components/PerformancePanel';
 
-// 节流函数工具
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle = false;
-  return function (...args: Parameters<T>) {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-}
 
 export default function Main() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''; // 使用环境变量
@@ -40,10 +27,36 @@ export default function Main() {
   const [cursorStyle, setCursorStyle] = useState<string>('default');
   const [isDragging, setIsDragging] = useState(false);
   const [config, setConfig] = useState<any>(null); // 存储当前配置
+  const [showPerformancePanel, setShowPerformancePanel] = useState(true);
+  
+  // 性能监控器
+  const performanceMonitorRef = useRef<PerformanceMonitor | null>(null);
   
   // 定义画布尺寸常量
   const CANVAS_HEIGHT = 800; // 可见高度
   const CANVAS_WIDTH = 1800; // 可见宽度
+  
+  // 初始化性能监控器
+  useEffect(() => {
+    if (!performanceMonitorRef.current) {
+      performanceMonitorRef.current = createPerformanceMonitor({
+        enabled: true,
+        updateInterval: 1000,
+        maxSamples: 60,
+        onUpdate: (metrics) => {
+          // 可以在这里处理性能指标更新
+          console.log('[Performance] FPS:', metrics.fps, 'Memory:', metrics.memory.used + 'MB');
+        }
+      });
+      performanceMonitorRef.current.start();
+    }
+    
+    return () => {
+      if (performanceMonitorRef.current) {
+        performanceMonitorRef.current.stop();
+      }
+    };
+  }, []);
 
   // 创建一个通用的获取鼠标坐标的函数
   const getMouseCoordinates = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -90,6 +103,11 @@ export default function Main() {
                 canvas.height = CANVAS_HEIGHT;
               });
 
+              // 记录渲染开始
+              if (performanceMonitorRef.current) {
+                performanceMonitorRef.current.renderStart();
+              }
+              
               worker.postMessage(
                 {
                   type: 'draw',
@@ -107,6 +125,11 @@ export default function Main() {
           }, 10); // 延迟10ms确保Canvas元素完全准备好
         },
         drawComplete: () => {
+          // 记录渲染结束
+          if (performanceMonitorRef.current) {
+            performanceMonitorRef.current.renderEnd();
+            performanceMonitorRef.current.frameStart();
+          }
           setIsLoading(false);
         },
         error: (data) => {
@@ -140,6 +163,10 @@ export default function Main() {
           // 处理配置更新
           setConfig(data.config);
           console.log('配置已更新:', data.config);
+        },
+        modeChanged: (data) => {
+          // 处理模式切换
+          console.log('模式已切换:', data.mode);
         },
       };
 
@@ -240,19 +267,22 @@ export default function Main() {
       const coords = getMouseCoordinates(e);
       if (!coords) return;
 
-      // 直接发送鼠标移动消息，不使用防抖
+      // 记录事件开始
+      if (performanceMonitorRef.current) {
+        performanceMonitorRef.current.eventStart();
+      }
+
+      // 发送鼠标移动消息，Worker会自动返回光标样式
       sendMessageToWorker({
         type: 'mousemove',
         x: coords.x,
         y: coords.y,
       });
-
-      // 直接发送获取鼠标样式消息，不使用防抖
-      sendMessageToWorker({
-        type: 'getCursorStyle',
-        x: coords.x,
-        y: coords.y,
-      });
+      
+      // 记录事件结束
+      if (performanceMonitorRef.current) {
+        performanceMonitorRef.current.eventEnd();
+      }
     },
     [getMouseCoordinates, sendMessageToWorker]
   );
@@ -267,10 +297,14 @@ export default function Main() {
     // 让window事件处理程序来管理拖动结束
   }, [sendMessageToWorker]);
 
-  // 处理滚轮事件 - 使用节流优化
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // 处理滚轮事件 - 无节流
   const handleWheel = useCallback(
-    throttle((e: ReactWheelEvent<HTMLCanvasElement>) => {
+    (e: ReactWheelEvent<HTMLCanvasElement>) => {
+      // 记录事件开始
+      if (performanceMonitorRef.current) {
+        performanceMonitorRef.current.eventStart();
+      }
+      
       // 无论是否在拖动状态，都发送滚轮事件到Worker
       sendMessageToWorker({
         type: 'wheel',
@@ -279,7 +313,12 @@ export default function Main() {
         y: e.nativeEvent.offsetY,
         isDragging: isDragging, // 添加拖动状态标志
       });
-    }, 20), // 20ms的节流时间，平衡响应性和性能
+      
+      // 记录事件结束
+      if (performanceMonitorRef.current) {
+        performanceMonitorRef.current.eventEnd();
+      }
+    },
     [sendMessageToWorker, isDragging] // 添加isDragging作为依赖项
   );
 
@@ -488,28 +527,9 @@ export default function Main() {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">K 线图 (Web Worker + OffscreenCanvas + serde-wasm-bindgen)</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => switchMode('kmap')}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            K线图
-          </button>
-          <button
-            onClick={() => switchMode('heatmap')}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-          >
-            热图
-          </button>
-        </div>
-      </div>
-
-    
-      {/* 新增控制面板 */}
+      {/* 控制面板 - 移到canvas上方 */}
       <div className="mb-4 p-4 bg-gray-100 rounded">
-        <h3 className="text-lg font-medium mb-2">配置管理 (serde-wasm-bindgen)</h3>
+        <h3 className="text-lg font-medium mb-2">配置管理与性能监控</h3>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={getCurrentConfig}
@@ -517,7 +537,7 @@ export default function Main() {
           >
             获取配置
           </button>
-            <button
+          <button
             onClick={() => switchTheme('light')}
             className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
           >
@@ -529,6 +549,26 @@ export default function Main() {
           >
             ETH/暗色主题
           </button>
+          <button
+            onClick={() => {
+              if (performanceMonitorRef.current) {
+                performanceMonitorRef.current.reset();
+              }
+            }}
+            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+          >
+            重置性能统计
+          </button>
+          <button
+            onClick={() => setShowPerformancePanel(!showPerformancePanel)}
+            className={`px-3 py-1 rounded transition-colors text-sm ${
+              showPerformancePanel 
+                ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {showPerformancePanel ? '隐藏性能监控' : '显示性能监控'}
+          </button>
         </div>
         
         {/* 显示当前配置 */}
@@ -537,6 +577,22 @@ export default function Main() {
             <strong>当前配置:</strong> {JSON.stringify(config, null, 2)}
           </div>
         )}
+      </div>
+
+      {/* 图表模式切换按钮 - canvas上方靠左 */}
+      <div className="mb-2 flex space-x-2">
+        <button
+          onClick={() => switchMode('kmap')}
+          className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          K线图
+        </button>
+        <button
+          onClick={() => switchMode('heatmap')}
+          className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+        >
+          热图
+        </button>
       </div>
       {isLoading && (
         <div className="p-4 flex items-center justify-center">
@@ -565,6 +621,17 @@ export default function Main() {
           ref={overlayCanvasRef}
           className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
         />
+        
+
+        
+        {/* 性能监控面板 */}
+        {performanceMonitorRef.current && (
+          <PerformancePanel 
+            monitor={performanceMonitorRef.current}
+            visible={showPerformancePanel}
+            position="top-right"
+          />
+        )}
       </div>
     </div>
   );

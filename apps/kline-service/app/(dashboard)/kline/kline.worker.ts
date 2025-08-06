@@ -120,6 +120,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         break;
       case 'mousemove':
         if (!processorRef) return;
+        // 只处理鼠标移动逻辑，不获取光标样式
         processorRef.handle_mouse_move(data.x, data.y);
         break;
       case 'mousedown':
@@ -335,7 +336,7 @@ async function handleDraw(message: DrawMessage) {
     console.timeEnd('[Worker] 设置 Canvas');
 
     // 新增：设置标题
-    processorRef.set_config_json(JSON.stringify({ title: '期货/SR' }));
+    processorRef.update_config({ title: '期货/SR' });
 
     // 绘制 K 线图
     console.time('[Worker] 绘制 K 线图');

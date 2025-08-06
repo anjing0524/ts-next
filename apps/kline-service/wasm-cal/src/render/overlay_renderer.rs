@@ -46,10 +46,20 @@ impl OverlayRenderer {
 
     /// 绘制交互层 - 只绘制十字线和tooltip
     pub fn draw(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
+        log(&format!(
+            "OverlayRenderer::draw - hover_index: {:?}, mouse_x: {}, mouse_y: {}",
+            render_ctx.hover_index(),
+            render_ctx.mouse_x(),
+            render_ctx.mouse_y()
+        ));
+
         // 仅当有有效的悬浮索引时才绘制
-        if render_ctx.hover_index.is_some() {
+        if render_ctx.hover_index().is_some() {
+            log("OverlayRenderer::draw - 有hover_index，开始绘制十字线");
             self.draw_crosshair_with_labels(ctx, render_ctx);
             self.draw_tooltip(ctx, render_ctx);
+        } else {
+            log("OverlayRenderer::draw - 没有hover_index，跳过绘制");
         }
     }
 
@@ -67,19 +77,19 @@ impl OverlayRenderer {
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
         let book_rect = layout.get_rect(&PaneId::OrderBook);
 
-        if let Some(hover_index) = render_ctx.hover_index {
+        if let Some(hover_index) = render_ctx.hover_index() {
             if hover_index >= items.len() {
                 return;
             }
 
-            if main_chart_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
+            if main_chart_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
                 self.tooltip_renderer.draw_main_chart_tooltip(
                     ctx,
                     &layout,
                     items,
                     Some(hover_index),
-                    render_ctx.mouse_x,
-                    render_ctx.mouse_y,
+                    render_ctx.mouse_x(),
+                    render_ctx.mouse_y(),
                     render_ctx.mode,
                     min_low,
                     max_high,
@@ -88,11 +98,11 @@ impl OverlayRenderer {
                 );
             }
 
-            if book_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
+            if book_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
                 let item = items.get(hover_index);
                 let price_mapper =
                     CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 0.0);
-                let price = price_mapper.unmap_y(render_ctx.mouse_y);
+                let price = price_mapper.unmap_y(render_ctx.mouse_y());
                 if let Some(volume) = self.calculate_volume_for_price(&item, price, min_low, tick) {
                     self.tooltip_renderer.draw_book_tooltip(
                         ctx,
@@ -100,8 +110,8 @@ impl OverlayRenderer {
                         item.timestamp().into(),
                         price,
                         volume,
-                        render_ctx.mouse_x,
-                        render_ctx.mouse_y,
+                        render_ctx.mouse_x(),
+                        render_ctx.mouse_y(),
                         render_ctx.theme_ref(),
                     );
                 }
@@ -156,7 +166,7 @@ impl OverlayRenderer {
 
         // 水平线
         let mouse_y_constrained = render_ctx
-            .mouse_y
+            .mouse_y()
             .max(main_chart_rect.y)
             .min(_volume_rect.y + _volume_rect.height);
         ctx.begin_path();
@@ -169,7 +179,7 @@ impl OverlayRenderer {
 
         // 垂直线
         let mouse_x_constrained = render_ctx
-            .mouse_x
+            .mouse_x()
             .max(main_chart_rect.x)
             .min(main_chart_rect.x + main_chart_rect.width);
         ctx.begin_path();
@@ -197,7 +207,7 @@ impl OverlayRenderer {
         );
 
         // 绘制成交量轴标签
-        if _volume_rect.contains(render_ctx.mouse_x, render_ctx.mouse_y) {
+        if _volume_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
             let volume_mapper =
                 CoordinateMapper::new_for_y_axis(_volume_rect, 0.0, max_volume, 2.0);
             let volume = volume_mapper.unmap_y(mouse_y_constrained);
@@ -212,19 +222,26 @@ impl OverlayRenderer {
         }
 
         // 绘制X轴标签
-        if let Some(index) = render_ctx.hover_index {
+        if let Some(index) = render_ctx.hover_index() {
             // 使用来自RenderContext的hover_index
             if let Some(items) = data_manager.get_items() {
                 if index < items.len() {
                     let item = items.get(index);
                     let time_str =
                         time::format_timestamp(item.timestamp() as i64, "%Y-%m-%d %H:%M");
+
+                    // 计算标签宽度和位置，确保标签居中且不超出边界
+                    let label_width = 120.0;
+                    let label_x = (mouse_x_constrained - label_width / 2.0)
+                        .max(time_axis_rect.x)
+                        .min(time_axis_rect.x + time_axis_rect.width - label_width);
+
                     self.draw_axis_label(
                         ctx,
                         &time_str,
-                        mouse_x_constrained - 50.0,
+                        label_x,
                         time_axis_rect.y,
-                        100.0,
+                        label_width,
                         theme,
                     );
                 }
@@ -256,6 +273,13 @@ impl OverlayRenderer {
 
 impl RenderStrategy for OverlayRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        log(&format!(
+            "OverlayRenderer::render - 被调用，hover_index: {:?}, mouse_x: {}, mouse_y: {}",
+            ctx.hover_index(),
+            ctx.mouse_x(),
+            ctx.mouse_y()
+        ));
+
         let canvas_manager = ctx.canvas_manager_ref();
         let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = ctx.layout_ref();
@@ -269,6 +293,7 @@ impl RenderStrategy for OverlayRenderer {
         overlay_ctx.clear_rect(root_rect.x, root_rect.y, root_rect.width, nav_rect.y);
 
         self.draw(overlay_ctx, ctx);
+        log("OverlayRenderer::render - 完成");
         Ok(())
     }
 

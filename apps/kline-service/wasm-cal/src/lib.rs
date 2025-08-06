@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 
 // 导入模块
 pub mod canvas;
+pub mod command;
 pub mod config;
 pub mod data;
 pub mod kline_generated;

@@ -240,7 +240,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_mouse_move(this.__wbg_ptr, x, y);
     }
     /**
-     * 获取当前鼠标位置的光标样式
      * @param {number} x
      * @param {number} y
      * @returns {string}
@@ -257,12 +256,8 @@ export class KlineProcess {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
-    /**
-     * @returns {boolean}
-     */
     handle_mouse_leave() {
-        const ret = wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
-        return ret !== 0;
+        wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
     }
     /**
      * @param {number} delta
@@ -273,27 +268,20 @@ export class KlineProcess {
         wasm.klineprocess_handle_wheel(this.__wbg_ptr, delta, x, y);
     }
     /**
-     * 处理鼠标按下事件
      * @param {number} x
      * @param {number} y
-     * @returns {boolean}
      */
     handle_mouse_down(x, y) {
-        const ret = wasm.klineprocess_handle_mouse_down(this.__wbg_ptr, x, y);
-        return ret !== 0;
+        wasm.klineprocess_handle_mouse_down(this.__wbg_ptr, x, y);
     }
     /**
-     * 处理鼠标释放事件
      * @param {number} x
      * @param {number} y
-     * @returns {boolean}
      */
     handle_mouse_up(x, y) {
-        const ret = wasm.klineprocess_handle_mouse_up(this.__wbg_ptr, x, y);
-        return ret !== 0;
+        wasm.klineprocess_handle_mouse_up(this.__wbg_ptr, x, y);
     }
     /**
-     * 处理鼠标拖动事件
      * @param {number} x
      * @param {number} y
      */
@@ -301,7 +289,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_mouse_drag(this.__wbg_ptr, x, y);
     }
     /**
-     * 设置渲染模式（由React层调用）
      * @param {string} mode
      */
     set_render_mode(mode) {
@@ -313,30 +300,6 @@ export class KlineProcess {
         }
     }
     /**
-     * 处理鼠标点击事件（已废弃，模式切换由React层管理）
-     * @param {number} _x
-     * @param {number} _y
-     * @returns {boolean}
-     */
-    handle_click(_x, _y) {
-        const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, _x, _y);
-        return ret !== 0;
-    }
-    /**
-     * 设置配置JSON（动态切换主题/配色等）
-     * @param {string} json
-     */
-    set_config_json(json) {
-        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.klineprocess_set_config_json(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
-    }
-    /**
-     * 处理画布大小改变
-     * 当窗口大小改变时调用此方法，需要重新初始化可见范围
      * @param {number} width
      * @param {number} height
      */
@@ -344,8 +307,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_canvas_resize(this.__wbg_ptr, width, height);
     }
     /**
-     * 使用 serde-wasm-bindgen 直接从 JsValue 更新配置
-     * 比 set_config_json 更高效，避免 JSON 字符串解析
      * @param {any} js_config
      */
     update_config(js_config) {
@@ -355,7 +316,6 @@ export class KlineProcess {
         }
     }
     /**
-     * 使用 serde-wasm-bindgen 获取当前配置为 JsValue
      * @returns {any}
      */
     get_config() {
@@ -366,7 +326,6 @@ export class KlineProcess {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
-     * 获取当前主题为 JsValue
      * @returns {any}
      */
     get_theme() {

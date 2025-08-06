@@ -32,7 +32,7 @@ pub enum StrategyType {
 /// 渲染策略工厂
 pub struct RenderStrategyFactory {
     // 支持同一类型多个策略实例，使用RefCell支持内部可变性
-    strategies: HashMap<StrategyType, Vec<RefCell<Box<dyn RenderStrategy>>>>,
+    pub(crate) strategies: HashMap<StrategyType, Vec<RefCell<Box<dyn RenderStrategy>>>>,
 }
 
 impl Default for RenderStrategyFactory {

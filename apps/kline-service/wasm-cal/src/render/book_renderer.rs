@@ -247,7 +247,7 @@ impl RenderStrategy for BookRenderer {
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
 
-        self.draw(main_ctx, &layout, &data_manager, ctx.hover_index, theme);
+        self.draw(main_ctx, &layout, &data_manager, ctx.hover_index(), theme);
         Ok(())
     }
 

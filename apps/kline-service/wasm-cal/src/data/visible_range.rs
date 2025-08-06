@@ -8,6 +8,10 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(message: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = time)]
+    fn time(label: &str);
+    #[wasm_bindgen(js_namespace = console, js_name = timeEnd)]
+    fn time_end(label: &str);
 }
 
 /// 可见数据范围结构体

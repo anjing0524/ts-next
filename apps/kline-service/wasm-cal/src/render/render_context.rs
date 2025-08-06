@@ -2,10 +2,12 @@
 //! 使用 Rc<RefCell<T>> 解决借用检查问题，提供专用上下文对象
 
 use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::command::state::MouseState;
 use crate::config::{ChartConfig, ChartTheme};
 use crate::data::DataManager;
 use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
+use crate::render::strategy::strategy_factory::RenderStrategyFactory;
 use crate::utils::error::WasmCalError;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,6 +26,10 @@ pub struct SharedRenderState {
     pub theme: Rc<ChartTheme>,
     /// 图表配置（可选）
     pub config: Option<Rc<ChartConfig>>,
+    /// 策略工厂
+    pub strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
+    /// 鼠标状态（用于渲染器访问）
+    pub mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
 }
 
 impl SharedRenderState {
@@ -34,6 +40,8 @@ impl SharedRenderState {
         layout: Rc<RefCell<ChartLayout>>,
         theme: Rc<ChartTheme>,
         config: Option<Rc<ChartConfig>>,
+        strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
+        mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
     ) -> Self {
         Self {
             canvas_manager,
@@ -41,6 +49,8 @@ impl SharedRenderState {
             layout,
             theme,
             config,
+            strategy_factory,
+            mouse_state,
         }
     }
 }
@@ -190,12 +200,6 @@ pub struct UnifiedRenderContext {
     pub timestamp: f64,
     /// 视口信息
     pub viewport: ViewportInfo,
-    /// 鼠标悬浮的K线索引（用于订单簿等需要悬浮状态的渲染器）
-    pub hover_index: Option<usize>,
-    /// 鼠标X坐标
-    pub mouse_x: f64,
-    /// 鼠标Y坐标
-    pub mouse_y: f64,
 }
 
 impl UnifiedRenderContext {
@@ -211,18 +215,15 @@ impl UnifiedRenderContext {
             mode,
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
-            hover_index: None,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
         }
     }
 
-    /// 创建带有悬浮索引的统一渲染上下文
+    /// 创建带有悬浮索引的统一渲染上下文（保留向后兼容）
     pub fn new_with_hover(
         shared: SharedRenderState,
         ctx: Option<OffscreenCanvasRenderingContext2d>,
         mode: RenderMode,
-        hover_index: Option<usize>,
+        _hover_index: Option<usize>,
     ) -> Self {
         Self {
             shared,
@@ -230,26 +231,41 @@ impl UnifiedRenderContext {
             mode,
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
-            hover_index,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
         }
     }
 
     /// 从共享状态创建
     pub fn from_shared(shared: SharedRenderState) -> Self {
-        Self::new(shared, None, RenderMode::Kmap)
+        Self {
+            shared,
+            ctx: None,
+            mode: RenderMode::Kmap,
+            timestamp: 0.0,
+            viewport: ViewportInfo::default(),
+        }
     }
 
-    /// 设置悬浮索引
-    pub fn set_hover_index(&mut self, hover_index: Option<usize>) {
-        self.hover_index = hover_index;
+    /// 从共享状态和鼠标状态创建（保留向后兼容）
+    pub fn from_shared_with_mouse_state(
+        shared: SharedRenderState,
+        _mouse_state: &MouseState,
+    ) -> Self {
+        Self::from_shared(shared)
     }
 
-    /// 设置鼠标位置
-    pub fn set_mouse_position(&mut self, x: f64, y: f64) {
-        self.mouse_x = x;
-        self.mouse_y = y;
+    /// 获取鼠标悬浮的K线索引
+    pub fn hover_index(&self) -> Option<usize> {
+        self.shared.mouse_state.borrow().hover_candle_index
+    }
+
+    /// 获取鼠标X坐标
+    pub fn mouse_x(&self) -> f64 {
+        self.shared.mouse_state.borrow().x
+    }
+
+    /// 获取鼠标Y坐标
+    pub fn mouse_y(&self) -> f64 {
+        self.shared.mouse_state.borrow().y
     }
 
     /// 获取绘制上下文
