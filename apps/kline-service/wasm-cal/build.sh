@@ -15,13 +15,13 @@ cd "$(dirname "$0")"
 # 格式化代码
 cargo fmt
 
-# 编译为WebAssembly
-wasm-pack build --target web --out-dir pkg --release 
-
 # 创建public/wasm-cal目录（如果不存在）
 mkdir -p ../public/wasm-cal
 
+# 编译为WebAssembly
+wasm-pack build --target web --out-dir ../public/wasm-cal --release 
+
 # 复制编译后的文件到public目录
-cp -r pkg/* ../public/wasm-cal/
+# cp -r pkg/* ../public/wasm-cal/
 
 echo "WebAssembly module built successfully!"

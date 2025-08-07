@@ -3,6 +3,7 @@ use crate::canvas::CanvasLayerType;
 use crate::command::{CommandManager, CommandResult, Event};
 use crate::config::{ChartConfig, ConfigManager};
 use crate::kline_generated::kline::{KlineData, root_as_kline_data_with_opts};
+use crate::performance::PerformanceMonitor;
 use crate::render::ChartRenderer;
 use crate::utils::WasmCalError;
 
@@ -34,6 +35,8 @@ pub struct KlineProcess {
     chart_renderer: Option<ChartRenderer>,
     // 命令管理器
     command_manager: Option<CommandManager>,
+    // 性能监控器
+    performance_monitor: Option<PerformanceMonitor>,
 }
 
 #[wasm_bindgen]
@@ -57,6 +60,7 @@ impl KlineProcess {
             config_manager: ConfigManager::new(),
             chart_renderer: None,
             command_manager: None,
+            performance_monitor: None,
         })
     }
 
@@ -106,12 +110,59 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn draw_all(&mut self) -> Result<(), JsValue> {
         time("KlineProcess::draw_all");
-        if let Some(renderer) = &mut self.chart_renderer {
-            renderer.force_render();
+
+        // 开始性能监控
+        if let Some(ref mut monitor) = self.performance_monitor {
+            monitor.start_frame();
         }
+
+        // 先估算K线数量，避免借用冲突
+        let kline_count = self.estimate_kline_count();
+
+        let result = if let Some(renderer) = &mut self.chart_renderer {
+            // 记录渲染开始时间
+            let _start_time = web_sys::window()
+                .and_then(|w| w.performance())
+                .map(|p| p.now())
+                .unwrap_or(0.0);
+
+            renderer.force_render();
+
+            // 记录渲染结束时间和性能指标
+            if let Some(ref mut monitor) = self.performance_monitor {
+                // 记录绘制调用（估算）
+                monitor.record_draw_call();
+                monitor.record_draw_call(); // 主画布
+                monitor.record_draw_call(); // 覆盖层
+
+                // 设置渲染的数据量
+                monitor.set_candles_rendered(kline_count);
+                monitor.set_indicators_rendered(kline_count / 10); // 估算指标数量
+
+                monitor.end_frame();
+            }
+
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Chart renderer not initialized"))
+        };
+
         time_end("KlineProcess::draw_all");
-        Ok(())
+        result
     }
+
+    /// 估算K线数量
+    fn estimate_kline_count(&self) -> usize {
+        // 从数据中解析K线数量
+        if let Ok(parsed_data) = Self::parse_kline_data_from_slice(&self.data) {
+            parsed_data.items().map(|c| c.len()).unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    // 性能监控相关的WASM绑定已迁移到PerformanceMonitor模块
+    // 使用PerformanceMonitor::new()、init_monitor()和get_performance_stats()方法
 
     fn handle_command_result(&mut self, result: CommandResult) {
         let renderer = match &mut self.chart_renderer {
@@ -173,6 +224,10 @@ impl KlineProcess {
             "KlineProcess::handle_mouse_move: x={}, y={}",
             x, y
         ));
+
+        // 记录交互事件功能已被删除
+        // 如果需要交互统计，可以在这里添加简单的计数逻辑
+
         if let Some(cm) = &mut self.command_manager {
             let event = Event::MouseMove { x, y };
             let result = cm.execute(event);

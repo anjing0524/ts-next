@@ -74,18 +74,9 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 
-const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
-
-if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
-
-function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
-}
-
 function addToExternrefTable0(obj) {
     const idx = wasm.__externref_table_alloc();
-    wasm.__wbindgen_export_5.set(idx, obj);
+    wasm.__wbindgen_export_4.set(idx, obj);
     return idx;
 }
 
@@ -96,6 +87,15 @@ function handleError(f, args) {
         const idx = addToExternrefTable0(e);
         wasm.__wbindgen_exn_store(idx);
     }
+}
+
+const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
+
+if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
 function isLikeNone(x) {
@@ -168,7 +168,7 @@ function debugString(val) {
 }
 
 function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_export_5.get(idx);
+    const value = wasm.__wbindgen_export_4.get(idx);
     wasm.__externref_table_dealloc(idx);
     return value;
 }
@@ -337,6 +337,189 @@ export class KlineProcess {
     }
 }
 
+const PerformanceMonitorFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_performancemonitor_free(ptr >>> 0, 1));
+/**
+ * WASM性能监控器
+ *
+ * 提供实时的性能监控功能，与前端PerformancePanel组件集成
+ * 通过JS接口提供FPS、内存使用、渲染时间等指标
+ */
+export class PerformanceMonitor {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PerformanceMonitorFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_performancemonitor_free(ptr, 0);
+    }
+    /**
+     * 创建新的性能监控器
+     */
+    constructor() {
+        const ret = wasm.performancemonitor_new();
+        this.__wbg_ptr = ret >>> 0;
+        PerformanceMonitorFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * 启用监控
+     */
+    enable() {
+        wasm.performancemonitor_enable(this.__wbg_ptr);
+    }
+    /**
+     * 禁用监控
+     */
+    disable() {
+        wasm.performancemonitor_disable(this.__wbg_ptr);
+    }
+    /**
+     * 开始帧监控
+     */
+    start_frame() {
+        wasm.performancemonitor_start_frame(this.__wbg_ptr);
+    }
+    /**
+     * 结束帧监控
+     */
+    end_frame() {
+        wasm.performancemonitor_end_frame(this.__wbg_ptr);
+    }
+    /**
+     * 记录绘制调用
+     */
+    record_draw_call() {
+        wasm.performancemonitor_record_draw_call(this.__wbg_ptr);
+    }
+    /**
+     * 设置渲染的K线数量
+     * @param {number} count
+     */
+    set_candles_rendered(count) {
+        wasm.performancemonitor_set_candles_rendered(this.__wbg_ptr, count);
+    }
+    /**
+     * 设置渲染的技术指标数量
+     * @param {number} count
+     */
+    set_indicators_rendered(count) {
+        wasm.performancemonitor_set_indicators_rendered(this.__wbg_ptr, count);
+    }
+    /**
+     * 记录帧开始（用于FPS计算，与JS接口兼容）
+     */
+    frame_start() {
+        wasm.performancemonitor_frame_start(this.__wbg_ptr);
+    }
+    /**
+     * 获取当前FPS（与JS接口兼容）
+     * @returns {number}
+     */
+    get_current_fps() {
+        const ret = wasm.performancemonitor_get_current_fps(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 获取渲染时间（与JS接口兼容）
+     * @returns {number}
+     */
+    get_render_time() {
+        const ret = wasm.performancemonitor_get_render_time(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 获取内存使用量（MB，与JS接口兼容）
+     * @returns {number}
+     */
+    get_memory_usage_mb() {
+        const ret = wasm.performancemonitor_get_memory_usage_mb(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 获取内存使用百分比（与JS接口兼容）
+     * @returns {number}
+     */
+    get_memory_percentage() {
+        const ret = wasm.performancemonitor_get_memory_percentage(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 获取完整的性能指标JSON（与PerformancePanel兼容）
+     * @returns {string}
+     */
+    get_metrics_json() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.performancemonitor_get_metrics_json(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * 获取性能指标（使用 serde-wasm-bindgen 高效序列化）
+     * @returns {any}
+     */
+    get_metrics_wasm() {
+        const ret = wasm.performancemonitor_get_metrics_wasm(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * 获取性能快照（使用 serde-wasm-bindgen 高效序列化）
+     * @returns {any}
+     */
+    get_snapshot_wasm() {
+        const ret = wasm.performancemonitor_get_snapshot_wasm(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * 初始化性能监控器（从KlineProcess迁移）
+     * 重新初始化监控器状态
+     */
+    init_monitor() {
+        wasm.performancemonitor_init_monitor(this.__wbg_ptr);
+    }
+    /**
+     * 获取性能统计信息（从KlineProcess迁移）
+     * 返回JSON格式的性能指标
+     * @returns {string}
+     */
+    get_performance_stats() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.performancemonitor_get_performance_stats(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+}
+
 async function __wbg_load(module, imports) {
     if (typeof Response === 'function' && module instanceof Response) {
         if (typeof WebAssembly.instantiateStreaming === 'function') {
@@ -385,6 +568,10 @@ function __wbg_get_imports() {
         const ret = arg0.buffer;
         return ret;
     };
+    imports.wbg.__wbg_call_672a4d21634d4a24 = function() { return handleError(function (arg0, arg1) {
+        const ret = arg0.call(arg1);
+        return ret;
+    }, arguments) };
     imports.wbg.__wbg_clearRect_4790e3611b42f068 = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.clearRect(arg1, arg2, arg3, arg4);
     };
@@ -466,6 +653,16 @@ function __wbg_get_imports() {
         const ret = result;
         return ret;
     };
+    imports.wbg.__wbg_instanceof_Window_def73ea0955fc569 = function(arg0) {
+        let result;
+        try {
+            result = arg0 instanceof Window;
+        } catch (_) {
+            result = false;
+        }
+        const ret = result;
+        return ret;
+    };
     imports.wbg.__wbg_length_a446193dc22c12f8 = function(arg0) {
         const ret = arg0.length;
         return ret;
@@ -487,6 +684,10 @@ function __wbg_get_imports() {
         const ret = new Object();
         return ret;
     };
+    imports.wbg.__wbg_new_5e0be73521bc8c17 = function() {
+        const ret = new Map();
+        return ret;
+    };
     imports.wbg.__wbg_new_78c8a92080461d08 = function(arg0) {
         const ret = new Float64Array(arg0);
         return ret;
@@ -503,6 +704,10 @@ function __wbg_get_imports() {
         const ret = new Uint8Array(arg0);
         return ret;
     };
+    imports.wbg.__wbg_newnoargs_105ed471475aaf50 = function(arg0, arg1) {
+        const ret = new Function(getStringFromWasm0(arg0, arg1));
+        return ret;
+    };
     imports.wbg.__wbg_newwithbyteoffsetandlength_93c8e0c1a479fa1a = function(arg0, arg1, arg2) {
         const ret = new Float64Array(arg0, arg1 >>> 0, arg2 >>> 0);
         return ret;
@@ -515,9 +720,29 @@ function __wbg_get_imports() {
         const ret = new Float64Array(arg0 >>> 0);
         return ret;
     };
+    imports.wbg.__wbg_now_2c95c9de01293173 = function(arg0) {
+        const ret = arg0.now();
+        return ret;
+    };
+    imports.wbg.__wbg_now_807e54c39636c349 = function() {
+        const ret = Date.now();
+        return ret;
+    };
+    imports.wbg.__wbg_now_d18023d54d4e5500 = function(arg0) {
+        const ret = arg0.now();
+        return ret;
+    };
     imports.wbg.__wbg_of_66b3ee656cbd962b = function(arg0, arg1) {
         const ret = Array.of(arg0, arg1);
         return ret;
+    };
+    imports.wbg.__wbg_performance_7a3ffd0b17f663ad = function(arg0) {
+        const ret = arg0.performance;
+        return ret;
+    };
+    imports.wbg.__wbg_performance_c185c0cdc2766575 = function(arg0) {
+        const ret = arg0.performance;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
     };
     imports.wbg.__wbg_quadraticCurveTo_d0e2225e49394b7a = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.quadraticCurveTo(arg1, arg2, arg3, arg4);
@@ -528,11 +753,18 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setLineDash_0e3f3e194352a774 = function() { return handleError(function (arg0, arg1) {
         arg0.setLineDash(arg1);
     }, arguments) };
+    imports.wbg.__wbg_set_37837023f3d740e8 = function(arg0, arg1, arg2) {
+        arg0[arg1 >>> 0] = arg2;
+    };
     imports.wbg.__wbg_set_3f1d0b984ed272ed = function(arg0, arg1, arg2) {
         arg0[arg1] = arg2;
     };
     imports.wbg.__wbg_set_65595bdd868b3009 = function(arg0, arg1, arg2) {
         arg0.set(arg1, arg2 >>> 0);
+    };
+    imports.wbg.__wbg_set_8fc6bf8a5b1071d1 = function(arg0, arg1, arg2) {
+        const ret = arg0.set(arg1, arg2);
+        return ret;
     };
     imports.wbg.__wbg_setfillStyle_cb059a69ce15cc28 = function(arg0, arg1, arg2) {
         arg0.fillStyle = getStringFromWasm0(arg1, arg2);
@@ -577,6 +809,22 @@ function __wbg_get_imports() {
         getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
         getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
     };
+    imports.wbg.__wbg_static_accessor_GLOBAL_88a902d13a557d07 = function() {
+        const ret = typeof global === 'undefined' ? null : global;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0 = function() {
+        const ret = typeof globalThis === 'undefined' ? null : globalThis;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_SELF_37c5d418e4bf5819 = function() {
+        const ret = typeof self === 'undefined' ? null : self;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_WINDOW_5de37043a91a9c40 = function() {
+        const ret = typeof window === 'undefined' ? null : window;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
     imports.wbg.__wbg_strokeRect_758dd38f99a9581f = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.strokeRect(arg1, arg2, arg3, arg4);
     };
@@ -595,6 +843,14 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_width_8fe4e8f77479c2a6 = function(arg0) {
         const ret = arg0.width;
+        return ret;
+    };
+    imports.wbg.__wbindgen_bigint_from_i64 = function(arg0) {
+        const ret = arg0;
+        return ret;
+    };
+    imports.wbg.__wbindgen_bigint_from_u64 = function(arg0) {
+        const ret = BigInt.asUintN(64, arg0);
         return ret;
     };
     imports.wbg.__wbindgen_boolean_get = function(arg0) {
@@ -618,7 +874,7 @@ function __wbg_get_imports() {
         return ret;
     };
     imports.wbg.__wbindgen_init_externref_table = function() {
-        const table = wasm.__wbindgen_export_5;
+        const table = wasm.__wbindgen_export_4;
         const offset = table.grow(4);
         table.set(0, undefined);
         table.set(offset + 0, undefined);
@@ -630,6 +886,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_is_object = function(arg0) {
         const val = arg0;
         const ret = typeof(val) === 'object' && val !== null;
+        return ret;
+    };
+    imports.wbg.__wbindgen_is_string = function(arg0) {
+        const ret = typeof(arg0) === 'string';
         return ret;
     };
     imports.wbg.__wbindgen_is_undefined = function(arg0) {

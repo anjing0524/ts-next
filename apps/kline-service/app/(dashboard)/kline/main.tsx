@@ -7,7 +7,6 @@ import {
   WheelEvent as ReactWheelEvent,
   useCallback,
 } from 'react';
-import { createPerformanceMonitor, PerformanceMonitor } from './performance-monitor';
 import { PerformancePanel } from './components/PerformancePanel';
 
 
@@ -29,34 +28,13 @@ export default function Main() {
   const [config, setConfig] = useState<any>(null); // 存储当前配置
   const [showPerformancePanel, setShowPerformancePanel] = useState(true);
   
-  // 性能监控器
-  const performanceMonitorRef = useRef<PerformanceMonitor | null>(null);
+
   
   // 定义画布尺寸常量
   const CANVAS_HEIGHT = 800; // 可见高度
   const CANVAS_WIDTH = 1800; // 可见宽度
   
-  // 初始化性能监控器
-  useEffect(() => {
-    if (!performanceMonitorRef.current) {
-      performanceMonitorRef.current = createPerformanceMonitor({
-        enabled: true,
-        updateInterval: 1000,
-        maxSamples: 60,
-        onUpdate: (metrics) => {
-          // 可以在这里处理性能指标更新
-          console.log('[Performance] FPS:', metrics.fps, 'Memory:', metrics.memory.used + 'MB');
-        }
-      });
-      performanceMonitorRef.current.start();
-    }
-    
-    return () => {
-      if (performanceMonitorRef.current) {
-        performanceMonitorRef.current.stop();
-      }
-    };
-  }, []);
+
 
   // 创建一个通用的获取鼠标坐标的函数
   const getMouseCoordinates = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -103,11 +81,6 @@ export default function Main() {
                 canvas.height = CANVAS_HEIGHT;
               });
 
-              // 记录渲染开始
-              if (performanceMonitorRef.current) {
-                performanceMonitorRef.current.renderStart();
-              }
-              
               worker.postMessage(
                 {
                   type: 'draw',
@@ -125,11 +98,6 @@ export default function Main() {
           }, 10); // 延迟10ms确保Canvas元素完全准备好
         },
         drawComplete: () => {
-          // 记录渲染结束
-          if (performanceMonitorRef.current) {
-            performanceMonitorRef.current.renderEnd();
-            performanceMonitorRef.current.frameStart();
-          }
           setIsLoading(false);
         },
         error: (data) => {
@@ -167,6 +135,10 @@ export default function Main() {
         modeChanged: (data) => {
           // 处理模式切换
           console.log('模式已切换:', data.mode);
+        },
+        performanceMetrics: (data) => {
+          // 处理性能指标数据，由PerformancePanel组件直接监听Worker消息
+          // 这里不需要特殊处理，只是为了避免"未处理的消息类型"警告
         },
       };
 
@@ -215,6 +187,8 @@ export default function Main() {
           type: 'module',
         });
         workerRef.current = worker; // 保存worker引用
+
+
 
         // 添加错误监听
         worker.onerror = (e) => {
@@ -267,22 +241,12 @@ export default function Main() {
       const coords = getMouseCoordinates(e);
       if (!coords) return;
 
-      // 记录事件开始
-      if (performanceMonitorRef.current) {
-        performanceMonitorRef.current.eventStart();
-      }
-
       // 发送鼠标移动消息，Worker会自动返回光标样式
       sendMessageToWorker({
         type: 'mousemove',
         x: coords.x,
         y: coords.y,
       });
-      
-      // 记录事件结束
-      if (performanceMonitorRef.current) {
-        performanceMonitorRef.current.eventEnd();
-      }
     },
     [getMouseCoordinates, sendMessageToWorker]
   );
@@ -300,11 +264,6 @@ export default function Main() {
   // 处理滚轮事件 - 无节流
   const handleWheel = useCallback(
     (e: ReactWheelEvent<HTMLCanvasElement>) => {
-      // 记录事件开始
-      if (performanceMonitorRef.current) {
-        performanceMonitorRef.current.eventStart();
-      }
-      
       // 无论是否在拖动状态，都发送滚轮事件到Worker
       sendMessageToWorker({
         type: 'wheel',
@@ -313,11 +272,6 @@ export default function Main() {
         y: e.nativeEvent.offsetY,
         isDragging: isDragging, // 添加拖动状态标志
       });
-      
-      // 记录事件结束
-      if (performanceMonitorRef.current) {
-        performanceMonitorRef.current.eventEnd();
-      }
     },
     [sendMessageToWorker, isDragging] // 添加isDragging作为依赖项
   );
@@ -549,16 +503,7 @@ export default function Main() {
           >
             ETH/暗色主题
           </button>
-          <button
-            onClick={() => {
-              if (performanceMonitorRef.current) {
-                performanceMonitorRef.current.reset();
-              }
-            }}
-            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-          >
-            重置性能统计
-          </button>
+
           <button
             onClick={() => setShowPerformancePanel(!showPerformancePanel)}
             className={`px-3 py-1 rounded transition-colors text-sm ${
@@ -625,9 +570,9 @@ export default function Main() {
 
         
         {/* 性能监控面板 */}
-        {performanceMonitorRef.current && (
+        {workerRef.current && (
           <PerformancePanel 
-            monitor={performanceMonitorRef.current}
+            worker={workerRef.current}
             visible={showPerformancePanel}
             position="top-right"
           />

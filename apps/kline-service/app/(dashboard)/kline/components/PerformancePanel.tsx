@@ -1,44 +1,93 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PerformanceMonitor, PerformanceMetrics } from '../performance-monitor';
+
+interface UnifiedPerformanceData {
+  fps?: number;
+  renderTime?: number;
+  memoryUsage?: number;
+  memoryPercentage?: number;
+  render_metrics?: {
+    fps?: number;
+    frame_time_ms?: number;
+    draw_calls?: number;
+    candles_rendered?: number;
+    indicators_rendered?: number;
+  };
+  memory_metrics?: {
+    used_mb?: number;
+    percentage?: number;
+  };
+}
+
+interface PerformanceData {
+  performanceData: UnifiedPerformanceData | null;
+  wasmMemory: { used: number; total: number } | null;
+  timestamp: number;
+}
 
 interface PerformancePanelProps {
-  monitor: PerformanceMonitor;
+  worker: Worker | null;
   visible?: boolean;
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
 /**
  * 性能监控面板组件
- * 显示实时的FPS、内存使用、渲染时间等性能指标
+ * 显示WASM性能指标、渲染统计和内存使用情况
  */
 export const PerformancePanel: React.FC<PerformancePanelProps> = ({
-  monitor,
+  worker,
   visible = true,
   position = 'top-right'
 }) => {
-  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
+  const [jsMemory, setJsMemory] = useState<{ used: number; total: number } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !worker) return;
 
-    // 每500ms更新一次显示
+    // 监听Worker的性能数据消息
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'performanceMetrics') {
+        setPerformanceData({
+          performanceData: event.data.performanceData,
+          wasmMemory: event.data.wasmMemory,
+          timestamp: event.data.timestamp
+        });
+      }
+    };
+
+    worker.addEventListener('message', handleMessage);
+
+    // 每1秒请求一次性能数据
     intervalRef.current = window.setInterval(() => {
-      const currentMetrics = monitor.getMetrics();
-      setMetrics(currentMetrics);
-    }, 500);
+      worker.postMessage({ type: 'getPerformance' });
+      
+      // 获取JS内存信息
+      if ('memory' in performance) {
+        const mem = (performance as any).memory;
+        setJsMemory({
+          used: Math.round(mem.usedJSHeapSize / 1024 / 1024 * 100) / 100,
+          total: Math.round(mem.totalJSHeapSize / 1024 / 1024 * 100) / 100
+        });
+      }
+    }, 1000);
+
+    // 立即请求一次
+    worker.postMessage({ type: 'getPerformance' });
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      worker.removeEventListener('message', handleMessage);
     };
-  }, [monitor, visible]);
+  }, [worker, visible]);
 
-  if (!visible || !metrics) {
+  if (!visible || !performanceData) {
     return null;
   }
 
@@ -52,7 +101,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
       borderRadius: '6px',
       fontSize: '12px',
       fontFamily: 'monospace',
-      minWidth: '120px',
+      minWidth: '160px',
       backdropFilter: 'blur(4px)',
       border: '1px solid rgba(255, 255, 255, 0.1)',
     };
@@ -71,23 +120,22 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
     }
   };
 
-  const getFpsColor = (fps: number) => {
-    if (fps >= 55) return '#4ade80'; // 绿色 - 良好
-    if (fps >= 30) return '#fbbf24'; // 黄色 - 一般
-    return '#ef4444'; // 红色 - 差
+  const getFrameTimeColor = (frameTime: number) => {
+    if (frameTime < 16) return '#4ade80'; // 绿色 - 60fps
+    if (frameTime < 33) return '#fbbf24'; // 黄色 - 30fps
+    return '#ef4444'; // 红色 - <30fps
   };
 
-  const getMemoryColor = (percentage: number) => {
+  const getMemoryColor = (used: number, total: number) => {
+    const percentage = total > 0 ? (used / total) * 100 : 0;
     if (percentage < 70) return '#4ade80'; // 绿色
     if (percentage < 85) return '#fbbf24'; // 黄色
     return '#ef4444'; // 红色
   };
 
-  const getRenderTimeColor = (time: number) => {
-    if (time < 16) return '#4ade80'; // 绿色 - 60fps
-    if (time < 33) return '#fbbf24'; // 黄色 - 30fps
-    return '#ef4444'; // 红色 - <30fps
-  };
+  const { performanceData: perfData, wasmMemory } = performanceData;
+  const fps = perfData?.fps || perfData?.render_metrics?.fps || 0;
+  const frameTime = perfData?.renderTime || perfData?.render_metrics?.frame_time_ms || 0;
 
   return (
     <div style={getPositionStyles()}>
@@ -111,16 +159,25 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>FPS:</span>
-          <span style={{ color: getFpsColor(metrics.fps), fontWeight: 'bold' }}>
-            {metrics.fps}
+          <span style={{ color: getFrameTimeColor(frameTime), fontWeight: 'bold' }}>
+            {fps || 'N/A'}
           </span>
         </div>
         
-        {metrics.memory.total > 0 && (
+        {wasmMemory && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>内存:</span>
-            <span style={{ color: getMemoryColor(metrics.memory.percentage) }}>
-              {metrics.memory.used}MB ({metrics.memory.percentage}%)
+            <span>WASM内存:</span>
+            <span style={{ color: getMemoryColor(wasmMemory.used, wasmMemory.total) }}>
+              {wasmMemory.used}MB
+            </span>
+          </div>
+        )}
+        
+        {jsMemory && (
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>JS内存:</span>
+            <span style={{ color: getMemoryColor(jsMemory.used, jsMemory.total) }}>
+              {jsMemory.used}MB
             </span>
           </div>
         )}
@@ -136,24 +193,47 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
           flexDirection: 'column', 
           gap: '4px' 
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>渲染时间:</span>
-            <span style={{ color: getRenderTimeColor(metrics.renderTime) }}>
-              {metrics.renderTime.toFixed(1)}ms
-            </span>
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>事件延迟:</span>
-            <span style={{ color: metrics.eventLatency > 16 ? '#fbbf24' : '#4ade80' }}>
-              {metrics.eventLatency.toFixed(1)}ms
-            </span>
-          </div>
-          
-          {metrics.memory.total > 0 && (
+          {frameTime > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>总内存:</span>
-              <span>{metrics.memory.total}MB</span>
+              <span>帧时间:</span>
+              <span style={{ color: getFrameTimeColor(frameTime) }}>
+                {frameTime.toFixed(1)}ms
+              </span>
+            </div>
+          )}
+          
+          {perfData?.render_metrics?.draw_calls && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>绘制调用:</span>
+              <span>{perfData.render_metrics.draw_calls}</span>
+            </div>
+          )}
+          
+          {perfData?.render_metrics?.candles_rendered && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>K线数量:</span>
+              <span>{perfData.render_metrics.candles_rendered}</span>
+            </div>
+          )}
+          
+          {perfData?.render_metrics?.indicators_rendered && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>指标数量:</span>
+              <span>{perfData.render_metrics.indicators_rendered}</span>
+            </div>
+          )}
+          
+          {perfData?.memory_metrics?.used_mb && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>WASM内存详情:</span>
+              <span>{perfData.memory_metrics.used_mb.toFixed(1)}MB ({perfData.memory_metrics.percentage?.toFixed(1)}%)</span>
+            </div>
+          )}
+          
+          {jsMemory && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>JS总内存:</span>
+              <span>{jsMemory.total}MB</span>
             </div>
           )}
           
@@ -162,102 +242,10 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
             fontSize: '10px', 
             color: 'rgba(255, 255, 255, 0.6)' 
           }}>
-            更新时间: {new Date(metrics.timestamp).toLocaleTimeString()}
+            更新时间: {new Date(performanceData.timestamp).toLocaleTimeString()}
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-/**
- * 性能图表组件（可选的详细视图）
- */
-interface PerformanceChartProps {
-  monitor: PerformanceMonitor;
-  width?: number;
-  height?: number;
-}
-
-export const PerformanceChart: React.FC<PerformanceChartProps> = ({
-  monitor,
-  width = 300,
-  height = 200
-}) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [history, setHistory] = useState<any>(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentHistory = monitor.getHistory();
-      setHistory(currentHistory);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [monitor]);
-
-  useEffect(() => {
-    if (!history || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // 清空画布
-    ctx.clearRect(0, 0, width, height);
-    
-    // 绘制FPS曲线
-    const fpsData = history.fps;
-    if (fpsData.length > 1) {
-      ctx.strokeStyle = '#4ade80';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      fpsData.forEach((fps: number, index: number) => {
-        const x = (index / (fpsData.length - 1)) * width;
-        const y = height - (fps / 60) * height;
-        
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      
-      ctx.stroke();
-    }
-    
-    // 绘制网格线
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 1;
-    
-    // 水平网格线 (FPS)
-    for (let i = 0; i <= 60; i += 15) {
-      const y = height - (i / 60) * height;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    
-  }, [history, width, height]);
-
-  return (
-    <div style={{ 
-      backgroundColor: 'rgba(0, 0, 0, 0.8)', 
-      padding: '10px', 
-      borderRadius: '6px',
-      border: '1px solid rgba(255, 255, 255, 0.1)'
-    }}>
-      <div style={{ color: 'white', fontSize: '12px', marginBottom: '8px' }}>
-        FPS 历史曲线
-      </div>
-      <canvas 
-        ref={canvasRef}
-        width={width}
-        height={height}
-        style={{ border: '1px solid rgba(255, 255, 255, 0.2)' }}
-      />
     </div>
   );
 };

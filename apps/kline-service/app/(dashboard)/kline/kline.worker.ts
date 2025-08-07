@@ -1,6 +1,6 @@
 'use client';
 // kline.worker.ts - Web Worker 用于处理 WASM 和 Canvas 操作
-import init, { KlineProcess } from '@/public/wasm-cal/kline_processor';
+import init, { KlineProcess, PerformanceMonitor } from '@/public/wasm-cal/kline_processor';
 
 // 定义消息类型
 interface InitMessage {
@@ -79,6 +79,9 @@ interface GetConfigMessage {
   type: 'getConfig';
 }
 
+interface GetPerformanceMessage {
+  type: 'getPerformance';
+}
 
 type WorkerMessage =
   | InitMessage
@@ -93,13 +96,17 @@ type WorkerMessage =
   | SwitchModeMessage
   | ResizeMessage
   | UpdateConfigMessage
-  | GetConfigMessage;
+  | GetConfigMessage
+  | GetPerformanceMessage;
 
 // 存储处理器实例
 let processorRef: KlineProcess | null = null;
 let wasmMemory: WebAssembly.Memory | null = null;
 let isInitializing = false;
 let pendingDrawRequest: DrawMessage | null = null;
+
+// 性能监控器实例
+let performanceMonitor: PerformanceMonitor | null = null;
 
 // 处理来自主线程的消息
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
@@ -240,6 +247,54 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           console.error('[Worker] 获取配置失败:', err);
         }
         break;
+      case 'getPerformance':
+        try {
+          let performanceData = null;
+          
+          // 统一从PerformanceMonitor获取性能数据
+          if (performanceMonitor) {
+            try {
+              // 使用统一的性能统计方法
+              const statsJson = performanceMonitor.get_performance_stats();
+              if (statsJson) {
+                performanceData = JSON.parse(statsJson);
+              }
+            } catch (perfErr) {
+              console.warn('[Worker] 获取性能数据失败:', perfErr);
+              // 降级到基础指标获取
+              try {
+                performanceData = {
+                  fps: performanceMonitor.get_current_fps(),
+                  renderTime: performanceMonitor.get_render_time(),
+                  memoryUsage: performanceMonitor.get_memory_usage_mb(),
+                  memoryPercentage: performanceMonitor.get_memory_percentage()
+                };
+              } catch (fallbackErr) {
+                console.warn('[Worker] 降级性能数据获取也失败:', fallbackErr);
+              }
+            }
+          }
+          
+          // 获取WASM内存信息
+          let wasmMemoryInfo = null;
+          if (wasmMemory) {
+            const memoryBytes = wasmMemory.buffer.byteLength;
+            wasmMemoryInfo = {
+              used: Math.round(memoryBytes / 1024 / 1024 * 100) / 100, // MB
+              total: Math.round(memoryBytes / 1024 / 1024 * 100) / 100
+            };
+          }
+          
+          self.postMessage({
+            type: 'performanceMetrics',
+            performanceData,
+            wasmMemory: wasmMemoryInfo,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          console.error('[Worker] 获取性能指标失败:', err);
+        }
+        break;
       default:
         console.error('Worker 收到未知类型的消息');
     }
@@ -299,6 +354,12 @@ async function handleInit(message: InitMessage) {
     processorRef = new KlineProcess(wasmMemory, 0, buf.length);
     console.timeEnd('[Worker] 创建 KlineProcess 实例');
 
+    // 6. 初始化性能监控（统一管理）
+    if (!performanceMonitor) {
+      performanceMonitor = new PerformanceMonitor();
+      performanceMonitor.init_monitor(); // 使用新的初始化方法
+    }
+
     console.timeEnd('[Worker] 完整初始化流程');
 
     // 通知主线程初始化完成
@@ -330,6 +391,11 @@ async function handleDraw(message: DrawMessage) {
   const { canvas, mainCanvas, overlayCanvas } = message;
 
   try {
+    // 记录帧开始
+    if (performanceMonitor) {
+      performanceMonitor.frame_start();
+    }
+
     console.time('[Worker] 设置 Canvas');
     // 设置 Canvas 到处理器
     processorRef.set_canvases(canvas, mainCanvas, overlayCanvas);
@@ -340,8 +406,15 @@ async function handleDraw(message: DrawMessage) {
 
     // 绘制 K 线图
     console.time('[Worker] 绘制 K 线图');
+    const renderStart = performance.now();
     processorRef.draw_all();
+    const renderEnd = performance.now();
     console.timeEnd('[Worker] 绘制 K 线图');
+
+    // 记录渲染时间到性能监控器
+    if (performanceMonitor) {
+      performanceMonitor.end_frame();
+    }
 
     // 通知主线程绘制完成
     self.postMessage({ type: 'drawComplete' });
@@ -357,6 +430,11 @@ function cleanup() {
     console.log('[Worker] 释放 KlineProcess');
     processorRef.free();
     processorRef = null;
+  }
+  if (performanceMonitor) {
+    console.log('[Worker] 释放 PerformanceMonitor');
+    performanceMonitor.free();
+    performanceMonitor = null;
   }
   wasmMemory = null;
   pendingDrawRequest = null;
