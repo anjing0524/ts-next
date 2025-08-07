@@ -19,13 +19,6 @@ pub use layout::ChartLayout;
 pub use performance::PerformanceMonitor;
 pub use render::ChartRenderer;
 
-// 为WASM导出添加wasm_bindgen注解
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
 // 导出 serde-wasm-bindgen 以便其他模块使用
 pub use serde_wasm_bindgen;
 

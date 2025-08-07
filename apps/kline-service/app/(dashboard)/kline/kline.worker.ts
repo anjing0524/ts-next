@@ -214,9 +214,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         }
         break;
       case 'resize':
-        if (!processorRef) return;
+        if (!processorRef) {
+          console.warn('[Worker] resize消息收到，但processorRef未初始化');
+          return;
+        }
         try {
+          console.log('[Worker] 收到resize消息，通知WASM环境:', { width: data.width, height: data.height });
           processorRef.handle_canvas_resize(data.width, data.height);
+          console.log('[Worker] WASM环境Canvas尺寸更新完成');
         } catch (err) {
           console.error('[Worker] 处理画布大小改变失败:', err);
         }
@@ -248,47 +253,38 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         }
         break;
       case 'getPerformance':
+        console.log('[Worker] 收到性能数据请求');
         try {
           let performanceData = null;
           
-          // 统一从PerformanceMonitor获取性能数据
+          // 从独立的PerformanceMonitor获取性能数据
           if (performanceMonitor) {
             try {
               // 使用统一的性能统计方法
               const statsJson = performanceMonitor.get_performance_stats();
+              console.log('[Worker] 原始性能数据:', statsJson);
               if (statsJson) {
                 performanceData = JSON.parse(statsJson);
+                console.log('[Worker] 解析后性能数据:', performanceData);
               }
             } catch (perfErr) {
               console.warn('[Worker] 获取性能数据失败:', perfErr);
-              // 降级到基础指标获取
-              try {
-                performanceData = {
-                  fps: performanceMonitor.get_current_fps(),
-                  renderTime: performanceMonitor.get_render_time(),
-                  memoryUsage: performanceMonitor.get_memory_usage_mb(),
-                  memoryPercentage: performanceMonitor.get_memory_percentage()
-                };
-              } catch (fallbackErr) {
-                console.warn('[Worker] 降级性能数据获取也失败:', fallbackErr);
-              }
+              performanceData = null;
             }
+          } else {
+            console.warn('[Worker] 性能监控器未初始化');
+            performanceData = null;
           }
           
-          // 获取WASM内存信息
-          let wasmMemoryInfo = null;
-          if (wasmMemory) {
-            const memoryBytes = wasmMemory.buffer.byteLength;
-            wasmMemoryInfo = {
-              used: Math.round(memoryBytes / 1024 / 1024 * 100) / 100, // MB
-              total: Math.round(memoryBytes / 1024 / 1024 * 100) / 100
-            };
-          }
-          
+          // 直接发送WASM性能数据，不需要重复计算
+          // performanceData已包含所有必要信息：renderTime、memoryUsage、memoryPercentage
           self.postMessage({
             type: 'performanceMetrics',
             performanceData,
-            wasmMemory: wasmMemoryInfo,
+            wasmMemory: performanceData ? {
+              used: Math.round(performanceData.memoryUsage * 100) / 100, // MB
+              total: wasmMemory ? Math.round(wasmMemory.buffer.byteLength / 1024 / 1024 * 100) / 100 : performanceData.memoryUsage
+            } : null,
             timestamp: Date.now()
           });
         } catch (err) {
@@ -356,8 +352,12 @@ async function handleInit(message: InitMessage) {
 
     // 6. 初始化性能监控（统一管理）
     if (!performanceMonitor) {
+      console.log('[Worker] 初始化性能监控器...');
       performanceMonitor = new PerformanceMonitor();
       performanceMonitor.init_monitor(); // 使用新的初始化方法
+      console.log('[Worker] 性能监控器初始化完成');
+    } else {
+      console.log('[Worker] 性能监控器已存在');
     }
 
     console.timeEnd('[Worker] 完整初始化流程');
@@ -391,9 +391,9 @@ async function handleDraw(message: DrawMessage) {
   const { canvas, mainCanvas, overlayCanvas } = message;
 
   try {
-    // 记录帧开始
+    // 开始渲染性能测量
     if (performanceMonitor) {
-      performanceMonitor.frame_start();
+      performanceMonitor.start_render_measurement();
     }
 
     console.time('[Worker] 设置 Canvas');
@@ -411,9 +411,9 @@ async function handleDraw(message: DrawMessage) {
     const renderEnd = performance.now();
     console.timeEnd('[Worker] 绘制 K 线图');
 
-    // 记录渲染时间到性能监控器
+    // 结束渲染性能测量
     if (performanceMonitor) {
-      performanceMonitor.end_frame();
+      performanceMonitor.end_render_measurement();
     }
 
     // 通知主线程绘制完成

@@ -22,8 +22,8 @@ export class KlineProcess {
   get_cursor_style(x: number, y: number): string;
   handle_mouse_leave(): void;
   handle_wheel(delta: number, x: number, y: number): void;
-  handle_mouse_down(x: number, y: number): void;
-  handle_mouse_up(x: number, y: number): void;
+  handle_mouse_down(x: number, y: number): boolean;
+  handle_mouse_up(x: number, y: number): boolean;
   handle_mouse_drag(x: number, y: number): void;
   set_render_mode(mode: string): void;
   handle_canvas_resize(width: number, height: number): void;
@@ -44,65 +44,13 @@ export class PerformanceMonitor {
    */
   constructor();
   /**
-   * 启用监控
+   * 开始渲染性能测量
    */
-  enable(): void;
+  start_render_measurement(): void;
   /**
-   * 禁用监控
+   * 结束渲染性能测量
    */
-  disable(): void;
-  /**
-   * 开始帧监控
-   */
-  start_frame(): void;
-  /**
-   * 结束帧监控
-   */
-  end_frame(): void;
-  /**
-   * 记录绘制调用
-   */
-  record_draw_call(): void;
-  /**
-   * 设置渲染的K线数量
-   */
-  set_candles_rendered(count: number): void;
-  /**
-   * 设置渲染的技术指标数量
-   */
-  set_indicators_rendered(count: number): void;
-  /**
-   * 记录帧开始（用于FPS计算，与JS接口兼容）
-   */
-  frame_start(): void;
-  /**
-   * 获取当前FPS（与JS接口兼容）
-   */
-  get_current_fps(): number;
-  /**
-   * 获取渲染时间（与JS接口兼容）
-   */
-  get_render_time(): number;
-  /**
-   * 获取内存使用量（MB，与JS接口兼容）
-   */
-  get_memory_usage_mb(): number;
-  /**
-   * 获取内存使用百分比（与JS接口兼容）
-   */
-  get_memory_percentage(): number;
-  /**
-   * 获取完整的性能指标JSON（与PerformancePanel兼容）
-   */
-  get_metrics_json(): string;
-  /**
-   * 获取性能指标（使用 serde-wasm-bindgen 高效序列化）
-   */
-  get_metrics_wasm(): any;
-  /**
-   * 获取性能快照（使用 serde-wasm-bindgen 高效序列化）
-   */
-  get_snapshot_wasm(): any;
+  end_render_measurement(): void;
   /**
    * 初始化性能监控器（从KlineProcess迁移）
    * 重新初始化监控器状态
@@ -127,8 +75,8 @@ export interface InitOutput {
   readonly klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_leave: (a: number) => void;
   readonly klineprocess_handle_wheel: (a: number, b: number, c: number, d: number) => void;
-  readonly klineprocess_handle_mouse_down: (a: number, b: number, c: number) => void;
-  readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => void;
+  readonly klineprocess_handle_mouse_down: (a: number, b: number, c: number) => number;
+  readonly klineprocess_handle_mouse_up: (a: number, b: number, c: number) => number;
   readonly klineprocess_handle_mouse_drag: (a: number, b: number, c: number) => void;
   readonly klineprocess_set_render_mode: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_canvas_resize: (a: number, b: number, c: number) => void;
@@ -137,21 +85,8 @@ export interface InitOutput {
   readonly klineprocess_get_theme: (a: number) => [number, number, number];
   readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
   readonly performancemonitor_new: () => number;
-  readonly performancemonitor_enable: (a: number) => void;
-  readonly performancemonitor_disable: (a: number) => void;
-  readonly performancemonitor_start_frame: (a: number) => void;
-  readonly performancemonitor_end_frame: (a: number) => void;
-  readonly performancemonitor_record_draw_call: (a: number) => void;
-  readonly performancemonitor_set_candles_rendered: (a: number, b: number) => void;
-  readonly performancemonitor_set_indicators_rendered: (a: number, b: number) => void;
-  readonly performancemonitor_frame_start: (a: number) => void;
-  readonly performancemonitor_get_current_fps: (a: number) => number;
-  readonly performancemonitor_get_render_time: (a: number) => number;
-  readonly performancemonitor_get_memory_usage_mb: (a: number) => number;
-  readonly performancemonitor_get_memory_percentage: (a: number) => number;
-  readonly performancemonitor_get_metrics_json: (a: number) => [number, number];
-  readonly performancemonitor_get_metrics_wasm: (a: number) => [number, number, number];
-  readonly performancemonitor_get_snapshot_wasm: (a: number) => [number, number, number];
+  readonly performancemonitor_start_render_measurement: (a: number) => void;
+  readonly performancemonitor_end_render_measurement: (a: number) => void;
   readonly performancemonitor_init_monitor: (a: number) => void;
   readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
   readonly start: () => void;

@@ -20,6 +20,9 @@ web-sys = { version = "0.3.77", features = [
   "WheelEvent",
   "TextMetrics",
   "Performance",
+  "PerformanceEntry",
+  "PerformanceMeasure",
+  "PerformanceMark",
   "Window",
 ] }
 js-sys = "0.3.77"

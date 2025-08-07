@@ -3,7 +3,7 @@ use crate::canvas::CanvasLayerType;
 use crate::command::{CommandManager, CommandResult, Event};
 use crate::config::{ChartConfig, ConfigManager};
 use crate::kline_generated::kline::{KlineData, root_as_kline_data_with_opts};
-use crate::performance::PerformanceMonitor;
+use crate::performance::monitor::PerformanceMonitor;
 use crate::render::ChartRenderer;
 use crate::utils::WasmCalError;
 
@@ -11,17 +11,6 @@ use js_sys;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::OffscreenCanvas;
-
-// --- Logging Helpers (moved from lib.rs) ---
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = time)]
-    fn time(label: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = timeEnd)]
-    fn time_end(label: &str);
-}
 
 /// KlineProcess - 持有K线数据和渲染器，提供统一的绘制函数
 #[wasm_bindgen]
@@ -36,7 +25,7 @@ pub struct KlineProcess {
     // 命令管理器
     command_manager: Option<CommandManager>,
     // 性能监控器
-    performance_monitor: Option<PerformanceMonitor>,
+    performance_monitor: PerformanceMonitor,
 }
 
 #[wasm_bindgen]
@@ -48,10 +37,6 @@ impl KlineProcess {
         ptr_offset: usize,
         data_length: usize,
     ) -> Result<KlineProcess, JsValue> {
-        log(&format!(
-            "KlineProcess::new - Reading WASM memory: offset={ptr_offset}, length={data_length}"
-        ));
-
         let data = Self::read_from_memory(memory_val, ptr_offset, data_length)?;
         Self::verify_kline_data_slice(&data)?;
 
@@ -60,7 +45,7 @@ impl KlineProcess {
             config_manager: ConfigManager::new(),
             chart_renderer: None,
             command_manager: None,
-            performance_monitor: None,
+            performance_monitor: PerformanceMonitor::new(),
         })
     }
 
@@ -109,96 +94,43 @@ impl KlineProcess {
     /// 绘制所有图表
     #[wasm_bindgen]
     pub fn draw_all(&mut self) -> Result<(), JsValue> {
-        time("KlineProcess::draw_all");
-
-        // 开始性能监控
-        if let Some(ref mut monitor) = self.performance_monitor {
-            monitor.start_frame();
-        }
-
-        // 先估算K线数量，避免借用冲突
-        let kline_count = self.estimate_kline_count();
-
-        let result = if let Some(renderer) = &mut self.chart_renderer {
-            // 记录渲染开始时间
-            let _start_time = web_sys::window()
-                .and_then(|w| w.performance())
-                .map(|p| p.now())
-                .unwrap_or(0.0);
-
-            renderer.force_render();
-
-            // 记录渲染结束时间和性能指标
-            if let Some(ref mut monitor) = self.performance_monitor {
-                // 记录绘制调用（估算）
-                monitor.record_draw_call();
-                monitor.record_draw_call(); // 主画布
-                monitor.record_draw_call(); // 覆盖层
-
-                // 设置渲染的数据量
-                monitor.set_candles_rendered(kline_count);
-                monitor.set_indicators_rendered(kline_count / 10); // 估算指标数量
-
-                monitor.end_frame();
-            }
-
+        if let Some(renderer) = &mut self.chart_renderer {
+            // 使用性能监控器测量渲染操作
+            self.performance_monitor
+                .measure_render_performance("draw_all", || {
+                    renderer.force_render();
+                });
             Ok(())
         } else {
             Err(JsValue::from_str("Chart renderer not initialized"))
-        };
-
-        time_end("KlineProcess::draw_all");
-        result
-    }
-
-    /// 估算K线数量
-    fn estimate_kline_count(&self) -> usize {
-        // 从数据中解析K线数量
-        if let Ok(parsed_data) = Self::parse_kline_data_from_slice(&self.data) {
-            parsed_data.items().map(|c| c.len()).unwrap_or(0)
-        } else {
-            0
         }
     }
-
-    // 性能监控相关的WASM绑定已迁移到PerformanceMonitor模块
-    // 使用PerformanceMonitor::new()、init_monitor()和get_performance_stats()方法
 
     fn handle_command_result(&mut self, result: CommandResult) {
         let renderer = match &mut self.chart_renderer {
             Some(r) => r,
             None => {
-                log("[DEBUG] handle_command_result: No renderer available");
                 return;
             }
         };
 
         match result {
-            CommandResult::Redraw(layer) => {
-                log(&format!(
-                    "[DEBUG] handle_command_result: Redraw layer {:?}",
-                    layer
-                ));
+            CommandResult::Redraw(_layer) => {
                 // CommandManager 已经调用了 set_dirty，这里只需要触发渲染
                 renderer.render();
-                log("[DEBUG] handle_command_result: Redraw completed");
             }
             CommandResult::RedrawAll => {
-                log("[DEBUG] handle_command_result: RedrawAll");
                 renderer
                     .get_shared_state()
                     .canvas_manager
                     .borrow_mut()
                     .set_all_dirty();
                 renderer.render();
-                log("[DEBUG] handle_command_result: RedrawAll completed");
             }
             CommandResult::LayoutChanged => {
-                log("[DEBUG] handle_command_result: LayoutChanged");
                 renderer.handle_layout_change();
             }
             CommandResult::CursorChanged(_style) => {
-                log("[DEBUG] handle_command_result: CursorChanged");
                 // 光标样式变化时，检查是否有图层需要重绘
                 let shared_state = renderer.get_shared_state();
                 let has_dirty_layers = {
@@ -209,22 +141,14 @@ impl KlineProcess {
                 };
                 if has_dirty_layers {
                     renderer.render();
-                    log("[DEBUG] handle_command_result: CursorChanged with render");
                 }
             }
-            _ => {
-                log("[DEBUG] handle_command_result: Unknown command result");
-            }
+            _ => {}
         }
     }
 
     #[wasm_bindgen]
     pub fn handle_mouse_move(&mut self, x: f64, y: f64) {
-        log(&format!(
-            "KlineProcess::handle_mouse_move: x={}, y={}",
-            x, y
-        ));
-
         // 记录交互事件功能已被删除
         // 如果需要交互统计，可以在这里添加简单的计数逻辑
 
@@ -272,20 +196,26 @@ impl KlineProcess {
     }
 
     #[wasm_bindgen]
-    pub fn handle_mouse_down(&mut self, x: f64, y: f64) {
+    pub fn handle_mouse_down(&mut self, x: f64, y: f64) -> bool {
         if let Some(cm) = &mut self.command_manager {
             let event = Event::MouseDown { x, y };
             let result = cm.execute(event);
             self.handle_command_result(result);
+            true // 返回事件已处理
+        } else {
+            false // 没有命令管理器，事件未处理
         }
     }
 
     #[wasm_bindgen]
-    pub fn handle_mouse_up(&mut self, x: f64, y: f64) {
+    pub fn handle_mouse_up(&mut self, x: f64, y: f64) -> bool {
         if let Some(cm) = &mut self.command_manager {
             let event = Event::MouseUp { x, y };
             let result = cm.execute(event);
             self.handle_command_result(result);
+            true // 返回拖拽结束状态
+        } else {
+            false // 没有命令管理器，事件未处理
         }
     }
 
@@ -372,10 +302,7 @@ impl KlineProcess {
             renderer.update_config(&self.config_manager.config, self.config_manager.get_theme());
             renderer.force_render();
         }
-        log(&format!(
-            "配置已更新: symbol={}, theme={}",
-            self.config_manager.config.symbol, self.config_manager.config.theme
-        ));
+
         Ok(())
     }
 

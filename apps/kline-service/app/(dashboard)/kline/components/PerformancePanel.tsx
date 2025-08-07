@@ -1,19 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { globalFPSMonitor } from '../fps-monitor';
 
 interface UnifiedPerformanceData {
   fps?: number;
   renderTime?: number;
   memoryUsage?: number;
   memoryPercentage?: number;
-  render_metrics?: {
-    fps?: number;
-    frame_time_ms?: number;
-    draw_calls?: number;
-    candles_rendered?: number;
-    indicators_rendered?: number;
-  };
+
   memory_metrics?: {
     used_mb?: number;
     percentage?: number;
@@ -43,15 +38,22 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
 }) => {
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [jsMemory, setJsMemory] = useState<{ used: number; total: number } | null>(null);
+  const [fpsData, setFpsData] = useState({ current: 0, average: 0, min: 0, max: 0 });
   const [isExpanded, setIsExpanded] = useState(false);
   const intervalRef = useRef<number | null>(null);
+  const fpsIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!visible || !worker) return;
 
+    // 启动FPS监控器
+    globalFPSMonitor.start();
+
     // 监听Worker的性能数据消息
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'performanceMetrics') {
+        console.log('[PerformancePanel] 接收到性能数据:', event.data.performanceData);
+        console.log('[PerformancePanel] WASM内存数据:', event.data.wasmMemory);
         setPerformanceData({
           performanceData: event.data.performanceData,
           wasmMemory: event.data.wasmMemory,
@@ -64,6 +66,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
 
     // 每1秒请求一次性能数据
     intervalRef.current = window.setInterval(() => {
+      console.log('[PerformancePanel] 发送性能数据请求');
       worker.postMessage({ type: 'getPerformance' });
       
       // 获取JS内存信息
@@ -76,14 +79,30 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
       }
     }, 1000);
 
+    // 每500ms更新一次FPS数据
+    fpsIntervalRef.current = window.setInterval(() => {
+      const stats = globalFPSMonitor.getStats();
+      setFpsData({
+        current: stats.current,
+        average: Math.round(stats.average * 10) / 10,
+        min: stats.min,
+        max: stats.max
+      });
+    }, 500);
+
     // 立即请求一次
+    console.log('[PerformancePanel] 发送初始性能数据请求');
     worker.postMessage({ type: 'getPerformance' });
 
     return () => {
+      worker.removeEventListener('message', handleMessage);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      worker.removeEventListener('message', handleMessage);
+      if (fpsIntervalRef.current) {
+        clearInterval(fpsIntervalRef.current);
+      }
+      globalFPSMonitor.stop();
     };
   }, [worker, visible]);
 
@@ -134,8 +153,10 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
   };
 
   const { performanceData: perfData, wasmMemory } = performanceData;
-  const fps = perfData?.fps || perfData?.render_metrics?.fps || 0;
-  const frameTime = perfData?.renderTime || perfData?.render_metrics?.frame_time_ms || 0;
+  
+  // FPS数据来自JS端测量，渲染时间来自WASM
+  const fps = fpsData?.current || 0;
+  const frameTime = perfData?.renderTime || 0;
 
   return (
     <div style={getPositionStyles()}>
@@ -160,7 +181,7 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>FPS:</span>
           <span style={{ color: getFrameTimeColor(frameTime), fontWeight: 'bold' }}>
-            {fps || 'N/A'}
+            {fps > 0 ? Math.round(fps) : '等待数据...'}
           </span>
         </div>
         
@@ -195,33 +216,37 @@ export const PerformancePanel: React.FC<PerformancePanelProps> = ({
         }}>
           {frameTime > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>帧时间:</span>
+              <span>渲染时间:</span>
               <span style={{ color: getFrameTimeColor(frameTime) }}>
                 {frameTime.toFixed(1)}ms
               </span>
             </div>
           )}
           
-          {perfData?.render_metrics?.draw_calls && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>绘制调用:</span>
-              <span>{perfData.render_metrics.draw_calls}</span>
-            </div>
+          {fpsData && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>平均FPS:</span>
+                <span style={{ color: getFrameTimeColor(1000/fpsData.average) }}>
+                  {fpsData.average.toFixed(1)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>最小/最大FPS:</span>
+                <span>
+                  <span style={{ color: getFrameTimeColor(1000/fpsData.min) }}>{fpsData.min}</span>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.6)', margin: '0 4px' }}>/</span>
+                  <span style={{ color: getFrameTimeColor(1000/fpsData.max) }}>{fpsData.max}</span>
+                </span>
+              </div>
+            </>
           )}
           
-          {perfData?.render_metrics?.candles_rendered && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>K线数量:</span>
-              <span>{perfData.render_metrics.candles_rendered}</span>
-            </div>
-          )}
-          
-          {perfData?.render_metrics?.indicators_rendered && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>指标数量:</span>
-              <span>{perfData.render_metrics.indicators_rendered}</span>
-            </div>
-          )}
+          {/* 移除了未被实际使用的计数器字段的显示：
+              - draw_calls: 没有代码实际更新此值
+              - candles_rendered: 没有代码实际更新此值  
+              - indicators_rendered: 没有代码实际更新此值
+          */}
           
           {perfData?.memory_metrics?.used_mb && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -9,7 +9,6 @@ import {
 } from 'react';
 import { PerformancePanel } from './components/PerformancePanel';
 
-
 export default function Main() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''; // 使用环境变量
 
@@ -19,7 +18,6 @@ export default function Main() {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
 
-  
   // 状态管理
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,13 +26,55 @@ export default function Main() {
   const [config, setConfig] = useState<any>(null); // 存储当前配置
   const [showPerformancePanel, setShowPerformancePanel] = useState(true);
   
+  // 跟踪Canvas是否已移交给Worker
+  const canvasTransferredRef = useRef(false);
 
-  
-  // 定义画布尺寸常量
-  const CANVAS_HEIGHT = 800; // 可见高度
-  const CANVAS_WIDTH = 1800; // 可见宽度
-  
+  // 定义画布尺寸常量 - 使用视口尺寸
+  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 600 });
 
+  // 监听窗口大小变化，动态调整Canvas尺寸
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      // 简化计算，直接使用视口尺寸减去固定的边距
+      const padding = 24; // 总边距
+      const headerHeight = 200; // 控制面板和按钮的总高度
+
+      const width = window.innerWidth - padding;
+      const height = window.innerHeight - headerHeight;
+
+      const finalWidth = Math.max(1200, Math.round(width));
+      const finalHeight = Math.max(600, Math.round(height));
+
+      console.log('🎯 Canvas尺寸计算:', {
+        视口尺寸: `${window.innerWidth}x${window.innerHeight}`,
+        计算尺寸: `${width}x${height}`,
+        最终尺寸: `${finalWidth}x${finalHeight}`,
+        宽高比: (finalWidth / finalHeight).toFixed(2),
+      });
+
+      setCanvasSize({
+        width: finalWidth,
+        height: finalHeight,
+      });
+    };
+
+    // 初始化尺寸
+    console.log('[Canvas] 组件挂载，开始计算Canvas尺寸');
+    updateCanvasSize();
+
+    // 强制触发一次resize事件
+    setTimeout(() => {
+      console.log('[Canvas] 延迟触发resize事件');
+      updateCanvasSize();
+    }, 100);
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', updateCanvasSize);
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, []);
 
   // 创建一个通用的获取鼠标坐标的函数
   const getMouseCoordinates = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -53,6 +93,20 @@ export default function Main() {
     workerRef.current.postMessage(message);
   }, []);
 
+  // 监听canvasSize变化，通知Worker和WASM环境
+  useEffect(() => {
+    if (!workerRef.current) return;
+
+    console.log('[Main] Canvas尺寸变化，通知Worker:', canvasSize);
+
+    // 发送resize消息给Worker，Worker会通知WASM环境
+    sendMessageToWorker({
+      type: 'resize',
+      width: canvasSize.width,
+      height: canvasSize.height,
+    });
+  }, [canvasSize, sendMessageToWorker]);
+
   // 鼠标移动和样式获取函数已移除防抖处理，直接使用sendMessageToWorker以提高响应速度
 
   // 设置Worker消息处理函数
@@ -70,15 +124,33 @@ export default function Main() {
               return;
             }
 
+            // 检查Canvas是否已经移交给Worker
+            if (canvasTransferredRef.current) {
+              console.warn('⚠️ Canvas已经移交给Worker，跳过重复移交');
+              return;
+            }
+
             try {
               // 第二次传输：OffscreenCanvas (无复制)
               const offscreen = canvasRef.current.transferControlToOffscreen();
               const mainOffscreen = mainCanvasRef.current.transferControlToOffscreen();
               const overlayOffscreen = overlayCanvasRef.current.transferControlToOffscreen();
 
+              // 标记Canvas已移交
+              canvasTransferredRef.current = true;
+
+              // 获取当前Canvas尺寸（从DOM元素获取，避免状态依赖）
+              const currentWidth = canvasRef.current.width || 1200;
+              const currentHeight = canvasRef.current.height || 600;
+
+              console.log('🔧 Canvas初始化尺寸:', {
+                获取尺寸: `${currentWidth}x${currentHeight}`,
+                Canvas已移交: canvasTransferredRef.current
+              });
+
               [offscreen, mainOffscreen, overlayOffscreen].forEach((canvas) => {
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
+                canvas.width = currentWidth;
+                canvas.height = currentHeight;
               });
 
               worker.postMessage(
@@ -138,6 +210,8 @@ export default function Main() {
         },
         performanceMetrics: (data) => {
           // 处理性能指标数据，由PerformancePanel组件直接监听Worker消息
+          console.log('[Main] 接收到性能数据:', data.performanceData);
+          console.log('[Main] WASM内存数据:', data.wasmMemory);
           // 这里不需要特殊处理，只是为了避免"未处理的消息类型"警告
         },
       };
@@ -157,10 +231,9 @@ export default function Main() {
         }
       };
     },
-    [CANVAS_WIDTH, CANVAS_HEIGHT]
+    [] // 移除canvasSize依赖，避免Canvas重复移交
   );
 
-  
   // 合并数据获取和Worker初始化到一个useEffect中
   useEffect(() => {
     const controller = new AbortController();
@@ -187,8 +260,6 @@ export default function Main() {
           type: 'module',
         });
         workerRef.current = worker; // 保存worker引用
-
-
 
         // 添加错误监听
         worker.onerror = (e) => {
@@ -232,8 +303,23 @@ export default function Main() {
           console.error('终止Worker时出错:', err);
         }
       }
+      // 重置Canvas移交状态
+      canvasTransferredRef.current = false;
     };
   }, [setupWorkerMessageHandler]);
+
+  // 监听canvasSize变化，向Worker发送resize消息
+  useEffect(() => {
+    // 只有在Canvas已移交且Worker存在时才发送resize消息
+    if (canvasTransferredRef.current && workerRef.current && !isLoading) {
+      console.log('📏 Canvas尺寸变化，通知Worker:', canvasSize);
+      workerRef.current.postMessage({
+        type: 'resize',
+        width: canvasSize.width,
+        height: canvasSize.height,
+      });
+    }
+  }, [canvasSize, isLoading]);
 
   // 使用useCallback优化鼠标移动事件处理函数，移除防抖以提高响应速度
   const handleMouseMove = useCallback(
@@ -416,7 +502,7 @@ export default function Main() {
         // 获取当前的 canvas 尺寸
         const width = canvasRef.current.width;
         const height = canvasRef.current.height;
-        
+
         // 通知 Worker 画布大小改变
         sendMessageToWorker({
           type: 'resize',
@@ -424,7 +510,7 @@ export default function Main() {
           height,
         });
       }
-    }
+    };
     window.addEventListener('resize', handleResize);
 
     return () => {
@@ -444,18 +530,15 @@ export default function Main() {
   );
 
   // 使用新的 serde-wasm-bindgen API 更新配置
-  const updateChartConfig = useCallback(
-    (newConfig: any) => {
-      if (workerRef.current) {
-        // 直接发送配置对象，无需 JSON.stringify
-        workerRef.current.postMessage({
-          type: 'updateConfig',
-          config: newConfig,
-        });
-      }
-    },
-    []
-  );
+  const updateChartConfig = useCallback((newConfig: any) => {
+    if (workerRef.current) {
+      // 直接发送配置对象，无需 JSON.stringify
+      workerRef.current.postMessage({
+        type: 'updateConfig',
+        config: newConfig,
+      });
+    }
+  }, []);
 
   // 获取当前配置
   const getCurrentConfig = useCallback(() => {
@@ -466,7 +549,6 @@ export default function Main() {
     }
   }, []);
 
-  
   // 示例：切换主题
   const switchTheme = useCallback(
     (themeName: string) => {
@@ -480,11 +562,11 @@ export default function Main() {
   );
 
   return (
-    <div className="p-4">
-      {/* 控制面板 - 移到canvas上方 */}
-      <div className="mb-4 p-4 bg-gray-100 rounded">
-        <h3 className="text-lg font-medium mb-2">配置管理与性能监控</h3>
-        <div className="flex flex-wrap gap-2">
+    <div className="min-h-screen max-h-screen overflow-hidden px-3 py-2 flex flex-col bg-gray-50">
+      {/* 控制面板 - 紧凑布局 */}
+      <div className="mb-3 p-3 bg-gray-100 rounded flex-shrink-0">
+        <h3 className="text-base font-medium mb-2">配置管理与性能监控</h3>
+        <div className="flex flex-wrap gap-2 text-sm">
           <button
             onClick={getCurrentConfig}
             className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm"
@@ -507,25 +589,25 @@ export default function Main() {
           <button
             onClick={() => setShowPerformancePanel(!showPerformancePanel)}
             className={`px-3 py-1 rounded transition-colors text-sm ${
-              showPerformancePanel 
-                ? 'bg-orange-500 text-white hover:bg-orange-600' 
+              showPerformancePanel
+                ? 'bg-orange-500 text-white hover:bg-orange-600'
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
             }`}
           >
             {showPerformancePanel ? '隐藏性能监控' : '显示性能监控'}
           </button>
         </div>
-        
+
         {/* 显示当前配置 */}
         {config && (
-          <div className="mt-2 text-xs bg-white p-2 rounded">
+          <div className="mt-2 text-xs bg-white p-2 rounded max-h-20 overflow-auto">
             <strong>当前配置:</strong> {JSON.stringify(config, null, 2)}
           </div>
         )}
       </div>
 
-      {/* 图表模式切换按钮 - canvas上方靠左 */}
-      <div className="mb-2 flex space-x-2">
+      {/* 图表模式切换按钮 - 紧凑布局 */}
+      <div className="mb-2 flex space-x-2 flex-shrink-0">
         <button
           onClick={() => switchMode('kmap')}
           className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
@@ -547,36 +629,49 @@ export default function Main() {
       )}
       {error && <div className="p-4 text-red-600">错误: {error}</div>}
 
-      {/* 新增容器并设置固定尺寸 */}
-      <div
-        className="relative m-0 border-0 p-0"
-        style={{ cursor: cursorStyle, width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}
-      >
-        <canvas ref={canvasRef} className="absolute top-0 left-0 m-0 border-0 p-0 z-10" />
-        <canvas
-          ref={mainCanvasRef}
-          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-20 "
-        />
-        <canvas
-          onMouseMove={isDragging ? handleMouseDrag : handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          ref={overlayCanvasRef}
-          className="absolute top-0 left-0 w-full m-0 border-0 p-0 z-30 "
-        />
-        
-
-        
-        {/* 性能监控面板 */}
-        {workerRef.current && (
-          <PerformancePanel 
-            worker={workerRef.current}
-            visible={showPerformancePanel}
-            position="top-right"
+      {/* Canvas容器 - 响应式尺寸，充分利用屏幕空间 */}
+      <div className="flex-grow flex min-h-0">
+        <div
+          className="relative m-0 border-0 p-0 shadow-lg rounded-lg overflow-hidden bg-white w-full h-full"
+          style={{
+            cursor: cursorStyle,
+            width: `${canvasSize.width}px`,
+            height: `${canvasSize.height}px`,
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            width={canvasSize.width}
+            height={canvasSize.height}
+            className="absolute top-0 left-0 w-full h-full m-0 border-0 p-0 z-10"
           />
-        )}
+          <canvas
+            ref={mainCanvasRef}
+            width={canvasSize.width}
+            height={canvasSize.height}
+            className="absolute top-0 left-0 w-full h-full m-0 border-0 p-0 z-20"
+          />
+          <canvas
+            onMouseMove={isDragging ? handleMouseDrag : handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            ref={overlayCanvasRef}
+            width={canvasSize.width}
+            height={canvasSize.height}
+            className="absolute top-0 left-0 w-full h-full m-0 border-0 p-0 z-30"
+          />
+
+          {/* 性能监控面板 */}
+          {workerRef.current && (
+            <PerformancePanel
+              worker={workerRef.current}
+              visible={showPerformancePanel}
+              position="top-right"
+            />
+          )}
+        </div>
       </div>
     </div>
   );

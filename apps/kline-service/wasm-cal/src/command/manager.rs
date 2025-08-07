@@ -8,16 +8,7 @@ use crate::render::SharedRenderState;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::datazoom_renderer::{DragHandleType, DragResult};
 use crate::render::render_context::RenderContext;
-use wasm_bindgen::prelude::*;
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = time)]
-    fn time(label: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = timeEnd)]
-    fn time_end(label: &str);
-}
+
 #[derive(Clone)]
 pub struct CommandManager {
     pub shared_state: SharedRenderState,
@@ -44,41 +35,13 @@ impl CommandManager {
 
         // 2. 事件到指令的转换与处理
         let result = match event {
-            Event::MouseMove { x, y } => {
-                log(&format!(
-                    "CommandManager::execute: MouseMove x={}, y={}",
-                    x, y
-                ));
-                self.handle_mouse_move(x, y)
-            }
-            Event::MouseDown { x, y } => {
-                log(&format!(
-                    "CommandManager::execute: MouseDown x={}, y={}",
-                    x, y
-                ));
-                self.handle_mouse_down(x, y)
-            }
-            Event::MouseUp { x, y } => {
-                log(&format!(
-                    "CommandManager::execute: MouseUp x={}, y={}",
-                    x, y
-                ));
-                self.handle_mouse_up(x, y)
-            }
-            Event::MouseLeave => {
-                log("CommandManager::execute: MouseLeave");
-                self.handle_mouse_leave()
-            }
-            Event::Wheel { delta, x, y } => {
-                log(&format!(
-                    "CommandManager::execute: Wheel delta={}, x={}, y={}",
-                    delta, x, y
-                ));
-                self.handle_wheel(delta, x, y)
-            }
+            Event::MouseMove { x, y } => self.handle_mouse_move(x, y),
+            Event::MouseDown { x, y } => self.handle_mouse_down(x, y),
+            Event::MouseUp { x, y } => self.handle_mouse_up(x, y),
+            Event::MouseLeave => self.handle_mouse_leave(),
+            Event::Wheel { delta, x, y } => self.handle_wheel(delta, x, y),
         };
 
-        log(&format!("CommandManager::execute: result={:?}", result));
         result
     }
 
@@ -122,15 +85,6 @@ impl CommandManager {
 
         // 鼠标位置总是变化的，因为我们已经更新了它
         let position_changed = true;
-
-        log(&format!(
-            "handle_mouse_move: hover_changed={:?}, area_changed={:?}, position_changed={:?}, is_in_chart={:?}, hover_index={:?}",
-            hover_changed,
-            area_changed,
-            position_changed,
-            is_in_chart,
-            mouse_state_after.hover_candle_index
-        ));
 
         drop(mouse_state_after); // 释放借用
 
@@ -245,15 +199,6 @@ impl CommandManager {
 
         let mut handled = false;
 
-        log(&format!(
-            "handle_wheel: delta={}, x={}, y={}, main_chart_contains={}, nav_contains={}",
-            delta,
-            x,
-            y,
-            main_chart_rect.contains(x, y),
-            nav_rect.contains(x, y)
-        ));
-
         if main_chart_rect.contains(x, y) {
             let mut data_manager = self.shared_state.data_manager.borrow_mut();
             handled = data_manager.handle_wheel(
@@ -264,7 +209,6 @@ impl CommandManager {
                 main_chart_rect.width,
                 true,
             );
-            log(&format!("handle_wheel: main_chart handled={}", handled));
         } else if nav_rect.contains(x, y) {
             let ctx = RenderContext::from_shared(self.shared_state.clone());
             if let Some(dz_renderer) = self
@@ -275,7 +219,6 @@ impl CommandManager {
             {
                 let mut renderer = dz_renderer.borrow_mut();
                 handled = renderer.handle_wheel(x, y, delta, &ctx); // 使用实际的delta值
-                log(&format!("handle_wheel: datazoom handled={}", handled));
             }
         }
 
@@ -295,11 +238,6 @@ impl CommandManager {
         mouse_state.is_in_chart_area =
             heatmap_area_rect.contains(x, y) || volume_chart_rect.contains(x, y);
 
-        log(&format!(
-            "update_hover_status: x={}, y={}, is_in_chart_area={}, total_candle_width={}",
-            x, y, mouse_state.is_in_chart_area, layout.total_candle_width
-        ));
-
         if mouse_state.is_in_chart_area {
             let data_manager = self.shared_state.data_manager.borrow();
             let (visible_start, _, _) = data_manager.get_visible();
@@ -311,19 +249,11 @@ impl CommandManager {
                     .map_or(0, |i| i.len().saturating_sub(1));
                 let hover_index = (visible_start + idx_in_visible).min(max_index);
                 mouse_state.hover_candle_index = Some(hover_index);
-                log(&format!(
-                    "update_hover_status: visible_start={}, idx_in_visible={}, max_index={}, hover_index={:?}",
-                    visible_start, idx_in_visible, max_index, mouse_state.hover_candle_index
-                ));
             } else {
                 mouse_state.hover_candle_index = None;
-                log(
-                    "update_hover_status: total_candle_width is 0, setting hover_candle_index to None",
-                );
             }
         } else {
             mouse_state.hover_candle_index = None;
-            log("update_hover_status: not in chart area, setting hover_candle_index to None");
         }
     }
 

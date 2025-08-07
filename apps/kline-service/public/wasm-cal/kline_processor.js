@@ -270,16 +270,20 @@ export class KlineProcess {
     /**
      * @param {number} x
      * @param {number} y
+     * @returns {boolean}
      */
     handle_mouse_down(x, y) {
-        wasm.klineprocess_handle_mouse_down(this.__wbg_ptr, x, y);
+        const ret = wasm.klineprocess_handle_mouse_down(this.__wbg_ptr, x, y);
+        return ret !== 0;
     }
     /**
      * @param {number} x
      * @param {number} y
+     * @returns {boolean}
      */
     handle_mouse_up(x, y) {
-        wasm.klineprocess_handle_mouse_up(this.__wbg_ptr, x, y);
+        const ret = wasm.klineprocess_handle_mouse_up(this.__wbg_ptr, x, y);
+        return ret !== 0;
     }
     /**
      * @param {number} x
@@ -369,124 +373,16 @@ export class PerformanceMonitor {
         return this;
     }
     /**
-     * 启用监控
+     * 开始渲染性能测量
      */
-    enable() {
-        wasm.performancemonitor_enable(this.__wbg_ptr);
+    start_render_measurement() {
+        wasm.performancemonitor_start_render_measurement(this.__wbg_ptr);
     }
     /**
-     * 禁用监控
+     * 结束渲染性能测量
      */
-    disable() {
-        wasm.performancemonitor_disable(this.__wbg_ptr);
-    }
-    /**
-     * 开始帧监控
-     */
-    start_frame() {
-        wasm.performancemonitor_start_frame(this.__wbg_ptr);
-    }
-    /**
-     * 结束帧监控
-     */
-    end_frame() {
-        wasm.performancemonitor_end_frame(this.__wbg_ptr);
-    }
-    /**
-     * 记录绘制调用
-     */
-    record_draw_call() {
-        wasm.performancemonitor_record_draw_call(this.__wbg_ptr);
-    }
-    /**
-     * 设置渲染的K线数量
-     * @param {number} count
-     */
-    set_candles_rendered(count) {
-        wasm.performancemonitor_set_candles_rendered(this.__wbg_ptr, count);
-    }
-    /**
-     * 设置渲染的技术指标数量
-     * @param {number} count
-     */
-    set_indicators_rendered(count) {
-        wasm.performancemonitor_set_indicators_rendered(this.__wbg_ptr, count);
-    }
-    /**
-     * 记录帧开始（用于FPS计算，与JS接口兼容）
-     */
-    frame_start() {
-        wasm.performancemonitor_frame_start(this.__wbg_ptr);
-    }
-    /**
-     * 获取当前FPS（与JS接口兼容）
-     * @returns {number}
-     */
-    get_current_fps() {
-        const ret = wasm.performancemonitor_get_current_fps(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * 获取渲染时间（与JS接口兼容）
-     * @returns {number}
-     */
-    get_render_time() {
-        const ret = wasm.performancemonitor_get_render_time(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * 获取内存使用量（MB，与JS接口兼容）
-     * @returns {number}
-     */
-    get_memory_usage_mb() {
-        const ret = wasm.performancemonitor_get_memory_usage_mb(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * 获取内存使用百分比（与JS接口兼容）
-     * @returns {number}
-     */
-    get_memory_percentage() {
-        const ret = wasm.performancemonitor_get_memory_percentage(this.__wbg_ptr);
-        return ret;
-    }
-    /**
-     * 获取完整的性能指标JSON（与PerformancePanel兼容）
-     * @returns {string}
-     */
-    get_metrics_json() {
-        let deferred1_0;
-        let deferred1_1;
-        try {
-            const ret = wasm.performancemonitor_get_metrics_json(this.__wbg_ptr);
-            deferred1_0 = ret[0];
-            deferred1_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-        }
-    }
-    /**
-     * 获取性能指标（使用 serde-wasm-bindgen 高效序列化）
-     * @returns {any}
-     */
-    get_metrics_wasm() {
-        const ret = wasm.performancemonitor_get_metrics_wasm(this.__wbg_ptr);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
-        }
-        return takeFromExternrefTable0(ret[0]);
-    }
-    /**
-     * 获取性能快照（使用 serde-wasm-bindgen 高效序列化）
-     * @returns {any}
-     */
-    get_snapshot_wasm() {
-        const ret = wasm.performancemonitor_get_snapshot_wasm(this.__wbg_ptr);
-        if (ret[2]) {
-            throw takeFromExternrefTable0(ret[1]);
-        }
-        return takeFromExternrefTable0(ret[0]);
+    end_render_measurement() {
+        wasm.performancemonitor_end_render_measurement(this.__wbg_ptr);
     }
     /**
      * 初始化性能监控器（从KlineProcess迁移）
@@ -568,6 +464,10 @@ function __wbg_get_imports() {
         const ret = arg0.buffer;
         return ret;
     };
+    imports.wbg.__wbg_byteLength_ea52ac3de882b483 = function(arg0) {
+        const ret = arg0.byteLength;
+        return ret;
+    };
     imports.wbg.__wbg_call_672a4d21634d4a24 = function() { return handleError(function (arg0, arg1) {
         const ret = arg0.call(arg1);
         return ret;
@@ -577,9 +477,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_closePath_cf0e7130243e1083 = function(arg0) {
         arg0.closePath();
-    };
-    imports.wbg.__wbg_error_524f506f44df1645 = function(arg0) {
-        console.error(arg0);
     };
     imports.wbg.__wbg_error_7534b8e9a36f1ab4 = function(arg0, arg1) {
         let deferred0_0;
@@ -604,6 +501,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_getContext_f65a0debd1e8f8e8 = function() { return handleError(function (arg0, arg1, arg2) {
         const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
         return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    }, arguments) };
+    imports.wbg.__wbg_get_67b2ba62fc30de12 = function() { return handleError(function (arg0, arg1) {
+        const ret = Reflect.get(arg0, arg1);
+        return ret;
     }, arguments) };
     imports.wbg.__wbg_getwithrefkey_1dc361bd10053bfe = function(arg0, arg1) {
         const ret = arg0[arg1];
@@ -670,9 +571,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_lineTo_04b5a9c687eccd70 = function(arg0, arg1, arg2) {
         arg0.lineTo(arg1, arg2);
     };
-    imports.wbg.__wbg_log_b46a0b216df7cf84 = function(arg0, arg1) {
-        console.log(getStringFromWasm0(arg0, arg1));
-    };
     imports.wbg.__wbg_measureText_f0f078704231c37f = function() { return handleError(function (arg0, arg1, arg2) {
         const ret = arg0.measureText(getStringFromWasm0(arg1, arg2));
         return ret;
@@ -682,10 +580,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_new_405e22f390576ce2 = function() {
         const ret = new Object();
-        return ret;
-    };
-    imports.wbg.__wbg_new_5e0be73521bc8c17 = function() {
-        const ret = new Map();
         return ret;
     };
     imports.wbg.__wbg_new_78c8a92080461d08 = function(arg0) {
@@ -724,14 +618,6 @@ function __wbg_get_imports() {
         const ret = arg0.now();
         return ret;
     };
-    imports.wbg.__wbg_now_807e54c39636c349 = function() {
-        const ret = Date.now();
-        return ret;
-    };
-    imports.wbg.__wbg_now_d18023d54d4e5500 = function(arg0) {
-        const ret = arg0.now();
-        return ret;
-    };
     imports.wbg.__wbg_of_66b3ee656cbd962b = function(arg0, arg1) {
         const ret = Array.of(arg0, arg1);
         return ret;
@@ -753,18 +639,11 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setLineDash_0e3f3e194352a774 = function() { return handleError(function (arg0, arg1) {
         arg0.setLineDash(arg1);
     }, arguments) };
-    imports.wbg.__wbg_set_37837023f3d740e8 = function(arg0, arg1, arg2) {
-        arg0[arg1 >>> 0] = arg2;
-    };
     imports.wbg.__wbg_set_3f1d0b984ed272ed = function(arg0, arg1, arg2) {
         arg0[arg1] = arg2;
     };
     imports.wbg.__wbg_set_65595bdd868b3009 = function(arg0, arg1, arg2) {
         arg0.set(arg1, arg2 >>> 0);
-    };
-    imports.wbg.__wbg_set_8fc6bf8a5b1071d1 = function(arg0, arg1, arg2) {
-        const ret = arg0.set(arg1, arg2);
-        return ret;
     };
     imports.wbg.__wbg_setfillStyle_cb059a69ce15cc28 = function(arg0, arg1, arg2) {
         arg0.fillStyle = getStringFromWasm0(arg1, arg2);
@@ -831,26 +710,12 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_stroke_44080cc2554b4436 = function(arg0) {
         arg0.stroke();
     };
-    imports.wbg.__wbg_timeEnd_c7b7463c4f4acfbc = function(arg0, arg1) {
-        console.timeEnd(getStringFromWasm0(arg0, arg1));
-    };
-    imports.wbg.__wbg_time_7aaed348524f10df = function(arg0, arg1) {
-        console.time(getStringFromWasm0(arg0, arg1));
-    };
     imports.wbg.__wbg_width_2fafd30484634e26 = function(arg0) {
         const ret = arg0.width;
         return ret;
     };
     imports.wbg.__wbg_width_8fe4e8f77479c2a6 = function(arg0) {
         const ret = arg0.width;
-        return ret;
-    };
-    imports.wbg.__wbindgen_bigint_from_i64 = function(arg0) {
-        const ret = arg0;
-        return ret;
-    };
-    imports.wbg.__wbindgen_bigint_from_u64 = function(arg0) {
-        const ret = BigInt.asUintN(64, arg0);
         return ret;
     };
     imports.wbg.__wbindgen_boolean_get = function(arg0) {
@@ -886,10 +751,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_is_object = function(arg0) {
         const val = arg0;
         const ret = typeof(val) === 'object' && val !== null;
-        return ret;
-    };
-    imports.wbg.__wbindgen_is_string = function(arg0) {
-        const ret = typeof(arg0) === 'string';
         return ret;
     };
     imports.wbg.__wbindgen_is_undefined = function(arg0) {

@@ -10,5 +10,6 @@ pub mod metrics;
 pub mod monitor;
 
 // 重新导出主要组件
-pub use metrics::{MemoryMetrics, PerformanceSnapshot, RenderMetrics};
+pub use metrics::{MemoryMetrics, PerformanceSnapshot};
+// RenderMetrics 已移除，现在直接使用 f64 存储帧渲染时间
 pub use monitor::PerformanceMonitor;

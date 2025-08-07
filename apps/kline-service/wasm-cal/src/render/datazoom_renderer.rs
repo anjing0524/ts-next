@@ -359,12 +359,17 @@ impl DataZoomRenderer {
 
 impl RenderStrategy for DataZoomRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
+        // 确认渲染器被调用
+
         let canvas_manager = ctx.canvas_manager_ref();
         let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
+
+        // 调试输出：打印NavigatorContainer和HeatmapArea的矩形坐标
+        let _heatmap_rect = layout.get_rect(&PaneId::HeatmapArea);
 
         let clear_padding = 20.0;
         overlay_ctx.clear_rect(

@@ -2,17 +2,6 @@
 
 use crate::kline_generated::kline::KlineItem;
 use crate::layout::{ChartLayout, PaneId};
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = time)]
-    fn time(label: &str);
-    #[wasm_bindgen(js_namespace = console, js_name = timeEnd)]
-    fn time_end(label: &str);
-}
 
 /// 可见数据范围结构体
 ///
@@ -122,16 +111,7 @@ impl VisibleRange {
         // 默认显示末尾的数据，而不是从0开始
         let start = items_len.saturating_sub(initial_visible_count);
 
-        log(&format!(
-            "[VisibleRange] 最终可见范围: start={start}, count={initial_visible_count}, total={items_len}"
-        ));
-
-        let result = Self::new(start, initial_visible_count, items_len);
-        log(&format!(
-            "[VisibleRange] 创建完成: {:?}",
-            result.get_range()
-        ));
-        result
+        Self::new(start, initial_visible_count, items_len)
     }
 
     /// 更新可见范围

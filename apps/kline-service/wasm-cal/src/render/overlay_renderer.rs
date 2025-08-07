@@ -2,13 +2,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::kline_generated::kline::KlineItem;
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-}
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
@@ -46,20 +40,11 @@ impl OverlayRenderer {
 
     /// 绘制交互层 - 只绘制十字线和tooltip
     pub fn draw(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
-        log(&format!(
-            "OverlayRenderer::draw - hover_index: {:?}, mouse_x: {}, mouse_y: {}",
-            render_ctx.hover_index(),
-            render_ctx.mouse_x(),
-            render_ctx.mouse_y()
-        ));
-
         // 仅当有有效的悬浮索引时才绘制
         if render_ctx.hover_index().is_some() {
-            log("OverlayRenderer::draw - 有hover_index，开始绘制十字线");
             self.draw_crosshair_with_labels(ctx, render_ctx);
             self.draw_tooltip(ctx, render_ctx);
         } else {
-            log("OverlayRenderer::draw - 没有hover_index，跳过绘制");
         }
     }
 
@@ -273,13 +258,6 @@ impl OverlayRenderer {
 
 impl RenderStrategy for OverlayRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        log(&format!(
-            "OverlayRenderer::render - 被调用，hover_index: {:?}, mouse_x: {}, mouse_y: {}",
-            ctx.hover_index(),
-            ctx.mouse_x(),
-            ctx.mouse_y()
-        ));
-
         let canvas_manager = ctx.canvas_manager_ref();
         let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
         let layout = ctx.layout_ref();
@@ -293,7 +271,7 @@ impl RenderStrategy for OverlayRenderer {
         overlay_ctx.clear_rect(root_rect.x, root_rect.y, root_rect.width, nav_rect.y);
 
         self.draw(overlay_ctx, ctx);
-        log("OverlayRenderer::render - 完成");
+
         Ok(())
     }
 

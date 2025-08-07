@@ -5,20 +5,7 @@
 use serde::{Deserialize, Serialize};
 use web_time::Duration;
 
-/// 渲染性能指标
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderMetrics {
-    /// 帧渲染时间 (毫秒)
-    pub frame_time_ms: f64,
-    /// 帧率 (FPS)
-    pub fps: f64,
-    /// 渲染的K线数量
-    pub candles_rendered: usize,
-    /// 渲染的技术指标数量
-    pub indicators_rendered: usize,
-    /// 画布绘制调用次数
-    pub draw_calls: usize,
-}
+// RenderMetrics 结构体已移除，现在直接使用 f64 存储帧渲染时间
 
 /// 内存使用指标
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,24 +25,10 @@ pub struct MemoryMetrics {
 pub struct PerformanceSnapshot {
     /// 时间戳
     pub timestamp: u64,
-    /// 渲染指标
-    pub render: RenderMetrics,
     /// 内存指标
     pub memory: MemoryMetrics,
     /// 监控持续时间 (毫秒)
     pub duration_ms: f64,
-}
-
-impl Default for RenderMetrics {
-    fn default() -> Self {
-        Self {
-            frame_time_ms: 0.0,
-            fps: 0.0,
-            candles_rendered: 0,
-            indicators_rendered: 0,
-            draw_calls: 0,
-        }
-    }
 }
 
 impl Default for MemoryMetrics {
@@ -69,23 +42,11 @@ impl Default for MemoryMetrics {
     }
 }
 
-impl RenderMetrics {
-    /// 计算FPS
-    pub fn calculate_fps(&mut self) {
-        if self.frame_time_ms > 0.0 {
-            self.fps = 1000.0 / self.frame_time_ms;
-        }
-    }
-
-    /// 重置指标
-    pub fn reset(&mut self) {
-        *self = Self::default();
-    }
-}
-
 impl MemoryMetrics {
-    /// 计算总内存使用量
+    /// 计算总内存使用量 - 只计算实际堆内存使用量
+    /// data_cache_size 和 render_cache_size 应由实际缓存管理器提供
     pub fn total_memory(&self) -> usize {
+        // 只返回实际测量的堆内存，缓存大小由具体实现提供
         self.heap_used + self.data_cache_size + self.render_cache_size
     }
 
@@ -97,10 +58,9 @@ impl MemoryMetrics {
 
 impl PerformanceSnapshot {
     /// 创建新的性能快照
-    pub fn new(render: RenderMetrics, memory: MemoryMetrics) -> Self {
+    pub fn new(memory: MemoryMetrics) -> Self {
         Self {
             timestamp: js_sys::Date::now() as u64,
-            render,
             memory,
             duration_ms: 0.0,
         }

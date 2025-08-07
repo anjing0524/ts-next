@@ -7,19 +7,13 @@ use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::config::{ChartConfig, ChartTheme, ConfigManager};
 use crate::data::DataManager;
 use crate::kline_generated::kline::KlineData;
+// 移除性能监控导入，ChartRenderer 专注于渲染
 
 use crate::layout::{self, ChartLayout, LayoutEngine, Rect};
 use crate::utils::WasmCalError;
 use std::cell::RefCell;
 use std::rc::Rc;
-use wasm_bindgen::prelude::*;
 use web_sys::OffscreenCanvas;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(message: &str);
-}
 
 // 定义渲染图形引擎
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -36,6 +30,7 @@ pub struct ChartRenderer {
     mode: RenderMode,
     /// 画布尺寸
     canvas_size: (f64, f64),
+    // 移除性能监控器字段，保持渲染器职责单一
 }
 
 impl ChartRenderer {
@@ -192,6 +187,8 @@ impl ChartRenderer {
         self.shared_state.config = Some(std::rc::Rc::new(config.clone()));
     }
 
+    // 移除性能监控器相关方法
+
     /// 内部渲染方法
     fn render_internal(&self) {
         let layers_to_render = {
@@ -213,6 +210,7 @@ impl ChartRenderer {
             return;
         }
 
+        // 执行渲染
         if layers_to_render.contains(&CanvasLayerType::Main) {
             self.shared_state
                 .data_manager
@@ -234,18 +232,11 @@ impl ChartRenderer {
         // 使用 from_shared 方法，它会自动从共享状态中获取鼠标信息
         let render_context = RenderContext::from_shared(self.shared_state.clone());
 
-        log(&format!(
-            "ChartRenderer::render_internal - 创建了RenderContext，hover_index: {:?}, layers_to_render: {:?}",
-            render_context.hover_index(),
-            layers_to_render
-        ));
-
         let strategy_factory = self.shared_state.strategy_factory.borrow();
-        if let Err(e) =
-            strategy_factory.render_layers(&render_context, self.mode, &layers_to_render)
-        {
-            web_sys::console::error_1(&format!("渲染错误: {e:?}").into());
-        }
+
+        // 调试：检查 DataZoom 渲染器是否被包含在渲染列表中
+
+        let _ = strategy_factory.render_layers(&render_context, self.mode, &layers_to_render);
 
         self.shared_state
             .canvas_manager
