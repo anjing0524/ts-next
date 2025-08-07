@@ -176,17 +176,6 @@ impl VisibleRange {
         (self.start, self.count, self.end)
     }
 
-    /// 计算可见范围的屏幕坐标
-    ///
-    /// # 参数
-    /// * `layout` - 图表布局
-    ///
-    /// # 返回值
-    /// 可见范围的起始和结束X坐标
-    pub fn get_screen_coordinates(&self, layout: &ChartLayout) -> (f64, f64) {
-        layout.calculate_visible_range_coordinates(self.total_len, self.start, self.count)
-    }
-
     /// 基于相对位置的缩放方法
     ///
     /// # 参数
@@ -328,25 +317,5 @@ impl VisibleRange {
             max_high: max_high + buffer,
             max_volume,
         }
-    }
-
-    /// 预计算所有可见项的X坐标，用于批量渲染
-    ///
-    /// # 参数
-    /// * `layout` - 图表布局
-    ///
-    /// # 返回值
-    /// 返回包含所有可见项X坐标的向量（仅限主图区域）
-    pub fn precompute_x_coordinates(&self, layout: &ChartLayout) -> Vec<f64> {
-        let mut x_coords = Vec::with_capacity(self.count);
-        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
-        let x_max = main_chart_rect.x + main_chart_rect.width;
-        for global_index in self.start..self.end {
-            let x = layout.map_index_to_x(global_index, self.start);
-            if x <= x_max {
-                x_coords.push(x);
-            }
-        }
-        x_coords
     }
 }

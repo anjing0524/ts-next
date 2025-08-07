@@ -12,12 +12,10 @@ use web_sys::OffscreenCanvasRenderingContext2d;
 
 pub struct BookRenderer {
     last_idx: Cell<Option<usize>>,
-    last_mode: Cell<Option<RenderMode>>,
     last_visible_range: Cell<Option<(usize, usize)>>,
     cached_bins: RefCell<Option<Vec<f64>>>,
     cached_max_volume: Cell<Option<f64>>,
     cached_hover_index: Cell<Option<usize>>,
-    cached_data_hash: Cell<u64>,
 }
 
 impl Default for BookRenderer {
@@ -30,12 +28,10 @@ impl BookRenderer {
     pub fn new() -> Self {
         Self {
             last_idx: Cell::new(None),
-            last_mode: Cell::new(None),
             last_visible_range: Cell::new(None),
             cached_bins: RefCell::new(None),
             cached_max_volume: Cell::new(None),
             cached_hover_index: Cell::new(None),
-            cached_data_hash: Cell::new(0),
         }
     }
 
@@ -226,16 +222,6 @@ impl BookRenderer {
     pub fn clear_area(&self, ctx: &OffscreenCanvasRenderingContext2d, layout: &ChartLayout) {
         let rect = layout.get_rect(&PaneId::OrderBook);
         ctx.clear_rect(rect.x, rect.y, rect.width, rect.height);
-    }
-
-    pub fn reset_cache(&self) {
-        self.last_idx.set(None);
-        self.last_mode.set(None);
-        self.last_visible_range.set(None);
-        self.cached_bins.borrow_mut().take();
-        self.cached_max_volume.set(None);
-        self.cached_hover_index.set(None);
-        self.cached_data_hash.set(0);
     }
 }
 

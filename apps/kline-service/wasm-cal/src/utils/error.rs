@@ -96,98 +96,10 @@ impl WasmCalError {
         }
     }
 
-    pub fn canvas_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Canvas {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
-    pub fn data(message: impl Into<String>) -> Self {
-        Self::Data {
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    pub fn data_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Data {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
-    pub fn render(message: impl Into<String>) -> Self {
-        Self::Render {
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    pub fn render_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Render {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
-    pub fn config(message: impl Into<String>) -> Self {
-        Self::Config {
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    pub fn config_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Config {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
-    pub fn cache(message: impl Into<String>) -> Self {
-        Self::Cache {
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    pub fn cache_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Cache {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
     pub fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
             message: message.into(),
             source: None,
-        }
-    }
-
-    pub fn validation_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Validation {
-            message: message.into(),
-            source: Some(source),
         }
     }
 
@@ -198,16 +110,6 @@ impl WasmCalError {
         }
     }
 
-    pub fn parse_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Parse {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
     pub fn buffer(message: impl Into<String>) -> Self {
         Self::Buffer {
             message: message.into(),
@@ -215,30 +117,10 @@ impl WasmCalError {
         }
     }
 
-    pub fn buffer_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Buffer {
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
     pub fn other(message: impl Into<String>) -> Self {
         Self::Other {
             message: message.into(),
             source: None,
-        }
-    }
-
-    pub fn other_with_source(
-        message: impl Into<String>,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    ) -> Self {
-        Self::Other {
-            message: message.into(),
-            source: Some(source),
         }
     }
 }

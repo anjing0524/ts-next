@@ -42,16 +42,6 @@ impl PerformanceMonitor {
         }
     }
 
-    // 移除了未使用的 enable/disable 方法
-    // 移除了未使用的 start_frame/end_frame 方法
-    // 移除了未使用的 record_draw_call 方法
-    // 移除了未使用的 set_candles_rendered/set_indicators_rendered 方法
-
-    // 删除了未使用的方法：get_fps、get_frame_time、get_memory_usage、
-    // get_snapshot_json、get_history_json、clear_history
-
-    // 删除了未使用的reset方法
-
     /// 开始渲染性能测量
     #[wasm_bindgen]
     pub fn start_render_measurement(&mut self) {
@@ -77,10 +67,6 @@ impl PerformanceMonitor {
 
         self.update_memory_metrics();
     }
-
-    // 移除了单独的获取方法，统一使用 get_performance_stats 方法
-
-    // 移除了未使用的 get_metrics_json、get_metrics_wasm、get_snapshot_wasm 方法
 
     /// 初始化性能监控器（从KlineProcess迁移）
     /// 重新初始化监控器状态
@@ -193,8 +179,6 @@ impl PerformanceMonitor {
         // 增加分配计数
         self.memory_metrics.allocations += 1;
     }
-
-    // 移除了未使用的 add_to_history 方法和其他未使用的方法
 }
 
 impl Default for PerformanceMonitor {

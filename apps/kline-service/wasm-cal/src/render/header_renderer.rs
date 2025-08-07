@@ -27,14 +27,6 @@ impl HeaderRenderer {
         }
     }
 
-    pub fn set_title(&mut self, title: String) {
-        self.title = title;
-    }
-
-    pub fn set_subtitle(&mut self, subtitle: String) {
-        self.subtitle = subtitle;
-    }
-
     fn draw_title(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
