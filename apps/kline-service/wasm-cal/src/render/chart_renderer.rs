@@ -140,6 +140,14 @@ impl ChartRenderer {
 
     /// 处理画布大小改变
     pub fn handle_canvas_resize(&mut self, width: f64, height: f64) {
+        // 在resize时强制清理整个Overlay层，防止DataZoom等组件出现重影
+        // 这是因为resize时布局可能发生变化，旧的渲染内容可能残留在新布局范围之外
+        {
+            let canvas_manager = self.shared_state.canvas_manager.borrow();
+            let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
+            overlay_ctx.clear_rect(0.0, 0.0, self.canvas_size.0, self.canvas_size.1);
+        }
+
         self.canvas_size = (width, height);
         self.update_layout();
         self.shared_state
