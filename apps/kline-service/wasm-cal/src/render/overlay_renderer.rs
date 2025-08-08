@@ -1,7 +1,7 @@
 //! 交互层渲染器 - 负责绘制十字光标、提示框等交互元素
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
-use crate::kline_generated::kline::KlineItem;
+use crate::data::model::KlineItemRef;
 
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
@@ -53,17 +53,18 @@ impl OverlayRenderer {
         let data_manager = render_ctx.data_manager_ref();
         let (min_low, max_high, _) = data_manager.get_cached_cal();
         let tick = data_manager.get_tick();
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
+
+        // 检查数据管理器是否有数据
+        if data_manager.len() == 0 {
+            return;
+        }
 
         let layout = render_ctx.layout_ref();
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
         let book_rect = layout.get_rect(&PaneId::OrderBook);
 
         if let Some(hover_index) = render_ctx.hover_index() {
-            if hover_index >= items.len() {
+            if hover_index >= data_manager.len() {
                 return;
             }
 
@@ -71,7 +72,7 @@ impl OverlayRenderer {
                 self.tooltip_renderer.draw_main_chart_tooltip(
                     ctx,
                     &layout,
-                    items,
+                    &data_manager,
                     Some(hover_index),
                     render_ctx.mouse_x(),
                     render_ctx.mouse_y(),
@@ -84,21 +85,24 @@ impl OverlayRenderer {
             }
 
             if book_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
-                let item = items.get(hover_index);
-                let price_mapper =
-                    CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 0.0);
-                let price = price_mapper.unmap_y(render_ctx.mouse_y());
-                if let Some(volume) = self.calculate_volume_for_price(&item, price, min_low, tick) {
-                    self.tooltip_renderer.draw_book_tooltip(
-                        ctx,
-                        &layout,
-                        item.timestamp().into(),
-                        price,
-                        volume,
-                        render_ctx.mouse_x(),
-                        render_ctx.mouse_y(),
-                        render_ctx.theme_ref(),
-                    );
+                if let Some(item) = data_manager.get(hover_index) {
+                    let price_mapper =
+                        CoordinateMapper::new_for_y_axis(main_chart_rect, min_low, max_high, 0.0);
+                    let price = price_mapper.unmap_y(render_ctx.mouse_y());
+                    if let Some(volume) =
+                        self.calculate_volume_for_price(&item, price, min_low, tick)
+                    {
+                        self.tooltip_renderer.draw_book_tooltip(
+                            ctx,
+                            &layout,
+                            item.timestamp().into(),
+                            price,
+                            volume,
+                            render_ctx.mouse_x(),
+                            render_ctx.mouse_y(),
+                            render_ctx.theme_ref(),
+                        );
+                    }
                 }
             }
         }
@@ -107,7 +111,7 @@ impl OverlayRenderer {
     /// 计算特定价格的成交量
     fn calculate_volume_for_price(
         &self,
-        kline: &KlineItem,
+        kline: &KlineItemRef,
         price: f64,
         min_low: f64,
         tick: f64,
@@ -118,7 +122,6 @@ impl OverlayRenderer {
         let tick_idx = ((price - min_low) / tick).floor() as usize;
         kline.volumes().map(|volumes| {
             volumes
-                .iter()
                 .filter(|pv| ((pv.price() - min_low) / tick).floor() as usize == tick_idx)
                 .map(|pv| pv.volume())
                 .sum::<f64>()
@@ -209,27 +212,23 @@ impl OverlayRenderer {
         // 绘制X轴标签
         if let Some(index) = render_ctx.hover_index() {
             // 使用来自RenderContext的hover_index
-            if let Some(items) = data_manager.get_items() {
-                if index < items.len() {
-                    let item = items.get(index);
-                    let time_str =
-                        time::format_timestamp(item.timestamp() as i64, "%Y-%m-%d %H:%M");
+            if let Some(item) = data_manager.get(index) {
+                let time_str = time::format_timestamp(item.timestamp() as i64, "%Y-%m-%d %H:%M");
 
-                    // 计算标签宽度和位置，确保标签居中且不超出边界
-                    let label_width = 120.0;
-                    let label_x = (mouse_x_constrained - label_width / 2.0)
-                        .max(time_axis_rect.x)
-                        .min(time_axis_rect.x + time_axis_rect.width - label_width);
+                // 计算标签宽度和位置，确保标签居中且不超出边界
+                let label_width = 120.0;
+                let label_x = (mouse_x_constrained - label_width / 2.0)
+                    .max(time_axis_rect.x)
+                    .min(time_axis_rect.x + time_axis_rect.width - label_width);
 
-                    self.draw_axis_label(
-                        ctx,
-                        &time_str,
-                        label_x,
-                        time_axis_rect.y,
-                        label_width,
-                        theme,
-                    );
-                }
+                self.draw_axis_label(
+                    ctx,
+                    &time_str,
+                    label_x,
+                    time_axis_rect.y,
+                    label_width,
+                    theme,
+                );
             }
         }
     }

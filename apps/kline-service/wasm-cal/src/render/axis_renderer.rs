@@ -252,10 +252,6 @@ impl AxisRenderer {
         let layout = render_ctx.layout_ref();
         let theme = render_ctx.theme_ref();
         let data_manager = render_ctx.data_manager_ref();
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
         let (visible_start, visible_count, visible_end) = data_manager.get_visible();
         if visible_start >= visible_end {
             return;
@@ -284,7 +280,7 @@ impl AxisRenderer {
 
         for i in (0..visible_count).step_by(candle_interval) {
             let data_idx = visible_start + i;
-            if data_idx >= items.len() {
+            if data_idx >= data_manager.len() {
                 break;
             }
 
@@ -295,13 +291,14 @@ impl AxisRenderer {
                 break;
             }
 
-            let item = items.get(data_idx);
-            let timestamp_secs = item.timestamp() as i64;
-            let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
-            let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
+            if let Some(item) = data_manager.get(data_idx) {
+                let timestamp_secs = item.timestamp() as i64;
+                let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
+                let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
 
-            let _ = ctx.fill_text(&date_str, x, time_axis_rect.y + 5.0);
-            let _ = ctx.fill_text(&time_str, x, time_axis_rect.y + 17.0);
+                let _ = ctx.fill_text(&date_str, x, time_axis_rect.y + 5.0);
+                let _ = ctx.fill_text(&time_str, x, time_axis_rect.y + 17.0);
+            }
         }
     }
 }

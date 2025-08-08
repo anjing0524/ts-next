@@ -33,11 +33,6 @@ impl HeatRenderer {
         layout: &ChartLayout,
         data_manager: &DataManager,
     ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
-
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
@@ -62,16 +57,16 @@ impl HeatRenderer {
         let mut global_max_bin: f64 = 0.0;
 
         for i in visible_start..visible_end {
-            let item = items.get(i);
             let mut bins = vec![0.0; num_bins];
-            if let Some(volumes) = item.volumes() {
-                for j in 0..volumes.len() {
-                    let pv = volumes.get(j);
-                    if pv.price() >= min_low && pv.price() < max_high {
-                        let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
-                        if bin_idx < num_bins {
-                            bins[bin_idx] += pv.volume();
-                            global_max_bin = global_max_bin.max(bins[bin_idx]);
+            if let Some(item) = data_manager.get(i) {
+                if let Some(volumes) = item.volumes() {
+                    for pv in volumes {
+                        if pv.price() >= min_low && pv.price() < max_high {
+                            let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
+                            if bin_idx < num_bins {
+                                bins[bin_idx] += pv.volume();
+                                global_max_bin = global_max_bin.max(bins[bin_idx]);
+                            }
                         }
                     }
                 }

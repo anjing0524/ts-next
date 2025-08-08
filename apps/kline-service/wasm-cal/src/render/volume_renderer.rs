@@ -20,11 +20,6 @@ impl VolumeRenderer {
         data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
-
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
@@ -39,16 +34,17 @@ impl VolumeRenderer {
         let mut bearish_rects = Vec::new();
 
         for i in visible_start..visible_end {
-            let item = items.get(i);
-            let x = volume_rect.x + ((i - visible_start) as f64 * layout.total_candle_width);
-            let volume = item.b_vol() + item.s_vol();
-            let y = y_mapper.map_y(volume);
-            let height = volume_rect.y + volume_rect.height - y;
+            if let Some(item) = data_manager.get(i) {
+                let x = volume_rect.x + ((i - visible_start) as f64 * layout.total_candle_width);
+                let volume = item.b_vol() + item.s_vol();
+                let y = y_mapper.map_y(volume);
+                let height = volume_rect.y + volume_rect.height - y;
 
-            if item.close() >= item.open() {
-                bullish_rects.push((x, y, layout.candle_width, height));
-            } else {
-                bearish_rects.push((x, y, layout.candle_width, height));
+                if item.close() >= item.open() {
+                    bullish_rects.push((x, y, layout.candle_width, height));
+                } else {
+                    bearish_rects.push((x, y, layout.candle_width, height));
+                }
             }
         }
 

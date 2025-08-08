@@ -71,10 +71,7 @@ impl DataZoomRenderer {
             return DragHandleType::None;
         }
 
-        let items_len = match data_manager.get_items() {
-            Some(items) => items.len(),
-            None => return DragHandleType::None,
-        };
+        let items_len = data_manager.len();
         if items_len == 0 {
             return DragHandleType::None;
         }
@@ -139,10 +136,7 @@ impl DataZoomRenderer {
         let layout = ctx.layout_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
         let mut data_manager = ctx.data_manager_mut_ref();
-        let items_len = match data_manager.get_items() {
-            Some(items) => items.len(),
-            None => return DragResult::None,
-        };
+        let items_len = data_manager.len();
         if items_len == 0 {
             return DragResult::None;
         }
@@ -200,11 +194,7 @@ impl DataZoomRenderer {
         data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items = match data_manager.get_items() {
-            Some(i) => i,
-            None => return,
-        };
-        if items.is_empty() {
+        if data_manager.len() == 0 {
             return;
         }
 
@@ -212,15 +202,16 @@ impl DataZoomRenderer {
         let nav_width = nav_rect.width;
         let nav_height = nav_rect.height;
 
-        let items_len = items.len();
+        let items_len = data_manager.len();
         let target_points = (nav_width as usize).min(400);
         let _step = (items_len as f64 / target_points as f64).max(1.0) as usize;
 
         let mut max_volume: f64 = 0.0;
         let volume_sample_step = (items_len / 100).max(1);
         for i in (0..items_len).step_by(volume_sample_step) {
-            let item = items.get(i);
-            max_volume = max_volume.max(item.b_vol() + item.s_vol());
+            if let Some(item) = data_manager.get(i) {
+                max_volume = max_volume.max(item.b_vol() + item.s_vol());
+            }
         }
         if max_volume <= 0.0 {
             max_volume = 1.0;
@@ -235,11 +226,12 @@ impl DataZoomRenderer {
 
         for i in 0..=target_points {
             let data_idx = (i as f64 / target_points as f64 * (items_len - 1) as f64) as usize;
-            let item = items.get(data_idx);
-            let volume = item.b_vol() + item.s_vol();
-            let x = nav_rect.x + (i as f64 / target_points as f64) * nav_width;
-            let y = nav_rect.y + nav_height * (1.0 - (volume / max_volume).min(0.9));
-            points.push((x, y));
+            if let Some(item) = data_manager.get(data_idx) {
+                let volume = item.b_vol() + item.s_vol();
+                let x = nav_rect.x + (i as f64 / target_points as f64) * nav_width;
+                let y = nav_rect.y + nav_height * (1.0 - (volume / max_volume).min(0.9));
+                points.push((x, y));
+            }
         }
         points.push((nav_rect.x + nav_width, nav_rect.y + nav_height));
 
@@ -273,10 +265,7 @@ impl DataZoomRenderer {
         data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items_len = match data_manager.get_items() {
-            Some(i) => i.len(),
-            None => return,
-        };
+        let items_len = data_manager.len();
         if items_len == 0 {
             return;
         }
@@ -382,7 +371,7 @@ impl RenderStrategy for DataZoomRenderer {
         overlay_ctx.set_fill_style_str(&theme.navigator_bg);
         overlay_ctx.fill_rect(nav_rect.x, nav_rect.y, nav_rect.width, nav_rect.height);
 
-        if data_manager.get_items().map_or(0, |i| i.len()) > 0 {
+        if data_manager.len() > 0 {
             self.draw_volume_area(overlay_ctx, &layout, &data_manager, theme);
             self.draw_visible_range_indicator(overlay_ctx, &layout, &data_manager, theme);
         }
@@ -426,10 +415,7 @@ impl RenderStrategy for DataZoomRenderer {
         }
 
         let mut data_manager = ctx.data_manager_mut_ref();
-        let items_len = match data_manager.get_items() {
-            Some(items) => items.len(),
-            None => return false,
-        };
+        let items_len = data_manager.len();
         if items_len == 0 {
             return false;
         }

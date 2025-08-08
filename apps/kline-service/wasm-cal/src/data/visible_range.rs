@@ -1,6 +1,7 @@
 //! 可见数据范围模块 - 封装可见数据范围的计算和管理
 
-use crate::kline_generated::kline::KlineItem;
+use crate::data::model::KlineItemRef;
+
 use crate::layout::{ChartLayout, PaneId};
 
 /// 可见数据范围结构体
@@ -273,15 +274,15 @@ impl VisibleRange {
     /// 计算可见区域的数据范围
     ///
     /// # 参数
-    /// * `items` - K线数据
+    /// * `getter` - 一个闭包，根据索引获取 `KlineItemRef`
     ///
     /// # 返回值
     /// 返回计算出的数据范围
-    pub fn calculate_data_ranges(
-        &self,
-        items: &flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<KlineItem<'_>>>,
-    ) -> DataRange {
-        if items.is_empty() || self.start >= self.end {
+    pub fn calculate_data_ranges<'a, F>(&self, getter: F) -> DataRange
+    where
+        F: Fn(usize) -> Option<KlineItemRef<'a>>,
+    {
+        if self.total_len == 0 || self.start >= self.end {
             return DataRange::new();
         }
 
@@ -289,11 +290,14 @@ impl VisibleRange {
         let (min_low, max_high, max_volume) = (self.start..self.end).fold(
             (f64::MAX, f64::MIN, 0.0_f64),
             |(min_low, max_high, max_volume), idx| {
-                let item = items.get(idx);
-                let low = item.low();
-                let high = item.high();
-                let volume = item.b_vol() + item.s_vol();
-                (min_low.min(low), max_high.max(high), max_volume.max(volume))
+                if let Some(item) = getter(idx) {
+                    let low = item.low();
+                    let high = item.high();
+                    let volume = item.b_vol() + item.s_vol();
+                    (min_low.min(low), max_high.max(high), max_volume.max(volume))
+                } else {
+                    (min_low, max_high, max_volume)
+                }
             },
         );
 

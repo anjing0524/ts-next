@@ -244,9 +244,7 @@ impl CommandManager {
             if layout.total_candle_width > 0.0 {
                 let relative_x = x - heatmap_area_rect.x;
                 let idx_in_visible = (relative_x / layout.total_candle_width).floor() as usize;
-                let max_index = data_manager
-                    .get_items()
-                    .map_or(0, |i| i.len().saturating_sub(1));
+                let max_index = data_manager.len().saturating_sub(1);
                 let hover_index = (visible_start + idx_in_visible).min(max_index);
                 mouse_state.hover_candle_index = Some(hover_index);
             } else {

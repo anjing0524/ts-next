@@ -1,19 +1,41 @@
 //! 数据管理器 - 负责管理K线数据和可见范围
+//!
+//! 这个模块是数据处理的核心，它通过分离历史数据和增量数据来优化性能。
+//! - **历史数据**: 一次性从FlatBuffers加载，零拷贝读取。
+//! - **增量数据**: 实时追加到`Vec`中，写入效率高。
+//! - **统一访问**: 通过`KlineItemRef`枚举，对上层屏蔽了数据源的差异。
 
+use super::model::{KlineItemOwned, KlineItemRef};
 use crate::data::visible_range::{DataRange, VisibleRange};
-use crate::kline_generated::kline::KlineItem;
+use crate::kline_generated::kline::{self};
 use crate::layout::ChartLayout;
 
-/// 数据管理器 - 负责管理K线数据和可见范围
-#[derive(Clone)]
+/// 数据管理器
+///
+/// 持有并管理所有K线图表数据。
 pub struct DataManager {
-    /// K线数据
-    items: Option<flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>>,
-    /// 最小变动价位
+    /// 拥有所有权的FlatBuffers二进制数据。
+    /// 这是所有`Borrowed`数据的来源。
+    initial_buffer: Vec<u8>,
+
+    /// 缓存的FlatBuffers解析结果，避免重复解析
+    /// 使用'static生命周期 + unsafe代码确保内存安全
+    parsed_data: Option<kline::KlineData<'static>>,
+
+    /// 初始数据的长度，用于索引计算
+    initial_items_len: usize,
+
+    /// 存储实时追加的、已拥有所有权的K线数据。
+    incremental_data: Vec<KlineItemOwned>,
+
+    /// 最小变动价位。
     tick: f64,
-    /// 可见数据范围
+
+    /// 可见数据范围。
     visible_range: VisibleRange,
-    /// 缓存的数据范围 - None表示无缓存，Some(data)表示有效缓存
+
+    /// 缓存的可见区域数据范围（最高价、最低价、最大成交量）。
+    /// `None`表示缓存无效，需要重新计算。
     cached_data_range: Option<DataRange>,
 }
 
@@ -24,109 +46,164 @@ impl Default for DataManager {
 }
 
 impl DataManager {
-    /// 创建新的数据管理器
+    /// 创建一个新的、空的`DataManager`。
     pub fn new() -> Self {
         Self {
-            items: None,
-            tick: 1.0,
+            initial_buffer: Vec::new(),
+            parsed_data: None,
+            initial_items_len: 0,
+            incremental_data: Vec::new(),
+            tick: 0.01,
             visible_range: VisibleRange::new(0, 0, 0),
             cached_data_range: None,
         }
     }
 
-    /// 设置K线数据
-    pub fn set_items(
-        &mut self,
-        items: flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>,
-        tick: f64,
-    ) {
-        // 清除缓存的范围计算
+    /// 设置初始的、大量的历史数据。
+    ///
+    /// 此方法会获取`buffer`的所有权，并建立一个对其中数据的零拷贝视图。
+    /// 同时缓存解析结果以避免重复解析，这是关键的性能优化。
+    pub fn set_initial_data(&mut self, buffer: Vec<u8>) {
         self.invalidate_cache();
+        self.incremental_data.clear(); // 清除任何旧的增量数据
 
-        // 设置数据
-        let items_len = items.len();
-        self.items = Some(items);
-        self.tick = if tick > 0.0 { tick } else { 0.01 }; // 确保 tick 为正数
-        // 更新可见范围的总长度
-        self.visible_range.update_total_len(items_len);
+        // 安全性检查：确保传入的buffer是有效的KlineData
+        if let Ok(kline_data) = kline::root_as_kline_data(&buffer) {
+            self.tick = if kline_data.tick() > 0.0 {
+                kline_data.tick()
+            } else {
+                0.01
+            };
+
+            // 获取初始数据的长度
+            self.initial_items_len = kline_data.items().map_or(0, |items| items.len());
+
+            // 移动buffer到self.initial_buffer
+            self.initial_buffer = buffer;
+
+            // 🔥 关键性能优化：缓存解析结果避免重复解析
+            // unsafe: 我们确保initial_buffer的生命周期长于parsed_data
+            // 因为DataManager拥有initial_buffer的所有权，所以这是安全的
+            let parsed = kline::root_as_kline_data(&self.initial_buffer).ok();
+            self.parsed_data = unsafe {
+                std::mem::transmute::<Option<kline::KlineData<'_>>, Option<kline::KlineData<'static>>>(
+                    parsed,
+                )
+            };
+        } else {
+            // 如果buffer无效，则重置所有状态
+            self.initial_buffer.clear();
+            self.parsed_data = None;
+            self.initial_items_len = 0;
+            self.tick = 0.01;
+        }
+
+        self.visible_range.update_total_len(self.len());
     }
 
-    /// 根据布局初始化可见范围
+    /// 追加一条新的K线数据。
+    pub fn append_item(&mut self, item: KlineItemOwned) {
+        self.invalidate_cache();
+        self.incremental_data.push(item);
+        self.visible_range.update_total_len(self.len());
+    }
+
+    /// 获取指定索引的K线数据项的统一视图。
+    ///
+    /// 这个方法是数据访问的核心，它会根据索引自动从历史数据或增量数据中获取。
+    /// 🔥 性能优化：使用缓存的解析结果避免重复解析FlatBuffers
+    pub fn get(&self, index: usize) -> Option<KlineItemRef> {
+        if index < self.initial_items_len {
+            // 🔥 关键性能优化：优先使用缓存的解析结果
+            if let Some(ref parsed) = self.parsed_data {
+                if let Some(items) = parsed.items() {
+                    if index < items.len() {
+                        let item = items.get(index);
+                        return Some(KlineItemRef::Borrowed(item));
+                    }
+                }
+            }
+
+            // fallback: 只有在缓存失效时才重新解析
+            // 这种情况应该很少发生，主要是为了健壮性
+            if let Ok(kline_data) = kline::root_as_kline_data(&self.initial_buffer) {
+                if let Some(items) = kline_data.items() {
+                    if index < items.len() {
+                        let item = items.get(index);
+                        return Some(KlineItemRef::Borrowed(item));
+                    }
+                }
+            }
+            None
+        } else {
+            // 从增量数据中获取所有权引用
+            let incremental_index = index - self.initial_items_len;
+            self.incremental_data
+                .get(incremental_index)
+                .map(KlineItemRef::Owned)
+        }
+    }
+
+    /// 返回数据集中K线项的总数（历史 + 增量）。
+    pub fn len(&self) -> usize {
+        self.initial_items_len + self.incremental_data.len()
+    }
+
+    /// 根据布局初始化可见范围。
     pub fn initialize_visible_range(&mut self, layout: &ChartLayout) {
-        let items_len = match &self.items {
-            Some(items) => items.len(),
-            None => 0,
-        };
-
-        // 使用VisibleRange的from_layout方法创建新的可见范围
-        self.visible_range = VisibleRange::from_layout(layout, items_len);
-
-        // 确保缓存失效，以便重新计算数据范围
+        self.visible_range = VisibleRange::from_layout(layout, self.len());
         self.invalidate_cache();
     }
 
-    /// 获取K线数据
-    pub fn get_items(
-        &self,
-    ) -> Option<flatbuffers::Vector<'static, flatbuffers::ForwardsUOffset<KlineItem<'static>>>>
-    {
-        self.items
-    }
-
-    /// 更新可见范围
+    /// 更新可见范围。
     pub fn update_visible_range(&mut self, start: usize, count: usize) {
-        // 使用VisibleRange的update方法更新范围，如果发生变化则无效化缓存
         if self.visible_range.update(start, count) {
             self.invalidate_cache();
         }
     }
 
-    /// 获取可见范围
+    /// 获取可见范围的元组 `(start, count, end)`。
     pub fn get_visible(&self) -> (usize, usize, usize) {
-        // 直接使用VisibleRange的get_range方法
         self.visible_range.get_range()
     }
 
-    /// 获取可见范围对象的引用
+    /// 获取可见范围对象的不可变引用。
     pub fn get_visible_range(&self) -> &VisibleRange {
         &self.visible_range
     }
 
-    /// 无效化缓存的范围计算
+    /// 无效化缓存的数据范围计算结果。
     pub fn invalidate_cache(&mut self) {
         self.cached_data_range = None;
     }
 
-    /// 获取缓存的计算结果
+    /// 获取缓存的计算结果 `(min_low, max_high, max_volume)`。
     pub fn get_cached_cal(&self) -> (f64, f64, f64) {
-        if let Some(data_range) = &self.cached_data_range {
-            return data_range.get();
-        }
-        (0.0, 0.0, 0.0)
+        self.cached_data_range
+            .map_or((0.0, 0.0, 0.0), |dr| dr.get())
     }
 
-    /// 计算可见区域的价格范围和最大成交量
+    /// 计算可见区域的价格范围和最大成交量。
+    ///
+    /// 如果缓存有效，则直接返回缓存结果。否则，进行计算并缓存结果。
     pub fn calculate_data_ranges(&mut self) -> (f64, f64, f64) {
-        // 如果缓存有效，直接返回
         if let Some(data_range) = &self.cached_data_range {
             return data_range.get();
         }
 
-        // 获取数据
-        if let Some(items) = &self.items {
-            // 使用VisibleRange的calculate_data_ranges方法计算数据范围
-            let data_range = self.visible_range.calculate_data_ranges(items);
-
-            // 缓存计算结果
-            self.cached_data_range = Some(data_range);
-
-            return data_range.get();
+        if self.len() == 0 {
+            return (0.0, 0.0, 0.0);
         }
 
-        (0.0, 0.0, 0.0)
+        // 使用VisibleRange的calculate_data_ranges方法计算数据范围
+        // 注意：这里需要传递一个闭包，让VisibleRange能够通过索引访问数据
+        let data_range = self.visible_range.calculate_data_ranges(|i| self.get(i));
+
+        self.cached_data_range = Some(data_range);
+        data_range.get()
     }
 
-    /// 处理鼠标滚轮事件
+    /// 处理鼠标滚轮事件。
     pub fn handle_wheel(
         &mut self,
         mouse_x: f64,
@@ -136,36 +213,56 @@ impl DataManager {
         chart_area_width: f64,
         is_in_chart: bool,
     ) -> bool {
-        if !is_in_chart {
+        if !is_in_chart || self.len() == 0 {
             return false;
         }
 
-        if let Some(items) = self.items {
-            if items.is_empty() {
-                return false;
-            }
+        let (new_visible_start, new_visible_count) =
+            self.visible_range
+                .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
 
-            let (new_visible_start, new_visible_count) =
-                self.visible_range
-                    .handle_wheel(mouse_x, chart_area_x, chart_area_width, delta);
-
-            let range_updated = self
-                .visible_range
-                .update(new_visible_start, new_visible_count);
-
-            if range_updated {
-                self.invalidate_cache();
-                self.calculate_data_ranges();
-            }
-
-            range_updated
+        if self
+            .visible_range
+            .update(new_visible_start, new_visible_count)
+        {
+            self.invalidate_cache();
+            self.calculate_data_ranges();
+            true
         } else {
             false
         }
     }
 
-    /// 获取 tick 值的方法
+    /// 获取tick值。
     pub fn get_tick(&self) -> f64 {
         self.tick
+    }
+}
+
+/// 自定义Clone实现，因为parsed_data字段包含不可克隆的类型
+impl Clone for DataManager {
+    fn clone(&self) -> Self {
+        // 对于克隆，我们需要重新解析FlatBuffers数据
+        // 这比共享引用更安全，但性能稍差
+        // 不过克隆操作本身应该很少发生
+        let parsed_data = if self.initial_buffer.is_empty() {
+            None
+        } else {
+            kline::root_as_kline_data(&self.initial_buffer)
+                .ok()
+                .map(|parsed| unsafe {
+                    std::mem::transmute::<kline::KlineData<'_>, kline::KlineData<'static>>(parsed)
+                })
+        };
+
+        Self {
+            initial_buffer: self.initial_buffer.clone(),
+            parsed_data,
+            initial_items_len: self.initial_items_len,
+            incremental_data: self.incremental_data.clone(),
+            tick: self.tick,
+            visible_range: self.visible_range,
+            cached_data_range: self.cached_data_range,
+        }
     }
 }

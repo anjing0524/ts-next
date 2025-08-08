@@ -1,11 +1,12 @@
 //! Tooltip模块 - 负责绘制十字光标处的提示框
 
-use crate::config::ChartTheme;
-use crate::kline_generated::kline::KlineItem;
+use crate::ChartTheme;
+use crate::data::DataManager;
+use crate::data::model::KlineItemRef;
+
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::utils::time;
-use flatbuffers;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 #[derive(Default)]
@@ -21,7 +22,7 @@ impl TooltipRenderer {
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<KlineItem<'_>>>,
+        data_manager: &DataManager,
         hover_candle_index: Option<usize>,
         mouse_x: f64,
         mouse_y: f64,
@@ -36,11 +37,11 @@ impl TooltipRenderer {
             None => return,
         };
 
-        if hover_index >= items.len() {
-            return;
-        }
+        let item = match data_manager.get(hover_index) {
+            Some(item) => item,
+            None => return,
+        };
 
-        let item = items.get(hover_index);
         let price_rect = layout.get_rect(&PaneId::HeatmapArea);
         let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 8.0);
         let price = y_mapper.unmap_y(mouse_y);
@@ -171,7 +172,7 @@ impl TooltipRenderer {
     }
 
     /// 获取K线图模式的Tooltip文本
-    fn get_kmap_tooltip_lines(&self, item: &KlineItem, price: f64) -> Vec<String> {
+    fn get_kmap_tooltip_lines(&self, item: &KlineItemRef, price: f64) -> Vec<String> {
         vec![
             format!(
                 "时间: {}",
@@ -192,7 +193,7 @@ impl TooltipRenderer {
     /// 获取热图模式的Tooltip文本
     fn get_heatmap_tooltip_lines(
         &self,
-        item: &KlineItem,
+        item: &KlineItemRef,
         price: f64,
         min_low: f64,
         tick: f64,
@@ -214,7 +215,7 @@ impl TooltipRenderer {
     /// 计算特定价格的成交量
     fn calculate_volume_for_price(
         &self,
-        kline: &KlineItem,
+        kline: &KlineItemRef,
         price: f64,
         min_low: f64,
         tick: f64,
@@ -225,7 +226,6 @@ impl TooltipRenderer {
         let tick_idx = ((price - min_low) / tick).floor() as usize;
         kline.volumes().map(|volumes| {
             volumes
-                .iter()
                 .filter(|pv| ((pv.price() - min_low) / tick).floor() as usize == tick_idx)
                 .map(|pv| pv.volume())
                 .sum::<f64>()

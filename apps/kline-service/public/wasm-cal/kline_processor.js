@@ -167,6 +167,13 @@ function debugString(val) {
     return className;
 }
 
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
 function takeFromExternrefTable0(idx) {
     const value = wasm.__wbindgen_export_4.get(idx);
     wasm.__externref_table_dealloc(idx);
@@ -198,12 +205,15 @@ export class KlineProcess {
     }
     /**
      * 创建新的KlineProcess实例
-     * @param {any} memory_val
-     * @param {number} ptr_offset
-     * @param {number} data_length
+     *
+     * # 参数
+     * * `initial_data` - 包含历史K线数据的 `Uint8Array`
+     * @param {Uint8Array} initial_data
      */
-    constructor(memory_val, ptr_offset, data_length) {
-        const ret = wasm.klineprocess_new(memory_val, ptr_offset, data_length);
+    constructor(initial_data) {
+        const ptr0 = passArray8ToWasm0(initial_data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_new(ptr0, len0);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -228,6 +238,19 @@ export class KlineProcess {
      */
     draw_all() {
         const ret = wasm.klineprocess_draw_all(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * 处理实时数据更新
+     * 接收新的FlatBuffers数据，更新内部数据并重新渲染
+     * @param {Uint8Array} new_data
+     */
+    update_realtime_data(new_data) {
+        const ptr0 = passArray8ToWasm0(new_data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_update_realtime_data(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -524,16 +547,6 @@ function __wbg_get_imports() {
         const ret = result;
         return ret;
     };
-    imports.wbg.__wbg_instanceof_Memory_111add5588accff2 = function(arg0) {
-        let result;
-        try {
-            result = arg0 instanceof WebAssembly.Memory;
-        } catch (_) {
-            result = false;
-        }
-        const ret = result;
-        return ret;
-    };
     imports.wbg.__wbg_instanceof_OffscreenCanvasRenderingContext2d_a070fdde7ba760a3 = function(arg0) {
         let result;
         try {
@@ -606,10 +619,6 @@ function __wbg_get_imports() {
         const ret = new Float64Array(arg0, arg1 >>> 0, arg2 >>> 0);
         return ret;
     };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a = function(arg0, arg1, arg2) {
-        const ret = new Uint8Array(arg0, arg1 >>> 0, arg2 >>> 0);
-        return ret;
-    };
     imports.wbg.__wbg_newwithlength_5ebc38e611488614 = function(arg0) {
         const ret = new Float64Array(arg0 >>> 0);
         return ret;
@@ -654,9 +663,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setglobalAlpha_3018cc44e3ab2d57 = function(arg0, arg1) {
         arg0.globalAlpha = arg1;
     };
-    imports.wbg.__wbg_setheight_433680330c9420c3 = function(arg0, arg1) {
-        arg0.height = arg1 >>> 0;
-    };
     imports.wbg.__wbg_setimageSmoothingEnabled_15335584d0f077b6 = function(arg0, arg1) {
         arg0.imageSmoothingEnabled = arg1 !== 0;
     };
@@ -677,9 +683,6 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_settextBaseline_7fb1acb93a0c121a = function(arg0, arg1, arg2) {
         arg0.textBaseline = getStringFromWasm0(arg1, arg2);
-    };
-    imports.wbg.__wbg_setwidth_660ca581e3fbe279 = function(arg0, arg1) {
-        arg0.width = arg1 >>> 0;
     };
     imports.wbg.__wbg_stack_0ed75d68575b0f3c = function(arg0, arg1) {
         const ret = arg1.stack;

@@ -43,10 +43,7 @@ impl BookRenderer {
         hover_index: Option<usize>,
         theme: &ChartTheme,
     ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
+        let data_manager = &data_manager;
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
@@ -54,7 +51,7 @@ impl BookRenderer {
         }
 
         let idx = hover_index.unwrap_or_else(|| visible_end.saturating_sub(1));
-        if idx >= items.len() {
+        if idx >= data_manager.len() {
             return;
         }
 
@@ -73,7 +70,10 @@ impl BookRenderer {
 
         let (bins, max_volume) = if needs_recalculation {
             // 重新计算
-            let item = items.get(idx);
+            let item = match data_manager.get(idx) {
+                Some(item) => item,
+                None => return,
+            };
             let volumes = match item.volumes() {
                 Some(v) => v,
                 None => return,
@@ -92,8 +92,7 @@ impl BookRenderer {
 
             let mut bins = vec![0.0; num_bins];
             let mut max_volume = 0.0f64;
-            for i in 0..volumes.len() {
-                let pv = volumes.get(i);
+            for pv in volumes {
                 if pv.price() >= min_low && pv.price() < max_high {
                     let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
                     if bin_idx < num_bins {
@@ -152,7 +151,10 @@ impl BookRenderer {
                 continue;
             }
 
-            let item = items.get(idx);
+            let item = match data_manager.get(idx) {
+                Some(item) => item,
+                None => return,
+            };
             let last_price = item.last_price();
 
             let y_in_price_chart = y_mapper.map_y(price);

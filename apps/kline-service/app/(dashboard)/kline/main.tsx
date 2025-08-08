@@ -256,9 +256,11 @@ export default function Main() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         // 创建Worker
+        console.log('[Main] 正在创建 Worker...');
         const worker = new Worker(new URL('./kline.worker.ts', import.meta.url), {
           type: 'module',
         });
+        console.log('[Main] Worker 创建成功');
         workerRef.current = worker; // 保存worker引用
 
         // 添加错误监听
@@ -270,6 +272,10 @@ export default function Main() {
         const arrayBuffer = await response.arrayBuffer();
 
         // 第一次传输：原始数据到Worker (无复制)
+        console.log('[Main] 正在发送初始化消息给 Worker...', {
+          arrayBufferSize: arrayBuffer.byteLength,
+          wasmPath
+        });
         worker.postMessage(
           {
             type: 'init',
@@ -278,6 +284,7 @@ export default function Main() {
           },
           [arrayBuffer] // 关键点1：标记为Transferable
         );
+        console.log('[Main] 初始化消息已发送');
 
         // 设置Worker消息处理函数
         setupWorkerMessageHandler(worker);

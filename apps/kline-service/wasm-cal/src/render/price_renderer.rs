@@ -20,11 +20,6 @@ impl PriceRenderer {
         data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
-
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
@@ -41,34 +36,35 @@ impl PriceRenderer {
         let mut bearish_rects = Vec::new();
 
         for i in visible_start..visible_end {
-            let item = items.get(i);
-            let x_center = price_rect.x
-                + ((i - visible_start) as f64 * layout.total_candle_width)
-                + (layout.total_candle_width / 2.0);
+            if let Some(item) = data_manager.get(i) {
+                let x_center = price_rect.x
+                    + ((i - visible_start) as f64 * layout.total_candle_width)
+                    + (layout.total_candle_width / 2.0);
 
-            let high_y = y_mapper.map_y(item.high());
-            let low_y = y_mapper.map_y(item.low());
-            let open_y = y_mapper.map_y(item.open());
-            let close_y = y_mapper.map_y(item.close());
+                let high_y = y_mapper.map_y(item.high());
+                let low_y = y_mapper.map_y(item.low());
+                let open_y = y_mapper.map_y(item.open());
+                let close_y = y_mapper.map_y(item.close());
 
-            if item.close() >= item.open() {
-                bullish_lines.push((x_center, high_y, x_center, low_y));
-                let height = (open_y - close_y).max(1.0);
-                bullish_rects.push((
-                    x_center - layout.candle_width / 2.0,
-                    close_y,
-                    layout.candle_width,
-                    height,
-                ));
-            } else {
-                bearish_lines.push((x_center, high_y, x_center, low_y));
-                let height = (close_y - open_y).max(1.0);
-                bearish_rects.push((
-                    x_center - layout.candle_width / 2.0,
-                    open_y,
-                    layout.candle_width,
-                    height,
-                ));
+                if item.close() >= item.open() {
+                    bullish_lines.push((x_center, high_y, x_center, low_y));
+                    let height = (open_y - close_y).max(1.0);
+                    bullish_rects.push((
+                        x_center - layout.candle_width / 2.0,
+                        close_y,
+                        layout.candle_width,
+                        height,
+                    ));
+                } else {
+                    bearish_lines.push((x_center, high_y, x_center, low_y));
+                    let height = (close_y - open_y).max(1.0);
+                    bearish_rects.push((
+                        x_center - layout.candle_width / 2.0,
+                        open_y,
+                        layout.candle_width,
+                        height,
+                    ));
+                }
             }
         }
 

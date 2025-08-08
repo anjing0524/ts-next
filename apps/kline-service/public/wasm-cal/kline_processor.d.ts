@@ -8,8 +8,11 @@ export class KlineProcess {
   free(): void;
   /**
    * 创建新的KlineProcess实例
+   *
+   * # 参数
+   * * `initial_data` - 包含历史K线数据的 `Uint8Array`
    */
-  constructor(memory_val: any, ptr_offset: number, data_length: number);
+  constructor(initial_data: Uint8Array);
   /**
    * 设置三层Canvas
    */
@@ -18,6 +21,11 @@ export class KlineProcess {
    * 绘制所有图表
    */
   draw_all(): void;
+  /**
+   * 处理实时数据更新
+   * 接收新的FlatBuffers数据，更新内部数据并重新渲染
+   */
+  update_realtime_data(new_data: Uint8Array): void;
   handle_mouse_move(x: number, y: number): void;
   get_cursor_style(x: number, y: number): string;
   handle_mouse_leave(): void;
@@ -68,9 +76,10 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_klineprocess_free: (a: number, b: number) => void;
-  readonly klineprocess_new: (a: any, b: number, c: number) => [number, number, number];
+  readonly klineprocess_new: (a: number, b: number) => [number, number, number];
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
   readonly klineprocess_draw_all: (a: number) => [number, number];
+  readonly klineprocess_update_realtime_data: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
   readonly klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_leave: (a: number) => void;
@@ -83,13 +92,13 @@ export interface InitOutput {
   readonly klineprocess_update_config: (a: number, b: any) => [number, number];
   readonly klineprocess_get_config: (a: number) => [number, number, number];
   readonly klineprocess_get_theme: (a: number) => [number, number, number];
+  readonly start: () => void;
   readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
   readonly performancemonitor_new: () => number;
   readonly performancemonitor_start_render_measurement: (a: number) => void;
   readonly performancemonitor_end_render_measurement: (a: number) => void;
   readonly performancemonitor_init_monitor: (a: number) => void;
   readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
-  readonly start: () => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;

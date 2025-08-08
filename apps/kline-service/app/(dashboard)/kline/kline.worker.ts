@@ -1,6 +1,6 @@
 'use client';
 // kline.worker.ts - Web Worker 用于处理 WASM 和 Canvas 操作
-import init, { KlineProcess, PerformanceMonitor } from '@/public/wasm-cal/kline_processor';
+import init, { KlineProcess, PerformanceMonitor } from '../../../public/wasm-cal/kline_processor';
 
 // 定义消息类型
 interface InitMessage {
@@ -114,6 +114,10 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
   try {
     switch (data.type) {
+      case 'test':
+        console.log('[Worker] 收到测试消息，Worker 正常工作');
+        self.postMessage({ type: 'test-response', message: 'Worker is working!' });
+        break;
       case 'init':
         await handleInit(data);
         break;
@@ -314,12 +318,19 @@ async function handleInit(message: InitMessage) {
   isInitializing = true;
 
   try {
+    console.log('[Worker] 开始初始化 WASM 模块');
+    console.log('[Worker] 接收到的数据:', { 
+      arrayBufferSize: message.buffer.byteLength,
+      wasmPath: message.wasmPath 
+    });
     console.time('[Worker] 完整初始化流程');
     console.log('[Worker] 开始初始化 WASM...');
 
     // 1. 初始化 WASM 模块
     console.time('[Worker] 加载 WASM 模块');
+    console.log('[Worker] 正在加载 WASM 模块...');
     await init({ module_or_path: message.wasmPath });
+    console.log('[Worker] WASM 模块加载成功');
     console.timeEnd('[Worker] 加载 WASM 模块');
 
     // 2. 准备数据
@@ -347,7 +358,14 @@ async function handleInit(message: InitMessage) {
 
     // 5. 创建处理器实例
     console.time('[Worker] 创建 KlineProcess 实例');
-    processorRef = new KlineProcess(wasmMemory, 0, buf.length);
+    console.log('[Worker] 正在创建 KlineProcess 实例，数据大小:', buf.length);
+    try {
+        processorRef = new KlineProcess(buf);
+        console.log('[Worker] KlineProcess 实例创建成功');
+    } catch (error) {
+        console.error('[Worker] KlineProcess 实例创建失败:', error);
+        throw error;
+    }
     console.timeEnd('[Worker] 创建 KlineProcess 实例');
 
     // 6. 初始化性能监控（统一管理）

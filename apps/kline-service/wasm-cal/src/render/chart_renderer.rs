@@ -6,7 +6,8 @@ use super::strategy::{RenderContext, RenderStrategyFactory};
 use crate::canvas::{CanvasLayerType, CanvasManager};
 use crate::config::{ChartConfig, ChartTheme, ConfigManager};
 use crate::data::DataManager;
-use crate::kline_generated::kline::KlineData;
+
+use std::collections::HashMap;
 // 移除性能监控导入，ChartRenderer 专注于渲染
 
 use crate::layout::{self, ChartLayout, LayoutEngine, Rect};
@@ -30,40 +31,22 @@ pub struct ChartRenderer {
     mode: RenderMode,
     /// 画布尺寸
     canvas_size: (f64, f64),
-    // 移除性能监控器字段，保持渲染器职责单一
 }
 
 impl ChartRenderer {
     /// 创建图表渲染器
-    pub fn new(
-        base_canvas: &OffscreenCanvas,
-        main_canvas: &OffscreenCanvas,
-        overlay_canvas: &OffscreenCanvas,
-        parsed_data: Option<KlineData<'static>>,
-    ) -> Result<Self, WasmCalError> {
-        let canvas_size = (base_canvas.width() as f64, base_canvas.height() as f64);
-        let canvas_manager = CanvasManager::new(base_canvas, main_canvas, overlay_canvas)?;
+    pub fn new() -> Result<Self, WasmCalError> {
         let data_manager = DataManager::new();
         let config_manager = ConfigManager::new();
         let strategy_factory = RenderStrategyFactory::new();
-
-        let initial_layout = {
-            let template = layout::create_layout_template(RenderMode::Kmap);
-            let bounds = Rect {
-                x: 0.0,
-                y: 0.0,
-                width: canvas_size.0,
-                height: canvas_size.1,
-            };
-            let panes = LayoutEngine::calculate(&template, bounds);
-            ChartLayout::new(panes, 0)
-        };
-
-        // 创建鼠标状态
         let mouse_state = Rc::new(RefCell::new(crate::command::state::MouseState::default()));
 
+        // 初始布局和Canvas管理器将在 set_canvases 中创建
+        let initial_layout = ChartLayout::new(HashMap::new(), 0);
+
         let shared_state = SharedRenderState::new(
-            Rc::new(RefCell::new(canvas_manager)),
+            // CanvasManager 将在 set_canvases 中初始化
+            Rc::new(RefCell::new(CanvasManager::new_uninitialized())),
             Rc::new(RefCell::new(data_manager)),
             Rc::new(RefCell::new(initial_layout)),
             Rc::new(config_manager.theme),
@@ -72,42 +55,55 @@ impl ChartRenderer {
             mouse_state.clone(),
         );
 
-        let mut renderer = Self {
-            shared_state: shared_state.clone(),
+        Ok(Self {
+            shared_state,
             mode: RenderMode::Kmap,
-            canvas_size,
-        };
+            canvas_size: (0.0, 0.0),
+        })
+    }
 
-        if let Some(_data) = parsed_data {
-            let items = _data.items().expect("Data must contain items");
-            let tick = _data.tick();
-            let mut dm = renderer.shared_state.data_manager.borrow_mut();
-            dm.set_items(items, tick);
+    /// 设置初始数据
+    pub fn set_initial_data(&mut self, data: Vec<u8>) {
+        {
+            let mut dm = self.shared_state.data_manager.borrow_mut();
+            dm.set_initial_data(data);
+        } // 释放借用
+        // 初始化完成后，更新布局和数据范围
+        self.full_recalculate();
+    }
+
+    /// 设置Canvases并完成初始化
+    pub fn set_canvases(
+        &mut self,
+        base_canvas: OffscreenCanvas,
+        main_canvas: OffscreenCanvas,
+        overlay_canvas: OffscreenCanvas,
+    ) -> Result<(), WasmCalError> {
+        self.canvas_size = (base_canvas.width() as f64, base_canvas.height() as f64);
+        let canvas_manager = CanvasManager::new(&base_canvas, &main_canvas, &overlay_canvas)?;
+        *self.shared_state.canvas_manager.borrow_mut() = canvas_manager;
+
+        // 现在我们有了canvas尺寸，可以进行完整的重新计算
+        self.full_recalculate();
+        Ok(())
+    }
+
+    /// 重新计算布局和数据范围
+    fn full_recalculate(&mut self) {
+        if self.canvas_size.0 > 0.0 && self.canvas_size.1 > 0.0 {
+            self.update_layout();
+            let mut data_manager = self.shared_state.data_manager.borrow_mut();
+            if data_manager.len() > 0 {
+                data_manager.initialize_visible_range(&self.shared_state.layout.borrow());
+                // 在initialize_visible_range之后再次更新布局，以确保candle_width正确
+                drop(data_manager);
+                self.update_layout();
+                self.shared_state
+                    .data_manager
+                    .borrow_mut()
+                    .calculate_data_ranges();
+            }
         }
-
-        let items_len = renderer
-            .shared_state
-            .data_manager
-            .borrow()
-            .get_items()
-            .map_or(0, |items| items.len());
-
-        if items_len > 0 && renderer.canvas_size.0 > 0.0 && renderer.canvas_size.1 > 0.0 {
-            renderer.update_layout();
-            renderer
-                .shared_state
-                .data_manager
-                .borrow_mut()
-                .initialize_visible_range(&renderer.shared_state.layout.borrow());
-            renderer.update_layout();
-            renderer
-                .shared_state
-                .data_manager
-                .borrow_mut()
-                .calculate_data_ranges();
-        }
-
-        Ok(renderer)
     }
 
     pub fn get_shared_state(&self) -> SharedRenderState {
@@ -135,7 +131,7 @@ impl ChartRenderer {
             .canvas_manager
             .borrow_mut()
             .set_all_dirty();
-        self.force_render();
+        let _ = self.render();
     }
 
     /// 处理画布大小改变
@@ -179,26 +175,15 @@ impl ChartRenderer {
     }
 
     /// 渲染图表
-    pub fn render(&self) {
-        // 节流已移至CommandManager
-        self.render_internal();
-    }
+    ///
+    /// 执行图表渲染操作。如果不需要处理错误，可以使用 `let _ = renderer.render();` 忽略返回值。
+    /// 节流控制已移至CommandManager层面处理。
+    pub fn render(&self) -> Result<(), WasmCalError> {
+        // 如果canvas未设置，则不执行渲染
+        if self.canvas_size.0 == 0.0 || self.canvas_size.1 == 0.0 {
+            return Ok(());
+        }
 
-    /// 强制渲染图表
-    pub fn force_render(&self) {
-        self.render_internal();
-    }
-
-    /// 更新配置（供 KlineProcess 使用）
-    pub fn update_config(&mut self, config: &ChartConfig, theme: &ChartTheme) {
-        self.shared_state.theme = std::rc::Rc::new(theme.clone());
-        self.shared_state.config = Some(std::rc::Rc::new(config.clone()));
-    }
-
-    // 移除性能监控器相关方法
-
-    /// 内部渲染方法
-    fn render_internal(&self) {
         let layers_to_render = {
             let canvas_manager = self.shared_state.canvas_manager.borrow();
             let mut layers = Vec::new();
@@ -215,7 +200,7 @@ impl ChartRenderer {
         };
 
         if layers_to_render.is_empty() {
-            return;
+            return Ok(());
         }
 
         // 执行渲染
@@ -242,14 +227,20 @@ impl ChartRenderer {
 
         let strategy_factory = self.shared_state.strategy_factory.borrow();
 
-        // 调试：检查 DataZoom 渲染器是否被包含在渲染列表中
-
-        let _ = strategy_factory.render_layers(&render_context, self.mode, &layers_to_render);
+        strategy_factory.render_layers(&render_context, self.mode, &layers_to_render)?;
 
         self.shared_state
             .canvas_manager
             .borrow_mut()
             .clear_all_dirty_flags();
+
+        Ok(())
+    }
+
+    /// 更新配置（供 KlineProcess 使用）
+    pub fn update_config(&mut self, config: &ChartConfig, theme: &ChartTheme) {
+        self.shared_state.theme = std::rc::Rc::new(theme.clone());
+        self.shared_state.config = Some(std::rc::Rc::new(config.clone()));
     }
 
     /// 获取光标样式
