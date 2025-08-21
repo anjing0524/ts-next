@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import * as flatbuffers from 'flatbuffers';
-import * as Kline from '@/generated/kline';
+import * as Kline from '@repo/flatbuffers-kline';
 
 type KlineItem = {
   timestamp: number;
@@ -38,7 +38,7 @@ class KlineDataGenerator {
       largeOrderRatio: options?.largeOrderRatio || 0.1,
       largeOrderMultiplier: options?.largeOrderMultiplier || 7.5,
     };
-    
+
     this.currentPrice = 2000 + Math.random() * 1000;
     this.currentTimestamp = Math.floor(Date.now() / 1000);
   }
@@ -90,46 +90,54 @@ class KlineDataGenerator {
     return result;
   }
 
-  private generatePriceLevels(center: number, high: number, low: number): Array<{ price: number; volume: number }> {
+  private generatePriceLevels(
+    center: number,
+    high: number,
+    low: number
+  ): Array<{ price: number; volume: number }> {
     const priceLevels: Array<{ price: number; volume: number }> = [];
     const sigma = (high - low) / 4 || 1;
-    
+
     const halfLevels = Math.floor(this.options.numLevels / 2);
-    const startPrice = Math.floor(center / this.options.tickSize - halfLevels) * this.options.tickSize;
-    
-    const numLargeOrders = Math.max(1, Math.floor(this.options.numLevels * this.options.largeOrderRatio));
+    const startPrice =
+      Math.floor(center / this.options.tickSize - halfLevels) * this.options.tickSize;
+
+    const numLargeOrders = Math.max(
+      1,
+      Math.floor(this.options.numLevels * this.options.largeOrderRatio)
+    );
     const largeOrderIndices = new Set<number>();
-    
+
     const numHotSpots = 2 + Math.floor(Math.random() * 2);
     for (let spot = 0; spot < numHotSpots; spot++) {
       const hotSpotCenter = Math.floor(Math.random() * this.options.numLevels);
       const hotSpotRange = 1 + Math.floor(Math.random() * 3);
-      
+
       for (let j = 0; j < hotSpotRange && largeOrderIndices.size < numLargeOrders; j++) {
         const offset = Math.floor(Math.random() * hotSpotRange) - Math.floor(hotSpotRange / 2);
         const index = (hotSpotCenter + offset + this.options.numLevels) % this.options.numLevels;
         largeOrderIndices.add(index);
       }
     }
-    
+
     while (largeOrderIndices.size < numLargeOrders) {
       largeOrderIndices.add(Math.floor(Math.random() * this.options.numLevels));
     }
 
     for (let i = 0; i < this.options.numLevels; i++) {
       const p = startPrice + i * this.options.tickSize;
-      
+
       const distanceFromCenter = Math.abs(p - center);
       const base = Math.exp(-Math.pow(distanceFromCenter, 2) / (2 * sigma * sigma));
-      
+
       let volume = Math.round(base * (Math.random() * 2500 + 500));
-      
+
       if (largeOrderIndices.has(i)) {
         const distanceFactor = 1 - distanceFromCenter / (sigma * 3);
         const multiplier = this.options.largeOrderMultiplier * (0.7 + 0.3 * distanceFactor);
         volume = Math.round(volume * multiplier);
       }
-      
+
       volume = Math.max(1, volume);
       priceLevels.push({ price: parseFloat(p.toFixed(2)), volume });
     }
@@ -139,12 +147,20 @@ class KlineDataGenerator {
 
   static parseOptions(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    
+
     return {
-      numLevels: searchParams.get('numLevels') ? parseInt(searchParams.get('numLevels')!) : undefined,
-      tickSize: searchParams.get('tickSize') ? parseFloat(searchParams.get('tickSize')!) : undefined,
-      largeOrderRatio: searchParams.get('largeOrderRatio') ? parseFloat(searchParams.get('largeOrderRatio')!) : undefined,
-      largeOrderMultiplier: searchParams.get('largeOrderMultiplier') ? parseFloat(searchParams.get('largeOrderMultiplier')!) : undefined,
+      numLevels: searchParams.get('numLevels')
+        ? parseInt(searchParams.get('numLevels')!)
+        : undefined,
+      tickSize: searchParams.get('tickSize')
+        ? parseFloat(searchParams.get('tickSize')!)
+        : undefined,
+      largeOrderRatio: searchParams.get('largeOrderRatio')
+        ? parseFloat(searchParams.get('largeOrderRatio')!)
+        : undefined,
+      largeOrderMultiplier: searchParams.get('largeOrderMultiplier')
+        ? parseFloat(searchParams.get('largeOrderMultiplier')!)
+        : undefined,
     };
   }
 }
@@ -190,21 +206,21 @@ export async function GET(request: NextRequest) {
   // largeOrderMultiplier: 大单倍数，默认7.5，大单成交量是普通档位的倍数
   const options = KlineDataGenerator.parseOptions(request);
   const generator = new KlineDataGenerator(options);
-  
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       let isConnected = true;
-      
+
       const sendData = () => {
         if (!isConnected) return;
-        
+
         try {
           const klineData = generator.generateNext();
           const flatbuffersData = serializeKlineItem(klineData);
           const base64Data = btoa(String.fromCharCode(...flatbuffersData));
           const message = `data: ${base64Data}\n\n`;
-          
+
           controller.enqueue(encoder.encode(message));
         } catch (error) {
           console.error('生成数据时出错:', error);
@@ -212,9 +228,9 @@ export async function GET(request: NextRequest) {
           controller.close();
         }
       };
-      
+
       const intervalId = setInterval(sendData, 250);
-      
+
       request.signal.addEventListener('abort', () => {
         isConnected = false;
         if (intervalId) {
@@ -223,10 +239,10 @@ export async function GET(request: NextRequest) {
         controller.close();
       });
     },
-    
+
     cancel() {
       console.log('SSE连接已取消');
-    }
+    },
   });
 
   // 返回SSE流响应
@@ -236,7 +252,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Cache-Control',
     },

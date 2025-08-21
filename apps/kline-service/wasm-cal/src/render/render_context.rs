@@ -30,10 +30,13 @@ pub struct SharedRenderState {
     pub strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
     /// 鼠标状态（用于渲染器访问）
     pub mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
+    // 渲染模式
+    pub mode: Rc<RefCell<RenderMode>>,
 }
 
 impl SharedRenderState {
     /// 创建新的共享渲染状态
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         canvas_manager: Rc<RefCell<CanvasManager>>,
         data_manager: Rc<RefCell<DataManager>>,
@@ -42,6 +45,7 @@ impl SharedRenderState {
         config: Option<Rc<ChartConfig>>,
         strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
         mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
+        mode: Rc<RefCell<RenderMode>>,
     ) -> Self {
         Self {
             canvas_manager,
@@ -51,6 +55,7 @@ impl SharedRenderState {
             config,
             strategy_factory,
             mouse_state,
+            mode,
         }
     }
 }
@@ -103,10 +108,11 @@ impl UnifiedRenderContext {
 
     /// 从共享状态创建
     pub fn from_shared(shared: SharedRenderState) -> Self {
+        let mode = *shared.mode.borrow();
         Self {
             shared,
             ctx: None,
-            mode: RenderMode::Kmap,
+            mode,
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
         }
@@ -163,6 +169,36 @@ impl UnifiedRenderContext {
     /// 获取图表配置
     pub fn config_ref(&self) -> Option<Rc<ChartConfig>> {
         self.shared.config.clone()
+    }
+}
+
+impl Default for UnifiedRenderContext {
+    /// 创建用于测试的默认 UnifiedRenderContext
+    ///
+    /// 使用最小依赖的默认值初始化所有组件，主要用于单元测试场景。
+    /// 所有管理器使用默认实例，无 Canvas 上下文。
+    fn default() -> Self {
+        let shared_state = SharedRenderState::new(
+            Rc::new(RefCell::new(CanvasManager::new_uninitialized())),
+            Rc::new(RefCell::new(DataManager::default())),
+            Rc::new(RefCell::new(ChartLayout::new(
+                std::collections::HashMap::new(),
+                0,
+            ))),
+            Rc::new(ChartTheme::default()),
+            Some(Rc::new(ChartConfig::default())),
+            Rc::new(RefCell::new(RenderStrategyFactory::new())),
+            Rc::new(RefCell::new(MouseState::default())),
+            Rc::new(RefCell::new(RenderMode::Kmap)),
+        );
+
+        Self {
+            shared: shared_state,
+            ctx: None,
+            mode: RenderMode::Kmap,
+            timestamp: 0.0,
+            viewport: ViewportInfo::default(),
+        }
     }
 }
 

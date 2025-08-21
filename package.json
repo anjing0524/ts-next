@@ -24,8 +24,11 @@
     "e2e:ui": "turbo e2e:ui",
     "e2e:report": "turbo e2e:report",
     "start:e2e": "pnpm turbo run dev --parallel --filter=admin-portal --filter=oauth-service",
+    "dev:kline": "pnpm turbo run dev --parallel --filter=ws-kline-service --filter=kline-service",
     "test:e2e:admin": "start-server-and-test 'pnpm turbo dev --parallel --filter=admin-portal --filter=oauth-service' http://localhost:3002 'pnpm --filter=admin-portal test:e2e'",
-    "test:e2e:ci": "pnpm turbo build --filter=admin-portal --filter=oauth-service && start-server-and-test 'pnpm turbo start --parallel --filter=admin-portal --filter=oauth-service' http://localhost:3002 'pnpm --filter=admin-portal test:e2e:integration'"
+    "test:e2e:ci": "pnpm turbo build --filter=admin-portal --filter=oauth-service && start-server-and-test 'pnpm turbo start --parallel --filter=admin-portal --filter=oauth-service' http://localhost:3002 'pnpm --filter=admin-portal test:e2e:integration'",
+    "wasm:test": "cd apps/kline-service/wasm-cal && wasm-pack test --headless --chrome",
+    "wasm:build": "cd apps/kline-service/wasm-cal && wasm-pack build --target web --out-dir pkg"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",

@@ -26,6 +26,9 @@ WASM-CAL是基于WebAssembly和Rust的高性能K线图渲染引擎，依托WebAs
 - **价格线和成交量渲染器**（PriceRenderer + VolumeRenderer）
 - **性能监控与基准测试**（完整基准测试框架）
 
+### 参考架构文档（最新）
+- 《wasm-cal 渲染与事件流架构说明（2025-08-18）》<mcfile name="wasm-cal-render-events.md" path="/Users/liushuo/code/ts-next-template/apps/kline-service/wasm-cal/docs/architecture/wasm-cal-render-events.md"></mcfile>
+
 ## 架构设计
 
 ### 核心模块架构
@@ -140,6 +143,6 @@ wasm-pack build --target web --out-dir pkg --release
 - **集成测试**：WASM-JS互操作测试
 - **性能基准**：渲染性能监控
 
-_最后更新时间: 2025-07-30_
+_最后更新时间: 2025-08-18_
 _文档版本: v3.0_
 _状态: 已实现架构文档_

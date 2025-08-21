@@ -152,9 +152,17 @@ impl LineRenderer {
 }
 
 impl RenderStrategy for LineRenderer {
+    /// 执行主图层渲染（绘制价格线）
+    ///
+    /// 在 Main 层绘制各种价格线（last_price、bid_price、ask_price）。
+    /// 不进行任何清理动作，由 ChartRenderer 统一清理 Main 层。
+    ///
+    /// 返回：
+    /// - Ok(()) 正常完成渲染
+    /// - Err(RenderError) 当 Canvas 上下文获取失败等
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas = ctx.canvas_manager_ref();
-        let main_ctx = canvas.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
@@ -162,14 +170,17 @@ impl RenderStrategy for LineRenderer {
         Ok(())
     }
 
+    /// 声明该渲染器支持的渲染模式
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 指定渲染层为主图层（Main）
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Main
     }
 
+    /// 指定渲染优先级（数值越小优先级越高）
     fn get_priority(&self) -> u32 {
         25
     }

@@ -9,7 +9,7 @@ export default function DebugPage() {
     // 测试 Worker 创建
     try {
       console.log('Creating worker...');
-      const worker = new Worker(new URL('../(dashboard)/kline/kline.worker.ts', import.meta.url));
+      const worker = new Worker(new URL('../(dashboard)/kline/rendering.worker.ts', import.meta.url), { type: 'module' });
       console.log('Worker created successfully:', worker);
       
       worker.onerror = (error) => {

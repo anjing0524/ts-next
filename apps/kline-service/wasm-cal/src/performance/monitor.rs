@@ -26,6 +26,10 @@ pub struct PerformanceMonitor {
     /// 上一帧时间（不参与序列化）
     #[serde(skip)]
     last_frame_time: Option<Instant>,
+    /// 渲染次数统计
+    render_count: u32,
+    /// 总渲染时间（用于计算平均值）
+    total_render_time: f64,
 }
 
 #[wasm_bindgen]
@@ -39,6 +43,8 @@ impl PerformanceMonitor {
             memory_metrics: MemoryMetrics::default(),
             start_time: None,
             last_frame_time: None,
+            render_count: 0,
+            total_render_time: 0.0,
         }
     }
 
@@ -63,6 +69,10 @@ impl PerformanceMonitor {
             let elapsed = start.elapsed();
             self.frame_time_ms = elapsed.as_millis() as f64;
             self.last_frame_time = Some(Instant::now());
+
+            // 更新统计数据
+            self.render_count += 1;
+            self.total_render_time += self.frame_time_ms;
         }
 
         self.update_memory_metrics();
@@ -77,20 +87,33 @@ impl PerformanceMonitor {
         self.last_frame_time = None;
         self.frame_time_ms = 0.0;
         self.memory_metrics = MemoryMetrics::default();
+        self.render_count = 0;
+        self.total_render_time = 0.0;
     }
 
-    /// 获取性能统计信息（从KlineProcess迁移）
-    /// 返回JSON格式的性能指标
+    /// 获取完整的性能统计信息
+    /// 返回包含所有性能指标的JSON格式数据
     #[wasm_bindgen]
     pub fn get_performance_stats(&self) -> Result<String, JsValue> {
         if !self.enabled {
             return Err(JsValue::from_str("Performance monitor not enabled"));
         }
 
+        let avg_render_time = if self.render_count == 0 {
+            0.0
+        } else {
+            self.total_render_time / self.render_count as f64
+        };
+
         let metrics = serde_json::json!({
             "renderTime": self.frame_time_ms,
+            "avgRenderTime": avg_render_time,
+            "renderCount": self.render_count,
+            "totalRenderTime": self.total_render_time,
             "memoryUsage": self.get_memory_usage_mb(),
-            "memoryPercentage": self.get_memory_percentage()
+            "memoryPercentage": self.get_memory_percentage(),
+            "wasmMemoryUsage": self.get_wasm_memory_usage(),
+            "enabled": self.enabled
         });
 
         Ok(serde_json::to_string(&metrics).unwrap_or_else(|_| "{}".to_string()))
@@ -183,6 +206,14 @@ impl PerformanceMonitor {
 
 impl Default for PerformanceMonitor {
     fn default() -> Self {
-        Self::new()
+        Self {
+            enabled: true,
+            frame_time_ms: 0.0,
+            memory_metrics: MemoryMetrics::default(),
+            start_time: None,
+            last_frame_time: None,
+            render_count: 0,
+            total_render_time: 0.0,
+        }
     }
 }

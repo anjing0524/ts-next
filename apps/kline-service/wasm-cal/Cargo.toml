@@ -7,7 +7,7 @@ edition = "2024"
 default = []
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 web-sys = { version = "0.3.77", features = [

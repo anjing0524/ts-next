@@ -22,10 +22,23 @@ export class KlineProcess {
    */
   draw_all(): void;
   /**
-   * 处理实时数据更新
-   * 接收新的FlatBuffers数据，更新内部数据并重新渲染
+   * 追加K线数据（用于实时数据流）
    */
-  update_realtime_data(new_data: Uint8Array): void;
+  append_data(data: Uint8Array): void;
+  /**
+   * 获取最后处理的数据的序列号（当前实现为获取tick值）
+   */
+  get_last_sequence(): number;
+  /**
+   * 合并K线数据（用于数据补齐）
+   *
+   * 此方法接收一个FlatBuffers二进制数组，解析后与现有数据合并。
+   * 主要用于处理网络断连后，补充丢失的数据包。
+   *
+   * # 参数
+   * * `data` - 包含一条或多条K线数据的 `Uint8Array`
+   */
+  merge_data(data: Uint8Array): void;
   handle_mouse_move(x: number, y: number): void;
   get_cursor_style(x: number, y: number): string;
   handle_mouse_leave(): void;
@@ -65,8 +78,8 @@ export class PerformanceMonitor {
    */
   init_monitor(): void;
   /**
-   * 获取性能统计信息（从KlineProcess迁移）
-   * 返回JSON格式的性能指标
+   * 获取完整的性能统计信息
+   * 返回包含所有性能指标的JSON格式数据
    */
   get_performance_stats(): string;
 }
@@ -75,11 +88,20 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly start: () => void;
+  readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
+  readonly performancemonitor_new: () => number;
+  readonly performancemonitor_start_render_measurement: (a: number) => void;
+  readonly performancemonitor_end_render_measurement: (a: number) => void;
+  readonly performancemonitor_init_monitor: (a: number) => void;
+  readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
   readonly __wbg_klineprocess_free: (a: number, b: number) => void;
   readonly klineprocess_new: (a: number, b: number) => [number, number, number];
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
   readonly klineprocess_draw_all: (a: number) => [number, number];
-  readonly klineprocess_update_realtime_data: (a: number, b: number, c: number) => [number, number];
+  readonly klineprocess_append_data: (a: number, b: number, c: number) => [number, number];
+  readonly klineprocess_get_last_sequence: (a: number) => number;
+  readonly klineprocess_merge_data: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_move: (a: number, b: number, c: number) => void;
   readonly klineprocess_get_cursor_style: (a: number, b: number, c: number) => [number, number];
   readonly klineprocess_handle_mouse_leave: (a: number) => void;
@@ -92,13 +114,6 @@ export interface InitOutput {
   readonly klineprocess_update_config: (a: number, b: any) => [number, number];
   readonly klineprocess_get_config: (a: number) => [number, number, number];
   readonly klineprocess_get_theme: (a: number) => [number, number, number];
-  readonly start: () => void;
-  readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
-  readonly performancemonitor_new: () => number;
-  readonly performancemonitor_start_render_measurement: (a: number) => void;
-  readonly performancemonitor_end_render_measurement: (a: number) => void;
-  readonly performancemonitor_init_monitor: (a: number) => void;
-  readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;

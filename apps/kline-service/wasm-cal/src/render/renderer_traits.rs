@@ -1,5 +1,6 @@
 //! 渲染器trait定义 - 基于Rust trait的可扩展渲染架构
 
+use crate::canvas::CanvasLayerType;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::render_context::UnifiedRenderContext;
 use crate::utils::error::WasmCalError;
@@ -29,8 +30,8 @@ pub trait Renderer: std::fmt::Debug {
     }
 
     /// 获取渲染器支持的图层类型
-    fn layer_type(&self) -> CanvasLayer {
-        CanvasLayer::Main
+    fn layer_type(&self) -> CanvasLayerType {
+        CanvasLayerType::Main
     }
 
     /// 初始化渲染器
@@ -80,14 +81,6 @@ pub trait InteractiveRenderer: Renderer {
     fn is_point_in_interactive_area(&self, _x: f64, _y: f64, _context: &RenderContext) -> bool {
         false
     }
-}
-
-/// Canvas层枚举
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CanvasLayer {
-    Base,    // 静态背景层
-    Main,    // 数据渲染层
-    Overlay, // 交互覆盖层
 }
 
 /// 渲染优先级枚举

@@ -1,0 +1,84 @@
+name: Wasm Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/kline-service/wasm-cal/**'
+      - '!apps/kline-service/wasm-cal/docs/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/kline-service/wasm-cal/**'
+      - '!apps/kline-service/wasm-cal/docs/**'
+
+jobs:
+  wasm-test:
+    name: Run WASM Tests
+    runs-on: ubuntu-latest
+    
+    env:
+      CARGO_TERM_COLOR: always
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+      
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@wasm-pack
+      
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/kline-service/wasm-cal/target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+      
+      - name: Run wasm tests in Chrome headless
+        run: pnpm run wasm:test
+        working-directory: apps/kline-service
+        
+      - name: Build wasm module
+        run: pnpm run wasm:build
+        working-directory: apps/kline-service

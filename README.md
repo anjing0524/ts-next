@@ -116,6 +116,9 @@ pnpm --filter=pingora-proxy dev      # 反向代理 (6188)
 
 # 仅启动认证相关服务 (推荐)
 pnpm start:e2e  # 并行启动 admin-portal 与 oauth-service
+
+# 启动K线图相关服务 (ws-kline-service 和 kline-service)
+pnpm dev:kline
 ```
 
 ### 6. 访问系统

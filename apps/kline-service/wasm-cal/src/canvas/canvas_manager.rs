@@ -22,6 +22,9 @@ pub struct CanvasManager {
 
 impl CanvasManager {
     /// 创建一个未初始化的Canvas管理器
+    ///
+    /// 使用场景：当还无法立即获取到 OffscreenCanvas 上下文时，可以先创建占位的管理器。
+    /// 后续通过 new(...) 进行完整初始化。
     pub fn new_uninitialized() -> Self {
         Self {
             base_ctx: None,
@@ -34,6 +37,12 @@ impl CanvasManager {
     }
 
     /// 创建Canvas管理器
+    ///
+    /// 参数：
+    /// - base_canvas: 底层 OffscreenCanvas
+    /// - main_canvas: 主渲染 OffscreenCanvas
+    /// - overlay_canvas: 交互覆盖 OffscreenCanvas
+    /// 返回：初始化完成的 CanvasManager 或 WasmCalError 错误
     pub fn new(
         base_canvas: &OffscreenCanvas,
         main_canvas: &OffscreenCanvas,
@@ -55,15 +64,25 @@ impl CanvasManager {
         })
     }
 
-    /// 获取指定层的Canvas上下文
-    pub fn get_context(&self, layer_type: CanvasLayerType) -> &OffscreenCanvasRenderingContext2d {
-        let ctx = match layer_type {
+    /// 获取指定层的Canvas上下文（不可变引用）
+    ///
+    /// 设计理念：统一错误处理，避免在渲染流程中触发 panic。
+    /// 使用说明：请使用 `?` 或 `match` 处理返回的 Result，确保在未初始化时提供清晰的错误信息。
+    /// 参数：
+    /// - layer_type: 目标层类型（Base/Main/Overlay）
+    /// 返回：对应层的 OffscreenCanvasRenderingContext2d 引用，或 WasmCalError
+    pub fn get_context(
+        &self,
+        layer_type: CanvasLayerType,
+    ) -> Result<&OffscreenCanvasRenderingContext2d, WasmCalError> {
+        let ctx_opt = match layer_type {
             CanvasLayerType::Base => &self.base_ctx,
             CanvasLayerType::Main => &self.main_ctx,
             CanvasLayerType::Overlay => &self.overlay_ctx,
         };
-        ctx.as_ref()
-            .expect("Canvas context should be initialized before rendering")
+        ctx_opt.as_ref().ok_or_else(|| {
+            WasmCalError::canvas("Canvas上下文未初始化，请先调用 set_canvases 进行初始化")
+        })
     }
 
     /// 检查指定层是否需要重绘

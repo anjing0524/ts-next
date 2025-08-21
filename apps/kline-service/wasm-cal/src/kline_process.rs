@@ -80,44 +80,88 @@ impl KlineProcess {
         }
     }
 
-    /// 处理实时数据更新
-    /// 接收新的FlatBuffers数据，更新内部数据并重新渲染
+    /// 追加K线数据（用于实时数据流）
     #[wasm_bindgen]
-    pub fn update_realtime_data(&mut self, new_data: Vec<u8>) -> Result<(), JsValue> {
-        // 验证新数据
-        Self::verify_kline_data_slice(&new_data)?;
-        let kline_data = root_as_kline_data(&new_data)
-            .map_err(|e| WasmCalError::other(format!("Flatbuffer 解析失败: {e}")))?;
+    pub fn append_data(&mut self, data: Vec<u8>) -> Result<(), JsValue> {
+        Self::verify_kline_data_slice(&data)?;
+        let kline_data = root_as_kline_data(&data)
+            .map_err(|e| WasmCalError::other(format!("Flatbuffer a解析失败: {e}")))?;
 
         if let Some(renderer) = &mut self.chart_renderer {
-            let shared_state = renderer.get_shared_state();
-            let mut data_manager = shared_state.data_manager.borrow_mut();
-
-            // 遍历新数据并追加
-            if let Some(items) = kline_data.items() {
-                for item_ref in items {
-                    let owned_item = KlineItemOwned::from(&item_ref);
-                    data_manager.append_item(owned_item);
-                }
-            }
-
-            // 数据追加后，需要重新计算数据范围并重绘
-            data_manager.calculate_data_ranges();
-            drop(data_manager); // 释放借用
-
-            // 标记所有图层需要重绘
-            renderer
-                .get_shared_state()
-                .canvas_manager
-                .borrow_mut()
-                .set_all_dirty();
-
-            // 重新绘制
-            self.performance_monitor
-                .measure_render_performance("realtime_update", || {
-                    let _ = renderer.render();
+            let items_to_append: Vec<KlineItemOwned> =
+                kline_data.items().map_or_else(Vec::new, |items| {
+                    items
+                        .iter()
+                        .map(|item_ref| KlineItemOwned::from(&item_ref))
+                        .collect()
                 });
 
+            if !items_to_append.is_empty() {
+                let shared_state = renderer.get_shared_state();
+                let mut data_manager = shared_state.data_manager.borrow_mut();
+                let mut items_added = 0;
+                for item in items_to_append {
+                    if data_manager.append_item(item) {
+                        items_added += 1;
+                    }
+                }
+
+                if items_added > 0 {
+                    drop(data_manager); // 释放借用
+                    renderer.handle_layout_change(); // 触发完整的重绘
+                }
+            }
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Chart renderer not initialized"))
+        }
+    }
+
+    /// 获取最后处理的数据的序列号（当前实现为获取tick值）
+    #[wasm_bindgen]
+    pub fn get_last_sequence(&self) -> f64 {
+        if let Some(renderer) = &self.chart_renderer {
+            let shared_state = renderer.get_shared_state();
+            let data_manager = shared_state.data_manager.borrow();
+            data_manager.get_tick()
+        } else {
+            -1.0
+        }
+    }
+
+    /// 合并K线数据（用于数据补齐）
+    ///
+    /// 此方法接收一个FlatBuffers二进制数组，解析后与现有数据合并。
+    /// 主要用于处理网络断连后，补充丢失的数据包。
+    ///
+    /// # 参数
+    /// * `data` - 包含一条或多条K线数据的 `Uint8Array`
+    #[wasm_bindgen]
+    pub fn merge_data(&mut self, data: Vec<u8>) -> Result<(), JsValue> {
+        Self::verify_kline_data_slice(&data)?;
+        let kline_data = root_as_kline_data(&data)
+            .map_err(|e| WasmCalError::other(format!("Flatbuffer a解析失败: {e}")))?;
+
+        if let Some(renderer) = &mut self.chart_renderer {
+            let items_to_merge: Vec<KlineItemOwned> =
+                kline_data.items().map_or_else(Vec::new, |items| {
+                    items
+                        .iter()
+                        .map(|item_ref| KlineItemOwned::from(&item_ref))
+                        .collect()
+                });
+
+            if !items_to_merge.is_empty() {
+                let shared_state = renderer.get_shared_state();
+                let mut data_manager = shared_state.data_manager.borrow_mut();
+                let merged_count = data_manager.merge_items(items_to_merge);
+
+                if merged_count > 0 {
+                    // 数据已合并且排序，需要完全重新计算布局和数据范围
+                    drop(data_manager); // 释放借用
+                    renderer.handle_layout_change(); // 触发完整的重绘
+                }
+            }
             Ok(())
         } else {
             Err(JsValue::from_str("Chart renderer not initialized"))
@@ -196,9 +240,7 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn get_cursor_style(&self, x: f64, y: f64) -> String {
         if let Some(cm) = &self.command_manager {
-            if let Some(style) = cm.get_cursor_style_at(x, y) {
-                return style.to_string();
-            }
+            return cm.get_cursor_style_at(x, y).to_string();
         }
         "default".to_string()
     }
@@ -286,7 +328,7 @@ impl KlineProcess {
     #[wasm_bindgen]
     pub fn get_config(&self) -> Result<JsValue, JsValue> {
         crate::serde_wasm_bindgen::to_value(&self.config_manager.config)
-            .map_err(|e| JsValue::from_str(&format!("配置序列化失败: {}", e)))
+            .map_err(|e| JsValue::from_str(&format!("主题序列化失败: {}", e)))
     }
 
     #[wasm_bindgen]

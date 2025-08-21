@@ -3,6 +3,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
 use crate::layout::PaneId;
+use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -115,9 +116,15 @@ impl HeaderRenderer {
 }
 
 impl RenderStrategy for HeaderRenderer {
+    /// 执行基础层渲染（标题与图例）
+    ///
+    /// 在 Base 层绘制标题与图例信息，不进行任何清理动作（交由 ChartRenderer 统一处理）。
+    /// 返回：
+    /// - Ok(()) 正常完成渲染
+    /// - Err(RenderError) 当 Canvas 上下文获取失败等
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_manager = ctx.canvas_manager_ref();
-        let base_ctx = canvas_manager.get_context(CanvasLayerType::Base);
+        let base_ctx = canvas_manager.get_context(CanvasLayerType::Base)?;
         let layout = ctx.layout_ref();
         let theme = ctx.theme_ref();
 
@@ -130,26 +137,32 @@ impl RenderStrategy for HeaderRenderer {
         Ok(())
     }
 
-    fn supports_mode(&self, _mode: crate::render::chart_renderer::RenderMode) -> bool {
+    /// 声明该渲染器支持的渲染模式
+    fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 指定渲染层为基础层（Base）
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Base
     }
 
+    /// 指定渲染优先级（数值越小优先级越高）
     fn get_priority(&self) -> u32 {
         10 // 高优先级，确保最先渲染
     }
 
+    /// 处理鼠标按下事件（无交互）
     fn handle_mouse_down(&mut self, _x: f64, _y: f64, _ctx: &RenderContext) -> bool {
         false
     }
 
+    /// 处理鼠标抬起事件（无交互）
     fn handle_mouse_up(&mut self, _x: f64, _y: f64, _ctx: &RenderContext) -> bool {
         false
     }
 
+    /// 处理鼠标拖动事件（无交互）
     fn handle_mouse_drag(
         &mut self,
         _x: f64,
@@ -159,10 +172,12 @@ impl RenderStrategy for HeaderRenderer {
         crate::render::datazoom_renderer::DragResult::None
     }
 
+    /// 处理鼠标离开事件（无交互）
     fn handle_mouse_leave(&mut self, _ctx: &RenderContext) -> bool {
         false
     }
 
+    /// 根据坐标返回光标样式（无变化）
     fn get_cursor_style(&self, _x: f64, _y: f64, _ctx: &RenderContext) -> CursorStyle {
         CursorStyle::Default
     }

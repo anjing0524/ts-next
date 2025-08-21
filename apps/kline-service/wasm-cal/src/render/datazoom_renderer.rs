@@ -347,26 +347,36 @@ impl DataZoomRenderer {
 }
 
 impl RenderStrategy for DataZoomRenderer {
+    /// 执行数据区域缩放渲染
+    ///
+    /// 清理策略：
+    /// - 清理导航器区域及周边padding区域
+    /// - 避免与 OverlayRenderer 清理策略冲突
+    ///
+    /// 绘制内容：
+    /// - 导航器背景
+    /// - 成交量缩略图
+    /// - 可见范围指示器（包含拖拽手柄）
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
-        // 确认渲染器被调用
-
         let canvas_manager = ctx.canvas_manager_ref();
-        let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay);
+        let overlay_ctx = canvas_manager.get_context(CanvasLayerType::Overlay)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
-        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
-        // 调试输出：打印NavigatorContainer和HeatmapArea的矩形坐标
-        let _heatmap_rect = layout.get_rect(&PaneId::HeatmapArea);
-
-        let clear_padding = 20.0;
+        // 使用 "NavigatorWrapper" 获取包含导航器和右侧空白的完整矩形进行清理
+        // 这是为了解决右侧空白区域渲染残留的问题
+        let nav_wrapper_rect = layout.get_rect(&PaneId::Custom("NavigatorWrapper".to_string()));
+        let padding = 10.0; // 10 pixels of padding
         overlay_ctx.clear_rect(
-            nav_rect.x - clear_padding,
-            nav_rect.y - clear_padding,
-            nav_rect.width + clear_padding * 2.0,
-            nav_rect.height + clear_padding * 2.0,
+            nav_wrapper_rect.x - padding,
+            nav_wrapper_rect.y,
+            nav_wrapper_rect.width + padding * 2.0,
+            nav_wrapper_rect.height,
         );
+
+        // 后续所有的绘制操作，仍然基于 NavigatorContainer 的精确矩形
+        let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
 
         overlay_ctx.set_fill_style_str(&theme.navigator_bg);
         overlay_ctx.fill_rect(nav_rect.x, nav_rect.y, nav_rect.width, nav_rect.height);
@@ -379,34 +389,61 @@ impl RenderStrategy for DataZoomRenderer {
         Ok(())
     }
 
+    /// 声明该渲染器支持的渲染模式
+    ///
+    /// DataZoom 导航器支持所有渲染模式（K线图、热图等）
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
+
+    /// 指定渲染层为叠加层（Overlay）
+    ///
+    /// DataZoom 在叠加层渲染，与 OverlayRenderer 共享层级但渲染不同区域
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Overlay
     }
+
+    /// 指定渲染优先级（数值越小优先级越高）
+    ///
+    /// 优先级低于 OverlayRenderer（90），确保导航器在十字线等交互元素之前渲染
     fn get_priority(&self) -> u32 {
         100
     }
 
+    /// 处理鼠标按下事件（转发到结构体自身的方法）
+    ///
+    /// 使用 UFCS 语法避免与 trait 方法同名导致的递归调用
     fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
-        self.handle_mouse_down(x, y, ctx)
+        // 使用 UFCS 语法避免与 trait 方法同名导致的递归调用
+        DataZoomRenderer::handle_mouse_down(self, x, y, ctx)
     }
 
+    /// 处理鼠标抬起事件（转发到结构体自身的方法）
+    ///
+    /// 完成拖拽操作，更新拖拽状态
     fn handle_mouse_up(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
         self.handle_mouse_up(x, y, ctx)
     }
 
+    /// 处理鼠标拖动事件（转发到结构体自身的方法）
+    ///
+    /// 根据拖拽手柄类型更新可见范围，并返回拖拽结果状态
     fn handle_mouse_drag(&mut self, x: f64, _y: f64, ctx: &RenderContext) -> DragResult {
         self.handle_mouse_drag(x, ctx)
     }
 
+    /// 处理鼠标离开事件
+    ///
+    /// 重置拖拽状态，结束当前的拖拽操作
     fn handle_mouse_leave(&mut self, _ctx: &RenderContext) -> bool {
         self.drag_state.is_dragging = false;
         self.drag_state.drag_handle_type = DragHandleType::None;
         true
     }
 
+    /// 处理滚轮缩放事件
+    ///
+    /// 在导航器区域内响应滚轮事件，实现可见范围的缩放操作
     fn handle_wheel(&mut self, x: f64, y: f64, delta: f64, ctx: &RenderContext) -> bool {
         let layout = ctx.layout_ref();
         let nav_rect = layout.get_rect(&PaneId::NavigatorContainer);
@@ -449,8 +486,7 @@ impl RenderStrategy for DataZoomRenderer {
             .max(0)
             .min((items_len - new_visible_count) as isize) as usize;
 
-        data_manager.update_visible_range(new_start, new_visible_count);
-        true
+        data_manager.update_visible_range(new_start, new_visible_count)
     }
 
     fn get_cursor_style(&self, x: f64, y: f64, ctx: &RenderContext) -> CursorStyle {
@@ -476,6 +512,9 @@ impl RenderStrategy for DataZoomRenderer {
         }
     }
 
+    /// 获取当前拖拽状态
+    ///
+    /// 返回当前拖拽状态的副本，用于外部查询拖拽相关信息
     fn get_drag_state(&self) -> DragState {
         self.drag_state
     }

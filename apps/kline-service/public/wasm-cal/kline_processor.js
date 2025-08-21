@@ -167,11 +167,8 @@ function debugString(val) {
     return className;
 }
 
-function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
+export function start() {
+    wasm.start();
 }
 
 function takeFromExternrefTable0(idx) {
@@ -180,8 +177,11 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 
-export function start() {
-    wasm.start();
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 const KlineProcessFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -243,14 +243,39 @@ export class KlineProcess {
         }
     }
     /**
-     * 处理实时数据更新
-     * 接收新的FlatBuffers数据，更新内部数据并重新渲染
-     * @param {Uint8Array} new_data
+     * 追加K线数据（用于实时数据流）
+     * @param {Uint8Array} data
      */
-    update_realtime_data(new_data) {
-        const ptr0 = passArray8ToWasm0(new_data, wasm.__wbindgen_malloc);
+    append_data(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.klineprocess_update_realtime_data(this.__wbg_ptr, ptr0, len0);
+        const ret = wasm.klineprocess_append_data(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * 获取最后处理的数据的序列号（当前实现为获取tick值）
+     * @returns {number}
+     */
+    get_last_sequence() {
+        const ret = wasm.klineprocess_get_last_sequence(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 合并K线数据（用于数据补齐）
+     *
+     * 此方法接收一个FlatBuffers二进制数组，解析后与现有数据合并。
+     * 主要用于处理网络断连后，补充丢失的数据包。
+     *
+     * # 参数
+     * * `data` - 包含一条或多条K线数据的 `Uint8Array`
+     * @param {Uint8Array} data
+     */
+    merge_data(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_merge_data(this.__wbg_ptr, ptr0, len0);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -415,8 +440,8 @@ export class PerformanceMonitor {
         wasm.performancemonitor_init_monitor(this.__wbg_ptr);
     }
     /**
-     * 获取性能统计信息（从KlineProcess迁移）
-     * 返回JSON格式的性能指标
+     * 获取完整的性能统计信息
+     * 返回包含所有性能指标的JSON格式数据
      * @returns {string}
      */
     get_performance_stats() {

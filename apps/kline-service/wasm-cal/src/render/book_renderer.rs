@@ -6,6 +6,7 @@ use crate::data::DataManager;
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
+use crate::utils::calculate_optimal_tick;
 use std::cell::Cell;
 use std::cell::RefCell;
 use web_sys::OffscreenCanvasRenderingContext2d;
@@ -55,6 +56,16 @@ impl BookRenderer {
             return;
         }
 
+        // 先获取布局信息和 tick 计算，这样缓存计算和渲染都使用相同的参数
+        let book_rect = layout.get_rect(&PaneId::OrderBook);
+        let (min_low, max_high) = data_manager.get_full_data_range();
+        let base_tick = data_manager.get_tick();
+        let adjusted_tick = calculate_optimal_tick(base_tick, min_low, max_high, book_rect.height);
+
+        if adjusted_tick <= 0.0 || min_low >= max_high {
+            return;
+        }
+
         // 检查是否需要重新计算缓存
         let needs_recalculation = {
             let hover_changed = self.cached_hover_index.get() != hover_index;
@@ -79,13 +90,7 @@ impl BookRenderer {
                 None => return,
             };
 
-            let (min_low, max_high, _) = data_manager.get_cached_cal();
-            let tick = data_manager.get_tick();
-            if tick <= 0.0 || min_low >= max_high {
-                return;
-            }
-
-            let num_bins = ((max_high - min_low) / tick).ceil() as usize;
+            let num_bins = ((max_high - min_low) / adjusted_tick).ceil() as usize;
             if num_bins == 0 {
                 return;
             }
@@ -94,7 +99,7 @@ impl BookRenderer {
             let mut max_volume = 0.0f64;
             for pv in volumes {
                 if pv.price() >= min_low && pv.price() < max_high {
-                    let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
+                    let bin_idx = ((pv.price() - min_low) / adjusted_tick).floor() as usize;
                     if bin_idx < num_bins {
                         bins[bin_idx] += pv.volume();
                         max_volume = max_volume.max(bins[bin_idx]);
@@ -128,26 +133,19 @@ impl BookRenderer {
             }
         };
 
-        let book_rect = layout.get_rect(&PaneId::OrderBook);
-        let price_rect = layout.get_rect(&PaneId::HeatmapArea);
-        let (min_low, max_high, _) = data_manager.get_cached_cal();
-        let tick = data_manager.get_tick();
-
-        let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 0.0);
+        let y_mapper = CoordinateMapper::new_for_y_axis(book_rect, min_low, max_high, 0.0);
 
         self.clear_area(ctx, layout);
-
-        let book_top_price = max_high;
-        let book_bottom_price = min_low;
 
         for (bin_idx, &volume) in bins.iter().enumerate() {
             if volume <= 0.0 {
                 continue;
             }
 
-            let price = min_low + bin_idx as f64 * tick;
+            let price_low = min_low + bin_idx as f64 * adjusted_tick;
+            let price_high = price_low + adjusted_tick;
 
-            if price < book_bottom_price || price > book_top_price {
+            if price_low < min_low || price_high > max_high {
                 continue;
             }
 
@@ -157,33 +155,20 @@ impl BookRenderer {
             };
             let last_price = item.last_price();
 
-            let y_in_price_chart = y_mapper.map_y(price);
-            let price_rect_height = price_rect.height;
-            let book_rect_height = book_rect.height;
-            let relative_y = (y_in_price_chart - price_rect.y) / price_rect_height;
-            let y_in_book = book_rect.y + relative_y * book_rect_height;
+            let y_top = y_mapper.map_y(price_high);
+            let y_bottom = y_mapper.map_y(price_low);
+            let bar_height = (y_bottom - y_top).max(1.0);
 
-            let next_y_in_price_chart = y_mapper.map_y(price + tick);
-            let bar_height_in_price = (next_y_in_price_chart - y_in_price_chart).abs();
-            let bar_height = (bar_height_in_price / price_rect_height) * book_rect_height;
-
-            let draw_y = y_in_book.max(book_rect.y);
-            let draw_height = if draw_y + bar_height > book_rect.y + book_rect.height {
-                book_rect.y + book_rect.height - draw_y
-            } else {
-                bar_height
-            };
-
-            if draw_height > 0.0 {
+            if bar_height > 0.0 {
                 self.draw_level(
                     ctx,
                     book_rect.x,
                     book_rect.width,
-                    draw_height,
-                    draw_y,
+                    bar_height,
+                    y_top,
                     volume,
                     max_volume,
-                    price > last_price,
+                    price_low > last_price,
                     theme,
                 );
             }
@@ -228,9 +213,17 @@ impl BookRenderer {
 }
 
 impl RenderStrategy for BookRenderer {
+    /// 执行订单簿渲染
+    ///
+    /// 参数：
+    /// - ctx: 统一渲染上下文，提供 Canvas、主题、布局与数据访问
+    ///
+    /// 返回：
+    /// - Ok(()) 正常完成渲染
+    /// - Err(RenderError) 当 Canvas 上下文获取失败或其他渲染错误
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_manager = ctx.canvas_manager_ref();
-        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
@@ -239,14 +232,17 @@ impl RenderStrategy for BookRenderer {
         Ok(())
     }
 
+    /// 声明该渲染器支持的渲染模式
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 指定渲染层为主图层
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Main
     }
 
+    /// 指定渲染优先级（数值越小优先级越高）
     fn get_priority(&self) -> u32 {
         30
     }

@@ -1,0 +1,66 @@
+# ZMQ Log Server Configuration
+
+[server]
+# Server configuration
+name = "zmq-log-server"
+version = "0.1.0"
+log_level = "info"
+
+[zmq]
+# ZMQ server configuration
+bind_address = "tcp://0.0.0.0"
+port = 5555
+socket_type = "PULL"
+io_threads = 1
+high_watermark = 1000
+recv_timeout = 1000
+enable_heartbeat = true
+heartbeat_interval = 5000
+
+[storage]
+# Storage configuration
+log_dir = "./logs"
+max_file_size = 104857600  # 100MB
+max_files = 30
+enable_compression = true
+compression_algorithm = "zstd"
+enable_rotation = true
+rotation_strategy = "daily"
+write_buffer_size = 8192
+flush_interval = 1000
+
+[processor]
+# Log processor configuration
+enable_batch = true
+batch_size = 100
+batch_timeout = 100
+enable_filter = false
+enable_transform = false
+enable_validation = true
+enable_sampling = false
+sample_rate = 1.0
+worker_threads = 4
+queue_size = 10000
+
+[http]
+# HTTP API configuration
+bind_address = "127.0.0.1"
+port = 3005
+enable_https = false
+max_request_size = 1048576  # 1MB
+request_timeout = 30000
+enable_cors = true
+cors_origins = ["*"]
+enable_metrics = true
+enable_health_check = true
+
+[metrics]
+# Metrics configuration
+enable_metrics = true
+collection_interval = 10
+enable_prometheus = true
+prometheus_bind_address = "0.0.0.0"
+prometheus_port = 9090
+enable_system_metrics = true
+enable_app_metrics = true
+retention_period = 24

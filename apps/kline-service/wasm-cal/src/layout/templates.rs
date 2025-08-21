@@ -28,6 +28,11 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                 id: PaneId::Header,
                 constraint: Constraint::Fixed(25.0),
             },
+            // 添加一个5px的垂直间距
+            LayoutNode::Pane {
+                id: PaneId::Custom("HeaderSpacer".to_string()),
+                constraint: Constraint::Fixed(5.0),
+            },
             // 中间主内容区: 填充剩余空间
             LayoutNode::HBox {
                 id: PaneId::MainContent,

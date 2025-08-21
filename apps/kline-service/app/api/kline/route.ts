@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as flatbuffers from 'flatbuffers';
-import * as Kline from '@/generated/kline';
+import * as Kline from '@repo/flatbuffers-kline';
 
 // 扩展类型定义，包含买卖成交量和价格订单量
 type KlineItem = {

@@ -9,6 +9,8 @@ use super::model::{KlineItemOwned, KlineItemRef};
 use crate::data::visible_range::{DataRange, VisibleRange};
 use crate::kline_generated::kline::{self};
 use crate::layout::ChartLayout;
+use std::collections::HashMap;
+use web_time::Instant;
 
 /// 数据管理器
 ///
@@ -37,6 +39,10 @@ pub struct DataManager {
     /// 缓存的可见区域数据范围（最高价、最低价、最大成交量）。
     /// `None`表示缓存无效，需要重新计算。
     cached_data_range: Option<DataRange>,
+
+    /// 时间戳索引，用于快速查找和去重
+    /// key: timestamp, value: index in incremental_data
+    timestamp_index: HashMap<i32, usize>,
 }
 
 impl Default for DataManager {
@@ -56,6 +62,7 @@ impl DataManager {
             tick: 0.01,
             visible_range: VisibleRange::new(0, 0, 0),
             cached_data_range: None,
+            timestamp_index: HashMap::new(),
         }
     }
 
@@ -66,6 +73,7 @@ impl DataManager {
     pub fn set_initial_data(&mut self, buffer: Vec<u8>) {
         self.invalidate_cache();
         self.incremental_data.clear(); // 清除任何旧的增量数据
+        self.timestamp_index.clear(); // 清除时间戳索引
 
         // 安全性检查：确保传入的buffer是有效的KlineData
         if let Ok(kline_data) = kline::root_as_kline_data(&buffer) {
@@ -101,11 +109,74 @@ impl DataManager {
         self.visible_range.update_total_len(self.len());
     }
 
-    /// 追加一条新的K线数据。
-    pub fn append_item(&mut self, item: KlineItemOwned) {
-        self.invalidate_cache();
+    /// 追加一条新的K线数据（带去重功能）
+    /// 返回是否实际添加了新数据
+    pub fn append_item(&mut self, item: KlineItemOwned) -> bool {
+        let _start_time = Instant::now();
+        let timestamp = item.timestamp;
+
+        // 检查是否已存在相同时间戳的数据
+        if let Some(&existing_index) = self.timestamp_index.get(&timestamp) {
+            // 更新现有数据而不是添加重复数据
+            if existing_index < self.incremental_data.len() {
+                self.incremental_data[existing_index] = item;
+                self.invalidate_cache();
+                return false; // 没有添加新数据
+            }
+        }
+
+        // 添加新数据
+        let new_index = self.incremental_data.len();
         self.incremental_data.push(item);
+        self.timestamp_index.insert(timestamp, new_index);
+
+        self.invalidate_cache();
         self.visible_range.update_total_len(self.len());
+
+        true // 成功添加新数据
+    }
+
+    /// 合并一批新的K线数据项，并保持排序。
+    ///
+    /// 此方法用于处理数据补齐或乱序的场景。
+    /// 它会合并新数据和现有增量数据，然后按时间戳排序。
+    ///
+    /// # 参数
+    /// * `items_to_merge` - 一个包含 `KlineItemOwned` 的向量，代表需要合并的数据。
+    ///
+    /// # 返回
+    /// * `usize` - 成功合并的新数据项数量。
+    pub fn merge_items(&mut self, items_to_merge: Vec<KlineItemOwned>) -> usize {
+        let mut new_items_count = 0;
+        let mut needs_resort = false;
+
+        for item in items_to_merge {
+            let timestamp = item.timestamp;
+            if !self.timestamp_index.contains_key(&timestamp) {
+                // 只有当时间戳不存在时才添加
+                self.incremental_data.push(item);
+                // 标记需要重新排序
+                needs_resort = true;
+                new_items_count += 1;
+            }
+        }
+
+        if needs_resort {
+            // 如果添加了新数据，则对增量数据部分进行排序
+            self.incremental_data.sort_by_key(|item| item.timestamp);
+
+            // 排序后，必须重建时间戳索引
+            self.timestamp_index.clear();
+            for (index, item) in self.incremental_data.iter().enumerate() {
+                self.timestamp_index.insert(item.timestamp, index);
+            }
+
+            // 数据结构发生变化，必须使缓存失效
+            self.invalidate_cache();
+            self.visible_range.update_total_len(self.len());
+        }
+
+        new_items_count
     }
 
     /// 获取指定索引的K线数据项的统一视图。
@@ -156,9 +227,12 @@ impl DataManager {
     }
 
     /// 更新可见范围。
-    pub fn update_visible_range(&mut self, start: usize, count: usize) {
+    pub fn update_visible_range(&mut self, start: usize, count: usize) -> bool {
         if self.visible_range.update(start, count) {
             self.invalidate_cache();
+            true
+        } else {
+            false
         }
     }
 
@@ -237,6 +311,28 @@ impl DataManager {
     pub fn get_tick(&self) -> f64 {
         self.tick
     }
+
+    pub fn get_full_data_range(&self) -> (f64, f64) {
+        if self.len() == 0 {
+            return (0.0, 0.0);
+        }
+
+        let (min_low, max_high, _) = (0..self.len()).fold(
+            (f64::MAX, f64::MIN, 0.0_f64),
+            |(min_low, max_high, max_volume), idx| {
+                if let Some(item) = self.get(idx) {
+                    let low = item.low();
+                    let high = item.high();
+                    let volume = item.b_vol() + item.s_vol();
+                    (min_low.min(low), max_high.max(high), max_volume.max(volume))
+                } else {
+                    (min_low, max_high, max_volume)
+                }
+            },
+        );
+
+        (min_low, max_high)
+    }
 }
 
 /// 自定义Clone实现，因为parsed_data字段包含不可克隆的类型
@@ -263,6 +359,7 @@ impl Clone for DataManager {
             tick: self.tick,
             visible_range: self.visible_range,
             cached_data_range: self.cached_data_range,
+            timestamp_index: self.timestamp_index.clone(),
         }
     }
 }

@@ -255,6 +255,9 @@ importers:
 
   apps/kline-service:
     dependencies:
+      '@repo/flatbuffers-kline':
+        specifier: workspace:*
+        version: link:../../packages/flatbuffers-kline
       '@repo/lib':
         specifier: workspace:*
         version: link:../../packages/lib
@@ -505,6 +508,37 @@ importers:
         specifier: ^5.9.2
         version: 5.9.2
 
+  apps/ws-kline-service:
+    dependencies:
+      '@repo/flatbuffers-kline':
+        specifier: workspace:*
+        version: link:../../packages/flatbuffers-kline
+      flatbuffers:
+        specifier: ^25.2.10
+        version: 25.2.10
+      uWebSockets.js:
+        specifier: uNetworking/uWebSockets.js#v20.47.0
+        version: https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/6f4b450fc642abba540535f0755c990b42a16026
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^20.19.1
+        version: 20.19.7
+      eslint:
+        specifier: ^9
+        version: 9.32.0(jiti@2.4.2)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.3
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   packages/cache:
     dependencies:
       ioredis:
@@ -592,6 +626,19 @@ importers:
         specifier: ^2.29.0
         version: 2.32.0(@typescript-eslint/parser@8.36.0(eslint@9.30.1(jiti@2.4.2))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1)(eslint@9.30.1(jiti@2.4.2))
 
+  packages/flatbuffers-kline:
+    dependencies:
+      flatbuffers:
+        specifier: ^25.2.10
+        version: 25.2.10
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.2
+
   packages/jest-config:
     dependencies:
       '@jest/types':
@@ -622,9 +669,6 @@ importers:
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
-      crypto:
-        specifier: ^1.0.1
-        version: 1.0.1
       ioredis:
         specifier: ^5.6.1
         version: 5.6.1
@@ -4154,10 +4198,6 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  crypto@1.0.1:
-    resolution: {integrity: sha512-VxBKmeNcqQdiUQUW2Tzq0t377b54N2bMtXO/qiLa+6eRRmmC4qT3D4OnTGoT/U6O9aklQ/jTwbOtRMTTY8G0Ig==}
-    deprecated: This package is no longer supported. It's now a built-in Node module. If you've depended on crypto, you should switch to the one that's built-in.
-
   css.escape@1.5.1:
     resolution: {integrity: sha512-YUifsXXuknHlUsmlgyY0PKzgPOr7/FjCePfHNt0jxm83wHZi44VDMQ7/fGNkjY3/jV1MC+1CmZbaHzugyeRtpg==}
 
@@ -7027,6 +7067,10 @@ packages:
     resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
     engines: {node: '>=14.17'}
     hasBin: true
+
+  uWebSockets.js@https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/6f4b450fc642abba540535f0755c990b42a16026:
+    resolution: {tarball: https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/6f4b450fc642abba540535f0755c990b42a16026}
+    version: 20.47.0
 
   unbox-primitive@1.1.0:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
@@ -10940,8 +10984,6 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  crypto@1.0.1: {}
-
   css.escape@1.5.1: {}
 
   cssstyle@4.6.0:
@@ -14579,6 +14621,8 @@ snapshots:
       reflect.getprototypeof: 1.0.10
 
   typescript@5.9.2: {}
+
+  uWebSockets.js@https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/6f4b450fc642abba540535f0755c990b42a16026: {}
 
   unbox-primitive@1.1.0:
     dependencies:

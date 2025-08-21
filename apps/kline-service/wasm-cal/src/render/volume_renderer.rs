@@ -71,9 +71,17 @@ impl VolumeRenderer {
 }
 
 impl RenderStrategy for VolumeRenderer {
+    /// 渲染成交量柱状图到 Main 画布层
+    ///
+    /// # 参数
+    /// * `ctx` - 渲染上下文，包含画布管理器、布局、数据等信息
+    ///
+    /// # 返回值
+    /// * `Ok(())` - 渲染成功
+    /// * `Err(RenderError)` - 渲染失败时返回错误信息
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_manager = ctx.canvas_manager_ref();
-        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
@@ -82,14 +90,29 @@ impl RenderStrategy for VolumeRenderer {
         Ok(())
     }
 
+    /// 检查是否支持指定的渲染模式
+    ///
+    /// # 参数
+    /// * `_mode` - 渲染模式（当前所有模式都支持）
+    ///
+    /// # 返回值
+    /// * `true` - 支持所有渲染模式
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 获取渲染器对应的画布层类型
+    ///
+    /// # 返回值
+    /// * `CanvasLayerType::Main` - 成交量渲染器使用主画布层
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Main
     }
 
+    /// 获取渲染器的优先级（数值越小优先级越高）
+    ///
+    /// # 返回值
+    /// * `20` - 成交量渲染器的渲染优先级
     fn get_priority(&self) -> u32 {
         20
     }

@@ -1,0 +1,66 @@
+# 开发环境配置
+log_level: "debug"
+
+# ZMQ配置
+zmq:
+  enabled: true
+  bind_address: "0.0.0.0"
+  port: 5555
+  recv_buffer_size: 65536  # 64KB
+  send_buffer_size: 65536  # 64KB
+  io_threads: 1
+  high_watermark: 100
+  connect_timeout: 2s
+  recv_timeout: 50ms
+  send_timeout: 50ms
+
+# 存储配置
+storage:
+  log_dir: "./logs/dev"
+  max_file_size: 10485760  # 10MB
+  max_files: 10
+  enable_compression: false
+  compression_level: 3
+  buffer_size: 8192  # 8KB
+  flush_interval: 1s
+  write_queue_size: 1000
+  enable_index: true
+  index_flush_interval: 10s
+
+# 处理器配置
+processor:
+  batch_size: 10
+  batch_timeout: 50ms
+  worker_threads: 2
+  max_retries: 2
+  retry_interval: 500ms
+  enable_validation: true
+  enable_formatting: true
+  time_format: "%Y-%m-%d %H:%M:%S%.3f"
+
+# HTTP配置
+http:
+  enabled: true
+  bind_address: "0.0.0.0"
+  port: 3005
+  worker_threads: 2
+  max_connections: 100
+  request_timeout: 10s
+  enable_cors: true
+  enable_compression: false
+  static_dir: null
+
+# 监控配置
+metrics:
+  enabled: true
+  bind_address: "0.0.0.0"
+  port: 9090
+  collect_interval: 5s
+  enable_prometheus: true
+  prometheus_path: "/metrics"
+
+# 压缩配置
+compression:
+  algorithm: "gzip"
+  level: 3
+  min_size: 512
