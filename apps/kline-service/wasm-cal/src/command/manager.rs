@@ -167,14 +167,12 @@ impl CommandManager {
                 let strategy_factory = self.shared_state.strategy_factory.borrow();
                 if let Some(dz_cell) = strategy_factory.get_datazoom_renderer() {
                     let mut renderer = dz_cell.borrow_mut();
-                    if renderer.handle_mouse_down(x, y, &ctx) {
-                        // 从 DataZoomRenderer 内部状态同步到 CommandManager
-                        let dz_state = renderer.get_drag_state();
+                    if let Some(drag_state) = renderer.handle_mouse_down(x, y, &ctx) {
                         let mut mouse_state = self.shared_state.mouse_state.borrow_mut();
-                        mouse_state.is_dragging = dz_state.is_dragging;
-                        mouse_state.drag_handle_type = dz_state.drag_handle_type;
-                        mouse_state.drag_start_x = dz_state.drag_start_x;
-                        mouse_state.drag_start_visible_range = dz_state.drag_start_visible_range;
+                        mouse_state.is_dragging = drag_state.is_dragging;
+                        mouse_state.drag_handle_type = drag_state.drag_handle_type;
+                        mouse_state.drag_start_x = drag_state.drag_start_x;
+                        mouse_state.drag_start_visible_range = drag_state.drag_start_visible_range;
                         true
                     } else {
                         false

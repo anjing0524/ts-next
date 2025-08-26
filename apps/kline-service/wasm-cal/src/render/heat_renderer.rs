@@ -157,26 +157,16 @@ impl HeatRenderer {
 
         let is_cache_valid = self.cache_key.borrow().as_ref() == Some(&new_cache_key);
 
-        let (buffer, global_max_bin) = if is_cache_valid {
-            if let Some(ref cached_data) = *self.cache_data.borrow() {
-                (cached_data.buffer.clone(), cached_data.global_max_bin)
-            } else {
-                return Ok(()); // Cache key valid but data is missing, something is wrong.
-            }
-        } else {
-            const SIMD_THRESHOLD: usize = 64; // Use SIMD for larger workloads
+        if !is_cache_valid {
+            const SIMD_THRESHOLD: usize = 64;
 
-            // 1. 数据提取 (单线程)
             let owned_kline_items: Vec<KlineItemOwned> = (visible_start..visible_end)
                 .filter_map(|idx| data_manager.get(idx))
                 .map(|item_ref| KlineItemOwned::from(&item_ref))
                 .collect();
 
-            // 2. 动态调度计算
             let (recalculated_buffer, recalculated_max) =
                 if owned_kline_items.len() > SIMD_THRESHOLD {
-                    // SAFETY: 此 unsafe 块包装了对 #[target_feature(enable = "simd128")] 函数的调用
-                    // 该函数内部已经包含了必要的安全检查和边界验证
                     unsafe {
                         self.calculate_heatmap_with_simd(
                             &owned_kline_items,
@@ -196,32 +186,33 @@ impl HeatRenderer {
                     )?
                 };
 
-            // 3. 更新缓存
             *self.cache_key.borrow_mut() = Some(new_cache_key);
             *self.cache_data.borrow_mut() = Some(HeatmapCacheData {
-                buffer: recalculated_buffer.clone(),
+                buffer: recalculated_buffer,
                 global_max_bin: recalculated_max,
             });
-            (recalculated_buffer, recalculated_max)
-        };
-
-        if global_max_bin <= 0.0 {
-            return Ok(());
         }
 
-        let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 0.0);
-        Self::draw_batched_rectangles(
-            ctx,
-            layout,
-            &buffer,
-            &price_rect,
-            min_low,
-            max_high,
-            adjusted_tick,
-            &y_mapper,
-            &self.color_cache,
-            global_max_bin,
-        )?;
+        let cache_guard = self.cache_data.borrow();
+        if let Some(cached_data) = &*cache_guard {
+            if cached_data.global_max_bin <= 0.0 {
+                return Ok(());
+            }
+
+            let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 0.0);
+            Self::draw_batched_rectangles(
+                ctx,
+                layout,
+                &cached_data.buffer,
+                &price_rect,
+                min_low,
+                max_high,
+                adjusted_tick,
+                &y_mapper,
+                &self.color_cache,
+                cached_data.global_max_bin,
+            )?
+        }
 
         Ok(())
     }

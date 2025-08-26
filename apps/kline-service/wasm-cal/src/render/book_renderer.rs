@@ -44,22 +44,12 @@ impl BookRenderer {
         hover_index: Option<usize>,
         theme: &ChartTheme,
     ) {
-        let data_manager = &data_manager;
-        // 只有当有hover_index时才显示订单簿，确保与工具提示框一致
         let idx = match hover_index {
-            Some(idx) => idx,
-            None => return, // 没有hover_index时不显示订单簿
+            Some(idx) if idx < data_manager.len() => idx,
+            _ => return,
         };
 
-        if idx >= data_manager.len() {
-            return;
-        }
-
-        // 获取可见范围信息用于缓存检查
         let (visible_start, visible_count, _) = data_manager.get_visible();
-
-        // 先获取布局信息和 tick 计算，这样缓存计算和渲染都使用相同的参数
-        // 使用与工具提示框相同的可见范围数据，确保数据一致性
         let book_rect = layout.get_rect(&PaneId::OrderBook);
         let (min_low, max_high, _) = data_manager.get_cached_cal();
         let base_tick = data_manager.get_tick();
@@ -69,21 +59,15 @@ impl BookRenderer {
             return;
         }
 
-        // 检查是否需要重新计算缓存
         let needs_recalculation = {
-            let hover_changed = self.cached_hover_index.get() != hover_index;
-            let visible_range_changed = self.last_visible_range.get()
-                != Some((visible_start, visible_start + visible_count));
-            let data_changed = self.last_idx.get() != Some(idx);
-
-            hover_changed
-                || visible_range_changed
-                || data_changed
+            self.cached_hover_index.get() != hover_index
+                || self.last_visible_range.get()
+                    != Some((visible_start, visible_start + visible_count))
+                || self.last_idx.get() != Some(idx)
                 || self.cached_bins.borrow().is_none()
         };
 
-        let (bins, max_volume) = if needs_recalculation {
-            // 重新计算
+        if needs_recalculation {
             let item = match data_manager.get(idx) {
                 Some(item) => item,
                 None => return,
@@ -110,47 +94,29 @@ impl BookRenderer {
                 }
             }
 
-            if max_volume <= 0.0 {
-                return;
+            if max_volume > 0.0 {
+                *self.cached_bins.borrow_mut() = Some(bins);
+                self.cached_max_volume.set(Some(max_volume));
+            } else {
+                *self.cached_bins.borrow_mut() = None;
+                self.cached_max_volume.set(None);
             }
 
-            // 更新缓存
-            *self.cached_bins.borrow_mut() = Some(bins.clone());
-            self.cached_max_volume.set(Some(max_volume));
             self.cached_hover_index.set(hover_index);
             self.last_visible_range
                 .set(Some((visible_start, visible_start + visible_count)));
             self.last_idx.set(Some(idx));
+        }
 
-            (bins, max_volume)
-        } else {
-            // 尝试从缓存安全地获取数据
-            let cached_bins_ref = self.cached_bins.borrow();
-            if let (Some(bins), Some(max_volume)) =
-                (cached_bins_ref.as_ref(), self.cached_max_volume.get())
-            {
-                (bins.clone(), max_volume)
-            } else {
-                // 如果缓存无效，则不进行渲染
+        let bins_guard = self.cached_bins.borrow();
+        if let (Some(bins), Some(max_volume)) = (bins_guard.as_ref(), self.cached_max_volume.get())
+        {
+            if max_volume <= 0.0 {
                 return;
             }
-        };
 
-        let y_mapper = CoordinateMapper::new_for_y_axis(book_rect, min_low, max_high, 0.0);
-
-        self.clear_area(ctx, layout);
-
-        for (bin_idx, &volume) in bins.iter().enumerate() {
-            if volume <= 0.0 {
-                continue;
-            }
-
-            let price_low = min_low + bin_idx as f64 * adjusted_tick;
-            let price_high = price_low + adjusted_tick;
-
-            if price_low < min_low || price_high > max_high {
-                continue;
-            }
+            let y_mapper = CoordinateMapper::new_for_y_axis(book_rect, min_low, max_high, 0.0);
+            self.clear_area(ctx, layout);
 
             let item = match data_manager.get(idx) {
                 Some(item) => item,
@@ -158,22 +124,35 @@ impl BookRenderer {
             };
             let last_price = item.last_price();
 
-            let y_top = y_mapper.map_y(price_high);
-            let y_bottom = y_mapper.map_y(price_low);
-            let bar_height = (y_bottom - y_top).max(1.0);
+            for (bin_idx, &volume) in bins.iter().enumerate() {
+                if volume <= 0.0 {
+                    continue;
+                }
 
-            if bar_height > 0.0 {
-                self.draw_level(
-                    ctx,
-                    book_rect.x,
-                    book_rect.width,
-                    bar_height,
-                    y_top,
-                    volume,
-                    max_volume,
-                    (price_low + price_high) / 2.0 >= last_price,
-                    theme,
-                );
+                let price_low = min_low + bin_idx as f64 * adjusted_tick;
+                let price_high = price_low + adjusted_tick;
+
+                if price_low < min_low || price_high > max_high {
+                    continue;
+                }
+
+                let y_top = y_mapper.map_y(price_high);
+                let y_bottom = y_mapper.map_y(price_low);
+                let bar_height = (y_bottom - y_top).max(1.0);
+
+                if bar_height > 0.0 {
+                    self.draw_level(
+                        ctx,
+                        book_rect.x,
+                        book_rect.width,
+                        bar_height,
+                        y_top,
+                        volume,
+                        max_volume,
+                        (price_low + price_high) / 2.0 >= last_price,
+                        theme,
+                    );
+                }
             }
         }
     }

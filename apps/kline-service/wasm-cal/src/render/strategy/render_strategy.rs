@@ -70,8 +70,4 @@ pub trait RenderStrategy: 'static {
     fn force_reset_drag_state(&mut self) -> bool {
         false // 默认不处理
     }
-
-    fn get_drag_state(&self) -> DragState {
-        DragState::default()
-    }
 }
