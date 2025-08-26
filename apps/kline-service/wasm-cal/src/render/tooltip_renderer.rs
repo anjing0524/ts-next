@@ -208,26 +208,18 @@ impl TooltipRenderer {
         let price = min_low + tick_idx as f64 * tick;
         let volume_at_price = self.calculate_volume_for_price(item, tick_idx, min_low, tick);
 
-        // 检查是否达到热图显示阈值 (与heat_renderer.rs的逻辑一致)
+        // 只要有数据就显示tooltip，不进行阈值判断
         if let Some(volume) = volume_at_price {
-            // 计算全局最大值来判断是否应该显示
-            let global_max = self.calculate_global_max_volume(item, min_low, tick);
-            if global_max > 0.0 {
-                let norm = (volume + 1.0).ln() / (global_max + 1.0).ln();
-                // 只在热图会显示颜色的情况下显示tooltip
-                if norm >= 0.05 {
-                    return vec![
-                        format!(
-                            "时间: {}",
-                            time::format_timestamp(item.timestamp() as i64, "%Y-%m-%d %H:%M")
-                        ),
-                        format!("价格: {:.2}", price),
-                        format!("订单量: {}", volume as u64), // 显示为整数
-                    ];
-                }
-            }
+            return vec![
+                format!(
+                    "时间: {}",
+                    time::format_timestamp(item.timestamp() as i64, "%Y-%m-%d %H:%M")
+                ),
+                format!("价格: {:.2}", price),
+                format!("订单量: {}", volume as u64), // 显示为整数
+            ];
         }
-        // 无数据或低于显示阈值时返回空
+        // 无数据时返回空
         vec![]
     }
 
@@ -251,31 +243,5 @@ impl TooltipRenderer {
                     .sum::<f64>()
             })
             .filter(|&sum| sum > 0.0)
-    }
-
-    /// 计算全局最大成交量 (与heat_renderer.rs逻辑一致)
-    fn calculate_global_max_volume(&self, kline: &KlineItemRef, min_low: f64, tick: f64) -> f64 {
-        if tick <= 0.0 {
-            return 0.0;
-        }
-
-        let num_bins = ((kline.high() - min_low) / tick).ceil() as usize;
-        if num_bins == 0 {
-            return 0.0;
-        }
-
-        let mut bins = vec![0.0; num_bins];
-        if let Some(volumes) = kline.volumes() {
-            for pv in volumes {
-                if pv.price() >= min_low && pv.price() < kline.high() {
-                    let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
-                    if bin_idx < num_bins {
-                        bins[bin_idx] += pv.volume();
-                    }
-                }
-            }
-        }
-
-        bins.iter().fold(0.0, |max, &vol| max.max(vol))
     }
 }

@@ -45,20 +45,23 @@ impl BookRenderer {
         theme: &ChartTheme,
     ) {
         let data_manager = &data_manager;
-        let (visible_start, visible_count, _) = data_manager.get_visible();
-        let visible_end = visible_start + visible_count;
-        if visible_start >= visible_end {
-            return;
-        }
+        // 只有当有hover_index时才显示订单簿，确保与工具提示框一致
+        let idx = match hover_index {
+            Some(idx) => idx,
+            None => return, // 没有hover_index时不显示订单簿
+        };
 
-        let idx = hover_index.unwrap_or_else(|| visible_end.saturating_sub(1));
         if idx >= data_manager.len() {
             return;
         }
 
+        // 获取可见范围信息用于缓存检查
+        let (visible_start, visible_count, _) = data_manager.get_visible();
+
         // 先获取布局信息和 tick 计算，这样缓存计算和渲染都使用相同的参数
+        // 使用与工具提示框相同的可见范围数据，确保数据一致性
         let book_rect = layout.get_rect(&PaneId::OrderBook);
-        let (min_low, max_high) = data_manager.get_full_data_range();
+        let (min_low, max_high, _) = data_manager.get_cached_cal();
         let base_tick = data_manager.get_tick();
         let adjusted_tick = calculate_optimal_tick(base_tick, min_low, max_high, book_rect.height);
 
@@ -168,7 +171,7 @@ impl BookRenderer {
                     y_top,
                     volume,
                     max_volume,
-                    price_low > last_price,
+                    (price_low + price_high) / 2.0 >= last_price,
                     theme,
                 );
             }

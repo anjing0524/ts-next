@@ -7,7 +7,7 @@ use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
 use crate::render::tooltip_renderer::TooltipRenderer;
-use crate::utils::time;
+use crate::utils::{calculate_optimal_tick, time};
 use js_sys;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
@@ -51,14 +51,15 @@ impl OverlayRenderer {
     fn draw_tooltip(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
         let data_manager = render_ctx.data_manager_ref();
         let (min_low, max_high, _) = data_manager.get_cached_cal();
-        let tick = data_manager.get_tick();
+        let base_tick = data_manager.get_tick();
+
+        let layout = render_ctx.layout_ref();
+        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
+        let tick = calculate_optimal_tick(base_tick, min_low, max_high, main_chart_rect.height);
 
         if data_manager.len() == 0 {
             return;
         }
-
-        let layout = render_ctx.layout_ref();
-        let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
 
         if let Some(hover_index) = render_ctx.hover_index() {
             if hover_index >= data_manager.len() {
