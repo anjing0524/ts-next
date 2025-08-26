@@ -21,7 +21,7 @@ PKG_DIR="./pkg"
 PUBLIC_DEST_DIR="../public/wasm-cal"
 
 # 编译为WebAssembly，输出到本地pkg目录
-wasm-pack build --target web --out-dir $PKG_DIR --release 
+wasm-pack build --target web --out-dir $PKG_DIR --release  
 
 echo "WebAssembly module built successfully into $PKG_DIR directory!"
 

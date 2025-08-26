@@ -405,9 +405,9 @@ impl RenderStrategy for DataZoomRenderer {
 
     /// 指定渲染优先级（数值越小优先级越高）
     ///
-    /// 优先级低于 OverlayRenderer（90），确保导航器在十字线等交互元素之前渲染
+    /// 优先级高于 OverlayRenderer（90），确保导航器光标样式优先于十字线等交互元素
     fn get_priority(&self) -> u32 {
-        100
+        80
     }
 
     /// 处理鼠标按下事件（转发到结构体自身的方法）

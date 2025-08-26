@@ -1,13 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export const start: () => void;
-export const __wbg_performancemonitor_free: (a: number, b: number) => void;
-export const performancemonitor_new: () => number;
-export const performancemonitor_start_render_measurement: (a: number) => void;
-export const performancemonitor_end_render_measurement: (a: number) => void;
-export const performancemonitor_init_monitor: (a: number) => void;
-export const performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
 export const __wbg_klineprocess_free: (a: number, b: number) => void;
 export const klineprocess_new: (a: number, b: number) => [number, number, number];
 export const klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
@@ -27,6 +20,13 @@ export const klineprocess_handle_canvas_resize: (a: number, b: number, c: number
 export const klineprocess_update_config: (a: number, b: any) => [number, number];
 export const klineprocess_get_config: (a: number) => [number, number, number];
 export const klineprocess_get_theme: (a: number) => [number, number, number];
+export const __wbg_performancemonitor_free: (a: number, b: number) => void;
+export const performancemonitor_new: () => number;
+export const performancemonitor_start_render_measurement: (a: number) => void;
+export const performancemonitor_end_render_measurement: (a: number) => void;
+export const performancemonitor_init_monitor: (a: number) => void;
+export const performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
+export const start: () => void;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
 export const __wbindgen_exn_store: (a: number) => void;

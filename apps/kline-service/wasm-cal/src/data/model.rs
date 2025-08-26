@@ -60,6 +60,15 @@ impl<'a> From<&kline::KlineItem<'a>> for KlineItemOwned {
     }
 }
 
+impl<'a> From<&KlineItemRef<'a>> for KlineItemOwned {
+    fn from(item_ref: &KlineItemRef<'a>) -> Self {
+        match item_ref {
+            KlineItemRef::Borrowed(item) => KlineItemOwned::from(item),
+            KlineItemRef::Owned(item) => (*item).clone(),
+        }
+    }
+}
+
 // --- Unified Data Access Enum (Cow-like) ---
 
 /// 统一的K线数据引用枚举。

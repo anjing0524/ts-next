@@ -150,7 +150,6 @@ impl ChartRenderer {
     }
 
     /// 获取共享渲染状态
-    /// 获取共享渲染状态
     ///
     /// 返回内部持有的共享状态副本（包含 Canvas/Data/Layout/Theme/Config/策略工厂/鼠标状态）。
     /// 注意：包含 Rc/RefCell 包装的可变共享对象，请在使用时注意借用边界与生命周期。
@@ -341,8 +340,8 @@ impl ChartRenderer {
 
     /// 更新配置（供 KlineProcess 使用）
     pub fn update_config(&mut self, config: &ChartConfig, theme: &ChartTheme) {
-        self.shared_state.theme = std::rc::Rc::new(theme.clone());
-        self.shared_state.config = Some(std::rc::Rc::new(config.clone()));
+        self.shared_state.theme = Rc::new(theme.clone());
+        self.shared_state.config = Some(Rc::new(config.clone()));
     }
 
     /// 获取光标样式

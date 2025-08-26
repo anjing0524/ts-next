@@ -103,7 +103,7 @@ impl OverlayRenderer {
         }
 
         let main_chart_rect = layout.get_rect(&PaneId::HeatmapArea);
-        let _volume_rect = layout.get_rect(&PaneId::VolumeChart);
+        let volume_rect = layout.get_rect(&PaneId::VolumeChart);
         let y_axis_rect = layout.get_rect(&PaneId::YAxis);
         let time_axis_rect = layout.get_rect(&PaneId::TimeAxis);
 
@@ -111,7 +111,7 @@ impl OverlayRenderer {
         let mouse_y_constrained = render_ctx
             .mouse_y()
             .max(main_chart_rect.y)
-            .min(_volume_rect.y + _volume_rect.height);
+            .min(volume_rect.y + volume_rect.height);
         ctx.begin_path();
         ctx.move_to(main_chart_rect.x, mouse_y_constrained);
         ctx.line_to(
@@ -127,7 +127,7 @@ impl OverlayRenderer {
             .min(main_chart_rect.x + main_chart_rect.width);
         ctx.begin_path();
         ctx.move_to(mouse_x_constrained, main_chart_rect.y);
-        ctx.line_to(mouse_x_constrained, _volume_rect.y + _volume_rect.height);
+        ctx.line_to(mouse_x_constrained, volume_rect.y + volume_rect.height);
         ctx.stroke();
 
         if let Some(empty_array) = &self.empty_array {
@@ -150,9 +150,8 @@ impl OverlayRenderer {
         );
 
         // 绘制成交量轴标签
-        if _volume_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
-            let volume_mapper =
-                CoordinateMapper::new_for_y_axis(_volume_rect, 0.0, max_volume, 2.0);
+        if volume_rect.contains(render_ctx.mouse_x(), render_ctx.mouse_y()) {
+            let volume_mapper = CoordinateMapper::new_for_y_axis(volume_rect, 0.0, max_volume, 2.0);
             let volume = volume_mapper.unmap_y(mouse_y_constrained);
             self.draw_axis_label(
                 ctx,

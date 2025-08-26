@@ -88,13 +88,6 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly start: () => void;
-  readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
-  readonly performancemonitor_new: () => number;
-  readonly performancemonitor_start_render_measurement: (a: number) => void;
-  readonly performancemonitor_end_render_measurement: (a: number) => void;
-  readonly performancemonitor_init_monitor: (a: number) => void;
-  readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
   readonly __wbg_klineprocess_free: (a: number, b: number) => void;
   readonly klineprocess_new: (a: number, b: number) => [number, number, number];
   readonly klineprocess_set_canvases: (a: number, b: any, c: any, d: any) => [number, number];
@@ -114,6 +107,13 @@ export interface InitOutput {
   readonly klineprocess_update_config: (a: number, b: any) => [number, number];
   readonly klineprocess_get_config: (a: number) => [number, number, number];
   readonly klineprocess_get_theme: (a: number) => [number, number, number];
+  readonly __wbg_performancemonitor_free: (a: number, b: number) => void;
+  readonly performancemonitor_new: () => number;
+  readonly performancemonitor_start_render_measurement: (a: number) => void;
+  readonly performancemonitor_end_render_measurement: (a: number) => void;
+  readonly performancemonitor_init_monitor: (a: number) => void;
+  readonly performancemonitor_get_performance_stats: (a: number) => [number, number, number, number];
+  readonly start: () => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;

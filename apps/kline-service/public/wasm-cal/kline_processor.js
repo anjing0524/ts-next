@@ -167,8 +167,11 @@ function debugString(val) {
     return className;
 }
 
-export function start() {
-    wasm.start();
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function takeFromExternrefTable0(idx) {
@@ -177,11 +180,8 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 
-function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
+export function start() {
+    wasm.start();
 }
 
 const KlineProcessFinalization = (typeof FinalizationRegistry === 'undefined')

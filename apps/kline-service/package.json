@@ -9,7 +9,7 @@
     "start": "next start -p 3003",
     "flatc:generate": "flatc -o ./src/generated --ts ./schemas/kline.fbs && flatc -o ./src/wasm-cal/src --rust ./schemas/kline.fbs",
     "wasm:test": "cd wasm-cal && wasm-pack test --headless --chrome",
-    "wasm:build": "cd wasm-cal && wasm-pack build --target web --out-dir pkg"
+    "wasm:build": "cd wasm-cal && ./build.sh"
   },
   "dependencies": {
     "next": "^15.4.5",

@@ -74,3 +74,5 @@ cd apps/kline-service/wasm-cal && ./build.sh
 
 - 更新代码的时候记得实时更新Claude.md
 - 保持中文对话
+
+- `rustc` version is `rustc 1.88.0

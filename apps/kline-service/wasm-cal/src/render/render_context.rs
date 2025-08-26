@@ -9,7 +9,7 @@ use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::strategy_factory::RenderStrategyFactory;
 
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
@@ -142,22 +142,22 @@ impl UnifiedRenderContext {
     }
 
     /// 获取 Canvas 管理器的不可变借用
-    pub fn canvas_manager_ref(&self) -> std::cell::Ref<CanvasManager> {
+    pub fn canvas_manager_ref(&self) -> Ref<CanvasManager> {
         self.shared.canvas_manager.borrow()
     }
 
     /// 获取数据管理器的不可变借用
-    pub fn data_manager_ref(&self) -> std::cell::Ref<DataManager> {
+    pub fn data_manager_ref(&self) -> Ref<DataManager> {
         self.shared.data_manager.borrow()
     }
 
     /// 获取数据管理器的可变借用
-    pub fn data_manager_mut_ref(&self) -> std::cell::RefMut<'_, DataManager> {
+    pub fn data_manager_mut_ref(&self) -> RefMut<'_, DataManager> {
         self.shared.data_manager.borrow_mut()
     }
 
     /// 获取图表布局的不可变借用
-    pub fn layout_ref(&self) -> std::cell::Ref<ChartLayout> {
+    pub fn layout_ref(&self) -> Ref<ChartLayout> {
         self.shared.layout.borrow()
     }
 
