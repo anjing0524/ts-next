@@ -5,6 +5,7 @@
 //! - **增量数据**: 实时追加到`Vec`中，写入效率高。
 //! - **统一访问**: 通过`KlineItemRef`枚举，对上层屏蔽了数据源的差异。
 
+use super::heatmap_index::GlobalHeatmapIndex;
 use super::model::{KlineItemOwned, KlineItemRef};
 use crate::data::visible_range::{DataRange, VisibleRange};
 use crate::kline_generated::kline::{self};
@@ -43,6 +44,9 @@ pub struct DataManager {
     /// 时间戳索引，用于快速查找和去重
     /// key: timestamp, value: index in incremental_data
     timestamp_index: HashMap<i32, usize>,
+
+    /// 全局热图索引
+    pub global_heatmap_index: Option<GlobalHeatmapIndex>,
 }
 
 impl Default for DataManager {
@@ -63,6 +67,7 @@ impl DataManager {
             visible_range: VisibleRange::new(0, 0, 0),
             cached_data_range: None,
             timestamp_index: HashMap::new(),
+            global_heatmap_index: None,
         }
     }
 
@@ -107,6 +112,7 @@ impl DataManager {
         }
 
         self.visible_range.update_total_len(self.len());
+        self.build_global_heatmap_index();
     }
 
     /// 追加一条新的K线数据（带去重功能）
@@ -174,6 +180,7 @@ impl DataManager {
             // 数据结构发生变化，必须使缓存失效
             self.invalidate_cache();
             self.visible_range.update_total_len(self.len());
+            self.build_global_heatmap_index();
         }
 
         new_items_count
@@ -249,6 +256,7 @@ impl DataManager {
     /// 无效化缓存的数据范围计算结果。
     pub fn invalidate_cache(&mut self) {
         self.cached_data_range = None;
+        self.global_heatmap_index = None;
     }
 
     /// 获取缓存的计算结果 `(min_low, max_high, max_volume)`。
@@ -261,6 +269,11 @@ impl DataManager {
     ///
     /// 如果缓存有效，则直接返回缓存结果。否则，进行计算并缓存结果。
     pub fn calculate_data_ranges(&mut self) -> (f64, f64, f64) {
+        // 如果热图索引无效，则重建它
+        if self.global_heatmap_index.is_none() && self.len() > 0 {
+            self.build_global_heatmap_index();
+        }
+
         if let Some(data_range) = &self.cached_data_range {
             return data_range.get();
         }
@@ -333,6 +346,59 @@ impl DataManager {
 
         (min_low, max_high)
     }
+
+    /// 构建全局热图索引
+    fn build_global_heatmap_index(&mut self) {
+        if self.len() == 0 {
+            self.global_heatmap_index = None;
+            return;
+        }
+
+        let (min_low, max_high) = self.get_full_data_range();
+        let tick = self.get_tick();
+
+        if tick <= 0.0 || min_low >= max_high {
+            self.global_heatmap_index = None;
+            return;
+        }
+
+        let price_buckets_len = ((max_high - min_low) / tick).ceil() as usize;
+        if price_buckets_len == 0 {
+            self.global_heatmap_index = None;
+            return;
+        }
+
+        let mut index =
+            GlobalHeatmapIndex::new(self.len(), price_buckets_len, min_low, max_high, tick);
+
+        let mut max_vol = 0.0f64;
+
+        for time_idx in 0..self.len() {
+            if let Some(item) = self.get(time_idx) {
+                if let Some(volumes) = item.volumes() {
+                    for pv in volumes {
+                        if pv.price() >= min_low && pv.price() < max_high {
+                            let price_bucket_idx = ((pv.price() - min_low) / tick).floor() as usize;
+                            if price_bucket_idx < price_buckets_len {
+                                let bin_linear_idx =
+                                    time_idx * price_buckets_len + price_bucket_idx;
+                                index.heatmap_bins[bin_linear_idx] += pv.volume();
+                                max_vol = max_vol.max(index.heatmap_bins[bin_linear_idx]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        index.global_max_volume_in_bin = max_vol;
+        self.global_heatmap_index = Some(index);
+    }
+
+    /// 获取全局热图索引的不可变引用
+    pub fn get_global_heatmap_index(&self) -> Option<&GlobalHeatmapIndex> {
+        self.global_heatmap_index.as_ref()
+    }
 }
 
 /// 自定义Clone实现，因为parsed_data字段包含不可克隆的类型
@@ -360,6 +426,7 @@ impl Clone for DataManager {
             visible_range: self.visible_range,
             cached_data_range: self.cached_data_range,
             timestamp_index: self.timestamp_index.clone(),
+            global_heatmap_index: self.global_heatmap_index.clone(),
         }
     }
 }

@@ -39,18 +39,25 @@ impl OverlayRenderer {
 
     /// 绘制交互层 - 只绘制十字线和tooltip
     pub fn draw(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
+        // 新增：只有当鼠标在图表区域内时，才绘制十字线和Tooltip
+        if !render_ctx.shared.mouse_state.borrow().is_in_chart_area {
+            return; // 鼠标已离开，不执行任何绘制
+        }
+
+        let last_hover_index = render_ctx.shared.mouse_state.borrow().last_hover_index;
+        let hover_index = render_ctx.hover_index().or(last_hover_index);
+
         // 仅当有有效的悬浮索引时才绘制
-        if render_ctx.hover_index().is_some() {
+        if hover_index.is_some() {
             self.draw_crosshair_with_labels(ctx, render_ctx);
             self.draw_tooltip(ctx, render_ctx);
-        } else {
         }
     }
 
     /// 绘制Tooltip
     fn draw_tooltip(&self, ctx: &OffscreenCanvasRenderingContext2d, render_ctx: &RenderContext) {
         let data_manager = render_ctx.data_manager_ref();
-        let (min_low, max_high, _) = data_manager.get_cached_cal();
+        let (min_low, max_high) = data_manager.get_full_data_range();
         let base_tick = data_manager.get_tick();
 
         let layout = render_ctx.layout_ref();
@@ -61,7 +68,10 @@ impl OverlayRenderer {
             return;
         }
 
-        if let Some(hover_index) = render_ctx.hover_index() {
+        let last_hover_index = render_ctx.shared.mouse_state.borrow().last_hover_index;
+        let hover_index = render_ctx.hover_index().or(last_hover_index);
+
+        if let Some(hover_index) = hover_index {
             if hover_index >= data_manager.len() {
                 return;
             }

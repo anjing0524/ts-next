@@ -51,9 +51,10 @@ impl BookRenderer {
 
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let book_rect = layout.get_rect(&PaneId::OrderBook);
-        let (min_low, max_high, _) = data_manager.get_cached_cal();
+        let price_rect = layout.get_rect(&PaneId::HeatmapArea);
+        let (min_low, max_high) = data_manager.get_full_data_range();
         let base_tick = data_manager.get_tick();
-        let adjusted_tick = calculate_optimal_tick(base_tick, min_low, max_high, book_rect.height);
+        let adjusted_tick = calculate_optimal_tick(base_tick, min_low, max_high, price_rect.height);
 
         if adjusted_tick <= 0.0 || min_low >= max_high {
             return;
@@ -176,7 +177,7 @@ impl BookRenderer {
         } else {
             &theme.bullish
         });
-        ctx.fill_rect(x, y, bar_width, h - 1.0);
+        ctx.fill_rect(x, y, bar_width, h);
 
         if vol > 0.0 {
             ctx.set_fill_style_str(&theme.text);
@@ -210,7 +211,10 @@ impl RenderStrategy for BookRenderer {
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
 
-        self.draw(main_ctx, &layout, &data_manager, ctx.hover_index(), theme);
+        let last_hover_index = ctx.shared.mouse_state.borrow().last_hover_index;
+        let hover_index = ctx.hover_index().or(last_hover_index); // Fallback
+
+        self.draw(main_ctx, &layout, &data_manager, hover_index, theme);
         Ok(())
     }
 

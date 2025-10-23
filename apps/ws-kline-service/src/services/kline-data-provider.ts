@@ -210,7 +210,7 @@ export class KlineDataProvider {
     // 创建KlineData根对象
     KlineData.startKlineData(builder);
     KlineData.addItems(builder, itemsVector);
-    KlineData.addTick(builder, sequence || this.getNextSequence());
+    KlineData.addTick(builder, 10);
     const klineDataOffset = KlineData.endKlineData(builder);
 
     // 完成构建并设置文件标识符

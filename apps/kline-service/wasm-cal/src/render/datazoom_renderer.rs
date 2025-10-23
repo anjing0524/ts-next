@@ -50,7 +50,9 @@ impl Default for DataZoomRenderer {
 
 impl DataZoomRenderer {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            drag_state: DragState::default(),
+        }
     }
 
     pub fn get_handle_at_position(
@@ -97,24 +99,24 @@ impl DataZoomRenderer {
         }
     }
 
-    pub fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> Option<DragState> {
+    pub fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let handle_type = self.get_handle_at_position(x, y, &layout, &data_manager);
 
         if handle_type == DragHandleType::None {
-            return None;
+            return false;
         }
 
         let (start, count, _) = data_manager.get_visible();
-        let drag_state = DragState {
+        self.drag_state = DragState {
             is_dragging: true,
             drag_start_x: x,
             drag_handle_type: handle_type,
             drag_start_visible_range: (start, count),
         };
 
-        Some(drag_state)
+        true
     }
 
     pub fn handle_mouse_up(&mut self, _x: f64, _y: f64, _ctx: &RenderContext) -> bool {
@@ -409,7 +411,7 @@ impl RenderStrategy for DataZoomRenderer {
     /// 处理鼠标按下事件（转发到结构体自身的方法）
     ///
     /// 使用 UFCS 语法避免与 trait 方法同名导致的递归调用
-    fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> Option<DragState> {
+    fn handle_mouse_down(&mut self, x: f64, y: f64, ctx: &RenderContext) -> bool {
         // 使用 UFCS 语法避免与 trait 方法同名导致的递归调用
         DataZoomRenderer::handle_mouse_down(self, x, y, ctx)
     }

@@ -3,7 +3,7 @@
 use crate::canvas::CanvasLayerType;
 use crate::render::chart_renderer::RenderMode;
 use crate::render::cursor_style::CursorStyle;
-use crate::render::datazoom_renderer::{DragResult, DragState};
+use crate::render::datazoom_renderer::DragResult;
 use crate::render::render_context::UnifiedRenderContext;
 use crate::utils::error::WasmCalError;
 
@@ -69,5 +69,10 @@ pub trait RenderStrategy: 'static {
     /// 强制重置拖动状态（用于鼠标离开等情况）
     fn force_reset_drag_state(&mut self) -> bool {
         false // 默认不处理
+    }
+
+    /// 获取当前拖拽状态（可选实现）
+    fn get_drag_state(&self) -> crate::render::datazoom_renderer::DragState {
+        crate::render::datazoom_renderer::DragState::default()
     }
 }

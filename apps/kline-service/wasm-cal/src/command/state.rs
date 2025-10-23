@@ -9,6 +9,7 @@ pub struct MouseState {
     pub is_in_chart_area: bool, // 是否在主图表+成交量区域
     pub is_in_navigator: bool,  // 是否在导航器区域
     pub hover_candle_index: Option<usize>,
+    pub last_hover_index: Option<usize>,
     // 拖动相关状态
     pub is_dragging: bool,
     pub drag_start_x: f64,

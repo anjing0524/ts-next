@@ -167,7 +167,8 @@ impl CommandManager {
                 let strategy_factory = self.shared_state.strategy_factory.borrow();
                 if let Some(dz_cell) = strategy_factory.get_datazoom_renderer() {
                     let mut renderer = dz_cell.borrow_mut();
-                    if let Some(drag_state) = renderer.handle_mouse_down(x, y, &ctx) {
+                    if renderer.handle_mouse_down(x, y, &ctx) {
+                        let drag_state = renderer.get_drag_state();
                         let mut mouse_state = self.shared_state.mouse_state.borrow_mut();
                         mouse_state.is_dragging = drag_state.is_dragging;
                         mouse_state.drag_handle_type = drag_state.drag_handle_type;
@@ -229,16 +230,30 @@ impl CommandManager {
 
     /// 处理鼠标离开事件
     ///
-    /// 清除所有鼠标相关状态并触发重绘以清除十字线等交互元素。
+    /// 修改逻辑：鼠标离开时，订单簿显示可见范围内最后一根K线数据，同时清除十字线等其他交互元素。
     ///
     /// 返回：
     /// - CommandResult: 根据是否在拖拽决定重绘范围
     fn handle_mouse_leave(&mut self) -> CommandResult {
+        // 从 DataManager 获取可见范围的结束索引
+        let last_visible_index = {
+            let data_manager = self.shared_state.data_manager.borrow();
+            let (_, _, end) = data_manager.get_visible();
+            if end > 0 {
+                Some(end - 1) // 最后一根可见K线的索引
+            } else {
+                None
+            }
+        };
+
         let was_dragging: bool;
         {
             let mut mouse_state = self.shared_state.mouse_state.borrow_mut();
             mouse_state.is_in_chart_area = false;
-            mouse_state.hover_candle_index = None;
+            // 关键修改：将悬停索引设置为最后一根可见K线的索引
+            mouse_state.hover_candle_index = last_visible_index;
+            // 同时更新 last_hover_index 以保持状态一致性
+            mouse_state.last_hover_index = last_visible_index;
             mouse_state.is_in_navigator = false;
             was_dragging = mouse_state.is_dragging;
             mouse_state.is_dragging = false;
@@ -367,6 +382,9 @@ impl CommandManager {
 
             let mut mouse_state = self.shared_state.mouse_state.borrow_mut();
             mouse_state.hover_candle_index = hover_index;
+            if hover_index.is_some() {
+                mouse_state.last_hover_index = hover_index;
+            }
         } else {
             let mut mouse_state = self.shared_state.mouse_state.borrow_mut();
             mouse_state.hover_candle_index = None;
