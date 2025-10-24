@@ -140,15 +140,18 @@ pub async fn login_endpoint(
         .issue_tokens(&client, Some(user.id), "session".to_string(), permissions, None)
         .await?;
 
-    // 3. Set the session cookie
+    // 3. Set the session cookie with enhanced security attributes
+    let is_production = std::env::var("NODE_ENV")
+        .unwrap_or_else(|_| "development".to_string()) == "production";
+
     let session_cookie = Cookie::build(("session_token", token_pair.access_token))
         .path("/")
-        .domain("localhost") // 设置为 localhost 以支持同域共享
-        .http_only(true)
-        .secure(false) // 开发环境使用 HTTP，生产环境应设为 true
-        .same_site(SameSite::Lax)
-        .max_age(time::Duration::hours(1));
-    
+        .domain("localhost") // Set to localhost for same-domain sharing (configure in production)
+        .http_only(true)      // ✅ Prevent XSS attacks - JavaScript cannot access this cookie
+        .secure(is_production) // ✅ Enforce HTTPS in production
+        .same_site(SameSite::Lax) // ✅ CSRF protection with Lax mode (allow same-site navigation)
+        .max_age(time::Duration::hours(1)); // Session expires in 1 hour
+
     let updated_jar = jar.add(session_cookie);
 
     // 4. Redirect back to the original /authorize URL
@@ -201,11 +204,23 @@ pub async fn authorize_endpoint(
     let user_id = match extract_user_id_from_request(&state, &jar, &headers).await {
         Ok(id) => id,
         Err(_) => {
-            // User not authenticated - redirect to admin-portal login page
+            // User not authenticated - redirect to login page
+            //
+            // IMPORTANT: This implements the OAuth 2.1 third-party client pattern:
+            // - Admin Portal has NO direct /login entry point
+            // - All unauthenticated users are redirected to OAuth Service's login flow
+            // - Login page is provided by Admin Portal but ONLY through this OAuth redirect
+            //
+            // Security considerations:
+            // - Admin Portal URL is configured via NEXT_PUBLIC_ADMIN_PORTAL_URL environment variable
+            // - Admin Portal's /login page MUST validate the redirect parameter
+            // - The redirect parameter contains the original authorize URL with all PKCE params preserved
+            //
             let admin_portal_url = std::env::var("NEXT_PUBLIC_ADMIN_PORTAL_URL")
                 .unwrap_or_else(|_| "http://localhost:3002".to_string());
 
             // Build the return URL that will redirect back to authorize after login
+            // This preserves all OAuth parameters including PKCE code_challenge
             let mut authorize_url = url::Url::parse(&format!(
                 "{}/api/v2/oauth/authorize",
                 std::env::var("NEXT_PUBLIC_OAUTH_SERVICE_URL")
@@ -223,6 +238,7 @@ pub async fn authorize_endpoint(
                 authorize_url.query_pairs_mut().append_pair("nonce", nonce);
             }
 
+            // Redirect to Admin Portal's /login with the authorize URL as the return destination
             let mut login_url = url::Url::parse(&format!("{}/login", admin_portal_url))
                 .expect("Failed to parse login URL");
             login_url.query_pairs_mut().append_pair("redirect", authorize_url.as_str());
