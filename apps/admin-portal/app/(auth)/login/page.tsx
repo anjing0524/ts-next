@@ -1,7 +1,8 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui';
 import { UsernamePasswordForm } from '@/components/auth/username-password-form';
 
@@ -15,11 +16,38 @@ import { UsernamePasswordForm } from '@/components/auth/username-password-form';
  * 4. 用户输入凭证 → 表单提交到 OAuth 服务的 /auth/login 端点
  * 5. OAuth 验证凭证 → 设置 session_token cookie → 重定向回 redirect URL
  * 6. /authorize 端点现在有 session_token → 继续授权流程
+ *
+ * 安全说明：
+ * - /login 页面应该仅通过 OAuth Service 的 /authorize 端点重定向到达
+ * - redirect 参数必须指向合法的 OAuth /authorize 端点 URL
+ * - 直接访问 /login（无 redirect 参数）将被拒绝
  */
 function LoginContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
-  const hasRedirect = !!redirect;
+  
+  // 安全检查：验证 redirect 参数指向合法的 OAuth authorize 端点
+  const isValidRedirect = redirect && 
+    (redirect.includes('/api/v2/oauth/authorize') || 
+     redirect.includes('/oauth/authorize'));
+  
+  useEffect(() => {
+    // 如果没有有效的 redirect 参数，拒绝访问
+    if (!redirect || !isValidRedirect) {
+      console.warn('Invalid or missing redirect parameter - rejecting /login access');
+      router.push('/');
+    }
+  }, [redirect, isValidRedirect, router]);
+
+  // 在验证 redirect 参数期间不显示任何内容
+  if (!isValidRedirect) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-500">Invalid request</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -42,10 +70,7 @@ function LoginContent() {
           </div>
           <CardTitle data-slot="card-title">登录认证中心</CardTitle>
           <CardDescription className="text-gray-600">
-            {hasRedirect
-              ? '正在进行授权流程，请输入您的凭证'
-              : '请输入您的凭证以继续'
-            }
+            正在进行授权流程，请输入您的凭证
           </CardDescription>
         </CardHeader>
         <CardContent>
