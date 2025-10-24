@@ -4,7 +4,9 @@ import { generateCodeVerifier, generateCodeChallenge, generateRandomString } fro
 
 // 定义路由配置
 const protectedRoutes = ['/admin', '/profile', '/oauth/consent'];
-const authRoutes = ['/login', '/auth/callback'];
+// NOTE: /login 已移除 - 登录页面现在仅由 OAuth Service 通过 authorize 流程提供
+// /login 不再是认证路由入口，而是由 OAuth Service 完全驱动的第三方客户端模式
+const authRoutes = ['/auth/callback'];
 const publicRoutes = ['/health', '/api'];
 
 // 页面路径与所需权限静态映射表（可根据实际页面和文档补充）
@@ -175,16 +177,9 @@ export async function middleware(request: NextRequest) {
   // 受保护路由逻辑
   if (isProtectedRoute) {
     if (!accessToken || isTokenExpired(accessToken)) {
-      // 尝试使用刷新令牌
-      if (refreshToken) {
-        // 在实际应用中，这里应该调用刷新令牌API
-        // 目前简化为重定向到登录
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('redirect', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-
-      // 未登录，启动 OAuth 2.1 授权流程
+      // 注意：不再重定向到 Admin Portal 的 /login
+      // 第三方客户端模式：直接启动 OAuth 授权流程
+      // OAuth Service 会处理未认证用户，包括重定向到其 /login 页面
       return await initiateOAuthFlow(request, pathname);
     }
 
@@ -211,12 +206,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 已登录用户访问认证路由，重定向到管理后台
-  if (isAuthRoute && pathname !== '/auth/callback') {
-    if (accessToken && !isTokenExpired(accessToken)) {
-      const adminUrl = new URL('/admin', request.url);
-      return NextResponse.redirect(adminUrl);
-    }
+  // OAuth 回调处理
+  // 注意：authRoutes 现在只包含 '/auth/callback'
+  // 已登录用户不应该再次访问 /auth/callback，重定向到管理后台
+  if (isAuthRoute && accessToken && !isTokenExpired(accessToken)) {
+    // 用户已登录且访问 /auth/callback，重定向回管理后台
+    const adminUrl = new URL('/admin', request.url);
+    return NextResponse.redirect(adminUrl);
   }
 
   // 为所有响应添加安全头部
