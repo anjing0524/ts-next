@@ -1,7 +1,10 @@
 use crate::error::ServiceError;
+use crate::cache::permission_cache::PermissionCache;
 use async_trait::async_trait;
 use sqlx::SqlitePool;
 use std::sync::Arc;
+
+const PERMISSION_CACHE_TTL: i64 = 300; // 5 minutes
 
 #[async_trait]
 pub trait RBACService: Send + Sync {
@@ -20,11 +23,12 @@ pub trait RBACService: Send + Sync {
 
 pub struct RBACServiceImpl {
     db: Arc<SqlitePool>,
+    permission_cache: Arc<dyn PermissionCache>,
 }
 
 impl RBACServiceImpl {
-    pub fn new(db: Arc<SqlitePool>) -> Self {
-        Self { db }
+    pub fn new(db: Arc<SqlitePool>, permission_cache: Arc<dyn PermissionCache>) -> Self {
+        Self { db, permission_cache }
     }
 }
 
@@ -36,6 +40,14 @@ struct Permission {
 #[async_trait]
 impl RBACService for RBACServiceImpl {
     async fn get_user_permissions(&self, user_id: &str) -> Result<Vec<String>, ServiceError> {
+        // 尝试从缓存获取权限
+        if let Some(cached_perms) = self.permission_cache.get(user_id).await {
+            tracing::debug!("Permission cache hit for user: {}", user_id);
+            return Ok(cached_perms);
+        }
+
+        // 缓存未命中，从数据库查询
+        tracing::debug!("Permission cache miss for user: {}, querying database", user_id);
         let permissions = sqlx::query_as::<_, Permission>(
             "SELECT p.name FROM permissions p
              JOIN role_permissions rp ON p.id = rp.permission_id
@@ -46,7 +58,17 @@ impl RBACService for RBACServiceImpl {
         .fetch_all(&*self.db)
         .await?;
 
-        Ok(permissions.into_iter().map(|p| p.name).collect())
+        let permission_names: Vec<String> = permissions.into_iter().map(|p| p.name).collect();
+
+        // 缓存查询结果
+        if let Err(e) = self.permission_cache
+            .set(user_id, permission_names.clone(), PERMISSION_CACHE_TTL)
+            .await {
+            tracing::warn!("Failed to cache permissions for user {}: {}", user_id, e);
+            // 不要因为缓存失败而影响权限查询，继续返回结果
+        }
+
+        Ok(permission_names)
     }
 
     async fn has_permission(

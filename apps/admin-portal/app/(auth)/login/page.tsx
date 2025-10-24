@@ -1,24 +1,25 @@
 'use client';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@repo/ui';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui';
 import { UsernamePasswordForm } from '@/components/auth/username-password-form';
-import { OAuthLoginButton } from '@/components/auth/oauth-login-button';
-import { ErrorDisplay } from '@/components/common/error-display';
-
-// 强制动态渲染，避免预渲染时访问浏览器API
-
 
 /**
- * 管理员门户登录页面
- * 提供用户名密码和OAuth两种登录方式，使用OAuth2.1授权流程
+ * Login 页面内容组件
+ *
+ * OAuth 流程说明：
+ * 1. 用户访问受保护资源但无有效 token → Middleware 重定向到 OAuth /authorize
+ * 2. OAuth /authorize 检查 session_token，如果没有 → 重定向到此 /login 页面
+ * 3. URL 参数包含 redirect（指向原始 /authorize URL）
+ * 4. 用户输入凭证 → 表单提交到 OAuth 服务的 /auth/login 端点
+ * 5. OAuth 验证凭证 → 设置 session_token cookie → 重定向回 redirect URL
+ * 6. /authorize 端点现在有 session_token → 继续授权流程
  */
-function LoginForm() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
+  const hasRedirect = !!redirect;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -39,41 +40,20 @@ function LoginForm() {
               />
             </svg>
           </div>
-          {/* 页面顶部标题，便于E2E用例定位 */}
-          <h1 className="text-2xl font-bold text-center mb-6">登录认证中心</h1>
           <CardTitle data-slot="card-title">登录认证中心</CardTitle>
           <CardDescription className="text-gray-600">
-            选择以下任一方式开始OAuth2.1认证流程
+            {hasRedirect
+              ? '正在进行授权流程，请输入您的凭证'
+              : '请输入您的凭证以继续'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {/* 用户名密码登录表单 */}
-            <UsernamePasswordForm />
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">或者</span>
-              </div>
-            </div>
-
-            {/* OAuth 快捷登录 */}
-            <OAuthLoginButton />
-
-            {/* 技术说明 */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">技术说明</h3>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• 使用OAuth2.1授权码流程</li>
-                <li>• 强制PKCE (Proof Key for Code Exchange)</li>
-                <li>• State参数防止CSRF攻击</li>
-                <li>• 安全的令牌交换机制</li>
-                <li>• 支持用户名密码和OAuth两种登录方式</li>
-              </ul>
-            </div>
+          <UsernamePasswordForm />
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-xs text-blue-800 text-center">
+              <strong>演示账户：</strong> username=admin, password=admin123
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -82,8 +62,17 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return <LoginForm />;
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-lg font-medium">加载中...</p>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
 }
 
-// 禁用预渲染，因为组件使用了浏览器专用API
 export const dynamic = 'force-dynamic';

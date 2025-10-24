@@ -17,6 +17,13 @@
     "test:e2e:ci": "playwright test --reporter=json",
     "test:e2e:full": "../../scripts/test-e2e.sh",
     "test:e2e:integration": "playwright test tests/e2e/oauth2.1-flow.spec.ts",
+    "test:oauth": "./run-oauth-e2e-tests.sh",
+    "test:oauth:headed": "./run-oauth-e2e-tests.sh --headed",
+    "test:oauth:debug": "./run-oauth-e2e-tests.sh --debug",
+    "test:oauth:ui": "./run-oauth-e2e-tests.sh --ui",
+    "test:oauth:skip-start": "PLAYWRIGHT_SKIP_SERVER_START=1 playwright test tests/e2e/oauth-client-flow.spec.ts",
+    "test:oauth:suite1": "PLAYWRIGHT_SKIP_SERVER_START=1 playwright test tests/e2e/oauth-client-flow.spec.ts -g 'Suite 1'",
+    "test:oauth:suite5": "PLAYWRIGHT_SKIP_SERVER_START=1 playwright test tests/e2e/oauth-client-flow.spec.ts -g 'Suite 5'",
     "playwright:install": "playwright install chromium"
   },
   "dependencies": {

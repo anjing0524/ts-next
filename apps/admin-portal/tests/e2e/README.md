@@ -1,136 +1,100 @@
-# E2E测试策略文档
+# OAuth 2.1 授权码流程 E2E 测试
 
-## 测试目标
+## 概述
 
-验证admin-portal与oauth-service的完整集成，确保：
-1. OAuth 2.1认证流程正确实现
-2. RBAC权限系统有效工作
-3. 管理功能正常运行
-4. 错误处理机制健壮
+本测试套件提供了完整的 OAuth 2.1 授权码流程（带 PKCE）的端到端测试，包含 **8 个测试套件，25+ 个具体测试用例**。
 
-## 测试范围
+## 测试覆盖范围
 
-### 1. 认证流程测试
-- 用户名/密码登录
-- OAuth 2.1授权码流程（PKCE）
-- 会话管理
-- 登出功能
-- 令牌刷新
+### Suite 1: OAuth 流程启动 (2 个测试)
+- ✅ 1.1: 无 token 访问受保护页面应重定向到 OAuth authorize
+- ✅ 1.2: middleware 应生成并存储正确的 PKCE 参数
 
-### 2. 权限系统测试
-- 角色权限验证
-- 页面级权限控制
-- 按钮级权限控制
-- API权限验证
-- 权限继承和覆盖
+### Suite 2: Login 页面 (4 个测试)
+- ✅ 2.1: authorize 无 session_token 时应重定向到 login
+- ✅ 2.2: login 页面应正确显示并包含必要的表单元素
+- ✅ 2.3: 使用无效凭证登录应失败
+- ✅ 2.4: 使用有效凭证登录应成功并设置 session_token
 
-### 3. 管理功能测试
-- 用户管理（CRUD）
-- 角色管理（CRUD）
-- 权限管理（CRUD）
-- 客户端管理（CRUD）
-- 审计日志查看
+### Suite 3: Consent 页面 (3 个测试)
+- ✅ 3.1: 登录后应显示 consent 页面
+- ✅ 3.2: 同意授权应返回 authorization_code
+- ✅ 3.3: 拒绝授权应返回错误或重定向到错误页面
 
-### 4. 集成测试
-- 服务间通信
-- 数据一致性
-- 错误处理
-- 性能表现
+### Suite 4: Callback 处理 (2 个测试)
+- ✅ 4.1: callback 应验证 state 参数防止 CSRF 攻击
+- ✅ 4.2: callback 应正确交换授权码为 access_token
 
-## 测试环境
+### Suite 5: 完整流程 (1 个测试)
+- ✅ 5.1: 端到端完整 OAuth 2.1 授权码流程（PKCE）
 
-### 服务配置
-- oauth-service: localhost:3001
-- admin-portal: localhost:3002
-- 测试数据库: SQLite (test.db)
+### Suite 6: Pingora 配置 (2 个测试)
+- ✅ 6.1: 所有路由应通过 Pingora (6188) 端口
+- ✅ 6.2: Cookie 应通过 Pingora 正确传递
 
-### 测试数据
-- 预定义测试用户
-- 标准角色和权限
-- 测试OAuth客户端
+### Suite 7: 安全性 (4 个测试)
+- ✅ 7.1: PKCE 参数应符合规范要求
+- ✅ 7.2: 无效的 authorization_code 应被拒绝
+- ✅ 7.3: state 参数验证应防止 CSRF 攻击
+- ✅ 7.4: Token 应包含必要的声明 (claims)
 
-## 测试执行策略
+### Suite 8: 边界情况 (3 个测试)
+- ✅ 8.1: 重复提交登录表单应正确处理
+- ✅ 8.2: 过期的 authorization_code 应被拒绝
+- ✅ 8.3: 缺少必需参数的 authorize 请求应被拒绝
 
-### 测试套件结构
-```
-tests/e2e/specs/
-├── 01-authentication.spec.ts    # 认证流程测试
-├── 02-permissions.spec.ts        # 权限系统测试
-├── 03-user-management.spec.ts    # 用户管理测试
-├── 04-role-management.spec.ts    # 角色管理测试
-├── 05-client-management.spec.ts  # 客户端管理测试
-├── 06-audit-logs.spec.ts         # 审计日志测试
-└── 07-error-handling.spec.ts     # 错误处理测试
+## 快速开始
+
+### 方式 1: 自动启动服务
+```bash
+cd apps/admin-portal
+npx playwright test tests/e2e/oauth-client-flow.spec.ts
 ```
 
-### 执行顺序
-1. 按数字顺序执行测试套件
-2. 每个套件内部并行执行
-3. 失败时停止执行
+### 方式 2: 手动启动服务（推荐）
+```bash
+# 终端 1
+cd apps/oauth-service-rust && cargo run
 
-### 数据管理
-- 每个测试使用独立数据
-- 测试前后清理数据
-- 使用事务回滚
+# 终端 2
+cd apps/admin-portal && pnpm dev
 
-## 关键测试场景
+# 终端 3
+cd apps/pingora-proxy && cargo run
 
-### 认证场景
-1. **成功登录流程**
-   - 输入有效凭据
-   - 验证重定向到仪表盘
-   - 检查会话建立
+# 终端 4
+cd apps/admin-portal
+PLAYWRIGHT_SKIP_SERVER_START=1 npx playwright test tests/e2e/oauth-client-flow.spec.ts
+```
 
-2. **OAuth授权流程**
-   - 触发OAuth流程
-   - 在oauth-service登录
-   - 同意授权
-   - 验证令牌交换
+## 测试命令
 
-3. **权限验证**
-   - 不同角色用户登录
-   - 验证可见菜单
-   - 验证可操作按钮
+```bash
+# 运行所有测试
+npx playwright test tests/e2e/oauth-client-flow.spec.ts
 
-### 管理场景
-1. **用户创建**
-   - 填写用户信息
-   - 分配角色
-   - 验证创建成功
+# 运行特定 Suite
+npx playwright test tests/e2e/oauth-client-flow.spec.ts -g "Suite 1"
 
-2. **权限修改**
-   - 编辑角色权限
-   - 验证权限生效
-   - 检查权限继承
+# 有头模式
+npx playwright test tests/e2e/oauth-client-flow.spec.ts --headed
 
-## 测试报告
+# 调试模式
+npx playwright test tests/e2e/oauth-client-flow.spec.ts --debug
 
-### 输出格式
-- JSON格式详细报告
-- 失败时截图和视频
-- 测试执行追踪
+# UI 模式
+npx playwright test tests/e2e/oauth-client-flow.spec.ts --ui
+```
 
-### 指标监控
-- 测试通过率
-- 执行时间
-- 失败原因分析
+## 辅助工具函数
 
-## 问题处理
+位于 `helpers/oauth-helpers.ts`：
 
-### 常见问题
-1. **服务启动失败**
-   - 检查端口占用
-   - 验证环境变量
+- `generateCodeVerifier()` - 生成 PKCE code_verifier
+- `generateCodeChallenge()` - 生成 code_challenge
+- `validatePKCEParams()` - 验证 PKCE 参数
+- `loginAndGetConsent()` - 登录到 consent 页面
+- `completeOAuthFlow()` - 完成完整流程并获取 token
+- `decodeJWT()` - 解码 JWT token
 
-2. **测试数据问题**
-   - 重新初始化数据库
-   - 检查数据一致性
-
-3. **权限错误**
-   - 验证角色配置
-   - 检查权限映射
-
-### 调试工具
-- Playwright UI模式
-- 浏览器开发者工具
-- 数据库查看器
+详见文件内的完整文档。

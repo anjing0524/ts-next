@@ -66,7 +66,13 @@ async function globalSetup() {
       try {
         const response = await fetch(url);
         if (response.ok) {
-          const healthData = await response.json();
+          const text = await response.text();
+          let healthData: any;
+          try {
+            healthData = JSON.parse(text);
+          } catch {
+            healthData = { status: text.trim() || 'healthy' };
+          }
           console.log(`✅ ${serviceName} 服务已就绪 (${healthData.status || 'healthy'})`);
           return healthData;
         }
@@ -79,7 +85,7 @@ async function globalSetup() {
   };
 
   // 等待OAuth服务启动
-  const oauthHealth = await checkServiceHealth('http://localhost:3001/api/v2/health', 'OAuth服务');
+  const oauthHealth = await checkServiceHealth('http://localhost:3001/health', 'OAuth服务');
   
   // 等待Admin门户启动 - 使用页面健康检查
   const adminHealth = await checkServiceHealth('http://localhost:3002/api/health', 'Admin门户');
@@ -88,10 +94,10 @@ async function globalSetup() {
   console.log('🔍 验证数据库连接...');
   try {
     // Database health is included in the main health check response
-    const healthCheck = await fetch('http://localhost:3001/api/v2/health');
+    const healthCheck = await fetch('http://localhost:3001/health');
     if (healthCheck.ok) {
-      const healthData = await healthCheck.json();
-      if (healthData.services?.database === 'healthy') {
+      const text = await healthCheck.text();
+      if (text.includes('OK') || text.includes('healthy')) {
         console.log('✅ 数据库连接正常');
       } else {
         console.warn('⚠️  数据库连接检查失败，但继续测试');

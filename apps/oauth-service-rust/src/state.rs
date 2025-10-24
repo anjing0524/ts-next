@@ -9,6 +9,7 @@ use crate::services::{
     token_service::{TokenService, TokenServiceImpl},
     user_service::{UserService, UserServiceImpl},
 };
+use crate::cache::permission_cache::{PermissionCache, InMemoryPermissionCache};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
 
@@ -21,6 +22,7 @@ pub struct AppState {
     pub rbac_service: Arc<dyn RBACService>,
     pub permission_service: Arc<dyn PermissionService>,
     pub role_service: Arc<dyn RoleService>,
+    pub permission_cache: Arc<dyn PermissionCache>,
 }
 
 impl AppState {
@@ -34,12 +36,15 @@ impl AppState {
         let db_pool = Arc::new(pool);
         let config = Arc::new(config);
 
+        // Initialize cache with 1000 user capacity
+        let permission_cache = Arc::new(InMemoryPermissionCache::with_capacity(1000));
+
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(db_pool.clone()));
         let client_service = Arc::new(ClientServiceImpl::new(db_pool.clone()));
-        let rbac_service = Arc::new(RBACServiceImpl::new(db_pool.clone()));
+        let rbac_service = Arc::new(RBACServiceImpl::new(db_pool.clone(), permission_cache.clone()));
         let permission_service = Arc::new(PermissionServiceImpl::new(db_pool.clone()));
-        let role_service = Arc::new(RoleServiceImpl::new(db_pool.clone()));
+        let role_service = Arc::new(RoleServiceImpl::new(db_pool.clone(), permission_cache.clone()));
         let token_service = Arc::new(TokenServiceImpl::new(
             db_pool.clone(),
             client_service.clone(),
@@ -60,6 +65,7 @@ impl AppState {
             rbac_service,
             permission_service,
             role_service,
+            permission_cache,
         })
     }
 
@@ -68,12 +74,15 @@ impl AppState {
         pool: Arc<sqlx::SqlitePool>,
         config: Arc<Config>,
     ) -> Result<Self, AppError> {
+        // Initialize cache with 1000 user capacity
+        let permission_cache = Arc::new(InMemoryPermissionCache::with_capacity(1000));
+
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
         let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
-        let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+        let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache.clone()));
         let permission_service = Arc::new(PermissionServiceImpl::new(pool.clone()));
-        let role_service = Arc::new(RoleServiceImpl::new(pool.clone()));
+        let role_service = Arc::new(RoleServiceImpl::new(pool.clone(), permission_cache.clone()));
         let token_service = Arc::new(TokenServiceImpl::new(
             pool.clone(),
             client_service.clone(),
@@ -94,6 +103,7 @@ impl AppState {
             rbac_service,
             permission_service,
             role_service,
+            permission_cache,
         })
     }
 }

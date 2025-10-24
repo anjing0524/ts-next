@@ -36,6 +36,7 @@ pub trait ClientService: Send + Sync {
         is_active: Option<bool>,
     ) -> Result<OAuthClientDetails, ServiceError>;
     async fn delete_client(&self, client_id: &str) -> Result<(), ServiceError>;
+    async fn get_internal_client(&self) -> Result<OAuthClientDetails, ServiceError>;
 }
 
 pub struct ClientServiceImpl {
@@ -403,6 +404,16 @@ impl ClientService for ClientServiceImpl {
         .await?;
 
         Ok(())
+    }
+
+    async fn get_internal_client(&self) -> Result<OAuthClientDetails, ServiceError> {
+        self.find_by_client_id("admin-portal-client")
+            .await?
+            .ok_or_else(|| {
+                ServiceError::NotFound(
+                    "Internal client 'admin-portal-client' not found".to_string(),
+                )
+            })
     }
 }
 

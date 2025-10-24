@@ -1,32 +1,41 @@
-/**
- * AuthProvider - Enhanced authentication provider with automatic token refresh
- * 
- * Provides:
- * - Global authentication state management
- * - Automatic token refresh
- * - Event-driven architecture
- * - Session continuity
- * - Error handling and recovery
- */
-
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { useAuth as useBaseAuth } from '@repo/ui';
-import { TokenRefreshManager, AuthEventListener } from '../../lib/auth/token-refresh';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { TokenStorage } from '../../lib/auth/token-storage';
 import { User } from '../../types/auth';
+import { oauthClient } from '@/lib/oauth-client';
+
+// Helper to generate random strings for PKCE
+const generateRandomString = (length: number): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let result = '';
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+};
+
+// Helper to generate PKCE code challenge
+const generateCodeChallenge = async (verifier: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return window
+    .btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+};
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  login: (accessToken: string, refreshToken: string) => Promise<void>;
   logout: () => void;
-  refreshToken: () => Promise<void>;
-  tokenStatus: ReturnType<TokenRefreshManager['getTokenStatus']>;
-  addAuthListener: (listener: AuthEventListener) => void;
-  removeAuthListener: (listener: AuthEventListener) => void;
+  initiateLogin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,177 +48,105 @@ export function useAuth() {
   return context;
 }
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const { login: baseLogin, logout: baseLogout, user: baseUser } = useBaseAuth();
-  const [user, setUser] = useState<User | null>(baseUser as User | null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [tokenStatus, setTokenStatus] = useState<ReturnType<TokenRefreshManager['getTokenStatus']>>({
-    hasAccessToken: false,
-    hasRefreshToken: false,
-    isExpiringSoon: false,
-    isExpired: false,
-    timeUntilExpiration: 0,
-    autoRefreshActive: false,
-  });
 
-  const tokenRefreshManager = useRef<TokenRefreshManager | null>(null);
-  const authListeners = useRef<AuthEventListener[]>([]);
+  const fetchUserInfo = useCallback(async (accessToken: string): Promise<User | null> => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL}/api/v2/oauth/userinfo`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch user info:', error);
+      return null;
+    }
+  }, []);
 
-  // 初始化认证状态
   useEffect(() => {
     const initializeAuth = async () => {
-      try {
-        setIsLoading(true);
-        
-        // 检查是否有有效的访问令牌
-        const accessToken = TokenStorage.getAccessToken();
-        if (accessToken) {
-          // 获取用户信息
-          const response = await fetch('/api/v2/users/me', {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-            baseLogin(userData);
-          } else {
-            // 令牌无效，清除存储
-            TokenStorage.clearTokens();
-          }
+      const accessToken = TokenStorage.getAccessToken();
+      if (accessToken) {
+        const userInfo = await fetchUserInfo(accessToken);
+        if (userInfo) {
+          setUser(userInfo);
         }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
     };
-
     initializeAuth();
-  }, [baseLogin]);
+  }, [fetchUserInfo]);
 
-  // 初始化令牌刷新管理器
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      tokenRefreshManager.current = new TokenRefreshManager();
-      
-      // 添加内部事件监听器
-      const internalListener: AuthEventListener = {
-        onTokenRefreshed: () => {
-          updateTokenStatus();
-        },
-        onRefreshFailed: (error) => {
-          console.warn('Token refresh failed:', error);
-        }
-      };
+  const login = useCallback(
+    async (accessToken: string, refreshToken: string) => {
+      TokenStorage.setTokens(accessToken, refreshToken);
+      const userInfo = await fetchUserInfo(accessToken);
+      if (userInfo) {
+        setUser(userInfo);
+      }
+    },
+    [fetchUserInfo],
+  );
 
-      tokenRefreshManager.current.addEventListener(internalListener);
-      
-      // 启动自动刷新
-      tokenRefreshManager.current.startAutoRefresh();
-      
-      // 定期更新令牌状态
-      const statusInterval = setInterval(updateTokenStatus, 30000); // 每30秒更新一次
-      
-      return () => {
-        if (tokenRefreshManager.current) {
-          tokenRefreshManager.current.removeEventListener(internalListener);
-          tokenRefreshManager.current.destroy();
-        }
-        clearInterval(statusInterval);
-      };
-    }
+  const initiateLogin = useCallback(async () => {
+    setIsLoading(true);
+    const state = generateRandomString(32);
+    const codeVerifier = generateRandomString(128);
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    sessionStorage.setItem('oauth_state', state);
+    sessionStorage.setItem('oauth_code_verifier', codeVerifier);
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal',
+      redirect_uri: `${window.location.origin}/auth/callback`,
+      scope: 'openid profile email offline_access',
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    });
+
+    const authorizeUrl = `${
+      process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL
+    }/api/v2/oauth/authorize?${params.toString()}`;
+
+    window.location.href = authorizeUrl;
   }, []);
 
-  // 更新令牌状态
-  const updateTokenStatus = useCallback(() => {
-    if (tokenRefreshManager.current) {
-      setTokenStatus(tokenRefreshManager.current.getTokenStatus());
+  const logout = useCallback(() => {
+    const refreshToken = TokenStorage.getRefreshToken();
+    if (refreshToken) {
+      oauthClient.exchangeToken({ // Using exchangeToken for revoke, assuming endpoint is the same
+        token: refreshToken,
+        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal',
+      }).catch(err => console.error('Failed to revoke token:', err));
     }
-  }, []);
-
-  // 登录处理
-  const login = useCallback((userData: User) => {
-    setUser(userData);
-    baseLogin(userData);
-    
-    // 启动令牌自动刷新
-    if (tokenRefreshManager.current) {
-      tokenRefreshManager.current.startAutoRefresh();
-    }
-  }, [baseLogin]);
-
-  // 登出处理
-  const handleLogout = useCallback(() => {
-    setUser(null);
-    baseLogout();
     TokenStorage.clearTokens();
-    
-    // 销毁令牌刷新管理器
-    if (tokenRefreshManager.current) {
-      tokenRefreshManager.current.destroy();
-      tokenRefreshManager.current = null;
-    }
-  }, [baseLogout]);
+    setUser(null);
+    router.push('/login');
+  }, [router]);
 
-  // 刷新令牌
-  const refreshToken = useCallback(async () => {
-    if (!tokenRefreshManager.current) {
-      throw new Error('Token refresh manager not initialized');
-    }
-    
-    try {
-      await tokenRefreshManager.current.refreshTokens();
-    } catch (error) {
-      console.error('Manual token refresh failed:', error);
-      throw error;
-    }
-  }, []);
-
-  // 添加认证监听器
-  const addAuthListener = useCallback((listener: AuthEventListener) => {
-    authListeners.current.push(listener);
-    if (tokenRefreshManager.current) {
-      tokenRefreshManager.current.addEventListener(listener);
-    }
-  }, []);
-
-  // 移除认证监听器
-  const removeAuthListener = useCallback((listener: AuthEventListener) => {
-    const index = authListeners.current.indexOf(listener);
-    if (index > -1) {
-      authListeners.current.splice(index, 1);
-    }
-    if (tokenRefreshManager.current) {
-      tokenRefreshManager.current.removeEventListener(listener);
-    }
-  }, []);
-
-  // 计算认证状态
-  const isAuthenticated = !!user && tokenStatus.hasAccessToken && !tokenStatus.isExpired;
+  const isAuthenticated = !!user;
 
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated,
     login,
-    logout: handleLogout,
-    refreshToken,
-    tokenStatus,
-    addAuthListener,
-    removeAuthListener,
+    logout,
+    initiateLogin,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

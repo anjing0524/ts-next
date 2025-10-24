@@ -47,6 +47,7 @@ pub async fn auth_middleware(
         "/api/v2/oauth/authorize",
         "/api/v2/oauth/introspect",
         "/api/v2/oauth/revoke",
+        "/api/v2/auth/authenticate",
     ];
 
     let path = request.uri().path();

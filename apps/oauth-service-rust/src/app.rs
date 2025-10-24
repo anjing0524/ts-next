@@ -34,6 +34,9 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
             post(routes::oauth::introspect_endpoint),
         )
         .route("/api/v2/oauth/revoke", post(routes::oauth::revoke_endpoint))
+        // 认证端点 (公开)
+        .route("/api/v2/auth/login", post(routes::oauth::login_endpoint))
+        .route("/api/v2/auth/authenticate", post(routes::oauth::authenticate_endpoint))
         // 客户端管理端点
         .route(
             "/api/v2/admin/clients",
