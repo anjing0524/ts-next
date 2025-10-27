@@ -143,18 +143,18 @@ impl TokenService for TokenServiceImpl {
             let refresh_token_hash = crate::utils::crypto::hash_password(&refresh_token)?;
             let refresh_id = Uuid::new_v4().to_string();
 
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO refresh_tokens (id, token, token_hash, jti, user_id, client_id, scope, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                refresh_id,
-                refresh_token,
-                refresh_token_hash,
-                refresh_jti,
-                uid,
-                client.client.id,
-                scope,
-                refresh_token_exp,
-                now
             )
+            .bind(&refresh_id)
+            .bind(&refresh_token)
+            .bind(&refresh_token_hash)
+            .bind(&refresh_jti)
+            .bind(&uid)
+            .bind(&client.client.id)
+            .bind(&scope)
+            .bind(&refresh_token_exp)
+            .bind(&now)
             .execute(&*self.db)
             .await?;
 
@@ -215,11 +215,11 @@ impl TokenService for TokenServiceImpl {
 
         // 3. Implement refresh token rotation: revoke the old token
         let now = Utc::now();
-        sqlx::query!(
+        sqlx::query(
             "UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = ? WHERE id = ?",
-            now,
-            stored_token.id
         )
+        .bind(&now)
+        .bind(&stored_token.id)
         .execute(&*self.db)
         .await?;
 
@@ -306,28 +306,28 @@ impl TokenService for TokenServiceImpl {
         let token_type = token_type_hint.unwrap_or("refresh_token");
 
         // 3. Add to blacklist
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO token_blacklist (id, jti, token_type, user_id, client_id, expires_at, reason, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            token_id,
-            jti,
-            token_type,
-            claims.sub,
-            claims.client_id,
-            expires_at,
-            "User initiated revocation",
-            now
         )
+        .bind(&token_id)
+        .bind(jti)
+        .bind(&token_type)
+        .bind(&claims.sub)
+        .bind(&claims.client_id)
+        .bind(&expires_at)
+        .bind("User initiated revocation")
+        .bind(&now)
         .execute(&*self.db)
         .await?;
 
         // 4. If it's a refresh token, also mark it as revoked in refresh_tokens table
         if token_type == "refresh_token" {
-            sqlx::query!(
+            sqlx::query(
                 "UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = ? WHERE jti = ?",
-                now,
-                jti
             )
+            .bind(&now)
+            .bind(jti)
             .execute(&*self.db)
             .await?;
         }
@@ -347,11 +347,11 @@ impl TokenService for TokenServiceImpl {
         let now = Utc::now();
 
         // Check token_blacklist table
-        let blacklist_entry = sqlx::query!(
+        let blacklist_entry: Option<(String,)> = sqlx::query_as(
             "SELECT id FROM token_blacklist WHERE jti = ? AND expires_at > ?",
-            jti,
-            now
         )
+        .bind(jti)
+        .bind(&now)
         .fetch_optional(&*self.db)
         .await?;
 
@@ -413,12 +413,12 @@ mod tests {
 
     async fn create_test_user(pool: &SqlitePool) -> String {
         let user_id = Uuid::new_v4().to_string();
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
-            user_id,
-            "testuser",
-            "hashedpassword"
         )
+        .bind(&user_id)
+        .bind("testuser")
+        .bind("hashedpassword")
         .execute(pool)
         .await
         .expect("Failed to create test user");

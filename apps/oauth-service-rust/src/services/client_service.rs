@@ -195,72 +195,72 @@ impl ClientService for ClientServiceImpl {
 
         let mut tx = self.db.begin().await?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO oauth_clients (
                 id, client_id, client_secret, name, client_type,
                 is_active, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-            id,
-            client_id,
-            client_secret_hash,
-            request.name,
-            client_type_str,
-            true, // is_active
-            now,
-            now
         )
+        .bind(&id)
+        .bind(&client_id)
+        .bind(&client_secret_hash)
+        .bind(&request.name)
+        .bind(&client_type_str)
+        .bind(true) // is_active
+        .bind(&now)
+        .bind(&now)
         .execute(&mut *tx)
         .await?;
 
         for uri in &request.redirect_uris {
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO client_redirect_uris (client_id, uri) VALUES (?, ?)",
-                id,
-                uri
             )
+            .bind(&id)
+            .bind(uri)
             .execute(&mut *tx)
             .await?;
         }
 
         for grant in &request.grant_types {
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO client_grant_types (client_id, grant_type) VALUES (?, ?)",
-                id,
-                grant
             )
+            .bind(&id)
+            .bind(grant)
             .execute(&mut *tx)
             .await?;
         }
 
         for res_type in &request.response_types {
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO client_response_types (client_id, response_type) VALUES (?, ?)",
-                id,
-                res_type
             )
+            .bind(&id)
+            .bind(res_type)
             .execute(&mut *tx)
             .await?;
         }
 
         for scope in &request.allowed_scopes {
-            sqlx::query!(
+            sqlx::query(
                 "INSERT INTO client_allowed_scopes (client_id, scope) VALUES (?, ?)",
-                id,
-                scope
             )
+            .bind(&id)
+            .bind(scope)
             .execute(&mut *tx)
             .await?;
         }
 
         if let Some(permissions) = &request.client_permissions {
             for perm in permissions {
-                sqlx::query!(
+                sqlx::query(
                     "INSERT INTO client_permissions (client_id, permission) VALUES (?, ?)",
-                    id,
-                    perm
                 )
+                .bind(&id)
+                .bind(perm)
                 .execute(&mut *tx)
                 .await?;
             }
@@ -334,47 +334,47 @@ impl ClientService for ClientServiceImpl {
         let new_is_active = is_active.unwrap_or(existing_client.is_active);
         let now = Utc::now();
 
-        sqlx::query!(
+        sqlx::query(
             "UPDATE oauth_clients SET name = ?, is_active = ?, updated_at = ? WHERE id = ?",
-            new_name,
-            new_is_active,
-            now,
-            existing_client.id
         )
+        .bind(&new_name)
+        .bind(&new_is_active)
+        .bind(&now)
+        .bind(&existing_client.id)
         .execute(&mut *tx)
         .await?;
 
         if let Some(uris) = redirect_uris {
-            sqlx::query!(
+            sqlx::query(
                 "DELETE FROM client_redirect_uris WHERE client_id = ?",
-                existing_client.id
             )
+            .bind(&existing_client.id)
             .execute(&mut *tx)
             .await?;
             for uri in &uris {
-                sqlx::query!(
+                sqlx::query(
                     "INSERT INTO client_redirect_uris (client_id, uri) VALUES (?, ?)",
-                    existing_client.id,
-                    uri
                 )
+                .bind(&existing_client.id)
+                .bind(uri)
                 .execute(&mut *tx)
                 .await?;
             }
         }
 
         if let Some(scopes) = allowed_scopes {
-            sqlx::query!(
+            sqlx::query(
                 "DELETE FROM client_allowed_scopes WHERE client_id = ?",
-                existing_client.id
             )
+            .bind(&existing_client.id)
             .execute(&mut *tx)
             .await?;
             for scope in &scopes {
-                sqlx::query!(
+                sqlx::query(
                     "INSERT INTO client_allowed_scopes (client_id, scope) VALUES (?, ?)",
-                    existing_client.id,
-                    scope
                 )
+                .bind(&existing_client.id)
+                .bind(scope)
                 .execute(&mut *tx)
                 .await?;
             }
@@ -394,12 +394,12 @@ impl ClientService for ClientServiceImpl {
             .ok_or_else(|| ServiceError::NotFound(format!("Client '{client_id}' not found")))?;
 
         let now = Utc::now();
-        sqlx::query!(
+        sqlx::query(
             "UPDATE oauth_clients SET is_active = ?, updated_at = ? WHERE id = ?",
-            false,
-            now,
-            client.client.id
         )
+        .bind(false)
+        .bind(&now)
+        .bind(&client.client.id)
         .execute(&*self.db)
         .await?;
 

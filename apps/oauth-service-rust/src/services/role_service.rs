@@ -96,20 +96,20 @@ impl RoleService for RoleServiceImpl {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO roles (id, name, display_name, description, is_system_role, is_active, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-            id,
-            name,
-            name, // display_name 默认与 name 相同
-            description,
-            false, // is_system_role
-            true, // is_active
-            now,
-            now
         )
+        .bind(&id)
+        .bind(&name)
+        .bind(&name) // display_name 默认与 name 相同
+        .bind(&description)
+        .bind(false) // is_system_role
+        .bind(true) // is_active
+        .bind(&now)
+        .bind(&now)
         .execute(&*self.db)
         .await?;
 
@@ -189,14 +189,14 @@ impl RoleService for RoleServiceImpl {
         let now = Utc::now();
 
         // 执行更新
-        sqlx::query!(
+        sqlx::query(
             "UPDATE roles SET name = ?, display_name = ?, description = ?, updated_at = ? WHERE id = ?",
-            new_name,
-            new_name, // display_name 与 name 相同
-            new_description,
-            now,
-            role_id
         )
+        .bind(&new_name)
+        .bind(&new_name) // display_name 与 name 相同
+        .bind(&new_description)
+        .bind(&now)
+        .bind(role_id)
         .execute(&*self.db)
         .await?;
 
@@ -290,12 +290,12 @@ impl RoleService for RoleServiceImpl {
 
             if !exists {
                 let now = Utc::now();
-                sqlx::query!(
+                sqlx::query(
                     "INSERT INTO role_permissions (role_id, permission_id, assigned_at) VALUES (?, ?, ?)",
-                    role_id,
-                    permission_id,
-                    now
                 )
+                .bind(role_id)
+                .bind(&permission_id)
+                .bind(&now)
                 .execute(&mut *tx)
                 .await?;
             }
@@ -320,11 +320,11 @@ impl RoleService for RoleServiceImpl {
         let mut tx = self.db.begin().await?;
 
         for permission_id in permission_ids {
-            sqlx::query!(
+            sqlx::query(
                 "DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?",
-                role_id,
-                permission_id
             )
+            .bind(role_id)
+            .bind(&permission_id)
             .execute(&mut *tx)
             .await?;
         }
@@ -395,12 +395,12 @@ impl RoleService for RoleServiceImpl {
         }
 
         let now = Utc::now();
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, ?)",
-            user_id,
-            role_id,
-            now
         )
+        .bind(user_id)
+        .bind(role_id)
+        .bind(&now)
         .execute(&mut *tx)
         .await?;
 
@@ -432,11 +432,11 @@ impl RoleService for RoleServiceImpl {
             ));
         }
 
-        sqlx::query!(
+        sqlx::query(
             "DELETE FROM user_roles WHERE user_id = ? AND role_id = ?",
-            user_id,
-            role_id
         )
+        .bind(user_id)
+        .bind(role_id)
         .execute(&mut *tx)
         .await?;
 
@@ -610,28 +610,28 @@ mod tests {
         let perm1_id = Uuid::new_v4().to_string();
         let perm2_id = Uuid::new_v4().to_string();
 
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO permissions (id, name, display_name, resource, action, type) VALUES (?, ?, ?, ?, ?, ?)",
-            perm1_id,
-            "user:read",
-            "user:read", // display_name
-            "user",      // resource
-            "read",      // action
-            PermissionType::API as PermissionType
         )
+        .bind(&perm1_id)
+        .bind("user:read")
+        .bind("user:read") // display_name
+        .bind("user")      // resource
+        .bind("read")      // action
+        .bind(PermissionType::API.to_string())
         .execute(&*db)
         .await
         .unwrap();
 
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO permissions (id, name, display_name, resource, action, type) VALUES (?, ?, ?, ?, ?, ?)",
-            perm2_id,
-            "user:write",
-            "user:write", // display_name
-            "user",       // resource
-            "write",      // action
-            PermissionType::API as PermissionType
         )
+        .bind(&perm2_id)
+        .bind("user:write")
+        .bind("user:write") // display_name
+        .bind("user")       // resource
+        .bind("write")      // action
+        .bind(PermissionType::API.to_string())
         .execute(&*db)
         .await
         .unwrap();
@@ -661,12 +661,12 @@ mod tests {
             .unwrap();
 
         let user_id = Uuid::new_v4().to_string();
-        sqlx::query!(
+        sqlx::query(
             "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
-            user_id,
-            "testuser",
-            "hash"
         )
+        .bind(&user_id)
+        .bind("testuser")
+        .bind("hash")
         .execute(&*db)
         .await
         .unwrap();
