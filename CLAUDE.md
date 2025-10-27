@@ -313,6 +313,7 @@ python3 tests/oauth_sso_e2e.py
 - 更新代码的时候记得实时更新Claude.md
 - 保持中文对话
 - OAuth SSO 集成相关修改：见 `OAUTH_2_1_SSO_IMPLEMENTATION_SUMMARY.md`
+- OAuth Service Rust 集成：见 `OAUTH_SERVICE_RUST_INTEGRATION.md`（2024-10-27 完成）
 - 自动化测试：见 `OAUTH_2_1_E2E_TESTING.md`
 - Login 页面实现：见 `LOGIN_PAGE_QUICK_REFERENCE.md` 和 `LOGIN_PAGE_IMPLEMENTATION_TASK.md`
 
