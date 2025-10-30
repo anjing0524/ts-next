@@ -21,15 +21,43 @@ export function generateRandomString(length: number): string {
  * 生成PKCE code challenge
  * @param codeVerifier code verifier
  * @returns code challenge
+ *
+ * 支持浏览器和 Node.js 环境
  */
 export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  // 检测是否在 Node.js 环境中
+  if (typeof globalThis !== 'undefined' && typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
+    // Web API 方式（浏览器和 Node.js 18+）
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(codeVerifier);
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+      return btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+    } catch (err) {
+      // 如果 Web API 失败，回退到 Node.js crypto
+      console.debug('Web API crypto failed, falling back to Node.js crypto:', err);
+    }
+  }
+
+  // Node.js 方式（使用原生 crypto 模块）
+  try {
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256');
+    hash.update(codeVerifier);
+    const digest = hash.digest('base64');
+
+    // 转换为 Base64URL
+    return digest
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (err) {
+    console.error('Failed to generate code challenge:', err);
+    throw new Error('Failed to generate code challenge');
+  }
 }
 
 /**

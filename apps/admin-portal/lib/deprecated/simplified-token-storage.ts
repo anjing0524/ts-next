@@ -129,7 +129,7 @@ export class SimplifiedTokenStorage {
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
       const [cookieName, cookieValue] = cookie.trim().split('=');
-      if (cookieName === name) {
+      if (cookieName === name && cookieValue) {
         return decodeURIComponent(cookieValue);
       }
     }

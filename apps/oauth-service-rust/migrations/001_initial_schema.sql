@@ -58,37 +58,37 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
 );
 
 -- 客户端关联表
-CREATE TABLE client_redirect_uris (
+CREATE TABLE IF NOT EXISTS client_redirect_uris (
     client_id TEXT NOT NULL,
     uri TEXT NOT NULL,
     PRIMARY KEY (client_id, uri),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_grant_types (
+CREATE TABLE IF NOT EXISTS client_grant_types (
     client_id TEXT NOT NULL,
     grant_type TEXT NOT NULL,
     PRIMARY KEY (client_id, grant_type),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_response_types (
+CREATE TABLE IF NOT EXISTS client_response_types (
     client_id TEXT NOT NULL,
     response_type TEXT NOT NULL,
     PRIMARY KEY (client_id, response_type),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_allowed_scopes (
+CREATE TABLE IF NOT EXISTS client_allowed_scopes (
     client_id TEXT NOT NULL,
     scope TEXT NOT NULL,
     PRIMARY KEY (client_id, scope),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_permissions (
+CREATE TABLE IF NOT EXISTS client_permissions (
     client_id TEXT NOT NULL,
     permission TEXT NOT NULL,
     PRIMARY KEY (client_id, permission),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_ip_whitelist (
+CREATE TABLE IF NOT EXISTS client_ip_whitelist (
     client_id TEXT NOT NULL,
     ip_address TEXT NOT NULL,
     PRIMARY KEY (client_id, ip_address),

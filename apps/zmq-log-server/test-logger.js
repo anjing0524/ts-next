@@ -98,7 +98,7 @@ async function testLogger() {
         'info',
         'OAuth服务启动',
         JSON.stringify({
-            service: 'oauth-service',
+            service: 'oauth-service-rust',
             version: '1.0.0',
             port: 3001
         }),

@@ -1,0 +1,6 @@
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/lazy_static-fb8df6f77a1e8223.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/core_lazy.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/liblazy_static-fb8df6f77a1e8223.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/core_lazy.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/lazy_static-1.5.0/src/core_lazy.rs:

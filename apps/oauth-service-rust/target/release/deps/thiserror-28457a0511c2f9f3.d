@@ -1,0 +1,12 @@
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/deps/thiserror-28457a0511c2f9f3.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/aserror.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/display.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/var.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/private.rs /Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/build/thiserror-9bf7938d209789e2/out/private.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/deps/libthiserror-28457a0511c2f9f3.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/aserror.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/display.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/var.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/private.rs /Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/build/thiserror-9bf7938d209789e2/out/private.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/aserror.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/display.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/var.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/thiserror-2.0.17/src/private.rs:
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/build/thiserror-9bf7938d209789e2/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/release/build/thiserror-9bf7938d209789e2/out

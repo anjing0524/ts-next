@@ -5,7 +5,7 @@
  */
 
 import { DynamicPermissionConfig } from './dynamic-permission-config';
-import { SimplifiedTokenStorage } from '../auth/simplified-token-storage';
+import { SimplifiedTokenStorage } from '../deprecated/simplified-token-storage';
 
 export interface PermissionCheckOptions {
   cache?: boolean;
@@ -257,16 +257,16 @@ export class PermissionService {
   /**
    * 从当前会话获取用户上下文
    */
-  private getCurrentUserContext(): UserContext | null {
-    if (typeof window === 'undefined') return null;
+  private getCurrentUserContext(): UserContext | undefined {
+    if (typeof window === 'undefined') return undefined;
 
     // 尝试从JWT令牌获取用户信息
     const accessToken = SimplifiedTokenStorage.getAccessToken();
-    if (!accessToken) return null;
+    if (!accessToken) return undefined;
 
     try {
       const payload = this.parseJWT(accessToken);
-      if (!payload) return null;
+      if (!payload) return undefined;
 
       // 检查缓存
       const cached = this.userContextCache.get(payload.sub);
@@ -288,7 +288,7 @@ export class PermissionService {
       return userContext;
     } catch (error) {
       console.error('Error parsing user context:', error);
-      return null;
+      return undefined;
     }
   }
 

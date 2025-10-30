@@ -26,9 +26,12 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt()
+    let log_file = std::fs::File::create("pingora.log")?;
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(log_file)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let args = Args::parse();
 

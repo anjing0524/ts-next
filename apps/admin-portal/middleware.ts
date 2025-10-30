@@ -3,11 +3,12 @@ import type { NextRequest } from 'next/server';
 import { generateCodeVerifier, generateCodeChallenge, generateRandomString } from '@repo/lib/browser';
 
 // 定义路由配置
-const protectedRoutes = ['/admin', '/profile', '/oauth/consent'];
+const protectedRoutes = ['/admin', '/profile'];
 // NOTE: /login 已移除 - 登录页面现在仅由 OAuth Service 通过 authorize 流程提供
 // /login 不再是认证路由入口，而是由 OAuth Service 完全驱动的第三方客户端模式
+// NOTE: /oauth/consent 已移除 - 同意页面由 OAuth Service 直接提供，不需要保护
 const authRoutes = ['/auth/callback'];
-const publicRoutes = ['/health', '/api'];
+const publicRoutes = ['/health', '/api', '/login', '/oauth/consent'];
 
 // 页面路径与所需权限静态映射表（可根据实际页面和文档补充）
 const routePermissionMap: Record<string, string[]> = {
@@ -101,6 +102,9 @@ async function initiateOAuthFlow(request: NextRequest, redirectPath: string): Pr
   );
 
   authorizeUrl.searchParams.set('client_id', process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client');
+  // 使用环境变量的 redirect_uri，确保与 OAuth Service 配置一致
+  // 这很重要！当通过 Pingora 代理时，request.nextUrl.origin 可能不准确
+  // NEXT_PUBLIC_OAUTH_REDIRECT_URI 已经设置为 http://localhost:6188/auth/callback
   authorizeUrl.searchParams.set(
     'redirect_uri',
     process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || `${request.nextUrl.origin}/auth/callback`
