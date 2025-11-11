@@ -1,0 +1,10 @@
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/untrusted-0aedcafc49a8d9e7.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/input.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/no_panic.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/reader.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/libuntrusted-0aedcafc49a8d9e7.rlib: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/input.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/no_panic.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/reader.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/libuntrusted-0aedcafc49a8d9e7.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/input.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/no_panic.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/reader.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/input.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/no_panic.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/untrusted-0.9.0/src/reader.rs:

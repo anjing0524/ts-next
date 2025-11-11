@@ -1,0 +1,6 @@
+[build]
+target = "wasm32-unknown-unknown"
+
+[target.wasm32-unknown-unknown]
+# 启用SIMD指令集，并保留对现代WASM环境有益的特性
+rustflags = ["-C", "target-feature=+simd128"]

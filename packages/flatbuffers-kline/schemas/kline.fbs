@@ -1,0 +1,30 @@
+namespace Kline;
+
+table PriceVolume{
+    price: double;
+    volume: double;
+}
+
+table KlineItem {
+    timestamp: int32;
+    open: double;
+    high: double;
+    low: double;
+    close: double;
+    b_vol: double;
+    s_vol: double;
+    volumes: [PriceVolume];
+    last_price: double;  // 最新成交价
+    bid_price: double;   // 买一价
+    ask_price: double;   // 卖一价
+}
+
+table KlineData {
+    items: [KlineItem];
+    tick: double; // 最小变动价位
+}
+
+root_type KlineData;
+
+// 添加文件标识符声明
+file_identifier "KLI1";

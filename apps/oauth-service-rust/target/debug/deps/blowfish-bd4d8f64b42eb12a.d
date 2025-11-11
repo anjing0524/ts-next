@@ -1,0 +1,6 @@
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/blowfish-bd4d8f64b42eb12a.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/consts.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/libblowfish-bd4d8f64b42eb12a.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/consts.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/blowfish-0.9.1/src/consts.rs:

@@ -11,4 +11,4 @@ spec:
   storageClassName: hostpath
   hostPath:
     path: /data/app-logs
-    type: DirectoryOrCreate 
+    type: DirectoryOrCreate

@@ -1,0 +1,19 @@
+{
+  "name": "@repo/jest-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jest configuration for the monorepo",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./base": "./base.cjs",
+    "./next": "./next.js"
+  },
+  "dependencies": {
+    "@jest/types": "^29.6.3",
+    "jest": "^30.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12"
+  }
+}

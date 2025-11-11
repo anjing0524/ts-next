@@ -1,0 +1,132 @@
+'use client';
+
+import { lazy, Suspense } from 'react';
+import type { MenuItem, IconName } from './types';
+import * as React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import * as LucideIcons from 'lucide-react';
+import dynamicIconImports from 'lucide-react/dynamicIconImports';
+import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/button';
+import { ScrollArea } from '../../ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
+
+interface AppSidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  menuItems?: MenuItem[];
+  logo?: React.ReactNode;
+  headerText?: string;
+  onItemClick?: () => void;
+}
+
+const fallback = <div style={{ width: 24, height: 24 }} />;
+
+const DynamicIcon = ({ name, ...props }: { name: IconName } & LucideIcons.LucideProps) => {
+  const LucideIcon = lazy(dynamicIconImports[name]);
+
+  return (
+    <Suspense fallback={fallback}>
+      <LucideIcon {...props} />
+    </Suspense>
+  );
+};
+
+export function AppSidebar({
+  className,
+  menuItems = [],
+  logo,
+  headerText = '主菜单',
+  onItemClick,
+  ...props
+}: AppSidebarProps) {
+  const pathname = usePathname();
+
+  const renderMenuItems = (items: MenuItem[], isSubmenu = false) => {
+    return items.map((item) => {
+      const isActive = item.href
+        ? pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+        : false;
+
+      if (item.children && item.children.length > 0) {
+        return (
+          <Collapsible
+            key={item.id}
+            defaultOpen={item.children.some((child) =>
+              child.href ? pathname.startsWith(child.href) : false
+            )}
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'w-full justify-start text-sm font-medium',
+                  isSubmenu ? 'pl-10' : 'pl-4', // Indent submenus trigger
+                  isActive && 'bg-accent text-accent-foreground'
+                )}
+              >
+                {item.icon && <DynamicIcon name={item.icon} className="mr-2 h-4 w-4" />}
+                {item.title}
+                <LucideIcons.ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-[data-state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-1 pb-1 space-y-1">
+              {renderMenuItems(item.children, true)}
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      }
+
+      return (
+        <Button
+          key={item.id}
+          asChild
+          variant="ghost"
+          className={cn(
+            'w-full justify-start text-sm',
+            isSubmenu ? 'pl-10' : 'pl-4', // Indent submenu items
+            isActive && 'bg-accent text-accent-foreground'
+          )}
+        >
+          <Link
+            href={item.href}
+            target={item.external ? '_blank' : undefined}
+            onClick={item.external ? undefined : onItemClick}
+          >
+            {' '}
+            {/* Call onItemClick for internal links */}
+            {item.icon && <DynamicIcon name={item.icon} className="mr-2 h-4 w-4" />}
+            {item.title}
+          </Link>
+        </Button>
+      );
+    });
+  };
+
+  return (
+    <aside className={cn('h-full flex flex-col', className)} {...props}>
+      {' '}
+      {/* Ensure it takes full height if in a flex container like DrawerContent */}
+      {logo && <div className="p-4 border-b shrink-0">{logo}</div>}
+      <div className={cn('space-y-4 py-4 flex-grow', !logo && 'pt-8')}>
+        {' '}
+        {/* flex-grow for scrollarea parent */}
+        <div className="px-3 py-2 h-full flex flex-col">
+          {headerText && (
+            <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight shrink-0">
+              {headerText}
+            </h2>
+          )}
+          <ScrollArea className="flex-grow">
+            {' '}
+            {/* flex-grow for scrollarea itself */}
+            <div className="space-y-1 pr-2">
+              {' '}
+              {/* Added pr-2 to prevent scrollbar overlap */}
+              {renderMenuItems(menuItems)}
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+    </aside>
+  );
+}

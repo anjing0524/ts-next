@@ -1,5 +1,5 @@
-import mysqlPool, { dbConfig } from '@/lib/instance/mysql-client';
-import logger from '@/utils/logger';
+import { mysqlPool, dbConfig } from '@repo/database';
+import logger from '@/lib/utils/logger';
 import fs from 'fs/promises';
 import path from 'path';
 export async function generateTableTypes() {

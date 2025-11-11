@@ -1,0 +1,128 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", ".next/standalone/**"],
+      "env": [
+        "NODE_ENV",
+        "NEXT_PUBLIC_*",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "outputs": [],
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
+      ]
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "JWT_PRIVATE_KEY_PATH",
+        "JWT_PUBLIC_KEY_PATH",
+        "AUTH_CENTER_LOGIN_PAGE_URL",
+        "AUTH_CENTER_UI_AUDIENCE",
+        "AUTH_CENTER_UI_CLIENT_ID",
+        "REDIS_URL"
+      ]
+    },
+    "lint": {
+      "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml}"],
+      "outputs": []
+    },
+    "type-check": {
+      "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx}", "tsconfig.json", "**/tsconfig.*.json"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "inputs": ["**/*.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}", "jest.config.{js,ts}"]
+    },
+    "test:integration": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "cache": false
+    },
+    "test:coverage": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"]
+    },
+    "db:generate": {
+      "cache": false,
+      "dependsOn": []
+    },
+    "db:push": {
+      "cache": false,
+      "dependsOn": ["db:generate"]
+    },
+    "db:seed": {
+      "cache": false,
+      "dependsOn": ["db:push"]
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "prisma:migrate": {
+      "cache": false,
+      "dependsOn": ["db:generate"]
+    },
+    "format": {
+      "dependsOn": [],
+      "inputs": ["**/*.{ts,tsx,js,jsx,mjs,cjs,json,yml,yaml,md}"],
+      "outputs": []
+    },
+    "flatc:generate": {
+      "cache": false,
+      "dependsOn": []
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "cache": false
+    },
+    "e2e:ui": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["build"]
+    },
+    "e2e:report": {
+      "cache": false,
+      "dependsOn": ["e2e"]
+    },
+    "wasm:test": {
+      "cache": false,
+      "persistent": false,
+      "dependsOn": []
+    },
+    "wasm:build": {
+      "cache": false,
+      "dependsOn": []
+    }
+  },
+  "globalDependencies": ["package.json", "pnpm-lock.yaml", "tsconfig.json", "components.json"],
+  "globalEnv": ["NODE_ENV"]
+}

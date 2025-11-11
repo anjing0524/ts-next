@@ -1,0 +1,41 @@
+{
+  "name": "test-service",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3005 --turbopack",
+    "build": "next build",
+    "start": "next start -p 3005"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.13.0",
+    "@repo/database": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "bcrypt": "^6.0.0",
+    "mysql2": "^3.14.2",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "uuid": "^9.0.0",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/jest-config": "workspace:*",
+    "@repo/next-config": "workspace:*",
+    "@repo/prettier-config": "workspace:*",
+    "@repo/tailwind-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.11",
+    "@types/react": "^19.2.0",
+    "@types/uuid": "^9.0.0",
+    "babel-plugin-react-compiler": "^19.0.0-beta-67d7974-20241201",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.9.2"
+  },
+  "prettier": "@repo/prettier-config"
+}

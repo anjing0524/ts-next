@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,14 +11,18 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
 
-# next.js
-/.next/
-/out/
+# next.js build outputs
+.next/
+out/
 
-# production
-/build
+# production builds
+build/
+dist/
+
+# turborepo
+.turbo/
 
 # misc
 .DS_Store
@@ -40,26 +44,63 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# test report
-playwright-report
+# test reports
+playwright-report/
+test-results/
+
+# logs
+logs/
+*.log
+dev-debug.log
+
+# rust/wasm
+**/wasm-cal/target/
+**/wasm-cal/install.sh
+**/wasm-cal/pkg/
+
+# editor directories and files
+.idea/
+.vscode/
+.cursor/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# task files
+tasks.json
+tasks/
+
+# build artifacts
+build-docker/node-*
+
+# generated files
+lib/generated/prisma/
+
+# other
+.continue
+public/
+
 test-results
 
-# log
-/logs
+.trae
+.cursor
+apps/pingora-proxy/target/*
 
-# rust target
-/wasm-cal/target
+packages/**/dist
+
+.gemini
+.cursor
+.trae
+apps/kline-service/wasm-cal/target/*
+
+.kiro
 
 
-# rust target
-/wasm-cal/install.sh
-# rust target
-/wasm-cal/pkg
-
-/.cusror/
-
-/public/
-
-/build-docker/node-*
-
-.continue
+.claude
+apps/zmq-log-server/target/*
