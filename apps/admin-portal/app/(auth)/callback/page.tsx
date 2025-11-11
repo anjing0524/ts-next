@@ -47,16 +47,21 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // 获取存储的code_verifier
-      const codeVerifier = sessionStorage.getItem('oauth_code_verifier');
+      // 获取存储的 code_verifier（从 cookie 中读取）
+      const cookies = document.cookie;
+      const codeVerifierCookie = cookies.split(';').find(c => c.trim().startsWith('oauth_code_verifier='));
+      const codeVerifier = codeVerifierCookie?.split('=')[1];
+
       if (!codeVerifier) {
         setStatus('error');
         setError('会话已过期，请重新登录');
         return;
       }
 
-      // 验证state
-      const storedState = sessionStorage.getItem('oauth_state');
+      // 验证 state（从 cookie 中读取）
+      const stateCookie = cookies.split(';').find(c => c.trim().startsWith('oauth_state='));
+      const storedState = stateCookie?.split('=')[1];
+
       if (storedState && state !== storedState) {
         setStatus('error');
         setError('无效的请求，可能存在CSRF攻击');
@@ -90,7 +95,27 @@ export default function AuthCallbackPage() {
       sessionStorage.removeItem('oauth_state');
       sessionStorage.removeItem('oauth_nonce');
 
-      // 统一使用TokenStorage存储令牌
+      // 调用 API 端点设置 cookies（middleware.ts 需要从 cookies 中读取）
+      // 这比仅使用 TokenStorage.setTokens() 存储在 sessionStorage 更重要
+      // 重要：必须包含 credentials: 'include' 以让浏览器接受 Set-Cookie 头
+      const callbackResponse = await fetch('/api/auth/login-callback', {
+        method: 'POST',
+        credentials: 'include', // 关键：允许浏览器处理 Set-Cookie 头
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: tokenResponse.access_token,
+          refresh_token: tokenResponse.refresh_token,
+          user_id: undefined, // 可选，如果需要从 userinfo 获取
+        }),
+      });
+
+      if (!callbackResponse.ok) {
+        throw new Error('Failed to set authentication cookies');
+      }
+
+      // 同时存储在 TokenStorage 供客户端使用
       TokenStorage.setTokens({
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token,
@@ -101,8 +126,9 @@ export default function AuthCallbackPage() {
         (Date.now() + tokenResponse.expires_in * 1000).toString()
       );
 
-      // 获取用户信息
-      const userResponse = await fetch(`${process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001'}/api/v2/users/me`, {
+      // 获取用户信息（通过 Pingora 代理保持同域 Cookie 上下文）
+      const userResponse = await fetch('/api/v2/users/me', {
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${tokenResponse.access_token}`,
           'Content-Type': 'application/json',
@@ -118,9 +144,16 @@ export default function AuthCallbackPage() {
       // 更新认证状态
       login(userData);
 
-      // 重定向到原始页面或首页
-      const redirectPath = sessionStorage.getItem('redirect_after_login') || '/dashboard';
-      sessionStorage.removeItem('redirect_after_login');
+      // 从 cookie 中获取原始请求路径（由 middleware.ts 存储）
+      // 如果 cookie 不存在，则默认重定向到 /admin
+      let redirectPath = '/admin';
+      const redirectCookie = cookies.split(';').find(c => c.trim().startsWith('oauth_redirect_path='));
+      if (redirectCookie) {
+        const cookieValue = redirectCookie.split('=')[1];
+        if (cookieValue) {
+          redirectPath = decodeURIComponent(cookieValue);
+        }
+      }
 
       setStatus('success');
 

@@ -103,10 +103,12 @@ function FormContent({ className }: UsernamePasswordFormProps) {
       }
 
       // 提交登录请求到 OAuth Service
-      // 通过 Pingora 代理 (6188) 而不是直接的 3001
-      const loginUrl = new URL(
-        `${process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:6188'}/api/v2/auth/login`
-      );
+      // 必须通过 Pingora 代理 (6188) 而不是直接的 3001
+      // 这样可以确保所有 cookies 在同一域下共享
+      const pingora_url = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.hostname}:6188`
+        : 'http://localhost:6188';
+      const loginUrl = new URL(`${pingora_url}/api/v2/auth/login`);
 
       console.debug('Sending login request to:', loginUrl.toString());
 
@@ -118,6 +120,7 @@ function FormContent({ className }: UsernamePasswordFormProps) {
         body: JSON.stringify({
           username,
           password,
+          redirect, // ✅ 传递 redirect 参数到后端
         }),
         credentials: 'include', // 包含 cookies，允许设置 session_token
       });
@@ -134,18 +137,19 @@ function FormContent({ className }: UsernamePasswordFormProps) {
         return;
       }
 
-      console.debug('Login successful, response status:', response.status);
+      // 解析 JSON 响应
+      const loginData = await response.json();
+      console.debug('Login successful, response:', loginData);
 
       // 成功登录，OAuth Service 已设置 session_token cookie
-      // 重定向回 OAuth Service 的 authorize URL（redirect 参数）
-      // 使用 window.location 进行完全页面刷新，确保 Pingora 能正确路由
-      if (redirect) {
-        console.debug('Redirecting to authorize URL:', redirect);
-        window.location.href = decodeURIComponent(redirect);
+      // 从响应中获取 redirect_url 并重定向
+      // 使用 window.location 进行完全页面刷新，确保 cookie 正确传递
+      if (loginData.redirect_url) {
+        console.debug('Redirecting to authorize URL:', loginData.redirect_url);
+        window.location.href = loginData.redirect_url;
       } else {
-        // 备用：如果没有 redirect 参数（不应该发生）
-        // 重定向到 admin portal 首页
-        console.warn('No redirect parameter provided, redirecting to /admin');
+        // 备用：如果响应中没有 redirect_url（不应该发生）
+        console.warn('No redirect_url in response, redirecting to /admin');
         window.location.href = '/admin';
       }
     } catch (err) {

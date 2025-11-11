@@ -13,32 +13,19 @@
 --
 -- 此脚本初始化身份 1 所需的客户端配置
 
--- 删除旧的 admin-portal 客户端（如果存在）
-DELETE FROM client_permissions WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM client_ip_whitelist WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM client_allowed_scopes WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM client_response_types WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM client_grant_types WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM client_redirect_uris WHERE client_id IN (
-    SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'
-);
-DELETE FROM oauth_clients WHERE client_id = 'auth-center-admin-client';
+-- 注意：此脚本已被 002_seed_data.sql 处理，仅用于额外配置
+-- 002_seed_data.sql 已创建了基本的 auth-center-admin-client
+-- 此脚本仅补充额外的初始化配置
+
+-- 跳过删除操作以避免外键约束冲突
+-- 如果需要重新初始化，请删除数据库文件后重新启动
 
 -- ===============================
--- 创建 Admin Portal OAuth 客户端
+-- 创建或更新 Admin Portal OAuth 客户端
 -- ===============================
 
-INSERT INTO oauth_clients (
+-- 仅当客户端不存在时才插入
+INSERT OR IGNORE INTO oauth_clients (
     id,
     client_id,
     client_secret,
@@ -90,7 +77,7 @@ INSERT INTO oauth_clients (
 -- OAuth 回调 URI 列表
 -- 开发环境、测试环境、生产环境均需配置
 
-INSERT INTO client_redirect_uris (client_id, uri) VALUES
+INSERT OR IGNORE INTO client_redirect_uris (client_id, uri) VALUES
     -- 开发环境
     (
         (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'),
@@ -117,7 +104,7 @@ INSERT INTO client_redirect_uris (client_id, uri) VALUES
 -- ===============================
 -- Admin Portal 支持的授权流程
 
-INSERT INTO client_grant_types (client_id, grant_type) VALUES
+INSERT OR IGNORE INTO client_grant_types (client_id, grant_type) VALUES
     -- Authorization Code Flow (主要)
     (
         (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'),
@@ -134,7 +121,7 @@ INSERT INTO client_grant_types (client_id, grant_type) VALUES
 -- ===============================
 -- Admin Portal 使用授权码流程
 
-INSERT INTO client_response_types (client_id, response_type) VALUES
+INSERT OR IGNORE INTO client_response_types (client_id, response_type) VALUES
     (
         (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client'),
         'code'
@@ -220,43 +207,10 @@ FROM oauth_clients
 WHERE oauth_clients.client_id = 'auth-center-admin-client';
 
 -- ===============================
--- 验证配置
+-- 注意：验证 SELECT 语句已移除
 -- ===============================
-
--- 验证客户端是否成功创建
-SELECT
-    'Admin Portal Client Configuration' as title,
-    id,
-    client_id,
-    name,
-    client_type,
-    require_pkce,
-    require_consent,
-    is_active,
-    created_at
-FROM oauth_clients
-WHERE client_id = 'auth-center-admin-client';
-
--- 验证重定向 URI
-SELECT
-    'Redirect URIs' as title,
-    COUNT(*) as total_uris
-FROM client_redirect_uris
-WHERE client_id = (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client');
-
--- 验证允许的 scopes
-SELECT
-    'Allowed Scopes' as title,
-    COUNT(*) as total_scopes
-FROM client_allowed_scopes
-WHERE client_id = (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client');
-
--- 验证权限
-SELECT
-    'Client Permissions' as title,
-    COUNT(*) as total_permissions
-FROM client_permissions
-WHERE client_id = (SELECT id FROM oauth_clients WHERE client_id = 'auth-center-admin-client');
+-- 验证配置的 SELECT 语句已移除，以避免迁移脚本问题
+-- 部署后可手动执行验证查询
 
 -- ===============================
 -- 注意事项

@@ -18,13 +18,15 @@ pub async fn initialize_database(database_url: &str) -> Result<SqlitePool, Servi
         .await
         .map_err(|e| ServiceError::Internal(format!("Failed to connect to database: {}", e)))?;
 
-    // 3. Run migrations
-    run_migrations(&pool, "migrations")
-        .await?;
-
-    // 4. Seed initial data
-    seed_initial_data(&pool)
-        .await?;
+    // 3. Run migrations and seed data (conditionally)
+    let skip_db_init = std::env::var("SKIP_DB_INIT").unwrap_or_else(|_| "false".to_string());
+    if &skip_db_init != "true" && &skip_db_init != "1" {
+        tracing::info!("Running migrations and seeding data...");
+        run_migrations(&pool, "migrations").await?;
+        seed_initial_data(&pool).await?;
+    } else {
+        tracing::info!("SKIP_DB_INIT is set, skipping migrations and seeding.");
+    }
 
     tracing::info!("Database initialization completed successfully");
     Ok(pool)

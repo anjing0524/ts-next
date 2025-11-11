@@ -3,7 +3,7 @@ use crate::models::client::OAuthClientDetails;
 use crate::state::AppState;
 use crate::utils::{pkce, validation};
 use axum::{
-    extract::{Form, Query, State},
+    extract::{Form, Json as JsonExtractor, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json, Redirect},
 };
@@ -19,6 +19,12 @@ pub struct LoginRequest {
     username: String,
     password: String,
     redirect: Option<String>, // The URL to redirect back to (the original /authorize request)
+}
+
+#[derive(Serialize, Debug)]
+pub struct LoginResponse {
+    success: bool,
+    redirect_url: String,
 }
 
 // --- Token Endpoint Structs ---
@@ -120,12 +126,12 @@ pub struct AuthenticateResponse {
 
 /// Handles POST `/api/v2/auth/login`
 /// This is the new primary login endpoint for browser-based flows.
-/// It authenticates a user via form submission, sets a session cookie, and redirects back to the /authorize flow.
+/// It authenticates a user via JSON submission, sets a session cookie, and returns the redirect URL.
 pub async fn login_endpoint(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
-    Form(request): Form<LoginRequest>,
-) -> Result<(CookieJar, Redirect), AppError> {
+    JsonExtractor(request): JsonExtractor<LoginRequest>,
+) -> Result<(CookieJar, Json<LoginResponse>), AppError> {
     // 1. Authenticate the user
     let user = state
         .user_service
@@ -144,9 +150,12 @@ pub async fn login_endpoint(
     let is_production = std::env::var("NODE_ENV")
         .unwrap_or_else(|_| "development".to_string()) == "production";
 
+    // 注意：不设置 domain 属性，让浏览器使用当前的 host
+    // 这样可以确保 cookie 在通过 Pingora 代理时正确工作
+    // domain 默认会被设置为当前请求的 host，这是最安全的做法
     let session_cookie = Cookie::build(("session_token", token_pair.access_token))
         .path("/")
-        .domain("localhost") // Set to localhost for same-domain sharing (configure in production)
+        // 移除 .domain("localhost") - 让浏览器自动使用当前的 host
         .http_only(true)      // ✅ Prevent XSS attacks - JavaScript cannot access this cookie
         .secure(is_production) // ✅ Enforce HTTPS in production
         .same_site(SameSite::Lax) // ✅ CSRF protection with Lax mode (allow same-site navigation)
@@ -154,17 +163,27 @@ pub async fn login_endpoint(
 
     let updated_jar = jar.add(session_cookie);
 
-    // 4. Redirect back to the original /authorize URL
+    // 4. Return JSON response with redirect URL instead of 302 redirect
+    // This ensures the Set-Cookie header is properly received by the browser
     let redirect_url = request.redirect.unwrap_or_else(|| "/".to_string());
-    
-    Ok((updated_jar, Redirect::to(&redirect_url)))
+
+    tracing::info!(
+        "Login successful for user: {}, redirecting to: {}",
+        request.username,
+        redirect_url
+    );
+
+    Ok((updated_jar, Json(LoginResponse {
+        success: true,
+        redirect_url,
+    })))
 }
 
 
 /// Handles `/api/v2/oauth/token`
 pub async fn token_endpoint(
     State(state): State<Arc<AppState>>,
-    Form(request): Form<TokenRequest>,
+    JsonExtractor(request): JsonExtractor<TokenRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
     let client = state
         .client_service
@@ -493,13 +512,30 @@ async fn extract_user_id_from_request(
     jar: &CookieJar,
     headers: &axum::http::HeaderMap,
 ) -> Result<String, AppError> {
+    // Log all cookies for debugging
+    tracing::debug!("Cookies received in authorize request:");
+    for cookie in jar.iter() {
+        tracing::debug!("  Cookie: {} = {}", cookie.name(), cookie.value());
+    }
+
     // 1. Try to authenticate via session cookie
     if let Some(cookie) = jar.get("session_token") {
-        if let Ok(claims) = state.token_service.introspect_token(cookie.value()).await {
-            if let Some(user_id) = claims.sub {
-                return Ok(user_id);
+        tracing::info!("Found session_token cookie, verifying...");
+        match state.token_service.introspect_token(cookie.value()).await {
+            Ok(claims) => {
+                if let Some(user_id) = claims.sub {
+                    tracing::info!("Session token validated successfully for user: {}", user_id);
+                    return Ok(user_id);
+                } else {
+                    tracing::warn!("Session token has no sub claim");
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to validate session token: {:?}", e);
             }
         }
+    } else {
+        tracing::warn!("No session_token cookie found in request");
     }
 
     // 2. Fallback to Authorization header

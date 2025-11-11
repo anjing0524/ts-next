@@ -130,6 +130,8 @@ pub async fn permission_middleware(request: Request, next: Next) -> Result<Respo
         "/api/v2/oauth/authorize",
         "/api/v2/oauth/introspect",
         "/api/v2/oauth/revoke",
+        "/api/v2/auth/login",          // ✅ OAuth login endpoint - must be public
+        "/api/v2/auth/authenticate",   // ✅ Authentication endpoint - must be public
     ];
 
     let path = request.uri().path();

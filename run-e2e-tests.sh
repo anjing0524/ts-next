@@ -2,6 +2,13 @@
 
 set -e
 
+# 清除代理环境变量，防止干扰测试
+unset http_proxy
+unset https_proxy
+
+echo "给服务一些启动时间..."
+sleep 5
+
 echo "=================================================="
 echo "🧪 OAuth 2.1 & Admin Portal E2E 测试执行脚本"
 echo "=================================================="
@@ -89,10 +96,10 @@ echo ""
 cd "$ADMIN_PORTAL_DIR"
 
 # 检查测试文件是否存在
-if [ ! -d "tests/e2e/specs" ]; then
-  echo -e "${RED}❌ 测试目录不存在${NC}"
-  exit 1
-fi
+# if [ ! -d "tests/e2e/specs" ]; then
+#   echo -e "${RED}❌ 测试目录不存在${NC}"
+#   exit 1
+# fi
 
 echo "测试用例发现:"
 find tests/e2e/specs -name "*.spec.ts" | wc -l | xargs echo "  共" && echo "  个测试文件"

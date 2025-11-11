@@ -1,7 +1,7 @@
 import { AuthProviderInterface, AuthUser, AuthTokens } from '@repo/ui';
 import { adminApi, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
-import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@repo/lib/browser';
+import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@/lib/utils/browser';
 
 // OAuth配置 - 使用环境变量进行标准化配置
 const OAUTH_BASE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:6188';

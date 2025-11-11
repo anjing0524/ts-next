@@ -1,4 +1,4 @@
-import { API_ROUTES } from '@repo/lib/api-routes';
+import { API_ROUTES } from '@/lib/utils/api-routes';
 
 /*
  * api-endpoints.ts

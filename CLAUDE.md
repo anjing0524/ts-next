@@ -57,9 +57,9 @@ REDIS_URL="redis://localhost:6379"
 
 ## 技术栈
 
-- 前端: Next.js 15, React 19, TypeScript, TailwindCSS
+- 前端: Next.js 16 (Turbopack), React 19.2, TypeScript 5.9, TailwindCSS
 - OAuth 服务: Rust (Axum), SQLx, SQLite/MySQL
-- Admin Portal: Next.js, Node.js, Prisma, JWT
+- Admin Portal: Next.js 16 (proxy.ts), Node.js, Prisma, JWT
 - 性能: Rust/WASM, Pingora代理 (Rust), uWebSockets.js
 - 数据序列化: FlatBuffers
 - 测试: Jest, Playwright
@@ -98,20 +98,20 @@ cd apps/kline-service/wasm-cal && ./build.sh
 
 ### 当前实现 (OAuth 2.1 第三方客户端模式)
 
-**核心原则** (2024-10-24 重构后)：
+**核心原则** (2024-10-30 Next.js 16 迁移后)：
 - **第三方客户端模式**：Admin Portal 作为标准的 OAuth 2.1 第三方客户端，不参与认证决策
-- **中间件驱动 OAuth**：`middleware.ts` 在检测到受保护路由无 token 时，**直接启动 OAuth authorize 流程**
+- **代理驱动 OAuth**：`proxy.ts`（Node.js Runtime）在检测到受保护路由无 token 时，**直接启动 OAuth authorize 流程**
 - **登录完全由 OAuth 驱动**：/login 页面仅通过 OAuth Service 的 authorize 端点重定向到达
 - **安全验证**：/login 页面验证 redirect 参数必须指向合法的 OAuth /authorize 端点
 
-**当前认证流程** (新的第三方客户端模式)：
+**当前认证流程** (Next.js 16 + proxy.ts)：
 
 ```
 标准 OAuth 2.1 授权码流程（带 PKCE）- 第三方客户端模式：
 
 用户访问受保护页面 (e.g., /admin/users)
   ↓
-middleware.ts 检测无有效 token
+proxy.ts 检测无有效 token（Node.js Runtime）
   ↓
 直接启动 OAuth authorize 流程（重构改动：不再重定向到 Admin Portal 的 /login）
   ↓ 生成并存储 PKCE 参数：
@@ -365,6 +365,34 @@ python3 tests/oauth_sso_e2e.py
   - 更新了 Pingora 配置（后端名称和所有路由）
   - 更新了 GitHub Actions 工作流
   - 删除了 apps/oauth-service 目录和所有过时文档
+- **Next.js 16 升级** （2024-10-30 完成）
+  - ✅ **所有 Next.js 应用升级到 16.0.0**
+    - admin-portal: 已升级到 16.0.0 ✅
+    - kline-service: 15.4.5 → 16.0.0 ✅
+    - test-service: 15.4.5 → 16.0.0 ✅
+  - ✅ **所有 React 应用升级到 19.2.0**
+    - 统一通过 pnpm overrides: react@19.2.0, react-dom@19.2.0
+    - @types/react: 19.1.9 → 19.2.0 (根和所有应用)
+  - ✅ **React Compiler 集成（优化版）**
+    - 添加 babel-plugin-react-compiler@19.0.0-beta 到根 package.json 和所有 Next.js 应用
+    - 创建 .babelrc 配置文件（所有应用均为 next/babel preset，不启用插件以保证兼容性）
+    - 在 next-config 中启用 `experimental.reactCompiler: true`
+    - 注：由于 React Compiler 仍处于 beta 阶段，目前不在应用级别启用，保留未来优化空间
+  - ✅ **更新 Next.js 相关依赖**
+    - 根 package.json: next@16.0.0, eslint-config-next@16.0.0
+    - 各应用同步更新
+  - ✅ 修复 crypto 模块兼容性（Web Crypto API 统一）
+  - ✅ 修复重复变量声明和 'use client' 指令
+  - ✅ 解决 monorepo 多版本 React 类型不一致（pnpm overrides）
+  - ✅ middleware.ts → proxy.ts 迁移（Node.js Runtime）
+  - 详见：[NEXTJS_16_UPGRADE_SUMMARY.md](./NEXTJS_16_UPGRADE_SUMMARY.md)
+  - **主要改动**：
+    - ✅ proxy.ts 替代 middleware.ts（运行在 Node.js Runtime，更灵活）
+    - ✅ Turbopack 现为默认构建器（已配置）
+    - ✅ Web Crypto API 统一用于 PKCE（所有环境兼容）
+    - ✅ pnpm overrides 强制统一 React 19.2.0 版本
+    - ✅ React Compiler 集成（Babel + Next.js experimental config）
+    - ✅ 移除了 middleware.ts 中的 `"use cache"` 标记（proxy.ts 不支持）
 
 ## Login 页面实现（OAuth 2.1 第三方客户端模式）
 
