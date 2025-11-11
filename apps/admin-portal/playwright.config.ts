@@ -22,12 +22,16 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
 
   // 测试报告配置
-  reporter: [['json', { outputFile: 'test-results.json' }]],
+  reporter: [
+    ['list'], // 控制台输出
+    ['json', { outputFile: 'test-results.json' }], // JSON 报告
+    ['html', { outputFolder: 'playwright-report', open: 'never' }], // HTML 报告
+  ],
 
   // 全局测试设置
   use: {
-    // 基础URL
-    baseURL: 'http://localhost:3002',
+    // 基础URL - 使用 Pingora 代理端口 6188
+    baseURL: 'http://localhost:6188',
 
     // 浏览器设置
     headless: !!process.env.CI,
@@ -59,37 +63,14 @@ export default defineConfig({
   ],
 
   // 开发服务器配置
-  webServer: [
-    {
-      // oauth-service服务（必须先启动）
-      command: 'cd ../oauth-service && pnpm dev',
-      port: 3001,
-      env: {
-        NODE_ENV: 'test',
-        DATABASE_URL: 'file:./test.db',
-        JWT_SECRET: 'test-jwt-secret-key-for-e2e-testing',
-        ENCRYPTION_KEY: 'test-encryption-key-32-chars-long',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 120000, // 2分钟启动超时
-    },
-    {
-      // admin-portal服务
-      command: 'pnpm dev',
-      port: 3002,
-      env: {
-        NODE_ENV: 'test',
-        NEXT_PUBLIC_OAUTH_SERVICE_URL: 'http://localhost:3001',
-        NEXT_PUBLIC_APP_URL: 'http://localhost:3002',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 120000, // 2分钟启动超时
-    },
-  ],
+  // 注意：OAuth 客户端流程测试需要以下服务同时运行：
+  // 1. oauth-service-rust (端口 3001)
+  // 2. admin-portal (端口 3002)
+  // 3. pingora-proxy (端口 6188)
+  //
+  // 推荐使用外部脚本启动所有服务，而不是在这里自动启动
+  // 运行测试前，请确保所有服务已经启动
+
 
   // 测试输出目录
   outputDir: 'test-results/',
@@ -98,8 +79,4 @@ export default defineConfig({
   expect: {
     timeout: 10000,
   },
-
-  // 全局设置
-  globalSetup: require.resolve('./tests/e2e/global-setup.ts'),
-  globalTeardown: require.resolve('./tests/e2e/global-teardown.ts'),
 });

@@ -32,7 +32,7 @@ pub enum StrategyType {
 /// 渲染策略工厂
 pub struct RenderStrategyFactory {
     // 支持同一类型多个策略实例，使用RefCell支持内部可变性
-    strategies: HashMap<StrategyType, Vec<RefCell<Box<dyn RenderStrategy>>>>,
+    pub(crate) strategies: HashMap<StrategyType, Vec<RefCell<Box<dyn RenderStrategy>>>>,
 }
 
 impl Default for RenderStrategyFactory {
@@ -42,7 +42,10 @@ impl Default for RenderStrategyFactory {
 }
 
 impl RenderStrategyFactory {
-    /// 创建新的渲染策略工厂
+    /// 创建新的渲染策略工厂（包含默认策略）
+    ///
+    /// 返回一个包含系统内置默认渲染策略的工厂实例，适用于实际渲染流程。
+    /// 在测试中如果需要完全可控、无默认策略的工厂，请使用 `new_empty`。
     pub fn new() -> Self {
         let mut factory = Self {
             strategies: HashMap::new(),
@@ -51,6 +54,16 @@ impl RenderStrategyFactory {
         // 注册默认策略
         factory.register_default_strategies();
         factory
+    }
+
+    /// 创建一个不包含任何默认策略的渲染策略工厂（测试友好）
+    ///
+    /// 该构造函数不会注册任何内置策略，便于在测试中只关注自定义策略，
+    /// 避免默认策略在遍历时被访问导致断言混淆或引入外部依赖。
+    pub fn new_empty() -> Self {
+        Self {
+            strategies: HashMap::new(),
+        }
     }
 
     /// 注册默认渲染策略
@@ -78,20 +91,6 @@ impl RenderStrategyFactory {
             .push(RefCell::new(strategy));
     }
 
-    /// 注销渲染策略
-    pub fn unregister_strategy(
-        &mut self,
-        strategy_type: &StrategyType,
-        index: usize,
-    ) -> Option<RefCell<Box<dyn RenderStrategy>>> {
-        if let Some(strategies) = self.strategies.get_mut(strategy_type) {
-            if index < strategies.len() {
-                return Some(strategies.remove(index));
-            }
-        }
-        None
-    }
-
     /// 获取指定类型的渲染策略
     pub fn get_strategy(
         &self,
@@ -108,21 +107,15 @@ impl RenderStrategyFactory {
         self.get_strategy(&StrategyType::DataZoom, 0)
     }
 
-    /// 获取指定类型的所有渲染策略
-    pub fn get_strategies_by_type(
-        &self,
-        strategy_type: &StrategyType,
-    ) -> Option<&Vec<RefCell<Box<dyn RenderStrategy>>>> {
-        self.strategies.get(strategy_type)
-    }
-
-    /// 根据渲染模式获取所有支持的策略并按优先级排序
-    pub fn get_strategies_for_mode(
-        &self,
-        mode: RenderMode,
-    ) -> Vec<&RefCell<Box<dyn RenderStrategy>>> {
+    /// [新API - 阶段C] 使用访问者模式按渲染模式和优先级遍历策略（只读访问）
+    /// 返回 ControlFlow：Continue 继续遍历，Break 提前终止
+    pub fn visit_strategies<F>(&self, mode: RenderMode, mut visitor: F) -> std::ops::ControlFlow<()>
+    where
+        F: FnMut(&dyn RenderStrategy) -> std::ops::ControlFlow<()>,
+    {
         let mut strategies: Vec<(u32, &RefCell<Box<dyn RenderStrategy>>)> = Vec::new();
 
+        // 收集支持该模式的所有策略
         for strategy_vec in self.strategies.values() {
             for strategy_cell in strategy_vec {
                 let strategy = strategy_cell.borrow();
@@ -135,20 +128,31 @@ impl RenderStrategyFactory {
         // 按优先级排序（数值越小优先级越高）
         strategies.sort_by_key(|(priority, _)| *priority);
 
-        strategies
-            .into_iter()
-            .map(|(_, strategy)| strategy)
-            .collect()
+        // 使用访问者模式遍历，避免返回借用
+        for (_, strategy_cell) in strategies {
+            let strategy = strategy_cell.borrow();
+            match visitor(&**strategy) {
+                std::ops::ControlFlow::Continue(()) => continue,
+                std::ops::ControlFlow::Break(()) => return std::ops::ControlFlow::Break(()),
+            }
+        }
+
+        std::ops::ControlFlow::Continue(())
     }
 
-    /// 根据渲染模式和图层类型获取所有支持的策略并按优先级排序
-    pub fn get_strategies_by_layer(
+    /// [新API - 阶段C] 使用访问者模式按图层类型和优先级遍历策略（只读访问）
+    pub fn visit_strategies_by_layer<F>(
         &self,
         mode: RenderMode,
         layer: CanvasLayerType,
-    ) -> Vec<&RefCell<Box<dyn RenderStrategy>>> {
+        mut visitor: F,
+    ) -> std::ops::ControlFlow<()>
+    where
+        F: FnMut(&dyn RenderStrategy) -> std::ops::ControlFlow<()>,
+    {
         let mut strategies: Vec<(u32, &RefCell<Box<dyn RenderStrategy>>)> = Vec::new();
 
+        // 收集支持该模式和图层的所有策略
         for strategy_vec in self.strategies.values() {
             for strategy_cell in strategy_vec {
                 let strategy = strategy_cell.borrow();
@@ -161,21 +165,52 @@ impl RenderStrategyFactory {
         // 按优先级排序（数值越小优先级越高）
         strategies.sort_by_key(|(priority, _)| *priority);
 
-        strategies
-            .into_iter()
-            .map(|(_, strategy)| strategy)
-            .collect()
+        // 使用访问者模式遍历
+        for (_, strategy_cell) in strategies {
+            let strategy = strategy_cell.borrow();
+            match visitor(&**strategy) {
+                std::ops::ControlFlow::Continue(()) => continue,
+                std::ops::ControlFlow::Break(()) => return std::ops::ControlFlow::Break(()),
+            }
+        }
+
+        std::ops::ControlFlow::Continue(())
     }
 
-    /// 执行渲染操作（按图层分别渲染）
-    pub fn render_all(&self, ctx: &RenderContext, mode: RenderMode) -> Result<(), RenderError> {
-        // 按图层顺序渲染：Base -> Main -> Overlay
-        let all_layers = [
-            CanvasLayerType::Base,
-            CanvasLayerType::Main,
-            CanvasLayerType::Overlay,
-        ];
-        self.render_layers(ctx, mode, &all_layers)
+    /// [新API - 阶段C] 使用访问者模式按渲染模式和优先级遍历策略（可变访问）
+    pub fn visit_strategies_mut<F>(
+        &self,
+        mode: RenderMode,
+        mut visitor: F,
+    ) -> std::ops::ControlFlow<()>
+    where
+        F: FnMut(&mut dyn RenderStrategy) -> std::ops::ControlFlow<()>,
+    {
+        let mut strategies: Vec<(u32, &RefCell<Box<dyn RenderStrategy>>)> = Vec::new();
+
+        // 收集支持该模式的所有策略
+        for strategy_vec in self.strategies.values() {
+            for strategy_cell in strategy_vec {
+                let strategy = strategy_cell.borrow();
+                if strategy.supports_mode(mode) {
+                    strategies.push((strategy.get_priority(), strategy_cell));
+                }
+            }
+        }
+
+        // 按优先级排序（数值越小优先级越高）
+        strategies.sort_by_key(|(priority, _)| *priority);
+
+        // 使用访问者模式遍历，支持可变访问
+        for (_, strategy_cell) in strategies {
+            let mut strategy = strategy_cell.borrow_mut();
+            match visitor(&mut **strategy) {
+                std::ops::ControlFlow::Continue(()) => continue,
+                std::ops::ControlFlow::Break(()) => return std::ops::ControlFlow::Break(()),
+            }
+        }
+
+        std::ops::ControlFlow::Continue(())
     }
 
     /// 渲染指定图层的策略
@@ -186,29 +221,24 @@ impl RenderStrategyFactory {
         layers: &[CanvasLayerType],
     ) -> Result<(), RenderError> {
         for &layer in layers {
-            let strategies = self.get_strategies_by_layer(mode, layer);
-            for strategy_cell in strategies {
-                let strategy = strategy_cell.borrow();
-                strategy.render(ctx)?;
+            // 使用新的访问者模式API替代返回借用集合
+            let mut render_err: Option<RenderError> = None;
+            let result = self.visit_strategies_by_layer(mode, layer, |strategy| {
+                // 若渲染失败则提前终止遍历，并记录错误
+                match strategy.render(ctx) {
+                    Ok(()) => std::ops::ControlFlow::Continue(()),
+                    Err(e) => {
+                        render_err = Some(e);
+                        std::ops::ControlFlow::Break(())
+                    }
+                }
+            });
+
+            // 如果访问者提前终止，表示渲染出错，向上传播原始错误
+            if let std::ops::ControlFlow::Break(()) = result {
+                return Err(render_err.expect("render error must be set on Break"));
             }
         }
-        Ok(())
-    }
-
-    /// 渲染指定图层的策略
-    pub fn render_layer(
-        &self,
-        ctx: &RenderContext,
-        mode: RenderMode,
-        layer: CanvasLayerType,
-    ) -> Result<(), RenderError> {
-        let strategies = self.get_strategies_by_layer(mode, layer);
-
-        for strategy_cell in strategies {
-            let strategy = strategy_cell.borrow();
-            strategy.render(ctx)?;
-        }
-
         Ok(())
     }
 
@@ -222,103 +252,55 @@ impl RenderStrategyFactory {
         ctx: &RenderContext,
         mode: RenderMode,
     ) -> CursorStyle {
-        let strategies = self.get_strategies_for_mode(mode);
-
-        for strategy_cell in strategies {
-            let strategy = strategy_cell.borrow();
+        let mut found = CursorStyle::Default;
+        let cf = self.visit_strategies(mode, |strategy| {
             let cursor = strategy.get_cursor_style(x, y, ctx);
             if cursor != CursorStyle::Default {
-                return cursor;
+                found = cursor;
+                return std::ops::ControlFlow::Break(());
             }
+            std::ops::ControlFlow::Continue(())
+        });
+        match cf {
+            std::ops::ControlFlow::Break(()) => found,
+            _ => found,
         }
-
-        CursorStyle::Default
     }
 
     /// 处理鼠标移动事件
     pub fn handle_mouse_move(&self, x: f64, y: f64, ctx: &RenderContext, mode: RenderMode) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
         let mut handled = false;
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
+        let _ = self.visit_strategies_mut(mode, |strategy| {
             if strategy.handle_mouse_move(x, y, ctx) {
                 handled = true;
             }
-        }
-
+            std::ops::ControlFlow::Continue(())
+        });
         handled
-    }
-
-    /// 处理鼠标移动事件并获取hover索引
-    pub fn handle_mouse_move_with_hover(
-        &self,
-        x: f64,
-        y: f64,
-        ctx: &RenderContext,
-        mode: RenderMode,
-    ) -> (bool, Option<usize>) {
-        let strategies = self.get_strategies_for_mode(mode);
-        let mut handled = false;
-        let mut hover_index = None;
-
-        // 计算hover索引基于鼠标位置和当前可见范围
-        let layout = ctx.layout_ref();
-        let data_manager = ctx.data_manager_ref();
-        let (visible_start, visible_count, _) = data_manager.get_visible();
-
-        if visible_count > 0 {
-            let main_chart_rect = layout.get_rect(&crate::layout::PaneId::HeatmapArea);
-            if main_chart_rect.contains(x, y) {
-                let relative_x = x - main_chart_rect.x;
-                let idx_in_visible = (relative_x / layout.total_candle_width).floor() as usize;
-                let calculated_index = visible_start + idx_in_visible;
-                let max_index = data_manager
-                    .get_items()
-                    .map_or(0, |i| i.len().saturating_sub(1));
-
-                if calculated_index <= max_index {
-                    hover_index = Some(calculated_index);
-                }
-            }
-        }
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
-            if strategy.handle_mouse_move(x, y, ctx) {
-                handled = true;
-            }
-        }
-
-        (handled, hover_index)
     }
 
     /// 处理鼠标按下事件
     pub fn handle_mouse_down(&self, x: f64, y: f64, ctx: &RenderContext, mode: RenderMode) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
+        let mut result = false;
+        let _ = self.visit_strategies_mut(mode, |strategy| {
             if strategy.handle_mouse_down(x, y, ctx) {
-                return true; // 第一个处理的策略优先
+                result = true;
+                return std::ops::ControlFlow::Break(()); // 第一个处理的策略优先
             }
-        }
-
-        false
+            std::ops::ControlFlow::Continue(())
+        });
+        result
     }
 
     /// 处理鼠标抬起事件
     pub fn handle_mouse_up(&self, x: f64, y: f64, ctx: &RenderContext, mode: RenderMode) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
         let mut handled = false;
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
+        let _ = self.visit_strategies_mut(mode, |strategy| {
             if strategy.handle_mouse_up(x, y, ctx) {
                 handled = true;
             }
-        }
-
+            std::ops::ControlFlow::Continue(())
+        });
         handled
     }
 
@@ -330,31 +312,27 @@ impl RenderStrategyFactory {
         ctx: &RenderContext,
         mode: RenderMode,
     ) -> DragResult {
-        let strategies = self.get_strategies_for_mode(mode);
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
-            let result = strategy.handle_mouse_drag(x, y, ctx);
-            if result != DragResult::None {
-                return result; // 第一个处理的策略优先
+        let mut out = DragResult::None;
+        let _ = self.visit_strategies_mut(mode, |strategy| {
+            let r = strategy.handle_mouse_drag(x, y, ctx);
+            if r != DragResult::None {
+                out = r;
+                return std::ops::ControlFlow::Break(());
             }
-        }
-
-        DragResult::None
+            std::ops::ControlFlow::Continue(())
+        });
+        out
     }
 
     /// 处理鼠标离开事件
     pub fn handle_mouse_leave(&self, ctx: &RenderContext, mode: RenderMode) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
         let mut handled = false;
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
+        let _ = self.visit_strategies_mut(mode, |strategy| {
             if strategy.handle_mouse_leave(ctx) {
                 handled = true;
             }
-        }
-
+            std::ops::ControlFlow::Continue(())
+        });
         handled
     }
 
@@ -367,31 +345,13 @@ impl RenderStrategyFactory {
         ctx: &RenderContext,
         mode: RenderMode,
     ) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
         let mut handled = false;
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
+        let _ = self.visit_strategies_mut(mode, |strategy| {
             if strategy.handle_wheel(x, y, delta, ctx) {
                 handled = true;
             }
-        }
-
-        handled
-    }
-
-    /// 强制重置所有策略的拖动状态
-    pub fn force_reset_drag_state(&self, mode: RenderMode) -> bool {
-        let strategies = self.get_strategies_for_mode(mode);
-        let mut handled = false;
-
-        for strategy_cell in strategies {
-            let mut strategy = strategy_cell.borrow_mut();
-            if strategy.force_reset_drag_state() {
-                handled = true;
-            }
-        }
-
+            std::ops::ControlFlow::Continue(())
+        });
         handled
     }
 }

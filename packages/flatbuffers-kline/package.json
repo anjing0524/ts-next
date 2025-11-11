@@ -1,0 +1,39 @@
+{
+  "name": "@repo/flatbuffers-kline",
+  "version": "1.0.0",
+  "description": "FlatBuffers generated TypeScript types for K-line data",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "compile-schema": "node examples/compile-schema.js",
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "flatbuffers": "^25.2.10"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./kline": {
+      "types": "./dist/kline.d.ts",
+      "default": "./dist/kline.js"
+    },
+    "./schemas/*": "./schemas/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "schemas",
+    "examples"
+  ],
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

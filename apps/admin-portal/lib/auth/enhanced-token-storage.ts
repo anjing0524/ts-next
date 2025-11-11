@@ -5,7 +5,7 @@
  * 支持服务器端和客户端的无缝集成
  */
 
-interface TokenStorageOptions {
+export interface TokenStorageOptions {
   accessToken: string;
   refreshToken?: string;
   csrfToken?: string;
@@ -13,7 +13,7 @@ interface TokenStorageOptions {
   refreshTokenExpiresIn?: number;
 }
 
-interface CookieOptions {
+export interface CookieOptions {
   httpOnly: boolean;
   secure: boolean;
   sameSite: 'Strict' | 'Lax' | 'None';

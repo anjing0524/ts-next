@@ -2,11 +2,13 @@ use wasm_bindgen::prelude::*;
 
 // 导入模块
 pub mod canvas;
+pub mod command;
 pub mod config;
 pub mod data;
 pub mod kline_generated;
 pub mod kline_process;
 pub mod layout;
+pub mod performance;
 pub mod render;
 pub mod utils;
 
@@ -14,6 +16,7 @@ pub mod utils;
 pub use config::{ChartConfig, ChartTheme, ConfigManager, LocaleConfig};
 pub use kline_process::KlineProcess;
 pub use layout::ChartLayout;
+pub use performance::PerformanceMonitor;
 pub use render::ChartRenderer;
 
 // 导出 serde-wasm-bindgen 以便其他模块使用

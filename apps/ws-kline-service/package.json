@@ -1,0 +1,26 @@
+{
+  "name": "ws-kline-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/flatbuffers-kline": "workspace:*",
+    "flatbuffers": "^25.2.10",
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.47.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^20.19.1",
+    "eslint": "^9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.2"
+  },
+  "prettier": "@repo/prettier-config"
+}

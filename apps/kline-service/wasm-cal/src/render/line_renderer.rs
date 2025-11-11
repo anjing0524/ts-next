@@ -2,12 +2,12 @@
 
 use crate::canvas::CanvasLayerType;
 use crate::config::ChartTheme;
-use crate::data::DataManager;
-use crate::kline_generated::kline::KlineItem;
+use crate::data::{DataManager, model::KlineItemRef};
+
 use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
-use flatbuffers;
+
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 #[derive(Default)]
@@ -35,15 +35,11 @@ impl LineRenderer {
     ) {
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let (min_low, max_high, _) = data_manager.get_cached_cal();
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
 
-        if visible_start >= items.len() || visible_count == 0 {
+        if visible_start >= data_manager.len() || visible_count == 0 {
             return;
         }
-        let visible_end = (visible_start + visible_count).min(items.len());
+        let visible_end = (visible_start + visible_count).min(data_manager.len());
 
         ctx.set_image_smoothing_enabled(true);
 
@@ -54,7 +50,7 @@ impl LineRenderer {
             self.draw_price_line(
                 ctx,
                 layout,
-                &items,
+                data_manager,
                 visible_start,
                 visible_end,
                 &y_mapper,
@@ -68,7 +64,7 @@ impl LineRenderer {
             self.draw_price_line(
                 ctx,
                 layout,
-                &items,
+                data_manager,
                 visible_start,
                 visible_end,
                 &y_mapper,
@@ -82,7 +78,7 @@ impl LineRenderer {
             self.draw_price_line(
                 ctx,
                 layout,
-                &items,
+                data_manager,
                 visible_start,
                 visible_end,
                 &y_mapper,
@@ -98,7 +94,7 @@ impl LineRenderer {
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
-        items: &flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<KlineItem<'_>>>,
+        data_manager: &DataManager,
         start: usize,
         end: usize,
         y_mapper: &CoordinateMapper,
@@ -107,7 +103,7 @@ impl LineRenderer {
         width: f64,
         dashed: bool,
     ) where
-        F: Fn(&KlineItem) -> f64,
+        F: Fn(&KlineItemRef) -> f64,
     {
         ctx.set_stroke_style_str(color);
         ctx.set_line_width(width);
@@ -123,12 +119,17 @@ impl LineRenderer {
         }
 
         let points: Vec<(f64, f64)> = (start..end)
-            .map(|i| {
-                let item = items.get(i);
+            .enumerate()
+            .filter_map(|(rel_idx, abs_idx)| {
+                data_manager
+                    .get(abs_idx)
+                    .map(|item_ref| (rel_idx, item_ref))
+            })
+            .map(|(rel_idx, item_ref)| {
                 let x = layout.get_rect(&PaneId::HeatmapArea).x
-                    + ((i - start) as f64 * layout.total_candle_width)
+                    + (rel_idx as f64 * layout.total_candle_width)
                     + (layout.candle_width / 2.0);
-                (x, y_mapper.map_y(price_fn(&item)))
+                (x, y_mapper.map_y(price_fn(&item_ref)))
             })
             .collect();
 
@@ -151,9 +152,17 @@ impl LineRenderer {
 }
 
 impl RenderStrategy for LineRenderer {
+    /// 执行主图层渲染（绘制价格线）
+    ///
+    /// 在 Main 层绘制各种价格线（last_price、bid_price、ask_price）。
+    /// 不进行任何清理动作，由 ChartRenderer 统一清理 Main 层。
+    ///
+    /// 返回：
+    /// - Ok(()) 正常完成渲染
+    /// - Err(RenderError) 当 Canvas 上下文获取失败等
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas = ctx.canvas_manager_ref();
-        let main_ctx = canvas.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
@@ -161,14 +170,17 @@ impl RenderStrategy for LineRenderer {
         Ok(())
     }
 
+    /// 声明该渲染器支持的渲染模式
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 指定渲染层为主图层（Main）
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Main
     }
 
+    /// 指定渲染优先级（数值越小优先级越高）
     fn get_priority(&self) -> u32 {
         25
     }

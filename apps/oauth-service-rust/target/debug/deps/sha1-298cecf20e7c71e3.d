@@ -1,0 +1,10 @@
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/sha1-298cecf20e7c71e3.d: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/soft.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/x86.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/libsha1-298cecf20e7c71e3.rlib: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/soft.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/x86.rs
+
+/Users/liushuo/code/ts-next-template/apps/oauth-service-rust/target/debug/deps/libsha1-298cecf20e7c71e3.rmeta: /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/lib.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/soft.rs /Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/x86.rs
+
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/lib.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/soft.rs:
+/Users/liushuo/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/sha1-0.10.6/src/compress/x86.rs:

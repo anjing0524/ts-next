@@ -1,1 +1,1 @@
-// This file is intentionally left blank after moving MenuItem to @repo/lib
+// This file is intentionally left blank (moved types to consuming apps)

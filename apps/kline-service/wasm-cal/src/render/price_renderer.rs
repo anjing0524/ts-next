@@ -20,11 +20,6 @@ impl PriceRenderer {
         data_manager: &DataManager,
         theme: &ChartTheme,
     ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
-
         let (visible_start, visible_count, _) = data_manager.get_visible();
         let visible_end = visible_start + visible_count;
         if visible_start >= visible_end {
@@ -41,34 +36,35 @@ impl PriceRenderer {
         let mut bearish_rects = Vec::new();
 
         for i in visible_start..visible_end {
-            let item = items.get(i);
-            let x_center = price_rect.x
-                + ((i - visible_start) as f64 * layout.total_candle_width)
-                + (layout.total_candle_width / 2.0);
+            if let Some(item) = data_manager.get(i) {
+                let x_center = price_rect.x
+                    + ((i - visible_start) as f64 * layout.total_candle_width)
+                    + (layout.total_candle_width / 2.0);
 
-            let high_y = y_mapper.map_y(item.high());
-            let low_y = y_mapper.map_y(item.low());
-            let open_y = y_mapper.map_y(item.open());
-            let close_y = y_mapper.map_y(item.close());
+                let high_y = y_mapper.map_y(item.high());
+                let low_y = y_mapper.map_y(item.low());
+                let open_y = y_mapper.map_y(item.open());
+                let close_y = y_mapper.map_y(item.close());
 
-            if item.close() >= item.open() {
-                bullish_lines.push((x_center, high_y, x_center, low_y));
-                let height = (open_y - close_y).max(1.0);
-                bullish_rects.push((
-                    x_center - layout.candle_width / 2.0,
-                    close_y,
-                    layout.candle_width,
-                    height,
-                ));
-            } else {
-                bearish_lines.push((x_center, high_y, x_center, low_y));
-                let height = (close_y - open_y).max(1.0);
-                bearish_rects.push((
-                    x_center - layout.candle_width / 2.0,
-                    open_y,
-                    layout.candle_width,
-                    height,
-                ));
+                if item.close() >= item.open() {
+                    bullish_lines.push((x_center, high_y, x_center, low_y));
+                    let height = (open_y - close_y).max(1.0);
+                    bullish_rects.push((
+                        x_center - layout.candle_width / 2.0,
+                        close_y,
+                        layout.candle_width,
+                        height,
+                    ));
+                } else {
+                    bearish_lines.push((x_center, high_y, x_center, low_y));
+                    let height = (close_y - open_y).max(1.0);
+                    bearish_rects.push((
+                        x_center - layout.candle_width / 2.0,
+                        open_y,
+                        layout.candle_width,
+                        height,
+                    ));
+                }
             }
         }
 
@@ -116,9 +112,17 @@ impl PriceRenderer {
 }
 
 impl RenderStrategy for PriceRenderer {
+    /// 渲染价格图表内容到 Main 画布层
+    ///
+    /// # 参数
+    /// * `ctx` - 渲染上下文，包含画布管理器、布局、数据等信息
+    ///
+    /// # 返回值
+    /// * `Ok(())` - 渲染成功
+    /// * `Err(RenderError)` - 渲染失败时返回错误信息
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_manager = ctx.canvas_manager_ref();
-        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas_manager.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
         let theme = ctx.theme_ref();
@@ -127,14 +131,29 @@ impl RenderStrategy for PriceRenderer {
         Ok(())
     }
 
+    /// 检查是否支持指定的渲染模式
+    ///
+    /// # 参数
+    /// * `_mode` - 渲染模式（当前所有模式都支持）
+    ///
+    /// # 返回值
+    /// * `true` - 支持所有渲染模式
     fn supports_mode(&self, mode: RenderMode) -> bool {
         mode == RenderMode::Kmap
     }
 
+    /// 获取渲染器对应的画布层类型
+    ///
+    /// # 返回值
+    /// * `CanvasLayerType::Main` - 价格渲染器使用主画布层
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Main
     }
 
+    /// 获取渲染器的优先级（数值越小优先级越高）
+    ///
+    /// # 返回值
+    /// * `10` - 价格渲染器的渲染优先级
     fn get_priority(&self) -> u32 {
         10
     }

@@ -113,7 +113,7 @@ export function useRole(roleId: string) {
 }
 
 export function useUserContext() {
-  const [userContext, setUserContext] = useState<UserContext | null>(null);
+  const [userContext, setUserContext] = useState<UserContext | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(true);
 
   const permissionService = PermissionService.getInstance();
@@ -122,13 +122,13 @@ export function useUserContext() {
     const loadUserContext = async () => {
       try {
         setLoading(true);
-        
+
         // Try to get current user context
         const context = permissionService['getCurrentUserContext']();
         setUserContext(context);
       } catch (error) {
         console.error('Error loading user context:', error);
-        setUserContext(null);
+        setUserContext(undefined);
       } finally {
         setLoading(false);
       }

@@ -15,13 +15,21 @@ cd "$(dirname "$0")"
 # 格式化代码
 cargo fmt
 
-# 编译为WebAssembly
-wasm-pack build --target web --out-dir pkg --release 
+# 定义输出目录
+PKG_DIR="./pkg"
+# 定义最终目标公共目录 (相对于项目根目录)
+PUBLIC_DEST_DIR="../public/wasm-cal"
 
-# 创建public/wasm-cal目录（如果不存在）
-mkdir -p ../public/wasm-cal
+# 编译为WebAssembly，输出到本地pkg目录
+wasm-pack build --target web --out-dir $PKG_DIR --release  
 
-# 复制编译后的文件到public目录
-cp -r pkg/* ../public/wasm-cal/
+echo "WebAssembly module built successfully into $PKG_DIR directory!"
 
-echo "WebAssembly module built successfully!"
+# 创建目标公共目录（如果不存在）
+mkdir -p $PUBLIC_DEST_DIR
+
+# 将pkg目录的内容复制到公共目录
+echo "Copying WASM artifacts to $PUBLIC_DEST_DIR..."
+cp -r $PKG_DIR/* $PUBLIC_DEST_DIR/
+
+echo "WASM artifacts are ready in the public directory."

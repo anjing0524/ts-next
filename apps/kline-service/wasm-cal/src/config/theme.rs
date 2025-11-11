@@ -221,11 +221,4 @@ impl ChartTheme {
         merge_field!(font_title);
         // 切换按钮字体合并逻辑已移除
     }
-
-    /// 从部分 JSON 合并
-    pub fn merge_from_json(&mut self, json: &str) -> Result<(), serde_json::Error> {
-        let partial: PartialChartTheme = serde_json::from_str(json)?;
-        self.merge(partial);
-        Ok(())
-    }
 }

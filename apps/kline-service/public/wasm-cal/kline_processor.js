@@ -74,18 +74,9 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 
-const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
-
-if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
-
-function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
-}
-
 function addToExternrefTable0(obj) {
     const idx = wasm.__externref_table_alloc();
-    wasm.__wbindgen_export_5.set(idx, obj);
+    wasm.__wbindgen_export_4.set(idx, obj);
     return idx;
 }
 
@@ -96,6 +87,15 @@ function handleError(f, args) {
         const idx = addToExternrefTable0(e);
         wasm.__wbindgen_exn_store(idx);
     }
+}
+
+const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
+
+if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
 function isLikeNone(x) {
@@ -167,8 +167,15 @@ function debugString(val) {
     return className;
 }
 
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
 function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_export_5.get(idx);
+    const value = wasm.__wbindgen_export_4.get(idx);
     wasm.__externref_table_dealloc(idx);
     return value;
 }
@@ -198,12 +205,15 @@ export class KlineProcess {
     }
     /**
      * 创建新的KlineProcess实例
-     * @param {any} memory_val
-     * @param {number} ptr_offset
-     * @param {number} data_length
+     *
+     * # 参数
+     * * `initial_data` - 包含历史K线数据的 `Uint8Array`
+     * @param {Uint8Array} initial_data
      */
-    constructor(memory_val, ptr_offset, data_length) {
-        const ret = wasm.klineprocess_new(memory_val, ptr_offset, data_length);
+    constructor(initial_data) {
+        const ptr0 = passArray8ToWasm0(initial_data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_new(ptr0, len0);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -233,6 +243,44 @@ export class KlineProcess {
         }
     }
     /**
+     * 追加K线数据（用于实时数据流）
+     * @param {Uint8Array} data
+     */
+    append_data(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_append_data(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * 获取最后处理的数据的序列号（当前实现为获取tick值）
+     * @returns {number}
+     */
+    get_last_sequence() {
+        const ret = wasm.klineprocess_get_last_sequence(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * 合并K线数据（用于数据补齐）
+     *
+     * 此方法接收一个FlatBuffers二进制数组，解析后与现有数据合并。
+     * 主要用于处理网络断连后，补充丢失的数据包。
+     *
+     * # 参数
+     * * `data` - 包含一条或多条K线数据的 `Uint8Array`
+     * @param {Uint8Array} data
+     */
+    merge_data(data) {
+        const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_merge_data(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * @param {number} x
      * @param {number} y
      */
@@ -240,7 +288,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_mouse_move(this.__wbg_ptr, x, y);
     }
     /**
-     * 获取当前鼠标位置的光标样式
      * @param {number} x
      * @param {number} y
      * @returns {string}
@@ -257,12 +304,8 @@ export class KlineProcess {
             wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
         }
     }
-    /**
-     * @returns {boolean}
-     */
     handle_mouse_leave() {
-        const ret = wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
-        return ret !== 0;
+        wasm.klineprocess_handle_mouse_leave(this.__wbg_ptr);
     }
     /**
      * @param {number} delta
@@ -273,7 +316,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_wheel(this.__wbg_ptr, delta, x, y);
     }
     /**
-     * 处理鼠标按下事件
      * @param {number} x
      * @param {number} y
      * @returns {boolean}
@@ -283,7 +325,6 @@ export class KlineProcess {
         return ret !== 0;
     }
     /**
-     * 处理鼠标释放事件
      * @param {number} x
      * @param {number} y
      * @returns {boolean}
@@ -293,7 +334,6 @@ export class KlineProcess {
         return ret !== 0;
     }
     /**
-     * 处理鼠标拖动事件
      * @param {number} x
      * @param {number} y
      */
@@ -301,7 +341,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_mouse_drag(this.__wbg_ptr, x, y);
     }
     /**
-     * 设置渲染模式（由React层调用）
      * @param {string} mode
      */
     set_render_mode(mode) {
@@ -313,30 +352,6 @@ export class KlineProcess {
         }
     }
     /**
-     * 处理鼠标点击事件（已废弃，模式切换由React层管理）
-     * @param {number} _x
-     * @param {number} _y
-     * @returns {boolean}
-     */
-    handle_click(_x, _y) {
-        const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, _x, _y);
-        return ret !== 0;
-    }
-    /**
-     * 设置配置JSON（动态切换主题/配色等）
-     * @param {string} json
-     */
-    set_config_json(json) {
-        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.klineprocess_set_config_json(this.__wbg_ptr, ptr0, len0);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
-        }
-    }
-    /**
-     * 处理画布大小改变
-     * 当窗口大小改变时调用此方法，需要重新初始化可见范围
      * @param {number} width
      * @param {number} height
      */
@@ -344,8 +359,6 @@ export class KlineProcess {
         wasm.klineprocess_handle_canvas_resize(this.__wbg_ptr, width, height);
     }
     /**
-     * 使用 serde-wasm-bindgen 直接从 JsValue 更新配置
-     * 比 set_config_json 更高效，避免 JSON 字符串解析
      * @param {any} js_config
      */
     update_config(js_config) {
@@ -355,7 +368,6 @@ export class KlineProcess {
         }
     }
     /**
-     * 使用 serde-wasm-bindgen 获取当前配置为 JsValue
      * @returns {any}
      */
     get_config() {
@@ -366,7 +378,6 @@ export class KlineProcess {
         return takeFromExternrefTable0(ret[0]);
     }
     /**
-     * 获取当前主题为 JsValue
      * @returns {any}
      */
     get_theme() {
@@ -375,6 +386,81 @@ export class KlineProcess {
             throw takeFromExternrefTable0(ret[1]);
         }
         return takeFromExternrefTable0(ret[0]);
+    }
+}
+
+const PerformanceMonitorFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_performancemonitor_free(ptr >>> 0, 1));
+/**
+ * WASM性能监控器
+ *
+ * 提供实时的性能监控功能，与前端PerformancePanel组件集成
+ * 通过JS接口提供FPS、内存使用、渲染时间等指标
+ */
+export class PerformanceMonitor {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PerformanceMonitorFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_performancemonitor_free(ptr, 0);
+    }
+    /**
+     * 创建新的性能监控器
+     */
+    constructor() {
+        const ret = wasm.performancemonitor_new();
+        this.__wbg_ptr = ret >>> 0;
+        PerformanceMonitorFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * 开始渲染性能测量
+     */
+    start_render_measurement() {
+        wasm.performancemonitor_start_render_measurement(this.__wbg_ptr);
+    }
+    /**
+     * 结束渲染性能测量
+     */
+    end_render_measurement() {
+        wasm.performancemonitor_end_render_measurement(this.__wbg_ptr);
+    }
+    /**
+     * 初始化性能监控器（从KlineProcess迁移）
+     * 重新初始化监控器状态
+     */
+    init_monitor() {
+        wasm.performancemonitor_init_monitor(this.__wbg_ptr);
+    }
+    /**
+     * 获取完整的性能统计信息
+     * 返回包含所有性能指标的JSON格式数据
+     * @returns {string}
+     */
+    get_performance_stats() {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.performancemonitor_get_performance_stats(this.__wbg_ptr);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
     }
 }
 
@@ -426,14 +512,19 @@ function __wbg_get_imports() {
         const ret = arg0.buffer;
         return ret;
     };
+    imports.wbg.__wbg_byteLength_ea52ac3de882b483 = function(arg0) {
+        const ret = arg0.byteLength;
+        return ret;
+    };
+    imports.wbg.__wbg_call_672a4d21634d4a24 = function() { return handleError(function (arg0, arg1) {
+        const ret = arg0.call(arg1);
+        return ret;
+    }, arguments) };
     imports.wbg.__wbg_clearRect_4790e3611b42f068 = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.clearRect(arg1, arg2, arg3, arg4);
     };
     imports.wbg.__wbg_closePath_cf0e7130243e1083 = function(arg0) {
         arg0.closePath();
-    };
-    imports.wbg.__wbg_error_524f506f44df1645 = function(arg0) {
-        console.error(arg0);
     };
     imports.wbg.__wbg_error_7534b8e9a36f1ab4 = function(arg0, arg1) {
         let deferred0_0;
@@ -459,6 +550,10 @@ function __wbg_get_imports() {
         const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
         return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
     }, arguments) };
+    imports.wbg.__wbg_get_67b2ba62fc30de12 = function() { return handleError(function (arg0, arg1) {
+        const ret = Reflect.get(arg0, arg1);
+        return ret;
+    }, arguments) };
     imports.wbg.__wbg_getwithrefkey_1dc361bd10053bfe = function(arg0, arg1) {
         const ret = arg0[arg1];
         return ret;
@@ -471,16 +566,6 @@ function __wbg_get_imports() {
         let result;
         try {
             result = arg0 instanceof ArrayBuffer;
-        } catch (_) {
-            result = false;
-        }
-        const ret = result;
-        return ret;
-    };
-    imports.wbg.__wbg_instanceof_Memory_111add5588accff2 = function(arg0) {
-        let result;
-        try {
-            result = arg0 instanceof WebAssembly.Memory;
         } catch (_) {
             result = false;
         }
@@ -507,15 +592,22 @@ function __wbg_get_imports() {
         const ret = result;
         return ret;
     };
+    imports.wbg.__wbg_instanceof_Window_def73ea0955fc569 = function(arg0) {
+        let result;
+        try {
+            result = arg0 instanceof Window;
+        } catch (_) {
+            result = false;
+        }
+        const ret = result;
+        return ret;
+    };
     imports.wbg.__wbg_length_a446193dc22c12f8 = function(arg0) {
         const ret = arg0.length;
         return ret;
     };
     imports.wbg.__wbg_lineTo_04b5a9c687eccd70 = function(arg0, arg1, arg2) {
         arg0.lineTo(arg1, arg2);
-    };
-    imports.wbg.__wbg_log_b46a0b216df7cf84 = function(arg0, arg1) {
-        console.log(getStringFromWasm0(arg0, arg1));
     };
     imports.wbg.__wbg_measureText_f0f078704231c37f = function() { return handleError(function (arg0, arg1, arg2) {
         const ret = arg0.measureText(getStringFromWasm0(arg1, arg2));
@@ -544,21 +636,33 @@ function __wbg_get_imports() {
         const ret = new Uint8Array(arg0);
         return ret;
     };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_93c8e0c1a479fa1a = function(arg0, arg1, arg2) {
-        const ret = new Float64Array(arg0, arg1 >>> 0, arg2 >>> 0);
+    imports.wbg.__wbg_newnoargs_105ed471475aaf50 = function(arg0, arg1) {
+        const ret = new Function(getStringFromWasm0(arg0, arg1));
         return ret;
     };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a = function(arg0, arg1, arg2) {
-        const ret = new Uint8Array(arg0, arg1 >>> 0, arg2 >>> 0);
+    imports.wbg.__wbg_newwithbyteoffsetandlength_93c8e0c1a479fa1a = function(arg0, arg1, arg2) {
+        const ret = new Float64Array(arg0, arg1 >>> 0, arg2 >>> 0);
         return ret;
     };
     imports.wbg.__wbg_newwithlength_5ebc38e611488614 = function(arg0) {
         const ret = new Float64Array(arg0 >>> 0);
         return ret;
     };
+    imports.wbg.__wbg_now_2c95c9de01293173 = function(arg0) {
+        const ret = arg0.now();
+        return ret;
+    };
     imports.wbg.__wbg_of_66b3ee656cbd962b = function(arg0, arg1) {
         const ret = Array.of(arg0, arg1);
         return ret;
+    };
+    imports.wbg.__wbg_performance_7a3ffd0b17f663ad = function(arg0) {
+        const ret = arg0.performance;
+        return ret;
+    };
+    imports.wbg.__wbg_performance_c185c0cdc2766575 = function(arg0) {
+        const ret = arg0.performance;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
     };
     imports.wbg.__wbg_quadraticCurveTo_d0e2225e49394b7a = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.quadraticCurveTo(arg1, arg2, arg3, arg4);
@@ -584,9 +688,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_setglobalAlpha_3018cc44e3ab2d57 = function(arg0, arg1) {
         arg0.globalAlpha = arg1;
     };
-    imports.wbg.__wbg_setheight_433680330c9420c3 = function(arg0, arg1) {
-        arg0.height = arg1 >>> 0;
-    };
     imports.wbg.__wbg_setimageSmoothingEnabled_15335584d0f077b6 = function(arg0, arg1) {
         arg0.imageSmoothingEnabled = arg1 !== 0;
     };
@@ -608,9 +709,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_settextBaseline_7fb1acb93a0c121a = function(arg0, arg1, arg2) {
         arg0.textBaseline = getStringFromWasm0(arg1, arg2);
     };
-    imports.wbg.__wbg_setwidth_660ca581e3fbe279 = function(arg0, arg1) {
-        arg0.width = arg1 >>> 0;
-    };
     imports.wbg.__wbg_stack_0ed75d68575b0f3c = function(arg0, arg1) {
         const ret = arg1.stack;
         const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -618,17 +716,27 @@ function __wbg_get_imports() {
         getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
         getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
     };
+    imports.wbg.__wbg_static_accessor_GLOBAL_88a902d13a557d07 = function() {
+        const ret = typeof global === 'undefined' ? null : global;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0 = function() {
+        const ret = typeof globalThis === 'undefined' ? null : globalThis;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_SELF_37c5d418e4bf5819 = function() {
+        const ret = typeof self === 'undefined' ? null : self;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
+    imports.wbg.__wbg_static_accessor_WINDOW_5de37043a91a9c40 = function() {
+        const ret = typeof window === 'undefined' ? null : window;
+        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
+    };
     imports.wbg.__wbg_strokeRect_758dd38f99a9581f = function(arg0, arg1, arg2, arg3, arg4) {
         arg0.strokeRect(arg1, arg2, arg3, arg4);
     };
     imports.wbg.__wbg_stroke_44080cc2554b4436 = function(arg0) {
         arg0.stroke();
-    };
-    imports.wbg.__wbg_timeEnd_c7b7463c4f4acfbc = function(arg0, arg1) {
-        console.timeEnd(getStringFromWasm0(arg0, arg1));
-    };
-    imports.wbg.__wbg_time_7aaed348524f10df = function(arg0, arg1) {
-        console.time(getStringFromWasm0(arg0, arg1));
     };
     imports.wbg.__wbg_width_2fafd30484634e26 = function(arg0) {
         const ret = arg0.width;
@@ -659,7 +767,7 @@ function __wbg_get_imports() {
         return ret;
     };
     imports.wbg.__wbindgen_init_externref_table = function() {
-        const table = wasm.__wbindgen_export_5;
+        const table = wasm.__wbindgen_export_4;
         const offset = table.grow(4);
         table.set(0, undefined);
         table.set(offset + 0, undefined);

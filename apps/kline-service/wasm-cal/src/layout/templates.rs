@@ -28,6 +28,11 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                 id: PaneId::Header,
                 constraint: Constraint::Fixed(25.0),
             },
+            // 添加一个5px的垂直间距
+            LayoutNode::Pane {
+                id: PaneId::Custom("HeaderSpacer".to_string()),
+                constraint: Constraint::Fixed(5.0),
+            },
             // 中间主内容区: 填充剩余空间
             LayoutNode::HBox {
                 id: PaneId::MainContent,
@@ -72,10 +77,26 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                                                     },
                                                 ],
                                             },
-                                            // 成交量图（与HeatmapArea同宽）
-                                            LayoutNode::Pane {
-                                                id: PaneId::VolumeChart,
+                                            // 成交量图区域（与HeatmapArea等宽）
+                                            LayoutNode::HBox {
+                                                id: PaneId::Custom(
+                                                    "VolumeChartWrapper".to_string(),
+                                                ),
                                                 constraint: volume_chart_constraint,
+                                                children: vec![
+                                                    // 左侧成交量图（与HeatmapArea同宽）
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::VolumeChart,
+                                                        constraint: Constraint::Percent(80.0),
+                                                    },
+                                                    // 右侧空白区域（与OrderBook对齐）
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::Custom(
+                                                            "VolumeChartSpacer".to_string(),
+                                                        ),
+                                                        constraint: Constraint::Percent(20.0),
+                                                    },
+                                                ],
                                             },
                                         ],
                                     },
@@ -89,24 +110,26 @@ pub fn create_layout_template(mode: RenderMode) -> LayoutNode {
                                         id: PaneId::Custom("NavigatorWrapper".to_string()),
                                         constraint: Constraint::Fixed(40.0),
                                         children: vec![
-                                            // 左侧空白区域（与YAxis对齐）
-                                            LayoutNode::Pane {
+                                            // 导航器主体区域（与MainChartWrapper结构对齐）
+                                            LayoutNode::HBox {
                                                 id: PaneId::Custom(
-                                                    "NavigatorLeftSpacer".to_string(),
+                                                    "NavigatorMainWrapper".to_string(),
                                                 ),
-                                                constraint: Constraint::Fixed(60.0),
-                                            },
-                                            // 中间导航器主体
-                                            LayoutNode::Pane {
-                                                id: PaneId::NavigatorContainer,
                                                 constraint: Constraint::Fill,
-                                            },
-                                            // 右侧空白区域（与OrderBook对齐）
-                                            LayoutNode::Pane {
-                                                id: PaneId::Custom(
-                                                    "NavigatorRightSpacer".to_string(),
-                                                ),
-                                                constraint: Constraint::Percent(20.0),
+                                                children: vec![
+                                                    // 导航器容器（与HeatmapArea对齐）
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::NavigatorContainer,
+                                                        constraint: Constraint::Percent(80.0),
+                                                    },
+                                                    // 右侧空白区域（与OrderBook对齐）
+                                                    LayoutNode::Pane {
+                                                        id: PaneId::Custom(
+                                                            "NavigatorRightSpacer".to_string(),
+                                                        ),
+                                                        constraint: Constraint::Percent(20.0),
+                                                    },
+                                                ],
                                             },
                                         ],
                                     },

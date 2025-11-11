@@ -74,26 +74,31 @@ interface AppState extends AuthState, UIState, APIState {
   clearAllData: () => void;
 }
 
-const initialState: Omit<AppState, 'actions'> = {
+const initialState = {
   // Auth state
   isAuthenticated: false,
-  user: null,
+  user: null as UserContext | null,
   loading: false,
-  error: null,
+  error: null as string | null,
   lastActivity: Date.now(),
-  
+
   // UI state
-  theme: 'system',
+  theme: 'system' as const,
   sidebarOpen: true,
-  notifications: [],
-  modals: {},
-  loadingStates: {},
-  
+  notifications: [] as Array<{
+    id: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+    timestamp: number;
+  }>,
+  modals: {} as Record<string, boolean>,
+  loadingStates: {} as Record<string, boolean>,
+
   // API state
-  lastFetchTime: {},
-  cache: {},
-  errors: {},
-  retryCount: {},
+  lastFetchTime: {} as Record<string, number>,
+  cache: {} as Record<string, any>,
+  errors: {} as Record<string, string>,
+  retryCount: {} as Record<string, number>,
 };
 
 export const useAppStore = create<AppState>()(

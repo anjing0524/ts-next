@@ -112,6 +112,15 @@
     "e2e:report": {
       "cache": false,
       "dependsOn": ["e2e"]
+    },
+    "wasm:test": {
+      "cache": false,
+      "persistent": false,
+      "dependsOn": []
+    },
+    "wasm:build": {
+      "cache": false,
+      "dependsOn": []
     }
   },
   "globalDependencies": ["package.json", "pnpm-lock.yaml", "tsconfig.json", "components.json"],

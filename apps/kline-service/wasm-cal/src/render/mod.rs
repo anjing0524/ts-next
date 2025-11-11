@@ -17,7 +17,4 @@ pub mod tooltip_renderer; // 新增：Tooltip渲染器
 pub mod volume_renderer; // 新增：策略模式 // 新增：高级渲染器架构
 
 pub use chart_renderer::ChartRenderer;
-pub use render_context::{
-    ConfigContext, DataContext, DrawContext, RenderContext, SharedRenderState,
-    UnifiedRenderContext, ViewportInfo,
-};
+pub use render_context::{RenderContext, SharedRenderState, UnifiedRenderContext, ViewportInfo};

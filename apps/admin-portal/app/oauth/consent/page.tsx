@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@repo/ui';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import {
@@ -32,7 +31,7 @@ interface ConsentApiData {
 function ConsentContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  // 注意：不需要 useAuth()，用户信息来自 OAuth Service 的 API 响应（apiData.user）
 
   const clientId = searchParams.get('client_id');
   const redirectUri = searchParams.get('redirect_uri');
@@ -261,7 +260,7 @@ function ConsentContent() {
               <div>
                 <p className="text-sm text-blue-800">
                   <strong>当前用户：</strong>{' '}
-                  {apiData?.user.username || user?.username || '未知用户'}
+                  {apiData?.user.username || '未知用户'}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   如果这不是您的账户，请取消并重新登录正确的账户。
@@ -303,35 +302,23 @@ function ConsentContent() {
 }
 
 export default function ConsentPage() {
-  const { user, isLoading } = useAuth();
-
-  // 如果未登录，跳转到登录页面
-  if (!isLoading && !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">需要登录</CardTitle>
-            <CardDescription>您需要先登录才能进行授权确认</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => {
-                const currentUrl = window.location.href;
-                const loginUrl = new URL('/login', window.location.origin);
-                loginUrl.searchParams.set('redirect_uri', currentUrl);
-                window.location.href = loginUrl.toString();
-              }}
-              className="w-full"
-            >
-              前往登录
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+  /**
+   * 同意页面不需要检查 admin-portal 的 access_token
+   *
+   * 重要：同意页面是由 OAuth Service 重定向到达的。用户已经通过 OAuth Service 登录
+   * （有 session_token），但可能没有 admin-portal 的 access_token。
+   *
+   * 认证流程：
+   * 1. 用户访问 OAuth Service 的 /authorize 端点
+   * 2. OAuth Service 检查 session_token（用户是否已登录）
+   * 3. 如果用户未登录，OAuth Service 重定向到 /login?redirect=...
+   * 4. 如果用户已登录但需要同意，OAuth Service 重定向到 /oauth/consent?...
+   * 5. 同意页面调用 /oauth/consent API 获取同意信息（已包含用户信息）
+   * 6. 如果 API 调用失败（如用户未登录），ConsentContent 会显示错误
+   *
+   * 因此，不需要在这里检查 useAuth()（admin-portal 的 access_token）
+   * OAuth Service 已经保证了用户已登录
+   */
   return (
     <Suspense
       fallback={

@@ -10,7 +10,6 @@
  */
 
 import { TokenStorage } from '../auth/token-storage-consolidated';
-import { TokenRefreshManager } from '../auth/token-refresh';
 import { triggerAuthError, triggerNetworkError, triggerApiError } from '@/components/error/global-error-handler';
 
 export interface RequestOptions extends RequestInit {
@@ -32,20 +31,7 @@ export class EnhancedAPIClient {
   private static readonly TIMEOUT = 30000;
   
   private static pendingRequests = new Map<string, PendingRequest>();
-  private static tokenRefreshManager: TokenRefreshManager | null = null;
 
-  /**
-   * Initialize the API client
-   */
-  static initialize() {
-    if (typeof window !== 'undefined') {
-      this.tokenRefreshManager = new TokenRefreshManager();
-      // Generate CSRF token if not exists
-      if (!this.getCSRFToken()) {
-        this.generateCSRFToken();
-      }
-    }
-  }
 
   /**
    * Make an HTTP request with enhanced error handling and retry logic
@@ -184,7 +170,9 @@ export class EnhancedAPIClient {
 
       // Handle authentication errors
       if (response.status === 401 && !skipAuthRefresh) {
-        return await this.handleAuthError<T>(url, options);
+        // Clear tokens and redirect to login
+        TokenStorage.clearTokens();
+        throw new Error('Authentication failed');
       }
 
       // Handle other HTTP errors
@@ -241,33 +229,7 @@ export class EnhancedAPIClient {
     return token;
   }
 
-  /**
-   * Handle authentication errors with token refresh
-   */
-  private static async handleAuthError<T>(url: string, options: RequestInit): Promise<T> {
-    if (!this.tokenRefreshManager) {
-      throw new Error('Token refresh manager not available');
-    }
 
-    try {
-      // Try to refresh the token
-      await this.tokenRefreshManager.refreshTokens();
-      
-      // Retry the request with the new token
-      return this.makeSingleRequest<T>(url, options, true);
-    } catch (refreshError) {
-      // Token refresh failed, trigger auth error event
-      triggerAuthError(
-        '认证失败，请重新登录',
-        refreshError instanceof Error ? refreshError.message : 'Token refresh failed',
-        false
-      );
-      
-      // Clear tokens and redirect to login
-      TokenStorage.clearTokens();
-      throw new Error('Authentication failed');
-    }
-  }
 
   /**
    * Check if request should not be retried
@@ -364,9 +326,4 @@ export class EnhancedAPIClient {
       headers: {}, // Let browser set Content-Type for FormData
     });
   }
-}
-
-// Initialize the API client when the module is loaded
-if (typeof window !== 'undefined') {
-  EnhancedAPIClient.initialize();
 }

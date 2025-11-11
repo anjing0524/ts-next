@@ -70,4 +70,9 @@ pub trait RenderStrategy: 'static {
     fn force_reset_drag_state(&mut self) -> bool {
         false // 默认不处理
     }
+
+    /// 获取当前拖拽状态（可选实现）
+    fn get_drag_state(&self) -> crate::render::datazoom_renderer::DragState {
+        crate::render::datazoom_renderer::DragState::default()
+    }
 }

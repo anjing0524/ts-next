@@ -252,10 +252,6 @@ impl AxisRenderer {
         let layout = render_ctx.layout_ref();
         let theme = render_ctx.theme_ref();
         let data_manager = render_ctx.data_manager_ref();
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
-        };
         let (visible_start, visible_count, visible_end) = data_manager.get_visible();
         if visible_start >= visible_end {
             return;
@@ -284,7 +280,7 @@ impl AxisRenderer {
 
         for i in (0..visible_count).step_by(candle_interval) {
             let data_idx = visible_start + i;
-            if data_idx >= items.len() {
+            if data_idx >= data_manager.len() {
                 break;
             }
 
@@ -295,21 +291,30 @@ impl AxisRenderer {
                 break;
             }
 
-            let item = items.get(data_idx);
-            let timestamp_secs = item.timestamp() as i64;
-            let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
-            let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
+            if let Some(item) = data_manager.get(data_idx) {
+                let timestamp_secs = item.timestamp() as i64;
+                let time_str = time::format_timestamp(timestamp_secs, "%H:%M");
+                let date_str = time::format_timestamp(timestamp_secs, "%y/%m/%d");
 
-            let _ = ctx.fill_text(&date_str, x, time_axis_rect.y + 5.0);
-            let _ = ctx.fill_text(&time_str, x, time_axis_rect.y + 17.0);
+                let _ = ctx.fill_text(&date_str, x, time_axis_rect.y + 5.0);
+                let _ = ctx.fill_text(&time_str, x, time_axis_rect.y + 17.0);
+            }
         }
     }
 }
 
 impl RenderStrategy for AxisRenderer {
+    /// 渲染坐标轴与辅助信息到 Base 画布层
+    ///
+    /// # 参数
+    /// * `ctx` - 渲染上下文，包含画布管理器、布局、主题等信息
+    ///
+    /// # 返回值
+    /// * `Ok(())` - 渲染成功
+    /// * `Err(RenderError)` - 渲染失败时返回错误信息
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_manager = ctx.canvas_manager_ref();
-        let base_ctx = canvas_manager.get_context(CanvasLayerType::Base);
+        let base_ctx = canvas_manager.get_context(CanvasLayerType::Base)?;
         let layout = ctx.layout_ref();
         let theme = ctx.theme_ref();
 
@@ -324,14 +329,29 @@ impl RenderStrategy for AxisRenderer {
         Ok(())
     }
 
+    /// 检查是否支持指定的渲染模式
+    ///
+    /// # 参数
+    /// * `_mode` - 渲染模式（当前所有模式都支持）
+    ///
+    /// # 返回值
+    /// * `true` - 支持所有渲染模式
     fn supports_mode(&self, _mode: RenderMode) -> bool {
         true
     }
 
+    /// 获取渲染器对应的画布层类型
+    ///
+    /// # 返回值
+    /// * `CanvasLayerType::Base` - 坐标轴渲染器使用基础画布层
     fn get_layer_type(&self) -> CanvasLayerType {
         CanvasLayerType::Base
     }
 
+    /// 获取渲染器的优先级（数值越小优先级越高）
+    ///
+    /// # 返回值
+    /// * `5` - 坐标轴渲染器的渲染优先级
     fn get_priority(&self) -> u32 {
         5
     }

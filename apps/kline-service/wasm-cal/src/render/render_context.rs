@@ -1,13 +1,15 @@
 //! 统一的渲染上下文管理
 //! 使用 Rc<RefCell<T>> 解决借用检查问题，提供专用上下文对象
 
-use crate::canvas::{CanvasLayerType, CanvasManager};
+use crate::canvas::CanvasManager;
+use crate::command::state::MouseState;
 use crate::config::{ChartConfig, ChartTheme};
 use crate::data::DataManager;
 use crate::layout::ChartLayout;
 use crate::render::chart_renderer::RenderMode;
-use crate::utils::error::WasmCalError;
-use std::cell::RefCell;
+use crate::render::strategy::strategy_factory::RenderStrategyFactory;
+
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use web_sys::OffscreenCanvasRenderingContext2d;
 
@@ -24,16 +26,26 @@ pub struct SharedRenderState {
     pub theme: Rc<ChartTheme>,
     /// 图表配置（可选）
     pub config: Option<Rc<ChartConfig>>,
+    /// 策略工厂
+    pub strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
+    /// 鼠标状态（用于渲染器访问）
+    pub mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
+    // 渲染模式
+    pub mode: Rc<RefCell<RenderMode>>,
 }
 
 impl SharedRenderState {
     /// 创建新的共享渲染状态
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         canvas_manager: Rc<RefCell<CanvasManager>>,
         data_manager: Rc<RefCell<DataManager>>,
         layout: Rc<RefCell<ChartLayout>>,
         theme: Rc<ChartTheme>,
         config: Option<Rc<ChartConfig>>,
+        strategy_factory: Rc<RefCell<RenderStrategyFactory>>,
+        mouse_state: Rc<RefCell<crate::command::state::MouseState>>,
+        mode: Rc<RefCell<RenderMode>>,
     ) -> Self {
         Self {
             canvas_manager,
@@ -41,140 +53,10 @@ impl SharedRenderState {
             layout,
             theme,
             config,
-        }
-    }
-}
-
-/// 绘制上下文，专门处理 Canvas 绘制操作
-pub struct DrawContext {
-    /// 共享状态
-    pub shared: SharedRenderState,
-    /// Canvas 上下文（如果可用）
-    pub ctx: Option<OffscreenCanvasRenderingContext2d>,
-    /// 当前渲染模式
-    pub mode: RenderMode,
-    /// 渲染时间戳
-    pub timestamp: f64,
-}
-
-impl DrawContext {
-    /// 创建新的绘制上下文
-    pub fn new(
-        shared: SharedRenderState,
-        ctx: Option<OffscreenCanvasRenderingContext2d>,
-        mode: RenderMode,
-    ) -> Self {
-        Self {
-            shared,
-            ctx,
+            strategy_factory,
+            mouse_state,
             mode,
-            timestamp: 0.0,
         }
-    }
-
-    /// 获取 Canvas 上下文
-    pub fn get_canvas_context(&self) -> Result<&OffscreenCanvasRenderingContext2d, WasmCalError> {
-        self.ctx
-            .as_ref()
-            .ok_or_else(|| WasmCalError::canvas("Canvas context not available"))
-    }
-
-    /// 使用指定层的 Canvas 上下文执行操作
-    pub fn with_layer_context<F, R>(&self, layer: CanvasLayerType, f: F) -> R
-    where
-        F: FnOnce(&OffscreenCanvasRenderingContext2d) -> R,
-    {
-        let canvas_manager = self.shared.canvas_manager.borrow();
-        let ctx = canvas_manager.get_context(layer);
-        f(ctx)
-    }
-}
-
-/// 数据上下文，专门处理数据访问操作
-pub struct DataContext {
-    /// 共享状态
-    pub shared: SharedRenderState,
-}
-
-impl DataContext {
-    /// 创建新的数据上下文
-    pub fn new(shared: SharedRenderState) -> Self {
-        Self { shared }
-    }
-
-    /// 安全地访问数据管理器
-    pub fn with_data_manager<F, R>(&self, f: F) -> Result<R, WasmCalError>
-    where
-        F: FnOnce(&DataManager) -> R,
-    {
-        let data_manager = self
-            .shared
-            .data_manager
-            .try_borrow()
-            .map_err(|_| WasmCalError::data("Data manager is already borrowed"))?;
-        Ok(f(&data_manager))
-    }
-
-    /// 安全地修改数据管理器
-    pub fn with_data_manager_mut<F, R>(&self, f: F) -> Result<R, WasmCalError>
-    where
-        F: FnOnce(&mut DataManager) -> R,
-    {
-        let mut data_manager = self
-            .shared
-            .data_manager
-            .try_borrow_mut()
-            .map_err(|_| WasmCalError::data("Data manager is already borrowed mutably"))?;
-        Ok(f(&mut data_manager))
-    }
-}
-
-/// 配置上下文，专门处理配置访问操作
-pub struct ConfigContext {
-    /// 共享状态
-    pub shared: SharedRenderState,
-}
-
-impl ConfigContext {
-    /// 创建新的配置上下文
-    pub fn new(shared: SharedRenderState) -> Self {
-        Self { shared }
-    }
-
-    /// 获取主题配置
-    pub fn theme(&self) -> &ChartTheme {
-        &self.shared.theme
-    }
-
-    /// 获取图表配置
-    pub fn config(&self) -> Option<&ChartConfig> {
-        self.shared.config.as_deref()
-    }
-
-    /// 安全地访问布局
-    pub fn with_layout<F, R>(&self, f: F) -> Result<R, WasmCalError>
-    where
-        F: FnOnce(&ChartLayout) -> R,
-    {
-        let layout = self
-            .shared
-            .layout
-            .try_borrow()
-            .map_err(|_| WasmCalError::config("Layout is already borrowed"))?;
-        Ok(f(&layout))
-    }
-
-    /// 安全地修改布局
-    pub fn with_layout_mut<F, R>(&self, f: F) -> Result<R, WasmCalError>
-    where
-        F: FnOnce(&mut ChartLayout) -> R,
-    {
-        let mut layout = self
-            .shared
-            .layout
-            .try_borrow_mut()
-            .map_err(|_| WasmCalError::config("Layout is already borrowed mutably"))?;
-        Ok(f(&mut layout))
     }
 }
 
@@ -190,12 +72,6 @@ pub struct UnifiedRenderContext {
     pub timestamp: f64,
     /// 视口信息
     pub viewport: ViewportInfo,
-    /// 鼠标悬浮的K线索引（用于订单簿等需要悬浮状态的渲染器）
-    pub hover_index: Option<usize>,
-    /// 鼠标X坐标
-    pub mouse_x: f64,
-    /// 鼠标Y坐标
-    pub mouse_y: f64,
 }
 
 impl UnifiedRenderContext {
@@ -211,18 +87,15 @@ impl UnifiedRenderContext {
             mode,
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
-            hover_index: None,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
         }
     }
 
-    /// 创建带有悬浮索引的统一渲染上下文
+    /// 创建带有悬浮索引的统一渲染上下文（保留向后兼容）
     pub fn new_with_hover(
         shared: SharedRenderState,
         ctx: Option<OffscreenCanvasRenderingContext2d>,
         mode: RenderMode,
-        hover_index: Option<usize>,
+        _hover_index: Option<usize>,
     ) -> Self {
         Self {
             shared,
@@ -230,60 +103,61 @@ impl UnifiedRenderContext {
             mode,
             timestamp: 0.0,
             viewport: ViewportInfo::default(),
-            hover_index,
-            mouse_x: 0.0,
-            mouse_y: 0.0,
         }
     }
 
     /// 从共享状态创建
     pub fn from_shared(shared: SharedRenderState) -> Self {
-        Self::new(shared, None, RenderMode::Kmap)
+        let mode = *shared.mode.borrow();
+        Self {
+            shared,
+            ctx: None,
+            mode,
+            timestamp: 0.0,
+            viewport: ViewportInfo::default(),
+        }
     }
 
-    /// 设置悬浮索引
-    pub fn set_hover_index(&mut self, hover_index: Option<usize>) {
-        self.hover_index = hover_index;
+    /// 从共享状态和鼠标状态创建（保留向后兼容）
+    pub fn from_shared_with_mouse_state(
+        shared: SharedRenderState,
+        _mouse_state: &MouseState,
+    ) -> Self {
+        Self::from_shared(shared)
     }
 
-    /// 设置鼠标位置
-    pub fn set_mouse_position(&mut self, x: f64, y: f64) {
-        self.mouse_x = x;
-        self.mouse_y = y;
+    /// 获取鼠标悬浮的K线索引
+    pub fn hover_index(&self) -> Option<usize> {
+        self.shared.mouse_state.borrow().hover_candle_index
     }
 
-    /// 获取绘制上下文
-    pub fn draw(&self) -> DrawContext {
-        DrawContext::new(self.shared.clone(), self.ctx.clone(), self.mode)
+    /// 获取鼠标X坐标
+    pub fn mouse_x(&self) -> f64 {
+        self.shared.mouse_state.borrow().x
     }
 
-    /// 获取数据上下文
-    pub fn data(&self) -> DataContext {
-        DataContext::new(self.shared.clone())
-    }
-
-    /// 获取配置上下文
-    pub fn config(&self) -> ConfigContext {
-        ConfigContext::new(self.shared.clone())
+    /// 获取鼠标Y坐标
+    pub fn mouse_y(&self) -> f64 {
+        self.shared.mouse_state.borrow().y
     }
 
     /// 获取 Canvas 管理器的不可变借用
-    pub fn canvas_manager_ref(&self) -> std::cell::Ref<CanvasManager> {
+    pub fn canvas_manager_ref(&self) -> Ref<CanvasManager> {
         self.shared.canvas_manager.borrow()
     }
 
     /// 获取数据管理器的不可变借用
-    pub fn data_manager_ref(&self) -> std::cell::Ref<DataManager> {
+    pub fn data_manager_ref(&self) -> Ref<DataManager> {
         self.shared.data_manager.borrow()
     }
 
     /// 获取数据管理器的可变借用
-    pub fn data_manager_mut_ref(&self) -> std::cell::RefMut<'_, DataManager> {
+    pub fn data_manager_mut_ref(&self) -> RefMut<'_, DataManager> {
         self.shared.data_manager.borrow_mut()
     }
 
     /// 获取图表布局的不可变借用
-    pub fn layout_ref(&self) -> std::cell::Ref<ChartLayout> {
+    pub fn layout_ref(&self) -> Ref<ChartLayout> {
         self.shared.layout.borrow()
     }
 
@@ -295,6 +169,36 @@ impl UnifiedRenderContext {
     /// 获取图表配置
     pub fn config_ref(&self) -> Option<Rc<ChartConfig>> {
         self.shared.config.clone()
+    }
+}
+
+impl Default for UnifiedRenderContext {
+    /// 创建用于测试的默认 UnifiedRenderContext
+    ///
+    /// 使用最小依赖的默认值初始化所有组件，主要用于单元测试场景。
+    /// 所有管理器使用默认实例，无 Canvas 上下文。
+    fn default() -> Self {
+        let shared_state = SharedRenderState::new(
+            Rc::new(RefCell::new(CanvasManager::new_uninitialized())),
+            Rc::new(RefCell::new(DataManager::default())),
+            Rc::new(RefCell::new(ChartLayout::new(
+                std::collections::HashMap::new(),
+                0,
+            ))),
+            Rc::new(ChartTheme::default()),
+            Some(Rc::new(ChartConfig::default())),
+            Rc::new(RefCell::new(RenderStrategyFactory::new())),
+            Rc::new(RefCell::new(MouseState::default())),
+            Rc::new(RefCell::new(RenderMode::Kmap)),
+        );
+
+        Self {
+            shared: shared_state,
+            ctx: None,
+            mode: RenderMode::Kmap,
+            timestamp: 0.0,
+            viewport: ViewportInfo::default(),
+        }
     }
 }
 

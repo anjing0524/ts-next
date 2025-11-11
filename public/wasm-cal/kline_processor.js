@@ -310,6 +310,18 @@ export class KlineProcess {
         const ret = wasm.klineprocess_handle_click(this.__wbg_ptr, x, y);
         return ret !== 0;
     }
+    /**
+     * 设置配置JSON（动态切换主题/配色等）
+     * @param {string} json
+     */
+    set_config_json(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.klineprocess_set_config_json(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
 }
 
 async function __wbg_load(module, imports) {
@@ -386,10 +398,6 @@ function __wbg_get_imports() {
         const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
         return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
     }, arguments) };
-    imports.wbg.__wbg_globalAlpha_d09f513957912176 = function(arg0) {
-        const ret = arg0.globalAlpha;
-        return ret;
-    };
     imports.wbg.__wbg_height_e3c322f23d99ad2f = function(arg0) {
         const ret = arg0.height;
         return ret;

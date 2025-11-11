@@ -19,7 +19,7 @@ export { APICacheLayer } from './cache-layer';
 export { RetryWithCircuitBreaker } from './retry-with-circuit-breaker';
 
 // Auth-related exports
-export { TokenRefreshManager } from '../auth/token-refresh';
+
 export { EnhancedTokenStorage as AuthTokenStorage } from '../auth/enhanced-token-storage';
 
 // Utility exports (removed to fix compilation issues)

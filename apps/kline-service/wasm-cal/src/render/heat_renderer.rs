@@ -2,12 +2,14 @@
 
 use crate::canvas::CanvasLayerType;
 use crate::data::DataManager;
-use crate::layout::{ChartLayout, CoordinateMapper, PaneId};
+use crate::layout::{ChartLayout, CoordinateMapper, PaneId, Rect};
 use crate::render::chart_renderer::RenderMode;
 use crate::render::strategy::render_strategy::{RenderContext, RenderError, RenderStrategy};
+use crate::utils::{calculate_optimal_tick, error::WasmCalError};
 use web_sys::OffscreenCanvasRenderingContext2d;
 
 /// 热图渲染器
+/// 新版本为无状态渲染器，所有计算和缓存逻辑已移至DataManager。
 pub struct HeatRenderer {
     color_cache: Vec<String>,
 }
@@ -27,115 +29,137 @@ impl HeatRenderer {
         Self { color_cache }
     }
 
+    /// 主绘制函数，从DataManager获取预计算的全局索引并渲染可见部分。
     pub fn draw(
         &self,
         ctx: &OffscreenCanvasRenderingContext2d,
         layout: &ChartLayout,
         data_manager: &DataManager,
-    ) {
-        let items = match data_manager.get_items() {
-            Some(items) => items,
-            None => return,
+    ) -> Result<(), WasmCalError> {
+        let (_visible_start, visible_count, _visible_end) = data_manager.get_visible();
+
+        // 如果没有可见数据或没有全局索引，则不渲染
+        let heatmap_index = match data_manager.get_global_heatmap_index() {
+            Some(index) if visible_count > 0 => index,
+            _ => return Ok(()),
         };
 
-        let (visible_start, visible_count, _) = data_manager.get_visible();
-        let visible_end = visible_start + visible_count;
-        if visible_start >= visible_end {
-            return;
-        }
-
-        let (min_low, max_high, _) = data_manager.get_cached_cal();
-        let tick = data_manager.get_tick();
-        if tick <= 0.0 || min_low >= max_high {
-            return;
-        }
-
-        let num_bins = ((max_high - min_low) / tick).ceil() as usize;
-        if num_bins == 0 {
-            return;
-        }
-
         let price_rect = layout.get_rect(&PaneId::HeatmapArea);
-        let y_mapper = CoordinateMapper::new_for_y_axis(price_rect, min_low, max_high, 0.0);
+        let adjusted_tick = calculate_optimal_tick(
+            heatmap_index.tick_size,
+            heatmap_index.global_min_price,
+            heatmap_index.global_max_price,
+            price_rect.height,
+        );
 
-        let mut all_bins: Vec<Vec<f64>> = Vec::with_capacity(visible_end - visible_start);
-        let mut global_max_bin: f64 = 0.0;
+        if adjusted_tick <= 0.0 {
+            return Ok(());
+        }
 
-        for i in visible_start..visible_end {
-            let item = items.get(i);
-            let mut bins = vec![0.0; num_bins];
-            if let Some(volumes) = item.volumes() {
-                for j in 0..volumes.len() {
-                    let pv = volumes.get(j);
-                    if pv.price() >= min_low && pv.price() < max_high {
-                        let bin_idx = ((pv.price() - min_low) / tick).floor() as usize;
-                        if bin_idx < num_bins {
-                            bins[bin_idx] += pv.volume();
-                            global_max_bin = global_max_bin.max(bins[bin_idx]);
+        // 计算显示时需要聚合的原始tick数量
+        let aggregation_factor = (adjusted_tick / heatmap_index.tick_size).round() as usize;
+
+        let y_mapper = CoordinateMapper::new_for_y_axis(
+            price_rect,
+            heatmap_index.global_min_price,
+            heatmap_index.global_max_price,
+            0.0,
+        );
+
+        self.draw_aggregated_heatmap(
+            ctx,
+            layout,
+            data_manager,
+            &y_mapper,
+            &price_rect,
+            aggregation_factor,
+        )?;
+
+        Ok(())
+    }
+
+    /// 绘制聚合后的热图
+    fn draw_aggregated_heatmap(
+        &self,
+        ctx: &OffscreenCanvasRenderingContext2d,
+        layout: &ChartLayout,
+        data_manager: &DataManager,
+        y_mapper: &CoordinateMapper,
+        price_rect: &Rect,
+        aggregation_factor: usize,
+    ) -> Result<(), WasmCalError> {
+        let (visible_start, _, visible_end) = data_manager.get_visible();
+        let heatmap_index = data_manager.get_global_heatmap_index().unwrap(); // 已在上层检查
+
+        if heatmap_index.global_max_volume_in_bin <= 0.0 {
+            return Ok(());
+        }
+        let global_max_ln = (heatmap_index.global_max_volume_in_bin + 1.0).ln();
+        ctx.set_global_alpha(1.0);
+        let candle_width = layout.total_candle_width;
+        let x_base = price_rect.x;
+
+        // 遍历可见的每个时间点 (K线)
+        for time_idx in visible_start..visible_end {
+            let x = x_base + (time_idx - visible_start) as f64 * candle_width;
+            let mut current_color_index: Option<usize> = None;
+
+            // 遍历价格桶 (Y轴)
+            let mut raw_bucket_idx = 0;
+            while raw_bucket_idx < heatmap_index.price_buckets_len {
+                let mut aggregated_volume = 0.0;
+                let end_agg_bucket =
+                    (raw_bucket_idx + aggregation_factor).min(heatmap_index.price_buckets_len);
+
+                // 聚合原始桶的数据
+                for i in raw_bucket_idx..end_agg_bucket {
+                    let linear_idx = time_idx * heatmap_index.price_buckets_len + i;
+                    aggregated_volume += heatmap_index.heatmap_bins[linear_idx];
+                }
+
+                if aggregated_volume > 0.0 {
+                    let norm = (aggregated_volume + 1.0).ln() / global_max_ln;
+                    if norm >= 0.05 {
+                        // 过滤掉非常小的值
+                        let price_low = heatmap_index.global_min_price
+                            + raw_bucket_idx as f64 * heatmap_index.tick_size;
+                        let price_high = heatmap_index.global_min_price
+                            + end_agg_bucket as f64 * heatmap_index.tick_size;
+
+                        let y_top = y_mapper.map_y(price_high);
+                        let y_bottom = y_mapper.map_y(price_low);
+                        let height = (y_bottom - y_top).max(1.0);
+
+                        if height > 0.0 {
+                            let color_index = (norm.clamp(0.0, 1.0) * 99.0).round() as usize;
+                            if color_index < self.color_cache.len() {
+                                if current_color_index != Some(color_index) {
+                                    ctx.set_fill_style_str(&self.color_cache[color_index]);
+                                    current_color_index = Some(color_index);
+                                }
+                                ctx.fill_rect(x, y_top, candle_width, height);
+                            }
                         }
                     }
                 }
-            }
-            all_bins.push(bins);
-        }
-
-        if global_max_bin <= 0.0 {
-            return;
-        }
-
-        let global_max_bin_ln = (global_max_bin + 1.0).ln();
-
-        for (rel_idx, bins) in all_bins.iter().enumerate() {
-            let x = price_rect.x + rel_idx as f64 * layout.total_candle_width;
-            for (bin_idx, &volume) in bins.iter().enumerate() {
-                if volume <= 0.0 {
-                    continue;
-                }
-
-                let norm = (volume + 1.0).ln() / global_max_bin_ln;
-                if norm < 0.001 {
-                    continue;
-                }
-
-                let price_low = min_low + bin_idx as f64 * tick;
-                let price_high = price_low + tick;
-
-                // --- FIX START: Calculate and clamp coordinates precisely ---
-                let y_bottom = y_mapper.map_y(price_low);
-                let y_top = y_mapper.map_y(price_high);
-
-                let draw_y_top = y_top.max(price_rect.y);
-                let draw_y_bottom = y_bottom.min(price_rect.y + price_rect.height);
-
-                let draw_height = draw_y_bottom - draw_y_top;
-
-                if draw_height > 0.0 {
-                    ctx.set_global_alpha(0.25 + 0.75 * norm);
-                    ctx.set_fill_style_str(self.get_cached_color(norm));
-                    ctx.fill_rect(x, draw_y_top, layout.total_candle_width, draw_height);
-                }
-                // --- FIX END ---
+                raw_bucket_idx += aggregation_factor;
             }
         }
-        ctx.set_global_alpha(1.0);
-    }
-
-    fn get_cached_color(&self, norm: f64) -> &String {
-        let index = (norm.clamp(0.0, 1.0) * 99.0).round() as usize;
-        &self.color_cache[index]
+        Ok(())
     }
 
     fn calculate_heat_color_static(norm: f64) -> String {
         let stops = [
-            (0.0, "#f0f9e8"),
-            (0.15, "#ccebc5"),
-            (0.35, "#a8ddb5"),
-            (0.55, "#7bccc4"),
-            (0.75, "#43a2ca"),
-            (0.90, "#0868ac"),
-            (0.94, "#fff600"),
-            (0.97, "#ff9900"),
-            (0.99, "#ff6a00"),
+            (0.0, "#f8f8f8"),
+            (0.1, "#e8e8f0"),
+            (0.2, "#d0d0f0"),
+            (0.35, "#a0a0ff"),
+            (0.5, "#6666ff"),
+            (0.65, "#00aaff"),
+            (0.75, "#00ffaa"),
+            (0.85, "#aaff00"),
+            (0.92, "#ffaa00"),
+            (0.97, "#ff6600"),
             (1.0, "#ff0000"),
         ];
         for i in 0..stops.len() - 1 {
@@ -144,7 +168,10 @@ impl HeatRenderer {
                 return Self::interpolate_color_static(stops[i].1, stops[i + 1].1, t);
             }
         }
-        stops.last().unwrap().1.to_string()
+        stops
+            .last()
+            .map(|(_, color)| color.to_string())
+            .unwrap_or_else(|| "#ff0000".to_string())
     }
 
     fn interpolate_color_static(c1: &str, c2: &str, t: f64) -> String {
@@ -153,7 +180,7 @@ impl HeatRenderer {
         let r = (r1 as f64 * (1.0 - t) + r2 as f64 * t) as u8;
         let g = (g1 as f64 * (1.0 - t) + g2 as f64 * t) as u8;
         let b = (b1 as f64 * (1.0 - t) + b2 as f64 * t) as u8;
-        format!("rgb({r},{g},{b})")
+        format!("rgb({},{},{})", r, g, b)
     }
 
     fn parse_rgb_static(c: &str) -> (u8, u8, u8) {
@@ -168,10 +195,14 @@ impl HeatRenderer {
 impl RenderStrategy for HeatRenderer {
     fn render(&self, ctx: &RenderContext) -> Result<(), RenderError> {
         let canvas_ref = ctx.canvas_manager_ref();
-        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main);
+        let main_ctx = canvas_ref.get_context(CanvasLayerType::Main)?;
         let layout = ctx.layout_ref();
         let data_manager = ctx.data_manager_ref();
-        self.draw(main_ctx, &layout, &data_manager);
+        self.draw(main_ctx, &layout, &data_manager)
+            .map_err(|e| WasmCalError::Other {
+                message: e.to_string(),
+                source: None,
+            })?;
         Ok(())
     }
 

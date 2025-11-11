@@ -84,7 +84,7 @@ function ErrorPageContent() {
 
 /**
  * OAuth错误页面
- * 显示oauth-service返回的各种OAuth错误
+ * 显示 oauth-service-rust 返回的各种OAuth错误
  */
 export default function OAuthErrorPage() {
   return (
