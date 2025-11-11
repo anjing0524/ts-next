@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from '@repo/lib/utils'; // 导入自定义logger (Import custom logger)
+
+// Simple logger for cleanup script
+const logger = {
+  info: (msg: string) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`),
+  error: (msg: string, error?: unknown) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`, error),
+};
 
 const prisma = new PrismaClient();
 

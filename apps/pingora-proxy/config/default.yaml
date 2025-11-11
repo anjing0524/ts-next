@@ -7,17 +7,17 @@ services:
         upstreams:
           - '127.0.0.1:3002'
         tls: false
-      oauth-service:
+      oauth-service-rust:
         upstreams:
           - '127.0.0.1:3001'
         tls: false
     routes:
       - path_prefix: '/api/v2/oauth/'
-        backend: 'oauth-service'
+        backend: 'oauth-service-rust'
       - path_prefix: '/api/v2/auth/'
-        backend: 'oauth-service'
+        backend: 'oauth-service-rust'
       - path_prefix: '/api/v2/admin/'
-        backend: 'oauth-service'
+        backend: 'oauth-service-rust'
       - path_prefix: '/login'
         backend: 'admin-portal'
       - path_prefix: '/auth/'

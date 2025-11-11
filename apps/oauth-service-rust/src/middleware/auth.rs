@@ -48,6 +48,7 @@ pub async fn auth_middleware(
         "/api/v2/oauth/introspect",
         "/api/v2/oauth/revoke",
         "/api/v2/auth/authenticate",
+        "/api/v2/auth/login",  // OAuth 2.1 login endpoint - must be public for unauthenticated users
     ];
 
     let path = request.uri().path();

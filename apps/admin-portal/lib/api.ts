@@ -3,7 +3,7 @@ import { User as DomainUser } from '../features/users/domain/user';
 import { OAuthClient } from '@repo/database';
 
 // API客户端配置
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v2';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
 
 // 基础请求函数
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, -- cuid()
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT true,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_login_at DATETIME,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar TEXT,
     organization TEXT,
     department TEXT,
-    must_change_password BOOLEAN DEFAULT true,
+    must_change_password INTEGER DEFAULT 1,
     failed_login_attempts INTEGER DEFAULT 0,
     locked_until DATETIME,
     created_by TEXT
@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
     tos_uri TEXT,
     jwks_uri TEXT,
     token_endpoint_auth_method TEXT DEFAULT 'client_secret_basic' NOT NULL,
-    require_pkce BOOLEAN DEFAULT true NOT NULL,
-    require_consent BOOLEAN DEFAULT true NOT NULL,
-    is_active BOOLEAN DEFAULT true NOT NULL,
+    require_pkce INTEGER DEFAULT 1 NOT NULL,
+    require_consent INTEGER DEFAULT 1 NOT NULL,
+    is_active INTEGER DEFAULT 1 NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 
@@ -52,43 +52,43 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
     access_token_ttl INTEGER DEFAULT 3600 NOT NULL,
     refresh_token_ttl INTEGER DEFAULT 2592000 NOT NULL,
     authorization_code_lifetime INTEGER DEFAULT 600 NOT NULL,
-    strict_redirect_uri_matching BOOLEAN DEFAULT true NOT NULL,
-    allow_localhost_redirect BOOLEAN DEFAULT false NOT NULL,
-    require_https_redirect BOOLEAN DEFAULT true NOT NULL
+    strict_redirect_uri_matching INTEGER DEFAULT 1 NOT NULL,
+    allow_localhost_redirect INTEGER DEFAULT 0 NOT NULL,
+    require_https_redirect INTEGER DEFAULT 1 NOT NULL
 );
 
 -- 客户端关联表
-CREATE TABLE client_redirect_uris (
+CREATE TABLE IF NOT EXISTS client_redirect_uris (
     client_id TEXT NOT NULL,
     uri TEXT NOT NULL,
     PRIMARY KEY (client_id, uri),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_grant_types (
+CREATE TABLE IF NOT EXISTS client_grant_types (
     client_id TEXT NOT NULL,
     grant_type TEXT NOT NULL,
     PRIMARY KEY (client_id, grant_type),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_response_types (
+CREATE TABLE IF NOT EXISTS client_response_types (
     client_id TEXT NOT NULL,
     response_type TEXT NOT NULL,
     PRIMARY KEY (client_id, response_type),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_allowed_scopes (
+CREATE TABLE IF NOT EXISTS client_allowed_scopes (
     client_id TEXT NOT NULL,
     scope TEXT NOT NULL,
     PRIMARY KEY (client_id, scope),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_permissions (
+CREATE TABLE IF NOT EXISTS client_permissions (
     client_id TEXT NOT NULL,
     permission TEXT NOT NULL,
     PRIMARY KEY (client_id, permission),
     FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 );
-CREATE TABLE client_ip_whitelist (
+CREATE TABLE IF NOT EXISTS client_ip_whitelist (
     client_id TEXT NOT NULL,
     ip_address TEXT NOT NULL,
     PRIMARY KEY (client_id, ip_address),
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS authorization_codes (
     code_challenge TEXT,
     code_challenge_method TEXT,
     nonce TEXT,
-    is_used BOOLEAN DEFAULT false,
+    is_used INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     client_id TEXT NOT NULL,
     scope TEXT NOT NULL, -- Space-separated string
     expires_at DATETIME NOT NULL,
-    is_revoked BOOLEAN DEFAULT false,
+    is_revoked INTEGER DEFAULT 0,
     revoked_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     previous_token_id TEXT UNIQUE,
@@ -160,8 +160,8 @@ CREATE TABLE IF NOT EXISTS roles (
     name TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
     description TEXT,
-    is_system_role BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
+    is_system_role INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -175,8 +175,8 @@ CREATE TABLE IF NOT EXISTS permissions (
     resource TEXT NOT NULL,
     action TEXT NOT NULL,
     type TEXT DEFAULT 'API', -- 'API', 'MENU', 'DATA'
-    is_system_perm BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
+    is_system_perm INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -221,8 +221,8 @@ CREATE TABLE IF NOT EXISTS menus (
     component TEXT,
     icon TEXT,
     "order" INTEGER DEFAULT 0,
-    is_hidden BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
+    is_hidden INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
     parent_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS password_reset_requests (
     user_id TEXT NOT NULL,
     token TEXT UNIQUE NOT NULL,
     expires_at DATETIME NOT NULL,
-    is_used BOOLEAN DEFAULT false,
+    is_used INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     used_at DATETIME,
 
@@ -310,9 +310,9 @@ CREATE TABLE IF NOT EXISTS scopes (
     id TEXT PRIMARY KEY, -- cuid()
     name TEXT UNIQUE NOT NULL,
     description TEXT,
-    is_public BOOLEAN DEFAULT false,
-    is_oidc_scope BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
+    is_public INTEGER DEFAULT 0,
+    is_oidc_scope INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -366,10 +366,10 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     ip_address TEXT,
     user_agent TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    successful BOOLEAN NOT NULL,
+    successful INTEGER NOT NULL,
     failure_reason TEXT,
-    mfa_attempted BOOLEAN DEFAULT false,
-    mfa_successful BOOLEAN,
+    mfa_attempted INTEGER DEFAULT 0,
+    mfa_successful INTEGER,
 
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -381,8 +381,8 @@ CREATE TABLE IF NOT EXISTS system_configurations (
     value TEXT NOT NULL, -- JSON
     description TEXT,
     type TEXT DEFAULT 'string',
-    is_editable BOOLEAN DEFAULT true,
-    is_sensitive BOOLEAN DEFAULT false,
+    is_editable INTEGER DEFAULT 1,
+    is_sensitive INTEGER DEFAULT 0,
     category TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -395,8 +395,8 @@ CREATE TABLE IF NOT EXISTS security_policies (
     type TEXT NOT NULL,
     policy TEXT NOT NULL, -- JSON
     description TEXT,
-    is_active BOOLEAN DEFAULT true,
-    is_default BOOLEAN DEFAULT false,
+    is_active INTEGER DEFAULT 1,
+    is_default INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

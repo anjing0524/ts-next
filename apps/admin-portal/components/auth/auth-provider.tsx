@@ -1,10 +1,7 @@
-'use client';
-
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TokenStorage } from '../../lib/auth/token-storage';
 import { User } from '../../types/auth';
-import { oauthClient } from '@/lib/oauth-client';
 
 // Helper to generate random strings for PKCE
 const generateRandomString = (length: number): string => {
@@ -73,6 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+
+
   useEffect(() => {
     const initializeAuth = async () => {
       const accessToken = TokenStorage.getAccessToken();
@@ -89,7 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (accessToken: string, refreshToken: string) => {
-      TokenStorage.setTokens(accessToken, refreshToken);
+      TokenStorage.setTokens({
+        accessToken,
+        refreshToken,
+      });
       const userInfo = await fetchUserInfo(accessToken);
       if (userInfo) {
         setUser(userInfo);
@@ -127,9 +129,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     const refreshToken = TokenStorage.getRefreshToken();
     if (refreshToken) {
-      oauthClient.exchangeToken({ // Using exchangeToken for revoke, assuming endpoint is the same
-        token: refreshToken,
-        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal',
+      fetch(`${process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL}/api/v2/oauth/revoke`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: refreshToken,
+          client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'admin-portal',
+          token_type_hint: 'refresh_token',
+        }),
       }).catch(err => console.error('Failed to revoke token:', err));
     }
     TokenStorage.clearTokens();

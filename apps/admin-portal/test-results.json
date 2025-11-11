@@ -1,0 +1,331 @@
+{
+  "config": {
+    "configFile": "/Users/liushuo/code/ts-next-template/apps/admin-portal/playwright.config.ts",
+    "rootDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "Desktop Chrome",
+        "name": "Desktop Chrome",
+        "testDir": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.{test,spec}.{js,ts}"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.54.0",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "auth-flow.spec.ts",
+      "file": "auth-flow.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "OAuth Authentication Flow",
+          "file": "auth-flow.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should redirect to login page when accessing a protected route",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 3167,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:9:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                          "column": 16,
+                          "line": 9
+                        },
+                        "snippet": "\u001b[0m \u001b[90m  7 |\u001b[39m\n \u001b[90m  8 |\u001b[39m   test(\u001b[32m'should redirect to login page when accessing a protected route'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m  9 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 10 |\u001b[39m\n \u001b[90m 11 |\u001b[39m     \u001b[90m// Should be redirected to the login page, which is part of the admin-portal itself\u001b[39m\n \u001b[90m 12 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                            "column": 16,
+                            "line": 9
+                          },
+                          "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m  7 |\u001b[39m\n \u001b[90m  8 |\u001b[39m   test(\u001b[32m'should redirect to login page when accessing a protected route'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m  9 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 10 |\u001b[39m\n \u001b[90m 11 |\u001b[39m     \u001b[90m// Should be redirected to the login page, which is part of the admin-portal itself\u001b[39m\n \u001b[90m 12 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:9:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-29T08:26:44.732Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-022b5-accessing-a-protected-route-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-022b5-accessing-a-protected-route-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-022b5-accessing-a-protected-route-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-022b5-accessing-a-protected-route-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                        "column": 16,
+                        "line": 9
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "df6b40174562c70df515-e68a8873b82260b45f0e",
+              "file": "auth-flow.spec.ts",
+              "line": 8,
+              "column": 7
+            },
+            {
+              "title": "should allow login and redirect back to the protected page",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 3143,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:18:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                          "column": 16,
+                          "line": 18
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 16 |\u001b[39m   test(\u001b[32m'should allow login and redirect back to the protected page'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 17 |\u001b[39m     \u001b[90m// Start at the protected page\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 18 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 19 |\u001b[39m\n \u001b[90m 20 |\u001b[39m     \u001b[90m// We are redirected to the login page\u001b[39m\n \u001b[90m 21 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 16 |\u001b[39m   test(\u001b[32m'should allow login and redirect back to the protected page'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 17 |\u001b[39m     \u001b[90m// Start at the protected page\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 18 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 19 |\u001b[39m\n \u001b[90m 20 |\u001b[39m     \u001b[90m// We are redirected to the login page\u001b[39m\n \u001b[90m 21 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:18:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-29T08:26:44.794Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-2b152--back-to-the-protected-page-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-2b152--back-to-the-protected-page-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-2b152--back-to-the-protected-page-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-2b152--back-to-the-protected-page-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                        "column": 16,
+                        "line": 18
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "df6b40174562c70df515-cb14a1523d5e0b38cb33",
+              "file": "auth-flow.spec.ts",
+              "line": 16,
+              "column": 7
+            },
+            {
+              "title": "should show an error for invalid credentials",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "Desktop Chrome",
+                  "projectName": "Desktop Chrome",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 2839,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:47:16",
+                        "location": {
+                          "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                          "column": 16,
+                          "line": 47
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 45 |\u001b[39m\n \u001b[90m 46 |\u001b[39m   test(\u001b[32m'should show an error for invalid credentials'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 47 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 48 |\u001b[39m\n \u001b[90m 49 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 50 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                            "column": 16,
+                            "line": 47
+                          },
+                          "message": "Error: page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at http://localhost:6188/admin\nCall log:\n\u001b[2m  - navigating to \"http://localhost:6188/admin\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 45 |\u001b[39m\n \u001b[90m 46 |\u001b[39m   test(\u001b[32m'should show an error for invalid credentials'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 47 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(protectedPage)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 48 |\u001b[39m\n \u001b[90m 49 |\u001b[39m     \u001b[36mawait\u001b[39m expect(page)\u001b[33m.\u001b[39mtoHaveURL(\u001b[35m/.*\\/login.*/\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 50 |\u001b[39m\u001b[0m\n\u001b[2m    at /Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts:47:16\u001b[22m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-29T08:26:45.009Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-f8dec-ror-for-invalid-credentials-Desktop-Chrome/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-f8dec-ror-for-invalid-credentials-Desktop-Chrome/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-f8dec-ror-for-invalid-credentials-Desktop-Chrome/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/liushuo/code/ts-next-template/apps/admin-portal/test-results/auth-flow-OAuth-Authentica-f8dec-ror-for-invalid-credentials-Desktop-Chrome/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/liushuo/code/ts-next-template/apps/admin-portal/tests/e2e/auth-flow.spec.ts",
+                        "column": 16,
+                        "line": 47
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "df6b40174562c70df515-700372daa015186f5391",
+              "file": "auth-flow.spec.ts",
+              "line": 46,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-29T08:26:42.853Z",
+    "duration": 7344.476000000001,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

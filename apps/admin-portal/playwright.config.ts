@@ -70,46 +70,7 @@ export default defineConfig({
   //
   // 推荐使用外部脚本启动所有服务，而不是在这里自动启动
   // 运行测试前，请确保所有服务已经启动
-  webServer: process.env.PLAYWRIGHT_SKIP_SERVER_START ? undefined : [
-    {
-      // oauth-service服务（必须先启动）
-      command: 'cd ../oauth-service-rust && DATABASE_URL="sqlite:test.db" cargo run',
-      port: 3001,
-      env: {
-        NODE_ENV: 'test',
-        DATABASE_URL: 'file:./test.db',
-        JWT_SECRET: 'test-jwt-secret-key-for-e2e-testing',
-        ENCRYPTION_KEY: 'test-encryption-key-32-chars-long',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 120000, // 2分钟启动超时
-    },
-    {
-      // admin-portal服务
-      command: 'pnpm dev',
-      port: 3002,
-      env: {
-        NODE_ENV: 'test',
-        NEXT_PUBLIC_OAUTH_SERVICE_URL: 'http://localhost:6188',
-        NEXT_PUBLIC_APP_URL: 'http://localhost:6188',
-      },
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 120000, // 2分钟启动超时
-    },
-    {
-      // pingora-proxy服务
-      command: 'cd ../pingora-proxy && cargo run',
-      port: 6188,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      timeout: 60000, // 1分钟启动超时
-    },
-  ],
+
 
   // 测试输出目录
   outputDir: 'test-results/',
@@ -118,8 +79,4 @@ export default defineConfig({
   expect: {
     timeout: 10000,
   },
-
-  // 全局设置
-  globalSetup: require.resolve('./tests/e2e/global-setup.ts'),
-  globalTeardown: require.resolve('./tests/e2e/global-teardown.ts'),
 });

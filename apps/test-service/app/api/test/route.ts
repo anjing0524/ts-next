@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getTimeWheelInstance } from '@repo/lib/node';
+import { getTimeWheelInstance } from '@/lib';
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,3 +1,5 @@
+'use client';
+
 import { lazy, Suspense } from 'react';
 import type { MenuItem, IconName } from './types';
 import * as React from 'react';

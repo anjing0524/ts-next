@@ -1,14 +1,16 @@
 import { AuthProviderInterface, AuthUser, AuthTokens } from '@repo/ui';
 import { adminApi, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
-import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@repo/lib/browser';
+import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@/lib/utils/browser';
 
 // OAuth配置 - 使用环境变量进行标准化配置
+const OAUTH_BASE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:6188';
+
 export const OAuthConfig = {
   clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
   redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
-  authorizationEndpoint: '/api/v2/oauth/authorize',
-  tokenEndpoint: '/api/v2/oauth/token',
+  authorizationEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/authorize`,
+  tokenEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/token`,
   scope: 'openid profile offline_access admin:full_access',
 };
 
@@ -33,12 +35,12 @@ export const authService: AuthProviderInterface = {
     sessionStorage.setItem('oauth_code_verifier', codeVerifier);
     sessionStorage.setItem('oauth_state', state);
 
-    // 检查是否有从oauth-service重定向过来的原始参数
+    // 检查是否有从 oauth-service-rust 重定向过来的原始参数
     const originalParams = sessionStorage.getItem('oauth_original_params');
     let targetUrl = OAuthConfig.authorizationEndpoint;
 
     if (originalParams) {
-      // 如果有原始oauth参数，直接重定向回oauth-service继续流程
+      // 如果有原始oauth参数，直接重定向回 oauth-service-rust 继续流程
       sessionStorage.removeItem('oauth_original_params');
       const params = new URLSearchParams(originalParams);
       params.set('code_challenge', codeChallenge);

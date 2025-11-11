@@ -7,8 +7,7 @@
     "types": ["node", "jest", "next"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@repo/lib/*": ["../lib/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"],
