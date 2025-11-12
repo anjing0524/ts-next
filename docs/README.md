@@ -1,15 +1,16 @@
 # 项目文档中心
 
-> **最后更新**: 2025-07-22
+> **最后更新**: 2025-11-11
 
 本目录包含 OAuth2.1 认证授权中心项目的完整技术文档。
 
 ## 文档导航
 
-- **[文档导航](./guidelines/文档导航.md)** - 完整文档索引
-- **[产品需求](./requirements/产品需求文档.md)** - 业务需求和用户故事
-- **[系统设计](./design/详细设计文档.md)** - 架构和技术设计
-- **[API规范](./guidelines/API设计规范.md)** - 接口设计标准
+- **[系统架构](./architecture/系统架构.md)** - 架构和技术设计
+- **[API参考](./api/API参考文档.md)** - 接口设计标准
+- **[部署运维](./deployment/部署运维文档.md)** - 部署和运维相关文档
+- **[开发指南](./development/开发指南.md)** - 开发相关文档
+- **[RBAC权限设计](./security/RBAC权限设计.md)** - RBAC权限设计
 
 ## 快速开始
 
@@ -30,15 +31,14 @@ pnpm db:seed      # 初始化数据
 pnpm dev
 
 # 或分别启动
-pnpm --filter=oauth-service dev  # 认证服务 (3001)
+pnpm --filter=oauth-service-rust dev  # 认证服务 (3001)
 pnpm --filter=admin-portal dev   # 管理后台 (3002)
-pnpm --filter=kline-service dev  # 金融数据服务 (3003)
+pnpm --filter=pingora-proxy dev  # 反向代理 (6188)
 ```
 
 ### 3. 访问系统
 - **管理后台**: http://localhost:3002
 - **认证服务**: http://localhost:3001
-- **金融数据服务**: http://localhost:3003
 - **默认管理员**: admin / admin123
 
 ## 核心功能
@@ -48,11 +48,6 @@ pnpm --filter=kline-service dev  # 金融数据服务 (3003)
 - 自动令牌刷新
 - JWT 权限验证
 - RBAC 权限模型
-
-### 金融数据可视化
-- WebAssembly 高性能渲染
-- 实时K线数据处理
-- 自定义指标分析
 
 ### 运维支持
 - 健康检查端点
@@ -64,9 +59,8 @@ pnpm --filter=kline-service dev  # 金融数据服务 (3003)
 ### 项目结构
 ```
 ├── apps/
-│   ├── oauth-service/     # OAuth2.1 认证服务
+│   ├── oauth-service-rust/     # OAuth2.1 认证服务
 │   ├── admin-portal/      # 管理后台
-│   ├── kline-service/     # 金融数据服务
 │   └── pingora-proxy/     # 反向代理
 ├── packages/              # 共享包
 │   ├── ui/               # UI组件
@@ -89,12 +83,6 @@ pnpm type-check        # 类型检查
 
 # 数据库管理
 pnpm db:studio         # 打开数据库管理界面
-```
-
-### WebAssembly 编译
-```bash
-cd apps/kline-service/wasm-cal
-./build.sh  # 编译 WASM 模块
 ```
 
 ## 部署说明
@@ -137,10 +125,10 @@ REDIS_URL="redis://localhost:6379"
 |------------|--------------------------|
 | 前端       | Next.js 15, React 19     |
 | UI框架     | shadcn/ui, TailwindCSS 4 |
-| 后端       | Node.js, Prisma ORM      |
+| 后端       | Rust, Actix-web, SQLx    |
 | 数据库     | SQLite (开发), PostgreSQL|
 | 安全认证   | OAuth2.1, JWT            |
-| 高性能计算 | Rust, WebAssembly        |
+| 代理       | Pingora                  |
 | 测试       | Jest 30, Playwright      |
 | 部署       | Docker, Kubernetes       |
 

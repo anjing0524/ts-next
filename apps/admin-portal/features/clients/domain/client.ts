@@ -1,10 +1,15 @@
 import { z } from 'zod';
-// 从 Prisma Client 导入基础类型
-import type { OAuthClient as PrismaClient } from '@repo/database';
-import { ClientType } from '@repo/database';
+// 从应用层类型导入
+import type { OAuthClient } from '@/types/auth';
 
-// 导出领域实体类型
-export type OAuthClient = PrismaClient;
+// 重新导出 OAuthClient
+export type { OAuthClient };
+
+// 本地定义客户端类型（不依赖 Prisma）
+export enum ClientType {
+  CONFIDENTIAL = 'CONFIDENTIAL',
+  PUBLIC = 'PUBLIC',
+}
 
 // 客户端类型的 Zod Schema
 export const ClientTypeSchema = z.nativeEnum(ClientType);

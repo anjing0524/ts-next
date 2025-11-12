@@ -1,5 +1,4 @@
-import { User } from '../../users/domain/user';
-import { TokenPayload } from '@/types/auth';
+import { User, TokenPayload } from '@/types/auth';
 
 export interface IAuthRepository {
   login(credentials: {

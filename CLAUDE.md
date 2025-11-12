@@ -393,6 +393,18 @@ python3 tests/oauth_sso_e2e.py
     - ✅ pnpm overrides 强制统一 React 19.2.0 版本
     - ✅ React Compiler 集成（Babel + Next.js experimental config）
     - ✅ 移除了 middleware.ts 中的 `"use cache"` 标记（proxy.ts 不支持）
+- **彻底移除 Admin Portal 中的 @repo/database** （2024-11-12 完成）
+  - ✅ 移除 package.json 中的 `@repo/database` 依赖
+  - ✅ 移除 app/api/health/route.ts 中的数据库检查逻辑
+  - ✅ 所有类型定义从 `types/auth.ts`（API 响应层）导入，不再从 @repo/database 导入
+  - ✅ Admin Portal 现为纯前端应用，零数据库依赖
+  - ✅ 所有后端数据库操作由 Rust OAuth Service 负责
+  - **改动详情**：
+    - `types/auth.ts` - 定义独立的 API 响应类型（User, OAuthClient, Role, Permission, AuditLog, SystemConfiguration 等）
+    - `app/api/health/route.ts` - 移除 Prisma 导入，仅检查 OAuth Service 健康状态
+    - `features/*/domain/*.ts` - 所有导入改为 `@/types/auth`，不再依赖 @repo/database
+    - `components/admin/clients/ClientFormDialog.tsx` - 修复数组/字符串转换
+    - `features/system-config/components/ConfigManagementView.tsx` - 修复类型枚举（STRING/NUMBER/BOOLEAN/JSON）
 
 ## Login 页面实现（OAuth 2.1 第三方客户端模式）
 

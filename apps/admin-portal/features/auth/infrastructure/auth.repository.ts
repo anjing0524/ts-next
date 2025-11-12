@@ -1,7 +1,6 @@
 import { authApi } from '../../../lib/api';
 import { IAuthRepository } from '../domain/auth.repository';
-import { User } from '../../users/domain/user';
-import { TokenPayload } from '@/types/auth';
+import { User, TokenPayload } from '@/types/auth';
 
 export class AuthRepository implements IAuthRepository {
   async login(credentials: {

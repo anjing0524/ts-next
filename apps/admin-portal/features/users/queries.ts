@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PaginationState, SortingState } from '@tanstack/react-table';
-import { User, CreateUserInput, UpdateUserInput, PaginatedResponse } from './domain/user';
+import { User } from '@/types/auth';
+import { CreateUserInput, UpdateUserInput, PaginatedResponse } from './domain/user';
 import { UserService } from './application/user.service';
 import { UserRepository } from './infrastructure/user.repository';
 import { adminApi } from '../../lib/api'; // Still needed for stats summary if not moved to UserService

@@ -1,7 +1,7 @@
 services:
   - name: 'unified-gateway'
     bind_address: '0.0.0.0:6188'
-    default_backend: 'admin-portal'
+    default_backend: 'admin-portal' # Default to admin-portal for all UI and non-API requests
     backends:
       admin-portal:
         upstreams:
@@ -12,18 +12,9 @@ services:
           - '127.0.0.1:3001'
         tls: false
     routes:
-      - path_prefix: '/api/v2/oauth/'
+      # Route all API v2 traffic to the Rust OAuth service
+      - path_prefix: '/api/v2/'
         backend: 'oauth-service-rust'
-      - path_prefix: '/api/v2/auth/'
-        backend: 'oauth-service-rust'
-      - path_prefix: '/api/v2/admin/'
-        backend: 'oauth-service-rust'
-      - path_prefix: '/login'
-        backend: 'admin-portal'
-      - path_prefix: '/auth/'
-        backend: 'admin-portal'
-      - path_prefix: '/oauth/consent'
-        backend: 'admin-portal'
     health_check:
       timeout_ms: 500
       frequency_secs: 5

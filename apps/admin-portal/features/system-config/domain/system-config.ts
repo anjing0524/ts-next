@@ -1,3 +1,3 @@
-import { SystemConfiguration as PrismaSystemConfig } from '@repo/database';
+import type { SystemConfiguration } from '@/types/auth';
 
-export type SystemConfig = PrismaSystemConfig;
+export type SystemConfig = SystemConfiguration;

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002 --turbopack",
+    "dev": "next dev -p 3002",
     "build": "next build",
-    "start": "next start -p 3002",
+    "start": "next start",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
-    "@repo/database": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-query": "^5.51.15",
     "@tanstack/react-table": "^8.20.5",

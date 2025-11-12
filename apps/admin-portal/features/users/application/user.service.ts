@@ -1,7 +1,8 @@
 // 用户服务实现
 // 2025-07-10：已彻底移除 PaginatedUsersResponse 类型，全部统一为 PaginatedResponse<User>
 import { IUserRepository } from '../domain/user.repository';
-import { User, CreateUserInput, UpdateUserInput, PaginatedResponse } from '../domain/user';
+import { User } from '@/types/auth';
+import { CreateUserInput, UpdateUserInput, PaginatedResponse } from '../domain/user';
 
 export class UserService {
   constructor(private userRepository: IUserRepository) {}

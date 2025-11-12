@@ -102,6 +102,8 @@ function FormContent({ className }: UsernamePasswordFormProps) {
         return;
       }
 
+      console.log('Submitting login form with username:', username, 'and redirect:', redirect);
+
       // 提交登录请求到 OAuth Service
       // 必须通过 Pingora 代理 (6188) 而不是直接的 3001
       // 这样可以确保所有 cookies 在同一域下共享
@@ -125,10 +127,13 @@ function FormContent({ className }: UsernamePasswordFormProps) {
         credentials: 'include', // 包含 cookies，允许设置 session_token
       });
 
+      console.log('Login response status:', response.status);
+
       if (!response.ok) {
         // 获取详细的错误信息
         try {
           const errorData = await response.json();
+          console.error('Login error data:', errorData);
           setError(errorData.error || 'invalid_credentials');
         } catch {
           setError('invalid_credentials');

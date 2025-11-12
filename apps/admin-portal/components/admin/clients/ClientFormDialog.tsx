@@ -86,10 +86,10 @@ export function ClientFormDialog({
   const getInitialFormState = (): ClientFormState => ({
     clientId: client?.clientId || '',
     clientName: client?.name || '',
-    redirectUris: client?.redirectUris || '', // It's a string from prisma
+    redirectUris: arrayToString(client?.redirectUris), // Convert API array response to string for form
     grantTypes: Array.isArray(client?.grantTypes) ? client.grantTypes : [],
     responseTypes: Array.isArray(client?.responseTypes) ? client.responseTypes : ['code'],
-    scope: client?.allowedScopes || 'openid profile email', // It's a string from prisma
+    scope: arrayToString(client?.allowedScopes) || 'openid profile email', // Convert API array response to string for form
     jwksUri: client?.jwksUri || '',
     logoUri: client?.logoUri || '',
   });

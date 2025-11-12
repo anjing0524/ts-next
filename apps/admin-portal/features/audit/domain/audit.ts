@@ -1,9 +1,9 @@
 import { z } from 'zod';
 // 从 Prisma Client 导入基础类型
-import type { AuditLog as PrismaAuditLog } from '@repo/database';
+import type { AuditLog } from '@/types/auth';
 
-// 导出领域实体类型
-export type AuditLog = PrismaAuditLog;
+// 重新导出应用层类型
+export type { AuditLog };
 
 // 审计日志实体的 Zod Schema，用于数据校验和确保类型一致性
 export const AuditLogSchema = z.object({

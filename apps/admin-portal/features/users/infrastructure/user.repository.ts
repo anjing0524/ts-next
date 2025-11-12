@@ -2,7 +2,8 @@
 // 2025-07-10：已彻底移除 PaginatedUsersResponse 类型，全部统一为 PaginatedResponse<User>
 import { adminApi } from '../../../lib/api';
 import { IUserRepository } from '../domain/user.repository';
-import { User, PaginatedResponse } from '../domain/user';
+import { User } from '@/types/auth';
+import { PaginatedResponse } from '../domain/user';
 
 export class UserRepository implements IUserRepository {
   /**
