@@ -1,7 +1,11 @@
-import { OAuthClient, Role as PrismaRole, Permission as PrismaPermission } from '@repo/database';
+/**
+ * OAuth 认证和用户管理的应用层类型定义
+ * 这些类型是从 OAuth Service API 响应中获取的
+ * 不依赖任何数据库或 ORM 层的类型（不使用 Prisma）
+ */
 
 /**
- * Represents the user object returned from the backend.
+ * User - 用户对象（来自 API 响应）
  */
 export interface User {
   id: string;
@@ -14,11 +18,10 @@ export interface User {
   isActive: boolean;
   mustChangePassword: boolean;
   userRoles: { roleId: string }[];
-  // Add other user properties as needed
 }
 
 /**
- * Represents the structure of the tokens received from the OAuth server.
+ * TokenPayload - OAuth token 响应结构
  */
 export interface TokenPayload {
   accessToken: string;
@@ -27,19 +30,18 @@ export interface TokenPayload {
 }
 
 /**
- * Represents the structure of an audit log entry.
- * Based on the Prisma schema.
+ * AuditLog - 审计日志（来自 API 响应）
  */
 export interface AuditLog {
   id: string;
-  timestamp: Date; // Keep as Date object for easier manipulation
+  timestamp: Date;
   userId: string | null;
   actorType: string;
   actorId: string;
   action: string;
   resourceType: string | null;
   resourceId: string | null;
-  details: any; // JSON object
+  details: any;
   status: string;
   ipAddress: string | null;
   userAgent: string | null;
@@ -49,12 +51,33 @@ export interface AuditLog {
 }
 
 /**
- * Represents the OAuthClient entity for the frontend.
+ * OAuthClient - OAuth 客户端（来自 API 响应）
+ */
+export interface OAuthClient {
+  id: string;
+  clientId: string;
+  clientSecret?: string;
+  clientType: 'CONFIDENTIAL' | 'PUBLIC';
+  name: string;
+  description?: string;
+  redirectUris: string[];
+  allowedScopes?: string[];
+  grantTypes?: string[];
+  responseTypes?: string[];
+  jwksUri?: string;
+  logoUri?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Client - OAuthClient 的别名（向后兼容）
  */
 export type Client = OAuthClient;
 
 /**
- * Represents the form data for creating/editing an OAuth client.
+ * ClientFormData - 创建/编辑 OAuth 客户端的表单数据
  */
 export interface ClientFormData {
   name: string;
@@ -62,16 +85,23 @@ export interface ClientFormData {
   redirectUris: string[];
   allowedScopes: string[];
   grantTypes: string[];
-  // Add other form fields as needed
 }
 
 /**
- * Represents the Role entity for the frontend.
+ * Role - 角色（来自 API 响应）
  */
-export type Role = PrismaRole;
+export interface Role {
+  id: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  isSystem: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
- * Represents the form data for creating/editing a Role.
+ * RoleFormData - 创建/编辑角色的表单数据
  */
 export interface RoleFormData {
   name: string;
@@ -80,6 +110,28 @@ export interface RoleFormData {
 }
 
 /**
- * Represents the Permission entity for the frontend.
+ * Permission - 权限（来自 API 响应）
  */
-export type Permission = PrismaPermission;
+export interface Permission {
+  id: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  type: 'API' | 'MENU' | 'DATA';
+  resource?: string;
+  action?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * SystemConfiguration - 系统配置（来自 API 响应）
+ */
+export interface SystemConfiguration {
+  id: string;
+  key: string;
+  value: string;
+  type: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON';
+  description?: string;
+  updatedAt: Date;
+}

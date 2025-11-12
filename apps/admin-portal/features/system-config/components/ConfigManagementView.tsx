@@ -39,10 +39,11 @@ const getConfigValue = (configs: SystemConfig[], key: string, defaultValue: any 
   
   // 根据配置类型解析值
   switch (config.type) {
-    case 'boolean':
-      return config.value === true || config.value === 'true';
-    case 'number':
-      return typeof config.value === 'number' ? config.value : parseInt(String(config.value)) || defaultValue;
+    case 'BOOLEAN':
+      // API returns config.value as string, compare with string literals
+      return String(config.value).toLowerCase() === 'true' || config.value === 'true';
+    case 'NUMBER':
+      return Number(config.value) || defaultValue;
     default:
       return config.value || defaultValue;
   }
@@ -51,22 +52,22 @@ const getConfigValue = (configs: SystemConfig[], key: string, defaultValue: any 
 // 辅助函数：将表单数据转换为SystemConfig更新格式
 const convertFormDataToConfigs = (data: ConfigFormData): Partial<SystemConfig>[] => {
   return [
-    { key: 'site.name', value: data.siteName, type: 'string' },
-    { key: 'site.description', value: data.siteDescription || '', type: 'string' },
-    { key: 'system.maintenance_mode', value: data.maintenanceMode, type: 'boolean' },
-    { key: 'auth.registration_enabled', value: data.registrationEnabled, type: 'boolean' },
-    { key: 'auth.email_verification_required', value: data.emailVerificationRequired, type: 'boolean' },
-    { key: 'security.max_login_attempts', value: data.maxLoginAttempts, type: 'number' },
-    { key: 'security.session_timeout', value: data.sessionTimeout, type: 'number' },
-    { key: 'security.password_min_length', value: data.passwordMinLength, type: 'number' },
-    { key: 'security.password_require_special_char', value: data.passwordRequireSpecialChar, type: 'boolean' },
-    { key: 'security.password_require_number', value: data.passwordRequireNumber, type: 'boolean' },
-    { key: 'security.password_require_uppercase', value: data.passwordRequireUppercase, type: 'boolean' },
-    { key: 'smtp.host', value: data.smtpHost || '', type: 'string' },
-    { key: 'smtp.port', value: data.smtpPort || 587, type: 'number' },
-    { key: 'smtp.username', value: data.smtpUsername || '', type: 'string' },
-    { key: 'smtp.password', value: data.smtpPassword || '', type: 'string' },
-    { key: 'smtp.secure', value: data.smtpSecure, type: 'boolean' },
+    { key: 'site.name', value: data.siteName, type: 'STRING' },
+    { key: 'site.description', value: data.siteDescription || '', type: 'STRING' },
+    { key: 'system.maintenance_mode', value: String(data.maintenanceMode), type: 'BOOLEAN' },
+    { key: 'auth.registration_enabled', value: String(data.registrationEnabled), type: 'BOOLEAN' },
+    { key: 'auth.email_verification_required', value: String(data.emailVerificationRequired), type: 'BOOLEAN' },
+    { key: 'security.max_login_attempts', value: String(data.maxLoginAttempts), type: 'NUMBER' },
+    { key: 'security.session_timeout', value: String(data.sessionTimeout), type: 'NUMBER' },
+    { key: 'security.password_min_length', value: String(data.passwordMinLength), type: 'NUMBER' },
+    { key: 'security.password_require_special_char', value: String(data.passwordRequireSpecialChar), type: 'BOOLEAN' },
+    { key: 'security.password_require_number', value: String(data.passwordRequireNumber), type: 'BOOLEAN' },
+    { key: 'security.password_require_uppercase', value: String(data.passwordRequireUppercase), type: 'BOOLEAN' },
+    { key: 'smtp.host', value: data.smtpHost || '', type: 'STRING' },
+    { key: 'smtp.port', value: String(data.smtpPort || 587), type: 'NUMBER' },
+    { key: 'smtp.username', value: data.smtpUsername || '', type: 'STRING' },
+    { key: 'smtp.password', value: data.smtpPassword || '', type: 'STRING' },
+    { key: 'smtp.secure', value: String(data.smtpSecure), type: 'BOOLEAN' },
   ];
 };
 

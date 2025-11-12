@@ -2,7 +2,8 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { Button, Badge, DataTableColumnHeader } from '@repo/ui';
-import { User, UserStatus } from '../domain/user';
+import { User } from '@/types/auth';
+import { UserStatus } from '../domain/user';
 import { format } from 'date-fns';
 
 // 定义操作的回调函数类型

@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi, authApi } from '../../lib/api';
+
+// 使用 types/auth.ts 中的 User 类型，确保与 API 返回的类型一致
 import { User } from '@/types/auth';
 
 const profileKeys = {
@@ -13,7 +15,10 @@ const profileKeys = {
 export const useProfileQuery = () => {
   return useQuery<User, Error>({
     queryKey: profileKeys.detail(),
-    queryFn: () => authApi.fetchUserProfile(),
+    queryFn: async () => {
+      const data = await authApi.fetchUserProfile();
+      return data as unknown as User;
+    },
   });
 };
 
@@ -22,12 +27,13 @@ export const useProfileQuery = () => {
  */
 export const useUpdateProfileMutation = () => {
   const queryClient = useQueryClient();
-  return useMutation<User, Error, Partial<User>>({
+  return useMutation<User, Error, { displayName: string }>({
     mutationFn: async (profileData) => {
       // 只传递 displayName，且保证为 string
-      await adminApi.updateUserProfile({ displayName: profileData.displayName ?? '' });
+      await adminApi.updateUserProfile({ displayName: profileData.displayName });
       // 更新后重新获取最新用户信息，保证类型为 User
-      return authApi.fetchUserProfile();
+      const data = await authApi.fetchUserProfile();
+      return data as unknown as User;
     },
     onSuccess: (data) => {
       // 更新成功后，使个人资料的查询缓存失效，以便重新获取最新数据

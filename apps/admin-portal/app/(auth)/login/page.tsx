@@ -30,6 +30,9 @@ function LoginContent() {
   const redirect = searchParams.get('redirect');
   const error = searchParams.get('error');
 
+  console.log('Login page loaded with redirect:', redirect, 'and error:', error);
+
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <Card className="w-full max-w-md shadow-xl">

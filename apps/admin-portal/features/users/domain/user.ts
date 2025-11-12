@@ -1,19 +1,6 @@
 import { z } from 'zod';
-// 从 Prisma Client 导入基础类型
-import type { User as PrismaUser, Role as PrismaRole } from '@repo/database';
-
-/**
- * 用户核心实体接口
- * 代表一个系统用户
- */
-export interface User extends PrismaUser {
-  // 扩展 PrismaUser，添加前端可能需要的额外字段
-  // 例如，如果 PrismaUser 不包含 roles 或 permissions，可以在这里添加
-  roles?: { id: string; name: string }[]; // 用户所属的角色列表
-  permissions?: string[]; // 用户最终拥有的所有权限名列表
-  userRoles: { roleId: string }[];
-  // createdAt 和 lastLogin 已经在 PrismaUser 中，但如果需要更具体的类型，可以在这里覆盖
-}
+// 从类型定义导入单一权威的 User 类型（确保全应用一致性）
+import type { User, Role as PrismaRole } from '@/types/auth';
 
 /**
  * 用户状态枚举
@@ -70,5 +57,6 @@ export const CreateUserSchema = z.object({
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
-// 导出 Role 类型
+// 重新导出类型（从 types/auth 获取，以支持从 './user' 导入）
 export type Role = PrismaRole;
+export type { User };

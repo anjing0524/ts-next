@@ -7,7 +7,8 @@ import {
   useUpdateUserMutation,
   useDeleteUserMutation,
 } from '../queries';
-import { User, CreateUserInput, UpdateUserInput } from '../domain/user';
+import { User } from '@/types/auth';
+import { CreateUserInput, UpdateUserInput } from '../domain/user';
 
 export const useUserManagement = () => {
   const queryClient = useQueryClient();

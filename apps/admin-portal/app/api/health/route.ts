@@ -2,19 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check database connection if available
-    let dbStatus = 'disconnected';
-    try {
-      const { PrismaClient } = await import('@repo/database');
-      const prisma = new PrismaClient();
-      await prisma.$queryRaw`SELECT 1`;
-      await prisma.$disconnect();
-      dbStatus = 'connected';
-    } catch (error) {
-      console.error('Database health check failed:', error);
-      dbStatus = 'error';
-    }
-
     // Check OAuth service
     let oauthStatus = 'unknown';
     try {
@@ -35,7 +22,6 @@ export async function GET(request: NextRequest) {
       service: 'admin-portal',
       version: process.env.npm_package_version || '1.0.0',
       checks: {
-        database: dbStatus,
         oauth: oauthStatus,
       },
       uptime: process.uptime(),

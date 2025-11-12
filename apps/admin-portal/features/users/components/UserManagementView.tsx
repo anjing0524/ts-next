@@ -75,7 +75,7 @@ export function UserManagementView() {
       <UserFormDialog
         isOpen={isModalOpen}
         onClose={closeModal}
-        user={selectedUser}
+        user={selectedUser as any}
         isProcessing={isProcessing}
         onSubmit={selectedUser ? handleUpdate : handleCreate}
       />

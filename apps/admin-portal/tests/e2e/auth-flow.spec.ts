@@ -131,7 +131,8 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
     await page.goto(`${baseUrl}/auth/callback?code=${validCode}&state=${invalidState}`);
 
     // Should show error about invalid state
-    await expect(page.getByText(/invalid|csrf/i)).toBeVisible({ timeout: 5000 });
+    const errorMessage = page.locator('[role="alert"]').getByText(/invalid state|csrf/i);
+    await expect(errorMessage).toBeVisible({ timeout: 5000 });
   });
 
   /**

@@ -1,5 +1,5 @@
 import { IAuthRepository } from '../domain/auth.repository';
-import { User } from '../../users/domain/user';
+import { User } from '@/types/auth';
 
 export class AuthService {
   constructor(private authRepository: IAuthRepository) {}

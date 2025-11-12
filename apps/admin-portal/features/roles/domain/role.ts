@@ -1,10 +1,9 @@
 import { z } from 'zod';
 // 从 Prisma Client 导入基础类型
-import type { Role as PrismaRole, Permission as PrismaPermission } from '@repo/database';
+import type { Role, Permission } from '@/types/auth';
 
-// 导出领域实体类型
-export type Role = PrismaRole;
-export type Permission = PrismaPermission;
+// 重新导出应用层类型
+export type { Role, Permission };
 
 // 为“更新角色”的表单/API输入创建 Zod 验证 Schema
 export const UpdateRoleSchema = z.object({

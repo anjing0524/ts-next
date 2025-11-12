@@ -1,6 +1,4 @@
-import { User } from '../types/auth';
-import { User as DomainUser } from '../features/users/domain/user';
-import { OAuthClient } from '@repo/database';
+import { User, OAuthClient } from '../types/auth';
 
 // API客户端配置
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
@@ -90,7 +88,7 @@ export const authApi = {
     TokenStorage.clearTokens();
   },
 
-  async fetchUserProfile(): Promise<DomainUser> {
+  async fetchUserProfile(): Promise<User> {
     return authenticatedRequest('/users/me');
   },
 };
