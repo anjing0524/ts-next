@@ -362,6 +362,7 @@ impl TokenService for TokenServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::permission_cache::InMemoryPermissionCache;
     use crate::config::Config;
     use crate::models::client::OAuthClientDetails;
     use crate::routes::clients::CreateClientRequest;
@@ -444,8 +445,9 @@ mod tests {
         let db = Arc::new(pool);
         let _keys = generate_test_keys();
 
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
         let client_service = Arc::new(ClientServiceImpl::new(db.clone())) as Arc<dyn ClientService>;
-        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone())) as Arc<dyn RBACService>;
+        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone(), permission_cache)) as Arc<dyn RBACService>;
         let user_service = Arc::new(UserServiceImpl::new(db.clone())) as Arc<dyn UserService>;
         let config = Arc::new(create_test_config());
 
@@ -483,8 +485,9 @@ mod tests {
         let db = Arc::new(pool);
         let _keys = generate_test_keys();
 
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
         let client_service = Arc::new(ClientServiceImpl::new(db.clone())) as Arc<dyn ClientService>;
-        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone())) as Arc<dyn RBACService>;
+        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone(), permission_cache)) as Arc<dyn RBACService>;
         let user_service = Arc::new(UserServiceImpl::new(db.clone())) as Arc<dyn UserService>;
         let config = Arc::new(create_test_config());
 
@@ -520,8 +523,9 @@ mod tests {
         let db = Arc::new(pool);
         let _keys = generate_test_keys();
 
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
         let client_service = Arc::new(ClientServiceImpl::new(db.clone())) as Arc<dyn ClientService>;
-        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone())) as Arc<dyn RBACService>;
+        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone(), permission_cache)) as Arc<dyn RBACService>;
         let user_service = Arc::new(UserServiceImpl::new(db.clone())) as Arc<dyn UserService>;
         let config = Arc::new(create_test_config());
 
@@ -577,8 +581,9 @@ mod tests {
         let pool = setup_test_db().await;
         let db = Arc::new(pool);
 
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
         let client_service = Arc::new(ClientServiceImpl::new(db.clone())) as Arc<dyn ClientService>;
-        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone())) as Arc<dyn RBACService>;
+        let rbac_service = Arc::new(RBACServiceImpl::new(db.clone(), permission_cache)) as Arc<dyn RBACService>;
         let user_service = Arc::new(UserServiceImpl::new(db.clone())) as Arc<dyn UserService>;
         let config = Arc::new(create_test_config());
 

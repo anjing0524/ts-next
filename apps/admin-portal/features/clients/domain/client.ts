@@ -5,7 +5,7 @@ import type { OAuthClient } from '@/types/auth';
 // 重新导出 OAuthClient
 export type { OAuthClient };
 
-// 本地定义客户端类型（不依赖 Prisma）
+// 本地定义客户端类型
 export enum ClientType {
   CONFIDENTIAL = 'CONFIDENTIAL',
   PUBLIC = 'PUBLIC',
@@ -14,7 +14,7 @@ export enum ClientType {
 // 客户端类型的 Zod Schema
 export const ClientTypeSchema = z.nativeEnum(ClientType);
 
-// 基础的 Zod Schema，反映了 Prisma 模型
+// 基础的 Zod Schema，反映了 OAuth Service Rust 的数据模型
 export const OAuthClientSchema = z.object({
   id: z.string().cuid(),
   clientId: z.string(),

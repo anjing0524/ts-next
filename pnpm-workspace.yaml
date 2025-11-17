@@ -3,11 +3,8 @@ packages:
   - packages/*
 onlyBuiltDependencies:
   - '@parcel/watcher'
-  - '@prisma/client'
-  - '@prisma/engines'
   - '@tailwindcss/oxide'
   - bcrypt
   - esbuild
-  - prisma
   - sharp
   - unrs-resolver

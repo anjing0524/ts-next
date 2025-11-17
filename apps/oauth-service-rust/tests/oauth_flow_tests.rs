@@ -1,9 +1,14 @@
 use jsonwebtoken::{DecodingKey, EncodingKey};
-use oauth_service_rust::routes::clients::CreateClientRequest;
-use oauth_service_rust::services::auth_code_service::AuthCodeService;
-use oauth_service_rust::services::client_service::ClientService;
-use oauth_service_rust::services::rbac_service::RBACService;
-use oauth_service_rust::services::token_service::TokenService;
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    routes::clients::CreateClientRequest,
+    services::{
+        auth_code_service::AuthCodeService,
+        client_service::ClientService,
+        rbac_service::RBACService,
+        token_service::TokenService,
+    },
+};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 
@@ -54,13 +59,14 @@ async fn setup_test_services() -> TestServices {
     use oauth_service_rust::services::token_service::TokenServiceImpl;
     use oauth_service_rust::services::user_service::UserServiceImpl;
 
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
     let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
         pool.clone(),
         client_service.clone(),
     ));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
 
     let _keys = (encoding_key, decoding_key); // Unused keys; TokenServiceImpl generates its own
 

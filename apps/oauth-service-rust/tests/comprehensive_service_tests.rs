@@ -2,12 +2,15 @@
 //!
 //! 测试 OAuth 服务的完整业务流程和边界情况
 
-use oauth_service_rust::routes::clients::CreateClientRequest;
-use oauth_service_rust::services::{
-    client_service::{ClientService, ClientServiceImpl},
-    rbac_service::RBACServiceImpl,
-    token_service::{TokenService, TokenServiceImpl},
-    user_service::{UserService, UserServiceImpl},
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    routes::clients::CreateClientRequest,
+    services::{
+        client_service::{ClientService, ClientServiceImpl},
+        rbac_service::RBACServiceImpl,
+        token_service::{TokenService, TokenServiceImpl},
+        user_service::{UserService, UserServiceImpl},
+    },
 };
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -300,8 +303,9 @@ async fn test_token_introspection_with_invalid_token() {
         jwt_algorithm: oauth_service_rust::config::JwtAlgorithm::HS256,
     });
 
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
 
     let token_service =

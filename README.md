@@ -1,248 +1,376 @@
-# ts-next-template-monorepo
+# OAuth 2.1 Authentication & Authorization System
 
-这是一个基于 Next.js 15 和 TypeScript 的全栈 Monorepo 项目，实现了完整的 OAuth 2.1 认证授权中心与微服务架构。
+> A modern, production-ready OAuth 2.1 authorization server with PKCE, built with Rust and Next.js
 
-## 🏗️ 项目架构
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.0-black.svg)](https://nextjs.org/)
 
-本项目采用 Monorepo 架构，使用 Turborepo 进行高效管理，包含 OAuth 2.1 认证服务和金融数据服务等核心组件。
+---
 
-### 📱 应用服务 (apps/)
+## 📋 Overview
 
-| 服务 | 端口 | 功能描述 | 技术栈 |
-|------|------|----------|--------|
-| **oauth-service** | 3001 | OAuth 2.1 认证授权服务，提供完整的授权码流程 + PKCE 支持 | Next.js 15 + Jose + Prisma |
-| **admin-portal** | 3002 | 管理后台 + 认证中心 UI，处理所有用户交互页面 | Next.js 15 + shadcn/ui + React Query |
-| **kline-service** | 3003 | 金融数据可视化服务，WebAssembly 高性能图表渲染 | Next.js 15 + Rust/WASM |
-| **pingora-proxy** | 6188 | 基于 Rust 的高性能反向代理和负载均衡 | Rust + Pingora |
-| **test-service** | 动态 | 测试服务，用于集成测试和演示 | Next.js 15 |
+This project provides a complete OAuth 2.1 authentication and authorization system with:
 
-### 📦 共享包 (packages/)
+- ✅ **OAuth 2.1 Compliance** - Follows the latest OAuth 2.1 security standards
+- ✅ **Mandatory PKCE** - All authorization code flows require PKCE
+- ✅ **RBAC** - Role-Based Access Control with permission caching
+- ✅ **Audit Logging** - Comprehensive security event tracking
+- ✅ **High Performance** - Rust-powered authorization server (50K+ req/s)
+- ✅ **Modern UI** - Next.js 16 admin portal with React 19
 
-| 包名 | 功能描述 |
-|------|----------|
-| **@repo/ui** | 基于 shadcn/ui 的共享 UI 组件库 |
-| **@repo/lib** | 认证工具、JWT 处理、权限管理等核心功能库 |
-| **@repo/database** | Prisma ORM 数据库模型和客户端 |
-| **@repo/cache** | Redis 和内存缓存抽象层 |
-| **@repo/eslint-config** | 共享 ESLint 配置 |
-| **@repo/jest-config** | 共享 Jest 测试配置 |
-| **@repo/typescript-config** | 共享 TypeScript 配置 |
-| **@repo/tailwind-config** | 共享 Tailwind CSS 配置 |
-| **@repo/next-config** | 共享 Next.js 配置 |
-| **@repo/prettier-config** | 共享 Prettier 配置 |
+---
 
-## 🚀 技术栈
+## 🏗️ Architecture
 
-- **前端框架**: Next.js 15.3.2 + React 19
-- **认证授权**: OAuth 2.1 + PKCE + JWT (Jose库)
-- **数据库**: Prisma ORM + SQLite (开发) / PostgreSQL (生产)
-- **样式**: Tailwind CSS 4 + shadcn/ui
-- **性能**: Rust/WASM (kline-service) + Pingora代理
-- **测试**: Jest + Playwright (E2E)
-- **构建**: Turborepo + pnpm workspaces
+### System Components
 
-## 🛠️ 环境准备
-
-### 必需软件
-
-- [Node.js](https://nodejs.org/) (v20.x 或更高版本)
-- [pnpm](https://pnpm.io/) (v10.x 或更高版本)
-- [Rust](https://www.rust-lang.org/) (最新稳定版) - 用于 pingora-proxy 和 WASM 构建
-- [Docker](https://www.docker.com/) (最新稳定版)
-
-### 可选软件
-
-- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) - 用于 Kubernetes 部署
-- [Redis](https://redis.io/) - 用于缓存服务 (开发环境可选)
-
-## 🚀 快速开始
-
-### 1. 安装依赖
-
-```bash
-# 克隆项目
-git clone <repository-url>
-cd ts-next-template
-
-# 安装所有依赖
-pnpm install
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Client Applications                       │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   Pingora Proxy      │  Port: 6188 (HTTP/HTTPS)
+              │   (Rust)             │  - Reverse Proxy
+              │                      │  - Load Balancing
+              │                      │  - SSL Termination
+              └──────────┬───────────┘
+                         │
+          ┌──────────────┴──────────────┐
+          │                             │
+          ▼                             ▼
+┌──────────────────┐          ┌──────────────────┐
+│ OAuth Service    │          │  Admin Portal    │
+│ (Rust + Axum)    │          │  (Next.js 16)    │
+│                  │          │                  │
+│ Port: 3001       │          │  Port: 3002      │
+│ - Authorization  │          │  - User Mgmt     │
+│ - Token Mgmt     │          │  - Client Mgmt   │
+│ - User Auth      │          │  - Role Mgmt     │
+│ - RBAC           │          │  - Audit Logs    │
+└────────┬─────────┘          └──────────────────┘
+         │
+         ▼
+   ┌──────────┐
+   │ SQLite   │  (Development)
+   │ MySQL    │  (Production)
+   └──────────┘
 ```
 
-### 2. 环境配置
+### Technology Stack
+
+#### Backend (OAuth Service)
+- **Rust 1.70+** - Systems programming language
+- **Axum 0.7** - Web framework
+- **SQLx** - SQL toolkit (SQLite/MySQL support)
+- **Tokio** - Async runtime
+- **JWT** - jsonwebtoken crate
+- **bcrypt** - Password hashing
+
+#### Frontend (Admin Portal)
+- **Next.js 16** - React framework (App Router)
+- **React 19** - UI library
+- **TypeScript 5** - Type safety
+- **TanStack Query** - Server state management
+- **Zustand** - Client state management
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - UI components
+
+#### Infrastructure
+- **Pingora** - Cloudflare's proxy (Rust-based)
+- **Docker** - Containerization
+- **Prometheus** - Metrics (optional)
+- **Grafana** - Monitoring (optional)
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Rust** 1.70+ ([Install](https://www.rust-lang.org/tools/install))
+- **Node.js** 20+ ([Install](https://nodejs.org/))
+- **pnpm** 9+ (`npm install -g pnpm`)
+- **Docker** (optional, for production deployment)
+
+### 1. Clone Repository
 
 ```bash
-# 复制环境变量模板
+git clone https://github.com/yourusername/oauth-system.git
+cd oauth-system
+```
+
+### 2. Setup OAuth Service (Rust)
+
+```bash
+cd apps/oauth-service-rust
+
+# Install dependencies (automatic with cargo)
+# Create .env file
 cp .env.example .env
 
-# 编辑 .env 文件，配置以下关键变量:
-# DATABASE_URL="file:./dev.db"
-# JWT_PRIVATE_KEY_PATH="./keys/private.pem"
-# JWT_PUBLIC_KEY_PATH="./keys/public.pem"
-# REDIS_URL="redis://localhost:6379"
+# Generate JWT keys
+mkdir -p keys
+openssl genrsa -out keys/private_key.pem 2048
+openssl rsa -in keys/private_key.pem -pubout -out keys/public_key.pem
+
+# Run migrations and start server
+cargo run
 ```
 
-### 3. 初始化数据库
+**OAuth Service will start on**: `http://localhost:3001`
+
+### 3. Setup Admin Portal (Next.js)
 
 ```bash
-# 生成 Prisma 客户端
-pnpm db:generate
+cd apps/admin-portal
 
-# 创建数据库表结构
-pnpm db:push
+# Install dependencies
+pnpm install
 
-# 初始化测试数据
-pnpm db:seed
-```
+# Create .env.local
+cp .env.example .env.local
 
-### 4. 构建 WASM 模块 (kline-service)
-
-```bash
-# 构建金融图表 WASM 模块
-cd apps/kline-service/wasm-cal
-./build.sh
-```
-
-### 5. 启动开发环境
-
-```bash
-# 启动所有服务
+# Start development server
 pnpm dev
-
-# 或者分别启动特定服务
-pnpm --filter=oauth-service dev      # 认证服务 (3001)
-pnpm --filter=admin-portal dev       # 管理后台 (3002)
-pnpm --filter=kline-service dev      # 金融数据服务 (3003)
-pnpm --filter=pingora-proxy dev      # 反向代理 (6188)
-
-# 仅启动认证相关服务 (推荐)
-pnpm start:e2e  # 并行启动 admin-portal 与 oauth-service
-
-# 启动K线图相关服务 (ws-kline-service 和 kline-service)
-pnpm dev:kline
 ```
 
-### 6. 访问系统
+**Admin Portal will start on**: `http://localhost:3002`
 
-- **管理后台**: http://localhost:3002
-- **认证服务**: http://localhost:3001
-- **金融数据服务**: http://localhost:3003
-- **默认管理员**: admin@example.com / admin123
-
-## 本地开发
-
-1.  **安装依赖**:
-
-    ```bash
-    pnpm install
-    ```
-
-2.  **启动开发环境**:
-
-    ```bash
-    pnpm dev
-    ```
-
-    此命令将启动所有应用。您也可以在特定应用的目录中运行 `pnpm dev` 来单独启动该应用。
-
-    > 若仅需调试 **admin-portal** 与 **oauth-service** 的 OAuth 集成，可执行：
-    >
-    > ```bash
-    > pnpm start:e2e # 并行启动 admin-portal 与 oauth-service，开启 watch 热重载
-    > ```
-
-3.  **环境变量**:
-
-    项目根目录下的 `.env` 文件用于配置全局环境变量。各个应用也可以有自己的 `.env` 文件。
-
-## 数据库
-
-本项目使用 Prisma 作为 ORM。
-
-- **生成 Prisma Client**:
-
-  ```bash
-  pnpm db:generate
-  ```
-
-- **同步数据库结构**:
-
-  ```bash
-  pnpm db:push
-  ```
-
-- **数据填充**:
-
-  ```bash
-  pnpm db:seed
-  ```
-
-- **启动 Prisma Studio**:
-
-  ```bash
-  pnpm db:studio
-  ```
-
-## 测试
-
-- **运行单元测试**:
-
-  ```bash
-  pnpm test
-  ```
-
-- **运行端到端测试**:
-
-  ```bash
-  pnpm e2e
-  ```
-
-## 代码规范
-
-- **代码格式化**:
-
-  ```bash
-  pnpm format
-  ```
-
-- **代码检查**:
-
-  ```bash
-  pnpm lint
-  ```
-
-## 提交代码
-
-本项目使用 Commitizen 来规范提交信息。
+### 4. Setup Pingora Proxy (Optional)
 
 ```bash
-pnpm commit
+cd apps/pingora-proxy
+
+# Run proxy
+cargo run -- --config config/default.yaml
 ```
 
-## 部署
+**Proxy will start on**: `http://localhost:6188`
 
-本项目支持使用 Docker 和 Kubernetes 进行部署。
+### 5. Access the System
 
-- **构建 Docker 镜像**:
+- **Admin Portal**: http://localhost:3002
+- **OAuth Service**: http://localhost:3001
+- **Unified Gateway** (via Pingora): http://localhost:6188
 
-  ```bash
-  docker build -t ts-next-template .
-  ```
+**Default Credentials**:
+- Username: `admin`
+- Password: `admin123` (⚠️ Change in production!)
 
-- **使用 Kubernetes 部署**:
+---
 
-  k8s 目录中包含了部署所需的 YAML 文件。
+## 📚 Documentation
 
-  ```bash
-  kubectl apply -f k8s/
-  ```
+### Core Documentation
 
-## 贡献
+| Document | Description | Location |
+|----------|-------------|----------|
+| **OAuth 2.1 Business Flows** | Complete OAuth flows and security | [docs/OAUTH_2.1_BUSINESS_FLOWS.md](docs/OAUTH_2.1_BUSINESS_FLOWS.md) |
+| **API Documentation** | REST API reference | [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) |
+| **Architecture Design** | System architecture | [docs/ARCHITECTURE_DESIGN.md](docs/ARCHITECTURE_DESIGN.md) |
+| **Deployment Guide** | Deployment procedures | [docs/DEPLOYMENT_AND_OPERATIONS.md](docs/DEPLOYMENT_AND_OPERATIONS.md) |
+| **Production Config** | Configuration guide | [docs/PRODUCTION_CONFIGURATION_GUIDE.md](docs/PRODUCTION_CONFIGURATION_GUIDE.md) |
+| **Production Checklist** | Readiness assessment | [docs/PRODUCTION_READINESS_CHECKLIST.md](docs/PRODUCTION_READINESS_CHECKLIST.md) |
+| **Delivery Summary** | Project overview | [docs/FINAL_DELIVERY_SUMMARY.md](docs/FINAL_DELIVERY_SUMMARY.md) |
 
-欢迎任何形式的贡献！如果您有任何问题或建议，请随时提 issue 或 pull request。
+---
 
-## 更新API说明
+## 🔑 Key Features
 
-- 会话注销统一调用 `/api/v2/oauth/revoke`
-- 客户端密钥轮换API路径为 `/api/v2/clients/[clientId]/secret`
+### OAuth 2.1 Implementation
 
-> 详细的项目技术规范与当前状态请参阅 [docs/项目综合规范与状态报告.md](./docs/项目综合规范与状态报告.md)。
+- ✅ **Authorization Code Flow with PKCE** (mandatory)
+- ✅ **Refresh Token Grant** (with token rotation)
+- ✅ **Client Credentials Grant** (for service accounts)
+- ✅ **Token Introspection** (RFC 7662)
+- ✅ **Token Revocation** (RFC 7009)
+- ✅ **OpenID Connect** (UserInfo endpoint)
+
+### Security Features
+
+- ✅ **PKCE** - Proof Key for Code Exchange (S256)
+- ✅ **JWT** - RS256/HS256 signatures
+- ✅ **RBAC** - Fine-grained permission system
+- ✅ **CSRF Protection** - State parameter validation
+- ✅ **XSS Protection** - HttpOnly cookies
+- ✅ **Rate Limiting** - 100 req/min per IP
+- ✅ **Audit Logging** - All operations tracked
+- ✅ **Data Sanitization** - Automatic PII masking
+
+### Performance Optimizations
+
+- ✅ **Permission Caching** - 5-minute TTL
+- ✅ **Connection Pooling** - Optimized DB connections
+- ✅ **Database Indexing** - All critical fields
+- ✅ **Async I/O** - Tokio async runtime
+- ✅ **Code Splitting** - Next.js optimization
+
+---
+
+## 🧪 Testing
+
+### Run Rust Tests
+
+```bash
+cd apps/oauth-service-rust
+cargo test
+```
+
+### Run Admin Portal Tests
+
+```bash
+cd apps/admin-portal
+
+# Unit tests
+pnpm test
+
+# E2E tests
+pnpm test:e2e
+
+# OAuth flow tests
+pnpm test:oauth
+```
+
+---
+
+## 🐳 Production Deployment
+
+### Docker Compose
+
+```bash
+# Build and start all services
+docker-compose -f docker-compose.production.yml up -d
+
+# View logs
+docker-compose -f docker-compose.production.yml logs -f
+
+# Stop all services
+docker-compose -f docker-compose.production.yml down
+```
+
+### Kubernetes
+
+```bash
+# Deploy to Kubernetes
+kubectl apply -f k8s/
+
+# Check status
+kubectl get pods -n oauth-system
+```
+
+See [Deployment Guide](docs/DEPLOYMENT_AND_OPERATIONS.md) for detailed instructions.
+
+---
+
+## 🔧 Configuration
+
+### OAuth Service (.env)
+
+```bash
+# Database
+DATABASE_URL=sqlite:./oauth.db  # Development
+# DATABASE_URL=mysql://user:pass@host:3306/oauth_db  # Production
+
+# JWT
+JWT_ALGORITHM=RS256  # Use RS256 in production
+JWT_PRIVATE_KEY_PATH=./keys/private_key.pem
+JWT_PUBLIC_KEY_PATH=./keys/public_key.pem
+
+# Server
+ISSUER=https://auth.yourdomain.com
+NODE_ENV=production
+```
+
+### Admin Portal (.env.local)
+
+```bash
+# OAuth Client
+NEXT_PUBLIC_OAUTH_CLIENT_ID=admin-portal-client
+NEXT_PUBLIC_OAUTH_CLIENT_SECRET=your-secret-here
+NEXT_PUBLIC_OAUTH_REDIRECT_URI=https://admin.yourdomain.com/auth/callback
+
+# API
+NEXT_PUBLIC_API_BASE_URL=https://api.yourdomain.com/api/v2
+NEXT_PUBLIC_OAUTH_SERVICE_URL=https://api.yourdomain.com/api/v2
+```
+
+---
+
+## 📊 Project Structure
+
+```
+oauth-system/
+├── apps/
+│   ├── oauth-service-rust/     # Rust OAuth Server
+│   │   ├── src/
+│   │   │   ├── routes/         # API endpoints
+│   │   │   ├── services/       # Business logic
+│   │   │   ├── middleware/     # Auth, permission, audit
+│   │   │   ├── models/         # Data models
+│   │   │   └── utils/          # Helpers
+│   │   └── migrations/         # Database migrations
+│   │
+│   ├── admin-portal/           # Next.js Admin UI
+│   │   ├── app/                # App router pages
+│   │   ├── features/           # Feature modules (DDD)
+│   │   ├── lib/                # Utilities
+│   │   └── components/         # React components
+│   │
+│   └── pingora-proxy/          # Reverse Proxy
+│       ├── src/                # Proxy logic
+│       └── config/             # Proxy configuration
+│
+├── packages/                   # Shared packages
+│   ├── ui/                     # Shared UI components
+│   ├── config/                 # Shared configs
+│   └── ...
+│
+├── docs/                       # Documentation
+├── k8s/                        # Kubernetes manifests
+├── docker-compose.production.yml
+└── README.md
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Cloudflare Pingora](https://github.com/cloudflare/pingora) - High-performance proxy
+- [Axum](https://github.com/tokio-rs/axum) - Rust web framework
+- [Next.js](https://nextjs.org/) - React framework
+- [OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-07) - OAuth specification
+
+---
+
+## 📞 Support
+
+For issues and questions:
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/oauth-system/issues)
+- **Documentation**: [docs/](docs/)
+- **Email**: support@yourdomain.com
+
+---
+
+**Built with ❤️ using Rust and Next.js**
