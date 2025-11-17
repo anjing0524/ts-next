@@ -104,3 +104,4 @@ apps/kline-service/wasm-cal/target/*
 
 .claude
 apps/zmq-log-server/target/*
+apps/oauth-service-rust/target/
