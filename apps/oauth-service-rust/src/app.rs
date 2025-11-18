@@ -1,4 +1,5 @@
 use axum::{
+    http::Method,
     routing::{get, post},
     Router,
 };
@@ -108,8 +109,24 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
         ))
         // 5. 追踪和日志 - 在审计之后执行
         .layer(TraceLayer::new_for_http())
-        // 4. CORS - 处理跨域请求
-        .layer(CorsLayer::permissive())
+        // 4. CORS - 处理跨域请求 (SECURITY FIX: Restricted origins)
+        .layer(
+            CorsLayer::new()
+                // Allow specific origins from config (for production)
+                // For development, can add localhost
+                .allow_origin([
+                    "http://localhost:3002".parse().unwrap(),  // Admin Portal
+                    "http://localhost:6188".parse().unwrap(),  // Pingora Proxy
+                    // Add production domains here
+                ])
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+                .allow_headers([
+                    axum::http::header::AUTHORIZATION,
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::ACCEPT,
+                ])
+                .allow_credentials(true)  // Important for cookies and Authorization headers
+        )
         // 3. 权限检查中间件 - 在认证之后执行（代码中在前）
         .layer(axum::middleware::from_fn(
             middleware::permission::permission_middleware,
@@ -120,7 +137,9 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
             middleware::auth::auth_middleware,
         ))
         // 1. 限流中间件 - 最先执行（代码中在后），早期检查防止资源浪费
-        .layer(axum::middleware::from_fn(
+        // SECURITY FIX: Use shared state for effective rate limiting
+        .layer(axum::middleware::from_fn_with_state(
+            app_state.clone(),
             middleware::rate_limit::rate_limit_middleware,
         ))
 }
