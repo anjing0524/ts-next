@@ -553,15 +553,22 @@ NEXT_PUBLIC_OAUTH_REDIRECT_URI=http://localhost:3002/auth/callback
 1. **审查报告**:
    - `FRONTEND_IMPLEMENTATION_COMPREHENSIVE_REVIEW.md` - 完整的前端审查报告
 
-2. **后端修复**:
+2. **测试指南**:
+   - `apps/admin-portal/INTEGRATION_TESTING_GUIDE.md` - **集成测试详细指南** ⭐
+     - Sentry 错误监控测试步骤
+     - Web Vitals 性能监控验证
+     - CSP 策略验证方法
+     - 故障排查和验证清单
+
+3. **后端修复**:
    - `COMPREHENSIVE_PRODUCT_ARCHITECTURE_REVIEW.md` - 后端架构审查
    - 后端已完成 6 个关键修复 (CRITICAL/HIGH/MEDIUM)
 
-3. **Sentry 文档**:
+4. **Sentry 文档**:
    - 官方文档: https://docs.sentry.io/platforms/javascript/guides/nextjs/
    - 配置示例: 参见 `apps/admin-portal/sentry.*.config.ts`
 
-4. **Web Vitals 文档**:
+5. **Web Vitals 文档**:
    - Google 指南: https://web.dev/vitals/
    - 实现参考: `apps/admin-portal/lib/analytics/web-vitals.ts`
 
