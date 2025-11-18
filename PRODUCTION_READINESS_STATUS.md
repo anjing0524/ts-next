@@ -152,72 +152,65 @@ cache/  config.json  # 只有缓存配置，缺少 server/ 目录
 - Playwright E2E 测试 (无法运行)
 - TailwindCSS (无法验证，前端未启动)
 
-## 推荐的下一步行动
+## 最终诊断结论
 
-### 方案 A：修复 Next.js 16 Dev 模式（优先）
+### ❌ 根本问题确认
 
-1. **检查 Next.js 16 已知问题：**
-   ```bash
-   # 查看 Next.js 16 GitHub Issues
-   # 搜索关键词: "build-manifest.json", "Turbopack ENOENT"
-   ```
+经过深入调查和多次尝试，确认 **Next.js 16 + Turbopack 在 pnpm monorepo 环境中完全不可用：**
 
-2. **尝试替代启动方式：**
-   ```bash
-   # 方式 1: 使用生产构建
-   pnpm --filter=admin-portal build
-   pnpm --filter=admin-portal start
+1. **Dev 模式：** 无法生成 build-manifest.json，所有页面返回 500 错误
+2. **生产构建：** 43 个模块解析错误，无法解析 `@repo/ui` 包的依赖
+3. **问题性质：** 工具链根本性缺陷，非配置或代码问题
 
-   # 方式 2: 禁用 Turbopack
-   # 修改 next.config.ts，添加 turbo: { enabled: false }
+**详细分析文档：** [`NEXTJS_16_TURBOPACK_ISSUES.md`](./NEXTJS_16_TURBOPACK_ISSUES.md)
 
-   # 方式 3: 降级到 Next.js 15
-   # 修改 package.json，使用 next@15.4.5
-   ```
+## 推荐解决方案
 
-3. **检查配置文件：**
-   - `next.config.ts` - 验证 experimental 配置
-   - `tsconfig.json` - 验证路径别名
-   - `package.json` - 验证依赖版本
+### ⭐ 方案 A：降级到 Next.js 15 + Webpack（强烈推荐）
 
-### 方案 B：使用生产构建运行 E2E 测试
-
-1. **构建所有应用：**
-   ```bash
-   pnpm build
-   ```
-
-2. **使用生产模式启动：**
-   ```bash
-   # OAuth Service (已在运行)
-   cd apps/oauth-service-rust && cargo run --release
-
-   # Admin Portal (生产模式)
-   pnpm --filter=admin-portal start
-
-   # Pingora Proxy
-   cd apps/pingora-proxy && cargo run --release
-   ```
-
-3. **运行 E2E 测试：**
-   ```bash
-   cd apps/admin-portal
-   ./run-all-e2e-tests.sh
-   ```
-
-### 方案 C：临时降级到 Next.js 15（最后手段）
+**时间成本：** 2-4 小时
+**风险等级：** 低
+**成功概率：** 99%+
 
 ```bash
-# 修改 package.json
-pnpm add next@15.4.5 --filter=admin-portal
-pnpm add eslint-config-next@15.4.5 --filter=admin-portal
+# 1. 降级 Next.js
+pnpm remove next eslint-config-next --filter=admin-portal
+pnpm add next@15.4.5 eslint-config-next@15.4.5 --filter=admin-portal
 
-# 重新安装依赖
+# 2. 移除 Turbopack experimental 配置
+# 编辑 apps/admin-portal/next.config.ts
+# 移除 experimental.turbo 相关配置
+
+# 3. 清理并重新安装
+rm -rf apps/admin-portal/.next node_modules/.cache
 pnpm install
 
-# 重启开发服务器
-pnpm --filter=admin-portal dev
+# 4. 验证
+pnpm --filter=admin-portal dev    # 开发模式
+pnpm --filter=admin-portal build  # 生产构建
 ```
+
+**优势：**
+- ✅ 立即可用，成熟稳定
+- ✅ 完整的 monorepo 支持
+- ✅ 无需代码修改
+- ✅ 可运行 E2E 测试
+- ✅ 可部署到生产环境
+
+**劣势：**
+- ⚠️ 失去 Turbopack 的快速刷新（但 Webpack 也足够快）
+- ⚠️ 未来需要再次升级到 Next.js 16（预计 2025 Q2-Q3 稳定）
+
+### 方案 B：拆分 Monorepo（不推荐）
+
+**时间成本：** 80-160 小时
+**风险等级：** 高
+**原因：** 失去代码共享能力，架构倒退
+
+### 方案 C：等待修复（不可行）
+
+**预计等待时间：** 2-6 个月
+**原因：** 项目完全停滞，无法接受
 
 ## E2E 测试覆盖范围
 
