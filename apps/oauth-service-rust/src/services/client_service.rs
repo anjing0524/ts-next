@@ -56,7 +56,14 @@ impl ClientService for ClientServiceImpl {
         client_id: &str,
     ) -> Result<Option<OAuthClientDetails>, ServiceError> {
         let client: Option<OAuthClient> =
-            sqlx::query_as("SELECT * FROM oauth_clients WHERE client_id = ?")
+            sqlx::query_as(
+                "SELECT id, client_id, client_secret, name, description, client_type, logo_uri, \
+                 policy_uri, tos_uri, jwks_uri, token_endpoint_auth_method, require_pkce, \
+                 require_consent, is_active, created_at, updated_at, access_token_ttl, \
+                 refresh_token_ttl, authorization_code_lifetime, strict_redirect_uri_matching, \
+                 allow_localhost_redirect, require_https_redirect \
+                 FROM oauth_clients WHERE client_id = ?"
+            )
                 .bind(client_id)
                 .fetch_optional(&*self.db)
                 .await?;
@@ -284,7 +291,12 @@ impl ClientService for ClientServiceImpl {
         let offset = offset.unwrap_or(0);
 
         let clients = sqlx::query_as::<_, OAuthClient>(
-            "SELECT * FROM oauth_clients ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, client_id, client_secret, name, description, client_type, logo_uri, \
+             policy_uri, tos_uri, jwks_uri, token_endpoint_auth_method, require_pkce, \
+             require_consent, is_active, created_at, updated_at, access_token_ttl, \
+             refresh_token_ttl, authorization_code_lifetime, strict_redirect_uri_matching, \
+             allow_localhost_redirect, require_https_redirect \
+             FROM oauth_clients ORDER BY created_at DESC LIMIT ? OFFSET ?",
         )
         .bind(limit)
         .bind(offset)
@@ -323,7 +335,12 @@ impl ClientService for ClientServiceImpl {
         let mut tx = self.db.begin().await?;
 
         let existing_client = sqlx::query_as::<_, OAuthClient>(
-            "SELECT * FROM oauth_clients WHERE client_id = ? FOR UPDATE",
+            "SELECT id, client_id, client_secret, name, description, client_type, logo_uri, \
+             policy_uri, tos_uri, jwks_uri, token_endpoint_auth_method, require_pkce, \
+             require_consent, is_active, created_at, updated_at, access_token_ttl, \
+             refresh_token_ttl, authorization_code_lifetime, strict_redirect_uri_matching, \
+             allow_localhost_redirect, require_https_redirect \
+             FROM oauth_clients WHERE client_id = ? FOR UPDATE",
         )
         .bind(client_id)
         .fetch_optional(&mut *tx)

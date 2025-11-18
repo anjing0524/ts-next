@@ -91,19 +91,38 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::Service(service_error) => match service_error {
-                ServiceError::Database(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Database error: {e}"),
-                ),
+                // SECURITY FIX: Don't expose database error details to clients
+                ServiceError::Database(e) => {
+                    // Log the actual error for debugging
+                    tracing::error!("Database error: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "An internal error occurred. Please try again later.".to_string(),
+                    )
+                },
                 ServiceError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
                 ServiceError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
                 ServiceError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
                 ServiceError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
                 ServiceError::Conflict(msg) => (StatusCode::CONFLICT, msg),
                 ServiceError::JwtError(msg) => (StatusCode::UNAUTHORIZED, msg),
-                ServiceError::PasswordError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+                // SECURITY FIX: Don't expose password hashing details
+                ServiceError::PasswordError(e) => {
+                    tracing::error!("Password hashing error: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Authentication system error. Please try again later.".to_string(),
+                    )
+                },
                 ServiceError::InvalidScope(msg) => (StatusCode::BAD_REQUEST, msg),
-                ServiceError::CacheError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+                // SECURITY FIX: Don't expose cache implementation details
+                ServiceError::CacheError(e) => {
+                    tracing::error!("Cache error: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "An internal error occurred. Please try again later.".to_string(),
+                    )
+                },
             },
             AppError::Auth(auth_error) => match auth_error {
                 AuthError::InvalidCredentials | AuthError::InvalidToken => {
@@ -118,16 +137,35 @@ impl IntoResponse for AppError {
                 StatusCode::BAD_REQUEST,
                 format!("PKCE verification failed: {e}"),
             ),
-            AppError::Sqlx(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error: {e}"),
-            ),
-            AppError::Jwt(e) => (StatusCode::UNAUTHORIZED, format!("JWT error: {e}")),
-            AppError::Io(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("IO error: {e}")),
-            AppError::Anyhow(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Internal error: {e}"),
-            ),
+            // SECURITY FIX: Don't expose database error details to clients
+            AppError::Sqlx(e) => {
+                tracing::error!("Database error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            },
+            // SECURITY FIX: Don't expose JWT implementation details
+            AppError::Jwt(e) => {
+                tracing::error!("JWT error: {}", e);
+                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string())
+            },
+            // SECURITY FIX: Don't expose IO error details
+            AppError::Io(e) => {
+                tracing::error!("IO error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            },
+            // SECURITY FIX: Don't expose internal error details
+            AppError::Anyhow(e) => {
+                tracing::error!("Internal error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            },
         };
 
         let body = Json(json!({ "error": error_message }));

@@ -123,7 +123,10 @@ impl RoleService for RoleServiceImpl {
     }
 
     async fn find_role_by_id(&self, role_id: &str) -> Result<Option<Role>, ServiceError> {
-        let role = sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE id = ?")
+        let role = sqlx::query_as::<_, Role>(
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles WHERE id = ?"
+        )
             .bind(role_id)
             .fetch_optional(&*self.db)
             .await?;
@@ -132,7 +135,10 @@ impl RoleService for RoleServiceImpl {
     }
 
     async fn find_role_by_name(&self, name: &str) -> Result<Option<Role>, ServiceError> {
-        let role = sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE name = ?")
+        let role = sqlx::query_as::<_, Role>(
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles WHERE name = ?"
+        )
             .bind(name)
             .fetch_optional(&*self.db)
             .await?;
@@ -149,7 +155,8 @@ impl RoleService for RoleServiceImpl {
         let offset = offset.unwrap_or(0);
 
         let roles = sqlx::query_as::<_, Role>(
-            "SELECT * FROM roles ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles ORDER BY created_at DESC LIMIT ? OFFSET ?",
         )
         .bind(limit)
         .bind(offset)

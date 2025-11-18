@@ -46,7 +46,12 @@ impl UserServiceImpl {
 #[async_trait]
 impl UserService for UserServiceImpl {
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, ServiceError> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
+        let user = sqlx::query_as::<_, User>(
+            "SELECT id, username, password_hash, is_active, created_at, updated_at, last_login_at, \
+             display_name, first_name, last_name, avatar, organization, department, \
+             must_change_password, failed_login_attempts, locked_until, created_by \
+             FROM users WHERE username = ?"
+        )
             .bind(username)
             .fetch_optional(&*self.db)
             .await?;
@@ -54,7 +59,12 @@ impl UserService for UserServiceImpl {
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<User>, ServiceError> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+        let user = sqlx::query_as::<_, User>(
+            "SELECT id, username, password_hash, is_active, created_at, updated_at, last_login_at, \
+             display_name, first_name, last_name, avatar, organization, department, \
+             must_change_password, failed_login_attempts, locked_until, created_by \
+             FROM users WHERE id = ?"
+        )
             .bind(id)
             .fetch_optional(&*self.db)
             .await?;
@@ -185,7 +195,10 @@ impl UserService for UserServiceImpl {
         let offset = offset.unwrap_or(0);
 
         let users = sqlx::query_as::<_, User>(
-            "SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, username, password_hash, is_active, created_at, updated_at, last_login_at, \
+             display_name, first_name, last_name, avatar, organization, department, \
+             must_change_password, failed_login_attempts, locked_until, created_by \
+             FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
         )
         .bind(limit)
         .bind(offset)

@@ -78,7 +78,11 @@ impl AuthCodeService for AuthCodeServiceImpl {
 
         // 2. Find the code in database
         let auth_code =
-            sqlx::query_as::<_, AuthCode>("SELECT * FROM authorization_codes WHERE code = ?")
+            sqlx::query_as::<_, AuthCode>(
+                "SELECT id, code, user_id, client_id, redirect_uri, scope, expires_at, \
+                 code_challenge, code_challenge_method, nonce, is_used, created_at \
+                 FROM authorization_codes WHERE code = ?"
+            )
                 .bind(code)
                 .fetch_optional(&mut *tx)
                 .await?
@@ -192,7 +196,11 @@ mod tests {
 
         let code = result.unwrap();
         let auth_code =
-            sqlx::query_as::<_, AuthCode>("SELECT * FROM authorization_codes WHERE code = ?")
+            sqlx::query_as::<_, AuthCode>(
+                "SELECT id, code, user_id, client_id, redirect_uri, scope, expires_at, \
+                 code_challenge, code_challenge_method, nonce, is_used, created_at \
+                 FROM authorization_codes WHERE code = ?"
+            )
                 .bind(&code)
                 .fetch_one(&*db)
                 .await

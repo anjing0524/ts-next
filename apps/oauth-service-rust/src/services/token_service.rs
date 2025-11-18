@@ -289,7 +289,9 @@ impl TokenService for TokenServiceImpl {
         // 2. Find the token in the database by its JTI and ensure it's valid
         let jti = claims.jti.clone();
         let stored_token = sqlx::query_as::<_, crate::models::refresh_token::RefreshToken>(
-            "SELECT * FROM refresh_tokens WHERE jti = ?",
+            "SELECT id, token, token_hash, jti, user_id, client_id, scope, expires_at, \
+             is_revoked, revoked_at, created_at, previous_token_id \
+             FROM refresh_tokens WHERE jti = ?",
         )
         .bind(&jti)
         .fetch_optional(&*self.db)
@@ -368,7 +370,9 @@ impl TokenService for TokenServiceImpl {
         // 3. If it might be a refresh token (check by JTI), see if it has been revoked.
         // This is a simplified check. A full implementation would distinguish token types more robustly.
         if let Some(stored_token) = sqlx::query_as::<_, crate::models::refresh_token::RefreshToken>(
-            "SELECT * FROM refresh_tokens WHERE jti = ?",
+            "SELECT id, token, token_hash, jti, user_id, client_id, scope, expires_at, \
+             is_revoked, revoked_at, created_at, previous_token_id \
+             FROM refresh_tokens WHERE jti = ?",
         )
         .bind(&claims.jti)
         .fetch_optional(&*self.db)
