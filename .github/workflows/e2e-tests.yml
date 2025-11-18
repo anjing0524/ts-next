@@ -61,10 +61,52 @@ jobs:
           DATABASE_URL="sqlite://test.db" sqlx database create
           sqlx migrate run
 
+      - name: 🦀 Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
       - name: 🌐 Install Playwright browsers
         run: |
           cd apps/admin-portal
           pnpm exec playwright install chromium
+
+      - name: 🚀 Start OAuth Service (Rust)
+        run: |
+          cd apps/oauth-service-rust
+          DATABASE_URL="sqlite://test.db" cargo build --release
+          DATABASE_URL="sqlite://test.db" cargo run --release &
+          echo $! > /tmp/oauth-service.pid
+          sleep 5
+
+      - name: 🚀 Start Admin Portal
+        run: |
+          cd apps/admin-portal
+          pnpm dev &
+          echo $! > /tmp/admin-portal.pid
+          sleep 5
+
+      - name: 🚀 Start Pingora Proxy
+        run: |
+          cd apps/pingora-proxy
+          cargo build --release
+          cargo run --release &
+          echo $! > /tmp/pingora.pid
+          sleep 3
+
+      - name: ✅ Health check services
+        run: |
+          echo "Checking OAuth Service..."
+          curl -f http://localhost:3001/api/v2/health || exit 1
+
+          echo "Checking Admin Portal..."
+          curl -f http://localhost:3002 || exit 1
+
+          echo "Checking Pingora Proxy..."
+          curl -f http://localhost:6188 || exit 1
+
+          echo "All services are healthy!"
 
       - name: 🧪 Run E2E tests
         run: |
@@ -72,6 +114,14 @@ jobs:
           pnpm test:e2e:ci
         env:
           PLAYWRIGHT_WORKERS: 1
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:6188
+
+      - name: 🛑 Stop services
+        if: always()
+        run: |
+          if [ -f /tmp/pingora.pid ]; then kill $(cat /tmp/pingora.pid) || true; fi
+          if [ -f /tmp/admin-portal.pid ]; then kill $(cat /tmp/admin-portal.pid) || true; fi
+          if [ -f /tmp/oauth-service.pid ]; then kill $(cat /tmp/oauth-service.pid) || true; fi
 
       - name: 📊 Upload test results
         if: always()
@@ -98,29 +148,32 @@ jobs:
           script: |
             const fs = require('fs');
             const path = 'apps/admin-portal/test-results.json';
-            
+
             if (fs.existsSync(path)) {
               const results = JSON.parse(fs.readFileSync(path, 'utf8'));
               const { stats } = results;
-              
+
               const passed = stats.expected || 0;
               const failed = stats.unexpected || 0;
               const skipped = stats.skipped || 0;
               const total = passed + failed + skipped;
-              
+
               const status = failed > 0 ? '❌ Failed' : '✅ Passed';
-              
+
               const comment = `## E2E Test Results ${status}
-              
+
               📊 **Test Summary:**
               - Total: ${total}
               - Passed: ${passed}
               - Failed: ${failed}
               - Skipped: ${skipped}
-              
+
               ${failed > 0 ? '⚠️ Some tests failed. Please check the test results for details.' : '🎉 All tests passed!'}
+
+              📁 **Artifacts:**
+              - Test results and screenshots are available in the workflow artifacts
               `;
-              
+
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
@@ -128,6 +181,86 @@ jobs:
                 body: comment
               });
             }
+
+      - name: 📧 Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ E2E Tests Failed - ${{ github.repository }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: "GitHub Actions <noreply@github.com>"
+          body: |
+            E2E tests failed in ${{ github.repository }}
+
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+
+            Workflow: ${{ github.workflow }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Please check the workflow logs and test results for details.
+          priority: high
+        continue-on-error: true
+
+      - name: 💬 Send Slack notification
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ E2E Tests Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ E2E Tests Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
 
   # 可选：性能测试作业
   performance-tests:
