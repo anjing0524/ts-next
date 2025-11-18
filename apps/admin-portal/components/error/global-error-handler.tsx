@@ -12,6 +12,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui';
 import { Button } from '@repo/ui';
 import { XCircle, RefreshCw, AlertTriangle, WifiOff } from 'lucide-react';
@@ -31,6 +32,18 @@ export function GlobalErrorHandler() {
   // 监听全局错误
   useEffect(() => {
     const handleUnhandledError = (event: ErrorEvent) => {
+      // 上报到 Sentry
+      Sentry.captureException(event.error || new Error(event.message), {
+        contexts: {
+          error_event: {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+          },
+        },
+      });
+
       addError({
         type: 'general',
         message: event.message || '发生未知错误',
@@ -40,7 +53,16 @@ export function GlobalErrorHandler() {
       });
     };
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) {
+      // 上报到 Sentry
+      Sentry.captureException(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), {
+        contexts: {
+          promise: {
+            reason: event.reason,
+          },
+        },
+      });
+
       addError({
         type: 'general',
         message: 'Promise 被拒绝',
