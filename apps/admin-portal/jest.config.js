@@ -22,17 +22,13 @@ const config = {
     '<rootDir>/components/**/*.{test,spec}.{js,jsx,ts,tsx}',
     '<rootDir>/hooks/**/*.{test,spec}.{js,jsx,ts,tsx}',
     '<rootDir>/lib/**/*.{test,spec}.{js,jsx,ts,tsx}',
-    '<rootDir>/features/**/*.{test,spec}.{js,jsx,ts,tsx}',
   ],
   collectCoverageFrom: [
     'components/**/*.{js,jsx,ts,tsx}',
     'hooks/**/*.{js,jsx,ts,tsx}',
     'lib/**/*.{js,jsx,ts,tsx}',
-    'features/**/*.{js,jsx,ts,tsx}',
     '!**/*.d.ts',
     '!**/node_modules/**',
-    '!**/*.test.{js,jsx,ts,tsx}',
-    '!**/*.spec.{js,jsx,ts,tsx}',
   ],
   coverageThreshold: {
     global: {

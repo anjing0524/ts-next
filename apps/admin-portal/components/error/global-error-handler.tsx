@@ -31,7 +31,7 @@ export function GlobalErrorHandler() {
 
   // 监听全局错误
   useEffect(() => {
-    const handleUnhandledError = (event: ErrorEvent) => {
+    const handleUnhandledError = (event) => {
       // 上报到 Sentry
       Sentry.captureException(event.error || new Error(event.message), {
         contexts: {
@@ -53,7 +53,7 @@ export function GlobalErrorHandler() {
       });
     };
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) {
+    const handleUnhandledRejection = (event) {
       // 上报到 Sentry
       Sentry.captureException(event.reason instanceof Error ? event.reason : new Error(String(event.reason)), {
         contexts: {
@@ -73,7 +73,7 @@ export function GlobalErrorHandler() {
     };
 
     // 监听认证错误
-    const handleAuthError = (event: CustomEvent) => {
+    const handleAuthError = (event) => {
       addError({
         type: 'auth',
         message: event.detail.message || '认证失败',
@@ -84,7 +84,7 @@ export function GlobalErrorHandler() {
     };
 
     // 监听网络错误
-    const handleNetworkError = (event: CustomEvent) => {
+    const handleNetworkError = (event) => {
       addError({
         type: 'network',
         message: event.detail.message || '网络连接失败',
@@ -95,7 +95,7 @@ export function GlobalErrorHandler() {
     };
 
     // 监听API错误
-    const handleApiError = (event: CustomEvent) => {
+    const handleApiError = (event) => {
       addError({
         type: 'api',
         message: event.detail.message || 'API 请求失败',
@@ -121,7 +121,7 @@ export function GlobalErrorHandler() {
   }, []);
 
   // 添加错误
-  const addError = (error: ErrorInfo) => {
+  const addError = (error) => {
     setErrors(prev => {
       // 限制错误数量，避免内存泄漏
       const newErrors = [...prev, error];
@@ -145,7 +145,7 @@ export function GlobalErrorHandler() {
   };
 
   // 重试操作
-  const retryError = (error: ErrorInfo) => {
+  const retryError = (error) => {
     // 根据错误类型执行不同的重试逻辑
     switch (error.type) {
       case 'auth':
