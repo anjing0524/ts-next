@@ -60,6 +60,15 @@ pub enum ServiceError {
 
     #[error("Password hashing error: {0}")]
     PasswordError(String),
+
+    #[error("Cache error: {0}")]
+    CacheError(String),
+}
+
+impl From<crate::cache::CacheError> for ServiceError {
+    fn from(err: crate::cache::CacheError) -> Self {
+        ServiceError::CacheError(err.to_string())
+    }
 }
 
 /// Errors related to authentication and authorization.
@@ -94,6 +103,7 @@ impl IntoResponse for AppError {
                 ServiceError::JwtError(msg) => (StatusCode::UNAUTHORIZED, msg),
                 ServiceError::PasswordError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
                 ServiceError::InvalidScope(msg) => (StatusCode::BAD_REQUEST, msg),
+                ServiceError::CacheError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             },
             AppError::Auth(auth_error) => match auth_error {
                 AuthError::InvalidCredentials | AuthError::InvalidToken => {

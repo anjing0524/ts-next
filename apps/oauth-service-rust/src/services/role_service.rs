@@ -405,6 +405,11 @@ impl RoleService for RoleServiceImpl {
         .await?;
 
         tx.commit().await?;
+
+        // CRITICAL FIX: Invalidate permission cache after role assignment
+        // This ensures user gets updated permissions immediately
+        self.permission_cache.invalidate(user_id).await?;
+
         Ok(())
     }
 
@@ -441,6 +446,11 @@ impl RoleService for RoleServiceImpl {
         .await?;
 
         tx.commit().await?;
+
+        // CRITICAL FIX: Invalidate permission cache after role removal
+        // This ensures user loses permissions immediately
+        self.permission_cache.invalidate(user_id).await?;
+
         Ok(())
     }
 

@@ -91,6 +91,101 @@ impl TokenServiceImpl {
             config,
         }
     }
+
+    /// Issue tokens within a database transaction (for atomicity)
+    /// This is a private helper method used by refresh_token to ensure atomic operations
+    async fn issue_tokens_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        client: &OAuthClientDetails,
+        user_id: Option<String>,
+        scope: String,
+        permissions: Vec<String>,
+        nonce: Option<String>,
+    ) -> Result<TokenPair, ServiceError> {
+        let encoding_key = self.config.load_encoding_key()?;
+        let now = Utc::now();
+        let access_token_ttl = client.client.access_token_ttl as u64;
+        let access_token_exp = now + Duration::seconds(access_token_ttl as i64);
+
+        let access_token_claims = TokenClaims {
+            sub: user_id.clone(),
+            client_id: client.client.client_id.clone(),
+            scope: scope.clone(),
+            permissions,
+            exp: access_token_exp.timestamp() as usize,
+            iat: now.timestamp() as usize,
+            jti: Uuid::new_v4().to_string(),
+        };
+
+        let access_token = jwt::generate_token(&access_token_claims, &encoding_key)?;
+
+        let mut issued_refresh_token: Option<String> = None;
+        let mut issued_id_token: Option<String> = None;
+
+        if let Some(uid) = user_id {
+            // Generate refresh token
+            let refresh_token_ttl = client.client.refresh_token_ttl as i64;
+            let refresh_token_exp = now + Duration::seconds(refresh_token_ttl);
+            let refresh_jti = Uuid::new_v4().to_string();
+
+            let refresh_token_claims = TokenClaims {
+                sub: Some(uid.clone()),
+                client_id: client.client.client_id.clone(),
+                scope: scope.clone(),
+                permissions: vec![], // Refresh tokens don't carry permissions
+                exp: refresh_token_exp.timestamp() as usize,
+                iat: now.timestamp() as usize,
+                jti: refresh_jti.clone(),
+            };
+
+            let refresh_token = jwt::generate_token(&refresh_token_claims, &encoding_key)?;
+            let refresh_token_hash = crate::utils::crypto::hash_password(&refresh_token)?;
+            let refresh_id = Uuid::new_v4().to_string();
+
+            // Insert refresh token within transaction
+            sqlx::query(
+                "INSERT INTO refresh_tokens (id, token, token_hash, jti, user_id, client_id, scope, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&refresh_id)
+            .bind(&refresh_token)
+            .bind(&refresh_token_hash)
+            .bind(&refresh_jti)
+            .bind(&uid)
+            .bind(&client.client.id)
+            .bind(&scope)
+            .bind(&refresh_token_exp)
+            .bind(&now)
+            .execute(&mut **tx)
+            .await?;
+
+            issued_refresh_token = Some(refresh_token);
+
+            // Generate ID Token if scope includes "openid"
+            if scope.contains("openid") {
+                let user = self.user_service.find_by_id(&uid).await?;
+                if let Some(user) = user {
+                    let id_token = jwt::generate_id_token(
+                        &user,
+                        &client.client.client_id,
+                        &scope,
+                        &self.config.issuer,
+                        nonce.as_deref(),
+                        &encoding_key,
+                        access_token_ttl,
+                    )?;
+                    issued_id_token = Some(id_token);
+                }
+            }
+        }
+
+        Ok(TokenPair {
+            access_token,
+            refresh_token: issued_refresh_token,
+            id_token: issued_id_token,
+            expires_in: access_token_ttl,
+        })
+    }
 }
 
 #[async_trait]
@@ -213,17 +308,7 @@ impl TokenService for TokenServiceImpl {
             ));
         }
 
-        // 3. Implement refresh token rotation: revoke the old token
-        let now = Utc::now();
-        sqlx::query(
-            "UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = ? WHERE id = ?",
-        )
-        .bind(&now)
-        .bind(&stored_token.id)
-        .execute(&*self.db)
-        .await?;
-
-        // 4. Issue a new access token and a new refresh token
+        // Get client and user info before starting transaction
         let client = self
             .client_service
             .find_by_client_id(&claims.client_id)
@@ -237,14 +322,34 @@ impl TokenService for TokenServiceImpl {
         })?;
         let permissions = self.rbac_service.get_user_permissions(&user_id).await?;
 
-        self.issue_tokens(
+        // 3. Use transaction to ensure atomicity: revoke old token and issue new tokens
+        let mut tx = self.db.begin().await?;
+
+        // Revoke the old token within transaction
+        let now = Utc::now();
+        sqlx::query(
+            "UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = ? WHERE id = ?",
+        )
+        .bind(&now)
+        .bind(&stored_token.id)
+        .execute(&mut *tx)
+        .await?;
+
+        // 4. Issue new tokens within transaction
+        let token_pair = self.issue_tokens_tx(
+            &mut tx,
             &client,
             Some(user_id),
             claims.scope,
             permissions,
             None, // No nonce for refresh token flow
         )
-        .await
+        .await?;
+
+        // Commit transaction - if this fails, everything rolls back
+        tx.commit().await?;
+
+        Ok(token_pair)
     }
 
     async fn introspect_token(&self, token: &str) -> Result<TokenClaims, ServiceError> {
