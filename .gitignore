@@ -105,3 +105,9 @@ apps/kline-service/wasm-cal/target/*
 .claude
 apps/zmq-log-server/target/*
 apps/oauth-service-rust/target/
+# OAuth Service Rust local files
+apps/oauth-service-rust/.env
+apps/oauth-service-rust/keys/
+apps/oauth-service-rust/*.db
+apps/oauth-service-rust/*.db-shm
+apps/oauth-service-rust/*.db-wal
