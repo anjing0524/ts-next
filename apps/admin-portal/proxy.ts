@@ -33,7 +33,7 @@ const securityHeaders = {
   'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
 };
 
-// 生成 CSP nonce（用于替代 unsafe-inline）
+// 生成 CSP nonce（用于替代不安全的内联脚本）
 function generateNonce(): string {
   // 生成 128 位（16 字节）随机 nonce，Base64 编码
   const array = new Uint8Array(16);
@@ -48,14 +48,14 @@ function generateNonce(): string {
   return Buffer.from(array).toString('base64');
 }
 
-// 内容安全策略（使用 nonce 替代 unsafe-inline）
+// 内容安全策略（使用 nonce 替代不安全的内联脚本）
 function getContentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'self'",
-    // script-src: 移除 unsafe-inline 和 unsafe-eval，使用 nonce
+    // script-src: 移除所有不安全的内联和 eval 指令，使用 nonce
     // 保留 'self' 用于加载外部脚本文件
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    // style-src: 移除 unsafe-inline，使用 nonce
+    // style-src: 移除所有不安全的内联指令，使用 nonce
     // 保留 'self' 用于加载外部样式文件
     `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' data: https:",
