@@ -11,6 +11,7 @@ import { ErrorBoundary } from '../components/error/ErrorBoundary';
 import { PerformanceMonitorToggle } from '../components/performance/performance-monitor';
 import { SecurityEnhancer } from '../components/security/security-enhancer';
 import { ToastProvider } from '../components/common/toast';
+import { WebVitalsReporter } from '../lib/analytics/web-vitals';
 import { authService } from '../lib/auth-service';
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
               <GlobalErrorHandler />
               <PerformanceMonitorToggle />
               <SecurityEnhancer />
+              <WebVitalsReporter />
               <Toaster />
             </AuthProvider>
           </ToastProvider>
