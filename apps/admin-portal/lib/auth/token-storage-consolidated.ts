@@ -20,19 +20,58 @@ import { EnhancedTokenStorage } from './enhanced-token-storage';
 // SSR-safe wrapper for EnhancedTokenStorage
 export class TokenStorage {
   // Proxy all methods with SSR safety checks
-  static setTokens = EnhancedTokenStorage.setTokens;
-  static getAccessToken = EnhancedTokenStorage.getAccessToken;
-  static getRefreshToken = EnhancedTokenStorage.getRefreshToken;
-  static getCSRFToken = EnhancedTokenStorage.getCSRFToken;
-  static clearTokens = EnhancedTokenStorage.clearTokens;
-  static isTokenExpired = EnhancedTokenStorage.isTokenExpired;
-  static getTokenRemainingTime = EnhancedTokenStorage.getTokenRemainingTime;
-  static getTokenExpiresAt = EnhancedTokenStorage.getTokenExpiresAt;
-  static setTokenExpiresAt = EnhancedTokenStorage.setTokenExpiresAt;
-  static generateCSRFToken = EnhancedTokenStorage.generateCSRFToken;
-  static validateCSRFToken = EnhancedTokenStorage.validateCSRFToken;
-  static isCookieStorageAvailable = EnhancedTokenStorage.isCookieStorageAvailable;
-  static getAllTokens = EnhancedTokenStorage.getAllTokens;
+  // Using wrapper functions to preserve 'this' context
+  static setTokens(...args: Parameters<typeof EnhancedTokenStorage.setTokens>) {
+    return EnhancedTokenStorage.setTokens(...args);
+  }
+
+  static getAccessToken() {
+    return EnhancedTokenStorage.getAccessToken();
+  }
+
+  static getRefreshToken() {
+    return EnhancedTokenStorage.getRefreshToken();
+  }
+
+  static getCSRFToken() {
+    return EnhancedTokenStorage.getCSRFToken();
+  }
+
+  static clearTokens() {
+    return EnhancedTokenStorage.clearTokens();
+  }
+
+  static isTokenExpired() {
+    return EnhancedTokenStorage.isTokenExpired();
+  }
+
+  static getTokenRemainingTime() {
+    return EnhancedTokenStorage.getTokenRemainingTime();
+  }
+
+  static getTokenExpiresAt() {
+    return EnhancedTokenStorage.getTokenExpiresAt();
+  }
+
+  static setTokenExpiresAt(...args: Parameters<typeof EnhancedTokenStorage.setTokenExpiresAt>) {
+    return EnhancedTokenStorage.setTokenExpiresAt(...args);
+  }
+
+  static generateCSRFToken() {
+    return EnhancedTokenStorage.generateCSRFToken();
+  }
+
+  static validateCSRFToken(...args: Parameters<typeof EnhancedTokenStorage.validateCSRFToken>) {
+    return EnhancedTokenStorage.validateCSRFToken(...args);
+  }
+
+  static isCookieStorageAvailable() {
+    return EnhancedTokenStorage.isCookieStorageAvailable();
+  }
+
+  static getAllTokens() {
+    return EnhancedTokenStorage.getAllTokens();
+  }
 
   // SSR-safe initialization
   static isSSR(): boolean {

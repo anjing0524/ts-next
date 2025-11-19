@@ -31,6 +31,10 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
    * Tests the full authentication process from protected route access to dashboard
    */
   test('Scenario 1: Complete OAuth flow with valid credentials', async ({ page }) => {
+    // Listen for console messages and errors
+    page.on('console', (msg) => console.log(`BROWSER ${msg.type()}: ${msg.text()}`));
+    page.on('pageerror', (err) => console.log(`PAGE ERROR: ${err.message}`));
+
     // Step 1: Access protected route
     await page.goto(`${baseUrl}${protectedRoute}`);
 
@@ -55,10 +59,15 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
 
         await usernameInput.fill(testUsername);
         await passwordInput.fill(testPassword);
-        await loginButton.click();
 
-        // Wait for login processing
-        await page.waitForURL(/.*/, { timeout: 5000 });
+        // Wait for login response and navigation
+        // The OAuth flow involves: form submit → auth → redirect → authorize → callback
+        const navigationPromise = page.waitForNavigation({ timeout: 30000 });
+        await loginButton.click();
+        await navigationPromise;
+
+        // Wait additional time for OAuth redirects to complete
+        await page.waitForTimeout(2000);
       });
     }
 
