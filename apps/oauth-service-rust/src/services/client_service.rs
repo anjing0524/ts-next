@@ -424,7 +424,7 @@ impl ClientService for ClientServiceImpl {
     }
 
     async fn get_internal_client(&self) -> Result<OAuthClientDetails, ServiceError> {
-        self.find_by_client_id("admin-portal-client")
+        self.find_by_client_id("auth-center-admin-client")
             .await?
             .ok_or_else(|| {
                 ServiceError::NotFound(
