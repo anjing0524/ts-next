@@ -118,7 +118,11 @@ impl TokenServiceImpl {
             jti: Uuid::new_v4().to_string(),
         };
 
-        let access_token = jwt::generate_token(&access_token_claims, &encoding_key)?;
+        let access_token = jwt::generate_token_with_algorithm(
+            &access_token_claims,
+            &encoding_key,
+            self.config.jwt_algorithm,
+        )?;
 
         let mut issued_refresh_token: Option<String> = None;
         let mut issued_id_token: Option<String> = None;
@@ -139,7 +143,11 @@ impl TokenServiceImpl {
                 jti: refresh_jti.clone(),
             };
 
-            let refresh_token = jwt::generate_token(&refresh_token_claims, &encoding_key)?;
+            let refresh_token = jwt::generate_token_with_algorithm(
+                &refresh_token_claims,
+                &encoding_key,
+                self.config.jwt_algorithm,
+            )?;
             let refresh_token_hash = crate::utils::crypto::hash_password(&refresh_token)?;
             let refresh_id = Uuid::new_v4().to_string();
 
@@ -165,7 +173,7 @@ impl TokenServiceImpl {
             if scope.contains("openid") {
                 let user = self.user_service.find_by_id(&uid).await?;
                 if let Some(user) = user {
-                    let id_token = jwt::generate_id_token(
+                    let id_token = jwt::generate_id_token_with_algorithm(
                         &user,
                         &client.client.client_id,
                         &scope,
@@ -173,6 +181,7 @@ impl TokenServiceImpl {
                         nonce.as_deref(),
                         &encoding_key,
                         access_token_ttl,
+                        self.config.jwt_algorithm,
                     )?;
                     issued_id_token = Some(id_token);
                 }
@@ -213,7 +222,11 @@ impl TokenService for TokenServiceImpl {
             jti: Uuid::new_v4().to_string(),
         };
 
-        let access_token = jwt::generate_token(&access_token_claims, &encoding_key)?;
+        let access_token = jwt::generate_token_with_algorithm(
+            &access_token_claims,
+            &encoding_key,
+            self.config.jwt_algorithm,
+        )?;
 
         let mut issued_refresh_token: Option<String> = None;
         let mut issued_id_token: Option<String> = None;
@@ -234,7 +247,11 @@ impl TokenService for TokenServiceImpl {
                 jti: refresh_jti.clone(),
             };
 
-            let refresh_token = jwt::generate_token(&refresh_token_claims, &encoding_key)?;
+            let refresh_token = jwt::generate_token_with_algorithm(
+                &refresh_token_claims,
+                &encoding_key,
+                self.config.jwt_algorithm,
+            )?;
             let refresh_token_hash = crate::utils::crypto::hash_password(&refresh_token)?;
             let refresh_id = Uuid::new_v4().to_string();
 
@@ -259,7 +276,7 @@ impl TokenService for TokenServiceImpl {
             if scope.contains("openid") {
                 let user = self.user_service.find_by_id(&uid).await?;
                 if let Some(user) = user {
-                    let id_token = jwt::generate_id_token(
+                    let id_token = jwt::generate_id_token_with_algorithm(
                         &user,
                         &client.client.client_id,
                         &scope,
@@ -267,6 +284,7 @@ impl TokenService for TokenServiceImpl {
                         nonce.as_deref(),
                         &encoding_key,
                         access_token_ttl,
+                        self.config.jwt_algorithm,
                     )?;
                     issued_id_token = Some(id_token);
                 }
