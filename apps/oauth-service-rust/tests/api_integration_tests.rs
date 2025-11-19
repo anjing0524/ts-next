@@ -10,6 +10,7 @@ use axum::{
 };
 use oauth_service_rust::{
     app::create_app,
+    cache::permission_cache::InMemoryPermissionCache,
     config::Config,
     models::permission::PermissionType,
     services::{
@@ -28,11 +29,12 @@ use uuid::Uuid;
 
 // Helper function to create a user, assign a role with permissions, and get an access token
 async fn create_test_user_and_token(pool: Arc<SqlitePool>, config: Arc<Config>) -> String {
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
-    let role_service = Arc::new(RoleServiceImpl::new(pool.clone()));
+    let role_service = Arc::new(RoleServiceImpl::new(pool.clone(), permission_cache.clone()));
     let permission_service = Arc::new(PermissionServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
 
     // Create user directly using sqlx
     let user_id = Uuid::new_v4().to_string();

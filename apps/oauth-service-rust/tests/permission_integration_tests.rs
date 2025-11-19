@@ -3,9 +3,12 @@
 //! 测试 RBAC (基于角色的访问控制) 系统
 //! 包括权限检查、角色分配等功能
 
-use oauth_service_rust::services::{
-    rbac_service::{RBACService, RBACServiceImpl},
-    role_service::{RoleService, RoleServiceImpl},
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    services::{
+        rbac_service::{RBACService, RBACServiceImpl},
+        role_service::{RoleService, RoleServiceImpl},
+    },
 };
 use std::sync::Arc;
 
@@ -25,8 +28,9 @@ async fn setup_rbac_services() -> (
         .expect("Failed to run initial schema migration");
 
     let pool = Arc::new(pool);
-    let role_service = Arc::new(RoleServiceImpl::new(pool.clone())) as Arc<dyn RoleService>;
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone())) as Arc<dyn RBACService>;
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let role_service = Arc::new(RoleServiceImpl::new(pool.clone(), permission_cache.clone())) as Arc<dyn RoleService>;
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache)) as Arc<dyn RBACService>;
 
     (role_service, rbac_service, pool)
 }

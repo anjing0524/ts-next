@@ -33,21 +33,40 @@ const securityHeaders = {
   'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
 };
 
-// 内容安全策略
-const contentSecurityPolicy = {
-  default: "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-  dashboard: [
+// 生成 CSP nonce（用于替代不安全的内联脚本）
+function generateNonce(): string {
+  // 生成 128 位（16 字节）随机 nonce，Base64 编码
+  const array = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(array);
+  } else {
+    // Fallback for environments without crypto.getRandomValues
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Buffer.from(array).toString('base64');
+}
+
+// 内容安全策略（使用 nonce 替代不安全的内联脚本）
+function getContentSecurityPolicy(nonce: string): string {
+  return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
+    // script-src: 移除所有不安全的内联和 eval 指令，使用 nonce
+    // 保留 'self' 用于加载外部脚本文件
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // style-src: 移除所有不安全的内联指令，使用 nonce
+    // 保留 'self' 用于加载外部样式文件
+    `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' data: https:",
-    "font-src 'self'",
+    "font-src 'self' data:",
     "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
-    "form-action 'self'"
-  ].join('; '),
-};
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join('; ');
+}
 
 // 简单JWT解析（仅Base64解码，不校验签名，仅用于代理权限判断）
 function parseJwt(token: string): any {
@@ -71,19 +90,22 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
-// 设置安全头部
-function setSecurityHeaders(response: NextResponse): NextResponse {
+// 设置安全头部（包含 CSP nonce）
+function setSecurityHeaders(response: NextResponse, nonce: string): NextResponse {
   Object.entries(securityHeaders).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
 
-  // 内容安全策略
-  response.headers.set('Content-Security-Policy', contentSecurityPolicy.dashboard);
+  // 内容安全策略（使用 nonce）
+  response.headers.set('Content-Security-Policy', getContentSecurityPolicy(nonce));
 
   // 严格传输安全（生产环境）
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
+
+  // 将 nonce 存储在自定义头部中，供页面使用
+  response.headers.set('X-CSP-Nonce', nonce);
 
   return response;
 }
@@ -153,6 +175,9 @@ async function initiateOAuthFlow(request: NextRequest, redirectPath: string): Pr
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 为每个请求生成唯一的 CSP nonce
+  const nonce = generateNonce();
+
   // 跳过静态资源和某些API路由
   if (pathname.startsWith('/_next') || pathname.startsWith('/api/auth/secure')) {
     return NextResponse.next();
@@ -161,7 +186,7 @@ export async function proxy(request: NextRequest) {
   // 处理API安全路由
   if (pathname.startsWith('/api/auth/')) {
     let response = NextResponse.next();
-    response = setSecurityHeaders(response);
+    response = setSecurityHeaders(response, nonce);
     return response;
   }
 
@@ -214,9 +239,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(adminUrl);
   }
 
-  // 为所有响应添加安全头部
+  // 为所有响应添加安全头部（包含 CSP nonce）
   let response = NextResponse.next();
-  response = setSecurityHeaders(response);
+  response = setSecurityHeaders(response, nonce);
 
   // 为GET请求设置CSRF令牌
   if (request.method === 'GET') {

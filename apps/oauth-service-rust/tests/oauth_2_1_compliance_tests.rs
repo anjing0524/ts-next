@@ -4,14 +4,19 @@
 //! - RFC Draft: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-09
 //! - 关键安全需求: PKCE强制、重定向URI验证、作用域限制
 
-use oauth_service_rust::routes::clients::CreateClientRequest;
-use oauth_service_rust::routes::oauth::AuthorizeRequest;
-use oauth_service_rust::services::{
-    auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
-    client_service::{ClientService, ClientServiceImpl},
-    rbac_service::RBACServiceImpl,
-    token_service::{TokenService, TokenServiceImpl},
-    user_service::UserServiceImpl,
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    routes::{
+        clients::CreateClientRequest,
+        oauth::AuthorizeRequest,
+    },
+    services::{
+        auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
+        client_service::{ClientService, ClientServiceImpl},
+        rbac_service::RBACServiceImpl,
+        token_service::{TokenService, TokenServiceImpl},
+        user_service::UserServiceImpl,
+    },
 };
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -154,13 +159,14 @@ async fn test_authorization_code_can_only_be_used_once() {
     let pool = Arc::new(setup_test_db().await);
     create_test_user(&pool, "user_456", "testuser2").await;
 
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
         pool.clone(),
         client_service.clone(),
     ));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
 
     // 1. 创建客户端
     let request = CreateClientRequest {

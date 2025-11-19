@@ -2,14 +2,19 @@
 //!
 //! 测试 PKCE 流程、令牌生成、刷新和验证
 
-use oauth_service_rust::routes::clients::CreateClientRequest;
-use oauth_service_rust::routes::oauth::AuthorizeRequest;
-use oauth_service_rust::services::{
-    auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
-    client_service::{ClientService, ClientServiceImpl},
-    rbac_service::RBACServiceImpl,
-    token_service::{TokenService, TokenServiceImpl},
-    user_service::UserServiceImpl,
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    routes::{
+        clients::CreateClientRequest,
+        oauth::AuthorizeRequest,
+    },
+    services::{
+        auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
+        client_service::{ClientService, ClientServiceImpl},
+        rbac_service::RBACServiceImpl,
+        token_service::{TokenService, TokenServiceImpl},
+        user_service::UserServiceImpl,
+    },
 };
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -286,7 +291,8 @@ async fn test_refresh_token_generates_new_access_token() {
 
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),
@@ -360,7 +366,8 @@ async fn test_refresh_token_with_invalid_token() {
     let pool = Arc::new(setup_test_db().await);
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),
@@ -396,7 +403,8 @@ async fn test_token_introspection_with_valid_token() {
 
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),
@@ -463,7 +471,8 @@ async fn test_token_introspection_claims_structure() {
 
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),
@@ -537,7 +546,8 @@ async fn test_token_pair_structure() {
 
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),
@@ -607,7 +617,8 @@ async fn test_client_credentials_flow_no_refresh_token() {
 
     let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
     let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone()));
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
     let config = Arc::new(oauth_service_rust::config::Config {
         database_url: "file::memory:".to_string(),
         jwt_private_key_path: "".to_string(),

@@ -134,6 +134,7 @@ impl RBACService for RBACServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::permission_cache::InMemoryPermissionCache;
     use sqlx::SqlitePool;
     use uuid::Uuid;
 
@@ -303,7 +304,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_no_roles() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db);
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db, permission_cache);
 
         let user_id = "user_with_no_roles";
         let permissions = service.get_user_permissions(user_id).await.unwrap();
@@ -314,7 +316,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_one_role_one_permission() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user1";
         let perm_id = create_permission(&db, "user:read", "api").await;
@@ -333,7 +336,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_one_role_multiple_permissions() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user2";
         let perm1_id = create_permission(&db, "user:read", "api").await;
@@ -358,7 +362,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_multiple_roles() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user3";
 
@@ -394,7 +399,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_role_without_permissions() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user4";
         let role_id = create_role(&db, "empty_role").await;
@@ -410,7 +416,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_nonexistent_user() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db);
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db, permission_cache);
 
         let permissions = service
             .get_user_permissions("nonexistent_user")
@@ -423,7 +430,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_different_permission_types() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user5";
 
@@ -451,7 +459,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_permissions_duplicate_permissions_across_roles() {
         let db = Arc::new(setup_test_db().await);
-        let service = RBACServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RBACServiceImpl::new(db.clone(), permission_cache);
 
         let user_id = "user6";
 

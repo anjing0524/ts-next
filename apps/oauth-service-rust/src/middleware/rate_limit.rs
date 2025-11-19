@@ -78,7 +78,9 @@ impl RateLimiter {
 /// Rate limiting 中间件
 ///
 /// 从 ConnectInfo 中提取 IP 地址进行限流
+/// SECURITY FIX: Now uses shared RateLimiter from AppState instead of creating new instance per request
 pub async fn rate_limit_middleware(
+    axum::extract::State(state): axum::extract::State<Arc<crate::state::AppState>>,
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
@@ -89,13 +91,11 @@ pub async fn rate_limit_middleware(
         .map(|ci| ci.0)
         .unwrap_or_else(|| ([127, 0, 0, 1], 0).into());
 
-    // 简化版本：直接使用全局限制
-    // 实际生产环境应该从 app state 获取配置
-    let rate_limiter = RateLimiter::new(100, 60); // 100 req/min
-
     let key = addr.ip().to_string();
 
-    if !rate_limiter.check_rate_limit(&key).await {
+    // CRITICAL FIX: Use shared rate limiter from AppState
+    // Previously created new instance per request, making rate limiting ineffective
+    if !state.rate_limiter.check_rate_limit(&key).await {
         return Err((
             StatusCode::TOO_MANY_REQUESTS,
             "Rate limit exceeded. Please try again later.".to_string(),

@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::error::AppError;
+use crate::middleware::rate_limit::RateLimiter;
 use crate::services::{
     auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
     client_service::{ClientService, ClientServiceImpl},
@@ -23,6 +24,7 @@ pub struct AppState {
     pub permission_service: Arc<dyn PermissionService>,
     pub role_service: Arc<dyn RoleService>,
     pub permission_cache: Arc<dyn PermissionCache>,
+    pub rate_limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -38,6 +40,9 @@ impl AppState {
 
         // Initialize cache with 1000 user capacity
         let permission_cache = Arc::new(InMemoryPermissionCache::with_capacity(1000));
+
+        // Initialize rate limiter (100 req/min per IP)
+        let rate_limiter = Arc::new(RateLimiter::new(100, 60));
 
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(db_pool.clone()));
@@ -66,6 +71,7 @@ impl AppState {
             permission_service,
             role_service,
             permission_cache,
+            rate_limiter,
         })
     }
 
@@ -76,6 +82,9 @@ impl AppState {
     ) -> Result<Self, AppError> {
         // Initialize cache with 1000 user capacity
         let permission_cache = Arc::new(InMemoryPermissionCache::with_capacity(1000));
+
+        // Initialize rate limiter (100 req/min per IP)
+        let rate_limiter = Arc::new(RateLimiter::new(100, 60));
 
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
@@ -104,6 +113,7 @@ impl AppState {
             permission_service,
             role_service,
             permission_cache,
+            rate_limiter,
         })
     }
 }

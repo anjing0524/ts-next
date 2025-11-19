@@ -35,7 +35,6 @@
     "@commitlint/config-conventional": "^19.7.1",
     "@eslint/eslintrc": "^3.1.0",
     "@eslint/js": "^9.1.0",
-    "@playwright/test": "^1.53.1",
     "@prisma/client": "^6.13.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/jest-config": "workspace:*",

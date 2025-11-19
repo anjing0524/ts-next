@@ -123,7 +123,10 @@ impl RoleService for RoleServiceImpl {
     }
 
     async fn find_role_by_id(&self, role_id: &str) -> Result<Option<Role>, ServiceError> {
-        let role = sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE id = ?")
+        let role = sqlx::query_as::<_, Role>(
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles WHERE id = ?"
+        )
             .bind(role_id)
             .fetch_optional(&*self.db)
             .await?;
@@ -132,7 +135,10 @@ impl RoleService for RoleServiceImpl {
     }
 
     async fn find_role_by_name(&self, name: &str) -> Result<Option<Role>, ServiceError> {
-        let role = sqlx::query_as::<_, Role>("SELECT * FROM roles WHERE name = ?")
+        let role = sqlx::query_as::<_, Role>(
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles WHERE name = ?"
+        )
             .bind(name)
             .fetch_optional(&*self.db)
             .await?;
@@ -149,7 +155,8 @@ impl RoleService for RoleServiceImpl {
         let offset = offset.unwrap_or(0);
 
         let roles = sqlx::query_as::<_, Role>(
-            "SELECT * FROM roles ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, name, display_name, description, is_system_role, is_active, \
+             created_at, updated_at FROM roles ORDER BY created_at DESC LIMIT ? OFFSET ?",
         )
         .bind(limit)
         .bind(offset)
@@ -405,6 +412,11 @@ impl RoleService for RoleServiceImpl {
         .await?;
 
         tx.commit().await?;
+
+        // CRITICAL FIX: Invalidate permission cache after role assignment
+        // This ensures user gets updated permissions immediately
+        self.permission_cache.invalidate(user_id).await?;
+
         Ok(())
     }
 
@@ -441,6 +453,11 @@ impl RoleService for RoleServiceImpl {
         .await?;
 
         tx.commit().await?;
+
+        // CRITICAL FIX: Invalidate permission cache after role removal
+        // This ensures user loses permissions immediately
+        self.permission_cache.invalidate(user_id).await?;
+
         Ok(())
     }
 
@@ -461,6 +478,7 @@ impl RoleService for RoleServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::permission_cache::InMemoryPermissionCache;
     use crate::models::permission::PermissionType;
     use sqlx::SqlitePool;
 
@@ -566,7 +584,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_role() {
         let db = Arc::new(setup_test_db().await);
-        let service = RoleServiceImpl::new(db);
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RoleServiceImpl::new(db, permission_cache);
 
         let role = service
             .create_role("admin".to_string(), Some("Administrator role".to_string()))
@@ -580,7 +599,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_duplicate_role() {
         let db = Arc::new(setup_test_db().await);
-        let service = RoleServiceImpl::new(db);
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RoleServiceImpl::new(db, permission_cache);
 
         service
             .create_role("admin".to_string(), Some("Administrator role".to_string()))
@@ -598,7 +618,8 @@ mod tests {
     #[tokio::test]
     async fn test_assign_permissions_to_role() {
         let db = Arc::new(setup_test_db().await);
-        let service = RoleServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RoleServiceImpl::new(db.clone(), permission_cache);
 
         // 创建角色和权限
         let role = service
@@ -618,7 +639,7 @@ mod tests {
         .bind("user:read") // display_name
         .bind("user")      // resource
         .bind("read")      // action
-        .bind(PermissionType::API.to_string())
+        .bind("API")       // Use string literal instead of enum
         .execute(&*db)
         .await
         .unwrap();
@@ -631,7 +652,7 @@ mod tests {
         .bind("user:write") // display_name
         .bind("user")       // resource
         .bind("write")      // action
-        .bind(PermissionType::API.to_string())
+        .bind("API")        // Use string literal instead of enum
         .execute(&*db)
         .await
         .unwrap();
@@ -652,7 +673,8 @@ mod tests {
     #[tokio::test]
     async fn test_assign_role_to_user() {
         let db = Arc::new(setup_test_db().await);
-        let service = RoleServiceImpl::new(db.clone());
+        let permission_cache = Arc::new(InMemoryPermissionCache::new());
+        let service = RoleServiceImpl::new(db.clone(), permission_cache);
 
         // 创建角色和用户
         let role = service

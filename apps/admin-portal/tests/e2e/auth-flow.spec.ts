@@ -31,34 +31,103 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
    * Tests the full authentication process from protected route access to dashboard
    */
   test('Scenario 1: Complete OAuth flow with valid credentials', async ({ page }) => {
+    // ===== DEBUG: Network Request Monitoring =====
+    const requests: string[] = [];
+    const responses: string[] = [];
+
+    page.on('request', (request) => {
+      const url = request.url();
+      const method = request.method();
+      console.log(`→ REQUEST: ${method} ${url}`);
+      requests.push(`${method} ${url}`);
+    });
+
+    page.on('response', (response) => {
+      const url = response.url();
+      const status = response.status();
+      console.log(`← RESPONSE: ${status} ${url}`);
+      responses.push(`${status} ${url}`);
+    });
+
+    page.on('console', (msg) => console.log(`BROWSER ${msg.type()}: ${msg.text()}`));
+    page.on('pageerror', (err) => console.log(`PAGE ERROR: ${err.message}`));
+
     // Step 1: Access protected route
     await page.goto(`${baseUrl}${protectedRoute}`);
 
-    // Verify: Should NOT immediately redirect to /login
-    // Instead, middleware initiates OAuth authorize
-    // OAuth Service might require login, so we expect to see login page
-    // (but it should come from OAuth Service redirect, not middleware)
-
     // Wait for redirect chain to settle
-    await page.waitForURL(/.*/, { timeout: 5000 });
+    await page.waitForLoadState('domcontentloaded');
 
-    // Step 2: Fill login form (if we reached login page)
     const currentUrl = page.url();
     console.log(`Current URL after initial request: ${currentUrl}`);
 
-    // If redirected to login, complete the login
+    // Step 2: Fill login form (if we reached login page)
     if (currentUrl.includes('/login')) {
       await test.step('Fill credentials and submit login', async () => {
+        // Wait for login page to stabilize (one load event should be enough)
+        await page.waitForLoadState('load');
+
+        // Give React time to hydrate
+        await page.waitForTimeout(1000);
+
         const usernameInput = page.getByTestId('username-input');
         const passwordInput = page.getByTestId('password-input');
         const loginButton = page.getByTestId('login-button');
 
+        // Ensure elements are visible before interacting
+        await expect(usernameInput).toBeVisible();
+        await expect(passwordInput).toBeVisible();
+        await expect(loginButton).toBeVisible();
+
         await usernameInput.fill(testUsername);
         await passwordInput.fill(testPassword);
+
+        console.log('✓ Form filled, waiting for login POST request...');
+
+        // ===== CRITICAL FIX: Wait for the actual login API response =====
+        const loginResponsePromise = page.waitForResponse(
+          (response) => {
+            const isLoginEndpoint = response.url().includes('/api/v2/auth/login');
+            const isPost = response.request().method() === 'POST';
+            if (isLoginEndpoint) {
+              console.log(`✓ Login POST detected: ${response.status()}`);
+            }
+            return isLoginEndpoint && isPost;
+          },
+          { timeout: 30000 }
+        );
+
+        // Click the button
+        console.log('Clicking login button...');
         await loginButton.click();
 
-        // Wait for login processing
-        await page.waitForURL(/.*/, { timeout: 5000 });
+        // Wait for login response
+        try {
+          const loginResponse = await loginResponsePromise;
+          const loginStatus = loginResponse.status();
+          console.log(`Login response status: ${loginStatus}`);
+
+          if (loginStatus !== 200) {
+            const responseBody = await loginResponse.text();
+            console.error(`Login failed with status ${loginStatus}: ${responseBody}`);
+            throw new Error(`Login failed: ${loginStatus}`);
+          }
+
+          // Wait for redirect after successful login
+          await page.waitForURL((url) => {
+            const urlStr = url.toString();
+            const isCallback = urlStr.includes('/auth/callback');
+            const isAdmin = urlStr.includes('/admin');
+            console.log(`Waiting for redirect, current: ${urlStr}`);
+            return isCallback || isAdmin;
+          }, { timeout: 30000 });
+
+          console.log('✓ Login successful, OAuth redirects completed');
+        } catch (error) {
+          console.error('Login failed:', error);
+          console.error('No POST /api/v2/auth/login request detected - form submission issue!');
+          throw error;
+        }
       });
     }
 

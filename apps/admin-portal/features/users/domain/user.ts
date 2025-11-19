@@ -26,8 +26,8 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// 为“更新用户”的表单/API输入创建 Zod 验证 Schema
-// 字段应与 prisma.schema 中的 User 模型对应
+// 为"更新用户"的表单/API输入创建 Zod 验证 Schema
+// 字段对应 OAuth Service Rust 的 User 模型
 export const UpdateUserSchema = z.object({
   displayName: z.string().min(1, '显示名称不能为空').optional(),
   firstName: z.string().optional(),

@@ -2,12 +2,15 @@
 //!
 //! 测试权限的创建、分配和检索功能。
 
-use oauth_service_rust::error::ServiceError;
-use oauth_service_rust::models::permission::PermissionType;
-use oauth_service_rust::services::{
-    permission_service::{PermissionService, PermissionServiceImpl},
-    rbac_service::{RBACService, RBACServiceImpl},
-    role_service::{RoleService, RoleServiceImpl},
+use oauth_service_rust::{
+    cache::permission_cache::InMemoryPermissionCache,
+    error::ServiceError,
+    models::permission::PermissionType,
+    services::{
+        permission_service::{PermissionService, PermissionServiceImpl},
+        rbac_service::{RBACService, RBACServiceImpl},
+        role_service::{RoleService, RoleServiceImpl},
+    },
 };
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -29,8 +32,9 @@ async fn setup_rbac_services() -> (
         .expect("Failed to run initial schema migration");
 
     let pool = Arc::new(pool);
-    let role_service = Arc::new(RoleServiceImpl::new(pool.clone())) as Arc<dyn RoleService>;
-    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone())) as Arc<dyn RBACService>;
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let role_service = Arc::new(RoleServiceImpl::new(pool.clone(), permission_cache.clone())) as Arc<dyn RoleService>;
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache)) as Arc<dyn RBACService>;
     let permission_service =
         Arc::new(PermissionServiceImpl::new(pool.clone())) as Arc<dyn PermissionService>;
 
