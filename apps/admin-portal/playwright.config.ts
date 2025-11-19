@@ -58,7 +58,24 @@ export default defineConfig({
     // Chrome桌面端
     {
       name: 'Desktop Chrome',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Chromium 启动参数 - 解决 headless 模式崩溃问题
+        launchOptions: {
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // 单进程模式（适用于容器环境）
+            '--disable-blink-features=AutomationControlled',
+          ],
+        },
+      },
     },
   ],
 

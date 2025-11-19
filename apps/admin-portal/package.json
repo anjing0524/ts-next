@@ -61,7 +61,7 @@
     "@babel/preset-typescript": "^7.27.1",
     "@faker-js/faker": "^9.9.0",
     "@next/codemod": "^16.0.0",
-    "@playwright/test": "^1.48.0",
+    "@playwright/test": "^1.55.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/jest-config": "workspace:*",
     "@repo/next-config": "workspace:*",
