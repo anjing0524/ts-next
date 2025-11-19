@@ -24,6 +24,13 @@ Sentry.init({
   replaysSessionSampleRate: 0.1, // 10% 的正常会话
   replaysOnErrorSampleRate: 1.0, // 100% 的错误会话
 
+  // 性能追踪传播目标（Sentry v10+ 顶层配置）
+  tracePropagationTargets: [
+    'localhost',
+    /^https:\/\/[^/]*\.yourdomain\.com/,
+    /^\/api\//,
+  ],
+
   // 集成配置
   integrations: [
     // Sentry.replayIntegration({
@@ -31,14 +38,7 @@ Sentry.init({
     //   maskAllText: true, // 掩盖所有文本（隐私保护）
     //   blockAllMedia: true, // 阻止所有媒体
     // }),
-    Sentry.browserTracingIntegration({
-      // 性能追踪配置
-      tracePropagationTargets: [
-        'localhost',
-        /^https:\/\/[^/]*\.yourdomain\.com/,
-        /^\/api\//,
-      ],
-    }),
+    Sentry.browserTracingIntegration(),
   ],
 
   // 在发送到 Sentry 前过滤敏感数据

@@ -53,10 +53,21 @@ logs/
 *.log
 dev-debug.log
 
-# rust/wasm
-**/wasm-cal/target/
-**/wasm-cal/install.sh
+# Rust 构建产物（所有 Rust 项目）
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# WASM 构建产物
 **/wasm-cal/pkg/
+**/wasm-cal/install.sh
+
+# OAuth Service Rust 本地文件
+apps/oauth-service-rust/.env
+apps/oauth-service-rust/keys/
+apps/oauth-service-rust/*.db
+apps/oauth-service-rust/*.db-shm
+apps/oauth-service-rust/*.db-wal
 
 # editor directories and files
 .idea/
@@ -76,38 +87,16 @@ Thumbs.db
 tasks.json
 tasks/
 
+# generated files
+lib/generated/prisma/
+packages/**/dist
+
 # build artifacts
 build-docker/node-*
 
-# generated files
-lib/generated/prisma/
-
 # other
 .continue
-public/
-
-test-results
-
-.trae
-.cursor
-apps/pingora-proxy/target/*
-
-packages/**/dist
-
 .gemini
-.cursor
-.trae
-apps/kline-service/wasm-cal/target/*
-
-.kiro
-
-
 .claude
-apps/zmq-log-server/target/*
-apps/oauth-service-rust/target/
-# OAuth Service Rust local files
-apps/oauth-service-rust/.env
-apps/oauth-service-rust/keys/
-apps/oauth-service-rust/*.db
-apps/oauth-service-rust/*.db-shm
-apps/oauth-service-rust/*.db-wal
+.kiro
+.trae

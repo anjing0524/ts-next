@@ -125,7 +125,8 @@ fi
 echo ""
 
 # 构建测试命令
-TEST_CMD="playwright test"
+# 使用 pnpm 确保使用 admin-portal 本地的 Playwright 安装
+TEST_CMD="pnpm playwright test"
 
 if [ -n "$UI_MODE" ]; then
   TEST_CMD="$TEST_CMD $UI_MODE"
