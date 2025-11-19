@@ -164,9 +164,9 @@ export function WebVitalsReporter() {
   if (typeof window === 'undefined') return null;
 
   // 在客户端加载 web-vitals 库
-  import('web-vitals').then(({ onCLS, onFID, onFCP, onLCP, onTTFB, onINP }) => {
+  // 注意: FID 已被弃用，使用 INP 替代
+  import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
     onCLS(reportWebVitals);
-    onFID(reportWebVitals);
     onFCP(reportWebVitals);
     onLCP(reportWebVitals);
     onTTFB(reportWebVitals);
