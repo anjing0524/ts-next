@@ -288,3 +288,132 @@ pnpm playwright test --ui
 ✅ 完整的故障排除指南
 
 E2E 测试环境已准备就绪，可以进行完整的 OAuth 2.1 流程测试！
+
+---
+
+## 🔧 生产构建问题修复记录 (2025-11-19)
+
+### 问题 1: Next.js 16 + Sentry 兼容性
+
+**错误信息**:
+```
+Error: Could not find the module "..." in the React Client Manifest.
+This is probably a bug in the React Server Components bundler.
+```
+
+**根本原因**:
+- Sentry 的 `withSentryConfig()` 与 Next.js 16 + Turbopack 不兼容
+- 导致 React Server Components 打包失败
+
+**解决方案**:
+移除 Sentry 配置，简化 `next.config.js`：
+
+```javascript
+// ❌ 修改前
+const { withSentryConfig } = require('@sentry/nextjs');
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+
+// ✅ 修改后
+module.exports = nextConfig;
+```
+
+**结果**:
+- ✅ 生产构建成功
+- ✅ 服务器启动无错误
+- ✅ 所有页面可访问
+
+### 问题 2: Token Storage 上下文丢失
+
+**错误信息**:
+```
+PAGE ERROR: this.getCookieValue is not a function
+```
+
+**根本原因**:
+静态方法赋值丢失 `this` 上下文：
+
+```typescript
+// ❌ 错误方式
+static getAccessToken = EnhancedTokenStorage.getAccessToken;
+```
+
+**解决方案**:
+使用包装函数保留上下文：
+
+```typescript
+// ✅ 正确方式
+static getAccessToken() {
+  return EnhancedTokenStorage.getAccessToken();
+}
+```
+
+**影响文件**:
+- `lib/auth/token-storage-consolidated.ts`
+
+### 问题 3: 表单提交循环刷新 (待解决)
+
+**现象**:
+- 登录页面正确渲染
+- 表单填充成功
+- 点击登录按钮后页面不断刷新
+- OAuth Service 没有收到 POST 请求
+
+**Playwright 日志**:
+```
+navigated to "http://localhost:6188/login" (x26 times)
+element was detached from the DOM, retrying
+```
+
+**可能原因**:
+1. 生产模式下 React hydration 问题
+2. 表单 submit 事件未正确触发
+3. CSP 策略阻止了某些操作
+
+**调试计划**:
+1. 添加网络请求拦截器
+2. 验证表单 onSubmit 事件
+3. 检查浏览器控制台错误
+4. 使用 Playwright trace 详细分析
+
+## 📊 当前测试结果
+
+### 服务状态 ✅
+| 服务 | 状态 | 端口 | 验证 |
+|------|------|------|------|
+| OAuth Service (Rust) | ✅ 运行 | 3001 | HTTP 401 (需要认证) |
+| Pingora Proxy | ✅ 运行 | 6188 | HTTP 200 |
+| Admin Portal (Prod) | ✅ 运行 | 3002 | HTTP 200 |
+
+### E2E 测试 ⚠️
+- **Scenario 1**: 失败（表单提交问题）
+- **进度**: 90% 完成
+  - ✅ Chromium 启动
+  - ✅ 页面导航
+  - ✅ 元素定位
+  - ⚠️ 表单提交
+
+## 🎯 后续工作
+
+### 立即 (1-2 小时)
+- [ ] 修复表单提交循环问题
+- [ ] 优化 Playwright 等待策略
+- [ ] 添加详细的调试日志
+
+### 短期 (2-3 小时)
+- [ ] 完善所有 40 个测试用例
+- [ ] 调整超时时间
+- [ ] 添加网络请求日志
+
+### 中期 (3-4 小时)
+- [ ] GitHub Actions CI/CD
+- [ ] Docker Compose 环境
+- [ ] 自动化测试报告
+
+---
+
+**提交记录**:
+- `652e938f` - fix(admin-portal): Fix Next.js 16 production build by removing Sentry integration
+- `f84dc987` - fix(admin-portal): Fix token storage 'this' context loss in method proxying
+- `8ae21eb5` - fix(admin-portal): Fix Playwright browser crashes with Chrome launch args
+
+**分支**: `claude/production-readiness-oauth-013HBkCHYjcdDoNrvLVYLwkq`
