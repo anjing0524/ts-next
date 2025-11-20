@@ -16,7 +16,7 @@ INSERT OR IGNORE INTO users (
 ) VALUES (
     'clh1234567890abcdef000000',
     'admin',
-    '$2b$12$YvvLFd.jEPSIpd3f1sWFpuJTCiJhMkHUqEGpKxp5Gkk5ooVEFUNBW', -- password: admin123
+    '$2b$12$RpakPpV3Dqfmv7bKS/Fa1O0dGaA1O.n8OY5uAWd6GVDIWvdb0pkqu', -- password: admin123
     true,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP,
@@ -33,7 +33,7 @@ INSERT OR IGNORE INTO users (
 ) VALUES (
     'clh1234567890abcdef000001',
     'demo',
-    '$2b$12$YvvLFd.jEPSIpd3f1sWFpuJTCiJhMkHUqEGpKxp5Gkk5ooVEFUNBW', -- password: admin123
+    '$2b$12$RpakPpV3Dqfmv7bKS/Fa1O0dGaA1O.n8OY5uAWd6GVDIWvdb0pkqu', -- password: admin123
     true,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP,
