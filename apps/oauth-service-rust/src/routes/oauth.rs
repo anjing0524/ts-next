@@ -223,17 +223,29 @@ pub async fn authorize_endpoint(
     let user_id = match extract_user_id_from_request(&state, &jar, &headers).await {
         Ok(id) => id,
         Err(_) => {
-            // User not authenticated - redirect to login page
+            // 用户未认证 - 重定向到登录页面
             //
-            // IMPORTANT: This implements the OAuth 2.1 third-party client pattern:
-            // - Admin Portal has NO direct /login entry point
-            // - All unauthenticated users are redirected to OAuth Service's login flow
-            // - Login page is provided by Admin Portal but ONLY through this OAuth redirect
+            // ⚠️ 重要：OAuth 2.1 "UI 助手"模式的实现
+            // 架构设计：
+            // - OAuth Service (本服务) 是认证授权中心，控制完整的 OAuth 流程
+            // - Admin Portal 是第三方客户端应用，同时作为 UI 助手
+            // - 登录页面由 Admin Portal 提供 UI，但由 OAuth Service 控制流程
             //
-            // Security considerations:
-            // - Admin Portal URL is configured via NEXT_PUBLIC_ADMIN_PORTAL_URL environment variable
-            // - Admin Portal's /login page MUST validate the redirect parameter
-            // - The redirect parameter contains the original authorize URL with all PKCE params preserved
+            // 工作流程：
+            // 1. 用户访问受保护的 Admin Portal 资源时发起 OAuth 授权 (/api/v2/oauth/authorize)
+            // 2. 此端点检查用户是否有有效的 session_token (由 /api/v2/auth/login 设置)
+            // 3. 如果用户未认证，本服务重定向到 Admin Portal 的 /login 页面
+            // 4. Admin Portal /login 页面收集用户凭证（不验证）
+            // 5. Admin Portal 将凭证转发到此服务的 /api/v2/auth/login
+            // 6. 此服务验证凭证、设置 session_token、返回 redirect_url
+            // 7. Admin Portal 重定向回原始的 /authorize 请求
+            // 8. 此服务现在看到有效的 session_token，处理授权流程
+            //
+            // 安全考虑：
+            // - Admin Portal URL 通过 NEXT_PUBLIC_ADMIN_PORTAL_URL 环境变量配置
+            // - Admin Portal 的 /login 必须验证 redirect 参数（防止 open redirect 攻击）
+            // - redirect 参数包含原始的 /authorize URL，保留所有 PKCE 参数
+            // - 凭证仅在内存中暂存，不被持久化到 Admin Portal
             //
             let admin_portal_url = std::env::var("NEXT_PUBLIC_ADMIN_PORTAL_URL")
                 .unwrap_or_else(|_| "http://localhost:3002".to_string());
@@ -266,10 +278,67 @@ pub async fn authorize_endpoint(
         }
     };
 
-    // TODO: Implement consent screen logic here.
-    // For now, we assume consent is implicitly given.
+    // 3. 检查是否需要显示同意页面 (require_consent)
+    //
+    // OAuth 2.1 同意流程：
+    // 如果客户端配置了 require_consent=true，用户需要明确同意授权
+    // 此时重定向到 Admin Portal 的同意页面，由用户进行同意决定
+    //
+    // 同意流程：
+    // 1. 重定向到 Admin Portal 的 /oauth/consent 页面
+    // 2. Admin Portal 调用 GET /api/v2/oauth/consent/info 获取同意信息
+    // 3. 显示同意对话框给用户
+    // 4. 用户选择"允许"或"拒绝"
+    // 5. Admin Portal 调用 POST /api/v2/oauth/consent/submit 提交决定
+    // 6. 此端点生成授权码或返回 error=access_denied
+    //
+    // 安全考虑：
+    // - ✅ 用户已认证（session_token 有效）
+    // - ✅ 客户端已验证（client_id, redirect_uri 有效）
+    // - ✅ scope 已验证（在客户端允许范围内）
+    // - ✅ 同意决定由经过认证的用户明确做出
+    if client_details.client.require_consent {
+        tracing::info!(
+            "Client {} requires consent, redirecting to consent page",
+            request.client_id
+        );
 
-    // 3. Create authorization code
+        let admin_portal_url = std::env::var("NEXT_PUBLIC_ADMIN_PORTAL_URL")
+            .unwrap_or_else(|_| "http://localhost:3002".to_string());
+
+        // 构建同意页面 URL，携带所有 OAuth 参数
+        let mut consent_url = url::Url::parse(&format!("{}/oauth/consent", admin_portal_url))
+            .expect("Failed to parse consent URL");
+
+        consent_url.query_pairs_mut()
+            .append_pair("client_id", &request.client_id)
+            .append_pair("redirect_uri", &request.redirect_uri)
+            .append_pair("response_type", &request.response_type)
+            .append_pair("scope", &request.scope)
+            .append_pair("code_challenge", &request.code_challenge)
+            .append_pair("code_challenge_method", &request.code_challenge_method);
+        if let Some(nonce) = &request.nonce {
+            consent_url.query_pairs_mut().append_pair("nonce", nonce);
+        }
+
+        return Ok(Redirect::to(consent_url.as_str()).into_response());
+    }
+
+    // 4. 创建授权码
+    //
+    // 只有在以下情况下才会到达这里：
+    // 1. 用户已认证（有有效的 session_token）
+    // 2. 客户端配置了 require_consent=false
+    //    OR
+    //    用户已经通过 /oauth/consent/submit 提交了"允许"决定，
+    //    现在返回到此端点进行授权码生成
+    //
+    // 此时所有验证都已通过，可以安全地生成授权码
+    tracing::info!(
+        "Generating authorization code for client: {}, user: {}",
+        request.client_id,
+        user_id
+    );
     let auth_code = state
         .auth_code_service
         .create_auth_code(&request, &user_id)
@@ -507,7 +576,7 @@ async fn handle_client_credentials_grant(
 // --- Helper Functions ---
 
 /// Extracts user_id from session cookie (priority) or Authorization header.
-async fn extract_user_id_from_request(
+pub async fn extract_user_id_from_request(
     state: &Arc<AppState>,
     jar: &CookieJar,
     headers: &axum::http::HeaderMap,

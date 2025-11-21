@@ -33,6 +33,9 @@ export default defineConfig({
     // 基础URL - 使用 Pingora 代理端口 6188
     baseURL: 'http://localhost:6188',
 
+    // 绕过 CSP
+    bypassCSP: true,
+
     // 浏览器设置
     headless: !!process.env.CI,
 

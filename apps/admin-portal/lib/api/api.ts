@@ -1,58 +1,365 @@
-/**
- * API Library - Unified exports
- * 
- * This file provides a single entry point for all API functionality
- */
+import { User, OAuthClient } from '@/types/auth';
 
-// Import consolidated implementations
-import { APIClient as APIClientImpl } from './api-client-consolidated';
-import { TokenStorage as TokenStorageImpl } from '../auth/token-storage-consolidated';
-import { EnhancedTokenStorage } from '../auth/enhanced-token-storage';
+// API客户端配置
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
 
-// Re-export the consolidated API client as the primary implementation
-export const APIClient = APIClientImpl;
-export const EnhancedAPIClient = APIClientImpl;
+// 基础请求函数
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  });
 
-// Export types
-export type { RequestOptions } from './api-client-consolidated';
-export type { TokenStorageOptions } from '../auth/token-storage-consolidated';
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP ${response.status}`);
+  }
 
-// Export supporting modules
-export { APICacheLayer } from './cache-layer';
-export { RetryWithCircuitBreaker } from './retry-with-circuit-breaker';
-export { EnhancedTokenStorage } from '../auth/enhanced-token-storage';
+  return response.json();
+}
 
-// Legacy compatibility exports for TokenStorage
-export const TokenStorage = {
-  // Static methods (new API)
-  setTokens: TokenStorageImpl.setTokens,
-  getAccessToken: TokenStorageImpl.getAccessToken,
-  getRefreshToken: TokenStorageImpl.getRefreshToken,
-  clearTokens: TokenStorageImpl.clearTokens,
-  isTokenExpired: TokenStorageImpl.isTokenExpired,
-  getTokenRemainingTime: TokenStorageImpl.getTokenRemainingTime,
-  
-  // Instance methods (legacy compatibility)
-  getInstance: () => ({
-    setToken: TokenStorageImpl.setTokens,
-    getToken: TokenStorageImpl.getAccessToken,
-    setRefreshToken: TokenStorageImpl.setTokens,
-    getRefreshToken: TokenStorageImpl.getRefreshToken,
-    clearTokens: TokenStorageImpl.clearTokens,
-  }),
+// 带认证的请求函数
+async function authenticatedRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // 使用TokenStorage获取access_token，而不是直接从localStorage
+  const { TokenStorage } = await import('@/lib/auth/token-storage');
+  const accessToken = TokenStorage.getAccessToken();
+
+  return apiRequest<T>(endpoint, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: accessToken ? `Bearer ${accessToken}` : '',
+    },
+  });
+}
+
+// 认证API
+export const authApi = {
+  async exchangeCodeForToken(
+    code: string,
+    codeVerifier: string
+  ): Promise<import('@repo/ui').AuthTokens> {
+    return apiRequest('/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
+        code: code,
+        redirect_uri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
+        code_verifier: codeVerifier,
+      }),
+    });
+  },
+
+  async login(credentials: {
+    grant_type: string;
+    username: string;
+    password: string;
+  }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    refreshExpiresIn: number;
+  }> {
+    return apiRequest('/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: credentials.grant_type,
+        client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
+        username: credentials.username,
+        password: credentials.password,
+      }),
+    });
+  },
+
+  async logout() {
+    // 使用TokenStorage清除token
+    const { TokenStorage } = await import('@/lib/auth/token-storage');
+    TokenStorage.clearTokens();
+  },
+
+  async fetchUserProfile(): Promise<User> {
+    // Updated to match the new Rust endpoint
+    return authenticatedRequest('/users/me');
+  },
 };
 
-// Legacy static methods for backward compatibility
-export const setTokens = TokenStorageImpl.setTokens;
-export const getAccessToken = TokenStorageImpl.getAccessToken;
-export const getRefreshToken = TokenStorageImpl.getRefreshToken;
-export const clearTokens = TokenStorageImpl.clearTokens;
-export const isTokenExpired = TokenStorageImpl.isTokenExpired;
-export const getTokenRemainingTime = TokenStorageImpl.getTokenRemainingTime;
+// 类型定义
+export type PaginatedResponse<T> = {
+  data: T[];
+  meta: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  };
+};
 
-// Default exports
-export default {
-  APIClient: APIClientImpl,
-  TokenStorage: TokenStorage,
-  EnhancedTokenStorage,
+export type AuditLogsResponse = PaginatedResponse<any>;
+
+// 导出基础请求函数，供页面等直接调用
+export { apiRequest };
+
+// 管理API
+export const adminApi = {
+  async getUserById(userId: string): Promise<import('@repo/ui').AuthUser | null> {
+    return authenticatedRequest(`/admin/users/${userId}`);
+  },
+
+  async getMenus() {
+    return authenticatedRequest('/menu');
+  },
+
+  async getAuditLogs(params?: {
+    page?: number;
+    limit?: number;
+    startDate?: Date;
+    endDate?: Date;
+    userId?: string;
+    action?: string;
+    resource?: string;
+    status?: string;
+    search?: string;
+  }): Promise<AuditLogsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.startDate) searchParams.set('startDate', params.startDate.toISOString());
+    if (params?.endDate) searchParams.set('endDate', params.endDate.toISOString());
+    if (params?.userId) searchParams.set('userId', params.userId);
+    if (params?.action) searchParams.set('action', params.action);
+    if (params?.resource) searchParams.set('resource', params.resource);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.search) searchParams.set('search', params.search);
+
+    const queryString = searchParams.toString();
+    const endpoint = `/audit-logs${queryString ? `?${queryString}` : ''}`;
+    return authenticatedRequest(endpoint);
+  },
+
+  async getUsers(params?: { page?: number; limit?: number; search?: string; role?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.role) searchParams.set('role', params.role);
+
+    const queryString = searchParams.toString();
+    const endpoint = `/admin/users${queryString ? `?${queryString}` : ''}`;
+    return authenticatedRequest(endpoint);
+  },
+
+  async getRoles(params?: { page?: number; limit?: number; search?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.search) searchParams.set('search', params.search);
+
+    const queryString = searchParams.toString();
+    const endpoint = `/admin/roles${queryString ? `?${queryString}` : ''}`;
+    return authenticatedRequest(endpoint);
+  },
+
+  async getPermissions(params?: { page?: number; limit?: number; search?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.search) searchParams.set('search', params.search);
+
+    const queryString = searchParams.toString();
+    const endpoint = `/admin/permissions${queryString ? `?${queryString}` : ''}`;
+    return authenticatedRequest(endpoint);
+  },
+
+  async getClients(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<OAuthClient>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.search) searchParams.set('search', params.search);
+
+    const queryString = searchParams.toString();
+    const endpoint = `/admin/clients${queryString ? `?${queryString}` : ''}`;
+    return authenticatedRequest(endpoint);
+  },
+
+  // 新增：根据ID获取客户端
+  async getClientById(clientId: string): Promise<OAuthClient> {
+    return authenticatedRequest(`/admin/clients/${clientId}`);
+  },
+
+  // 新增：创建客户端
+  async createClient(clientData: any): Promise<OAuthClient> {
+    return authenticatedRequest('/admin/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData),
+    });
+  },
+
+  // 新增：更新客户端
+  async updateClient(clientId: string, clientData: any): Promise<OAuthClient> {
+    return authenticatedRequest(`/admin/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData),
+    });
+  },
+
+  // 新增：删除客户端
+  async deleteClient(clientId: string): Promise<void> {
+    await authenticatedRequest(`/admin/clients/${clientId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // 新增：轮换客户端密钥
+  async rotateClientSecret(clientId: string): Promise<{ clientSecret: string }> {
+    return authenticatedRequest(`/admin/clients/${clientId}/secret`, {
+      method: 'POST',
+    });
+  },
+
+  async registerClient(clientData: {
+    name: string;
+    redirectUris: string;
+    jwksUri?: string;
+  }): Promise<{ message: string; clientId?: string; clientSecret?: string }> {
+    return authenticatedRequest('/admin/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData),
+    });
+  },
+
+  async updateUserProfile(profileData: { displayName: string }): Promise<{ message: string }> {
+    return authenticatedRequest('/users/me/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+  },
+
+  async updatePassword(passwordData: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ message: string }> {
+    return authenticatedRequest('/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify(passwordData),
+    });
+  },
+
+  async createUser(userData: {
+    username: string;
+    password: string;
+    displayName: string;
+    isActive: boolean;
+    mustChangePassword: boolean;
+    roleIds: string[];
+  }): Promise<{ message: string }> {
+    return authenticatedRequest('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  async updateUser(
+    userId: string,
+    userData: {
+      displayName: string;
+      firstName: string;
+      lastName: string;
+      organization: string;
+      department: string;
+      isActive: boolean;
+      mustChangePassword: boolean;
+    }
+  ): Promise<{ message: string }> {
+    return authenticatedRequest(`/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  // 新增：获取仪表盘统计数据
+  async getStatsSummary(): Promise<import('@/features/dashboard/queries').DashboardStats> {
+    return authenticatedRequest('/stats/summary');
+  },
+
+  async getRoleById(roleId: string) {
+    return authenticatedRequest(`/admin/roles/${roleId}`);
+  },
+
+  async createRole(roleData: any) {
+    return authenticatedRequest('/admin/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData),
+    });
+  },
+
+  async updateRole(roleId: string, roleData: any) {
+    return authenticatedRequest(`/admin/roles/${roleId}`, {
+      method: 'PUT',
+      body: JSON.stringify(roleData),
+    });
+  },
+
+  async deleteRole(roleId: string) {
+    return authenticatedRequest(`/admin/roles/${roleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async updateRolePermissions(roleId: string, permissionIds: string[]) {
+    return authenticatedRequest(`/admin/roles/${roleId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permissionIds }),
+    });
+  },
+
+  // 新增：获取系统配置
+  async getSystemConfig(): Promise<any[]> {
+    // 获取系统配置，返回 SystemConfig 数组
+    return authenticatedRequest('/system/config');
+  },
+
+  // 新增：更新系统配置
+  async updateSystemConfig(configData: any[]): Promise<any[]> {
+    // 更新系统配置，返回更新后的 SystemConfig 数组
+    return authenticatedRequest('/system/config', {
+      method: 'PUT',
+      body: JSON.stringify(configData),
+    });
+  },
+
+  // 新增：删除用户
+  async deleteUser(userId: string): Promise<void> {
+    // 删除指定用户
+    return authenticatedRequest(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async submitConsent(decision: 'allow' | 'deny', consentParams: URLSearchParams): Promise<any> {
+    return authenticatedRequest(`/oauth/consent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        decision,
+        ...Object.fromEntries(consentParams),
+      }),
+    });
+  },
 };

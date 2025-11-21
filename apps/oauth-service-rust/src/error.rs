@@ -43,6 +43,9 @@ pub enum ServiceError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 
@@ -102,6 +105,7 @@ impl IntoResponse for AppError {
                 },
                 ServiceError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
                 ServiceError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+                ServiceError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
                 ServiceError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
                 ServiceError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
                 ServiceError::Conflict(msg) => (StatusCode::CONFLICT, msg),

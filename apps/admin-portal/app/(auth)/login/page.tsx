@@ -13,16 +13,15 @@ import { UsernamePasswordForm } from '@/components/auth/username-password-form';
  *
  * 流程：
  * 1. 用户访问受保护页面 (e.g., /admin)
- * 2. middleware.ts 启动 OAuth authorize 流程
- * 3. OAuth Service 检查 session_token（没有）
- * 4. 重定向到 /login?redirect=<original_authorize_url>
- * 5. 用户输入凭证并提交
- * 6. 表单验证 redirect 参数（防止 open redirect 攻击）
- * 7. 提交到 OAuth Service /api/v2/auth/login
- * 8. OAuth Service 设置 session_token cookie
- * 9. 重定向回 redirect URL（原始 authorize URL）
- * 10. OAuth Service 生成 authorization code，重定向到 /auth/callback
- * 11. /auth/callback 交换 code 为 token
+ * 2. 客户端 PermissionGuard 或 Server Component 检查权限
+ * 3. 如果未认证，重定向到 /login?redirect=<original_url>
+ * 4. 用户输入凭证并提交
+ * 5. 表单验证 redirect 参数（防止 open redirect 攻击）
+ * 6. 提交到 OAuth Service /api/v2/auth/login
+ * 7. OAuth Service 设置 session_token cookie
+ * 8. 重定向回 redirect URL（原始 authorize URL）
+ * 9. OAuth Service 生成 authorization code，重定向到 /auth/callback
+ * 10. /auth/callback 交换 code 为 token
  */
 function LoginContent() {
   const router = useRouter();
@@ -52,9 +51,9 @@ function LoginContent() {
               />
             </svg>
           </div>
-          <CardTitle data-slot="card-title">登录认证中心</CardTitle>
+          <CardTitle data-slot="card-title">登录</CardTitle>
           <CardDescription className="text-gray-600">
-            请输入您的凭证登录
+            使用您的账户访问 Admin Portal
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -65,8 +64,8 @@ function LoginContent() {
                 {error === 'invalid_redirect'
                   ? '无效的重定向 URL，请重新开始。'
                   : error === 'invalid_credentials'
-                  ? '用户名或密码错误，请重试。'
-                  : '发生错误，请稍后重试。'}
+                    ? '用户名或密码错误，请重试。'
+                    : '发生错误，请稍后重试。'}
               </p>
             </div>
           )}

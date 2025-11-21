@@ -1,8 +1,38 @@
 /**
  * EnhancedTokenStorage - 安全令牌存储策略
- * 
- * 使用HttpOnly Cookie存储刷新令牌，提供CSRF保护
- * 支持服务器端和客户端的无缝集成
+ *
+ * 双轨存储模式说明：
+ * ========================
+ *
+ * 为什么同时使用 Cookie 和 localStorage？
+ *
+ * 1. HTTP-Only Cookie 存储（服务器端使用）:
+ *    - 存储 access_token 和 refresh_token
+ *    - 防止 JavaScript 访问（XSS 保护）
+ *    - 自动随请求发送（无需手动设置 header）
+ *    - 服务器端中间件和 API 路由可直接访问
+ *    - 安全特性：HttpOnly, Secure (HTTPS), SameSite
+ *
+ * 2. localStorage 存储（前端 JS 使用）:
+ *    - 存储 access_token（重复存储）
+ *    - 允许前端 JavaScript 代码读取和使用
+ *    - 用于手动构造 Authorization header
+ *    - 存储 token 过期时间（token_expires_at）
+ *    - 用于前端的 token 有效性检查
+ *
+ * 双轨存储的好处：
+ * - 服务器请求自动认证（Cookie）
+ * - 前端可灵活使用 token（localStorage）
+ * - 兼容性好，支持不同场景
+ *
+ * 安全考虑：
+ * - Token 在浏览器内存中存在（不可避免）
+ * - XSS 只能访问 localStorage，不能访问 Cookie
+ * - CSRF 保护由 SameSite 和 CSRF token 提供
+ *
+ * 清除策略：
+ * - logout 时同时清除 Cookie 和 localStorage
+ * - 确保彻底移除认证信息
  */
 
 export interface TokenStorageOptions {
