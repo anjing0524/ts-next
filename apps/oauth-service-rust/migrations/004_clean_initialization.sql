@@ -8,7 +8,7 @@ INSERT OR IGNORE INTO users (
 ) VALUES (
     'user-admin-001',
     'admin',
-    '$2b$12$YvvLFd.jEPSIpd3f1sWFpuJTCiJhMkHUqEGpKxp5Gkk5ooVEFUNBW', -- password: admin123
+    '$2b$12$RpakPpV3Dqfmv7bKS/Fa1O0dGaA1O.n8OY5uAWd6GVDIWvdb0pkqu', -- password: admin123 (verified hash)
     1,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP,

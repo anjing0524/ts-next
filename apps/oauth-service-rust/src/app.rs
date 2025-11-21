@@ -38,6 +38,15 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
         // 认证端点 (公开)
         .route("/api/v2/auth/login", post(routes::oauth::login_endpoint))
         .route("/api/v2/auth/authenticate", post(routes::oauth::authenticate_endpoint))
+        // 同意页面端点 (需要认证)
+        .route(
+            "/api/v2/oauth/consent/info",
+            get(routes::consent::get_consent_info),
+        )
+        .route(
+            "/api/v2/oauth/consent/submit",
+            post(routes::consent::submit_consent),
+        )
         // 客户端管理端点
         .route(
             "/api/v2/admin/clients",
@@ -59,6 +68,11 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
             get(routes::users::get_user)
                 .put(routes::users::update_user)
                 .delete(routes::users::delete_user),
+        )
+        // 当前用户端点
+        .route(
+            "/api/v2/users/me",
+            get(routes::users::get_current_user),
         )
         // 权限管理端点
         .route(

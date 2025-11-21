@@ -139,6 +139,9 @@ pub async fn update_user(
     }))
 }
 
+    })))
+}
+
 pub async fn delete_user(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
@@ -150,4 +153,26 @@ pub async fn delete_user(
         "message": "User deleted successfully",
         "user_id": user_id
     })))
+}
+
+pub async fn get_current_user(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(auth): axum::Extension<AuthContext>,
+) -> Result<Json<UserResponse>, AppError> {
+    let user_id = auth.user_id.ok_or_else(|| ServiceError::Unauthorized("User not authenticated".to_string()))?;
+
+    let user = state
+        .user_service
+        .find_by_id(&user_id)
+        .await?
+        .ok_or_else(|| ServiceError::NotFound("User not found".to_string()))?;
+
+    Ok(Json(UserResponse {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        is_active: user.is_active,
+        created_at: user.created_at.to_rfc3339(),
+        last_login_at: user.last_login_at.map(|dt| dt.to_rfc3339()),
+    }))
 }

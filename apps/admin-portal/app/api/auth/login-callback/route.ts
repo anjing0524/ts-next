@@ -1,14 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Login 回调处理端点
- * 在用户通过用户名密码登录后被重定向到此端点
+ * Token 存储端点 - 用于设置 HTTP-Only Cookie
  *
- * 预期的请求来源：OAuth Service 的 /api/v2/auth/login 端点
- * 参数：
- * - access_token: JWT token 用于认证
- * - refresh_token: 刷新令牌
- * - user_id: 用户ID
+ * 在 OAuth 授权码交换后，由前端调用此端点来设置 token 相关的 HTTP-Only Cookie。
+ * 这样可以使 token 对 XSS 攻击更加安全。
+ *
+ * 工作流程：
+ * 1. /auth/callback 页面从 OAuth Service 获取授权码
+ * 2. /auth/callback 使用授权码交换 access_token 和 refresh_token
+ * 3. /auth/callback 调用此端点来设置 HTTP-Only Cookie
+ * 4. Token 既存储在 HTTP-Only Cookie（用于服务器请求）
+ *    也存储在 localStorage（用于前端 JS 使用）
+ *
+ * 请求参数：
+ * - access_token: JWT access token（用于 API 请求认证）
+ * - refresh_token: 刷新令牌（用于获取新的 access_token）
+ * - user_id: 用户ID（可选）
+ *
+ * 安全特性：
+ * - HttpOnly: 防止 JavaScript 访问（保护 XSS 攻击）
+ * - Secure: 仅在 HTTPS 传输（生产环境）
+ * - SameSite=Lax: 防止 CSRF 攻击
  */
 export async function POST(request: NextRequest) {
   try {

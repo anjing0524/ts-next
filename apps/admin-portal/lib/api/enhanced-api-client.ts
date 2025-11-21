@@ -29,7 +29,7 @@ export class EnhancedAPIClient {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 1000;
   private static readonly TIMEOUT = 30000;
-  
+
   private static pendingRequests = new Map<string, PendingRequest>();
 
 
@@ -91,7 +91,7 @@ export class EnhancedAPIClient {
         return await this.makeSingleRequest<T>(url, fetchOptions, skipAuthRefresh);
       } catch (error) {
         lastError = error as Error;
-        
+
         // Don't retry on certain errors
         if (this.shouldNotRetry(error)) {
           break;
@@ -118,7 +118,7 @@ export class EnhancedAPIClient {
   ): Promise<T> {
     // Prepare headers
     const headers = new Headers(options.headers || {});
-    
+
     // Add authentication header
     if (!skipAuthRefresh) {
       const accessToken = TokenStorage.getAccessToken();
@@ -150,12 +150,12 @@ export class EnhancedAPIClient {
 
     try {
       const response = await fetch(url, {
+        // Add security attributes (defaults, can be overridden by options)
+        credentials: 'same-origin',
+        mode: 'same-origin',
         ...options,
         headers,
         signal: controller.signal,
-        // Add security attributes
-        credentials: 'same-origin',
-        mode: 'same-origin',
       });
 
       clearTimeout(timeoutId);
@@ -184,11 +184,11 @@ export class EnhancedAPIClient {
       return await response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timeout');
       }
-      
+
       throw error;
     }
   }
@@ -220,12 +220,12 @@ export class EnhancedAPIClient {
       }
     }
     const token = btoa(String.fromCharCode(...array)).replace(/[+/=]/g, '');
-    
+
     // Set CSRF token cookie
     const isSecure = window.location.protocol === 'https:';
     const cookie = `csrf_token=${token}; Path=/; SameSite=Lax${isSecure ? '; Secure' : ''}`;
     document.cookie = cookie;
-    
+
     return token;
   }
 

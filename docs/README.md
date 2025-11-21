@@ -1,16 +1,24 @@
-# 项目文档中心
+# OAuth 2.1 认证授权系统 - 生产文档中心
 
-> **最后更新**: 2025-11-11
+> **这是项目的主文档目录。请始终从 [INDEX.md](./INDEX.md) 开始。**
 
-本目录包含 OAuth2.1 认证授权中心项目的完整技术文档。
+**最后更新**: 2025-11-20
+**文档状态**: ✅ 生产就绪
+**覆盖范围**: 需求、设计、API、部署、运维、测试
 
-## 文档导航
+## 📚 9大核心文档
 
-- **[系统架构](./architecture/design.md)** - 架构和技术设计
-- **[API参考](./api/reference.md)** - 接口设计标准
-- **[部署运维](./deployment/guide.md)** - 部署和运维相关文档
-- **[交付报告](./reports/delivery_summary.md)** - 项目交付总结
-- **[开发指南](./development/guides/i18n_implementation.md)** - 开发相关文档
+| # | 文档 | 用途 | 受众 |
+|----|------|------|------|
+| 1️⃣ | [1-REQUIREMENTS.md](./1-REQUIREMENTS.md) | 完整的需求规范 | 产品、架构师 |
+| 2️⃣ | [2-SYSTEM_DESIGN.md](./2-SYSTEM_DESIGN.md) | 系统设计和架构 | 架构师、开发 |
+| 3️⃣ | [3-DATABASE_DESIGN.md](./3-DATABASE_DESIGN.md) | 数据库设计 | DBA、开发 |
+| 4️⃣ | [4-API_REFERENCE.md](./4-API_REFERENCE.md) | API 完整参考 | 前后端开发 |
+| 5️⃣ | [5-DEPLOYMENT.md](./5-DEPLOYMENT.md) | 部署指南 | DevOps |
+| 6️⃣ | [6-OPERATIONS.md](./6-OPERATIONS.md) | 运维指南 | SRE、运维 |
+| 7️⃣ | [7-TESTING.md](./7-TESTING.md) | 测试策略 | QA、开发 |
+| 8️⃣ | [8-OAUTH_FLOWS.md](./8-OAUTH_FLOWS.md) | OAuth 2.1 流程详解 | 所有人 |
+| 📖 | **[INDEX.md](./INDEX.md)** | **完整导航和速查** | **所有人** |
 
 ## 快速开始
 
@@ -37,9 +45,16 @@ pnpm --filter=pingora-proxy dev  # 反向代理 (6188)
 ```
 
 ### 3. 访问系统
-- **管理后台**: http://localhost:3002
-- **认证服务**: http://localhost:3001
-- **默认管理员**: admin / admin123
+
+**通过 Pingora 代理访问（推荐）**:
+- **应用入口**: http://localhost:6188
+  - 管理后台、OAuth Service API、所有应用都通过此地址访问
+  - 默认管理员: admin / admin123
+
+**直接访问服务（调试用）**:
+- **Admin Portal**: http://localhost:3002
+- **OAuth Service**: http://localhost:3001
+- **说明**: 这些地址仅用于开发环境本机调试，生产环境应使用 Pingora 代理
 
 ## 核心功能
 
@@ -121,7 +136,7 @@ REDIS_URL="redis://localhost:6379"
    ```
 
 3. **构建启动**:
-   参考 [部署指南](./deployment/guide.md) 进行 Kubernetes 部署。
+   参考 [5-DEPLOYMENT.md](./5-DEPLOYMENT.md) 进行 Kubernetes 部署。
 
 ## 技术栈
 | 类别       | 技术                     |
@@ -129,7 +144,7 @@ REDIS_URL="redis://localhost:6379"
 | 前端       | Next.js 15, React 19     |
 | UI框架     | shadcn/ui, TailwindCSS 4 |
 | 后端       | Rust, Actix-web, SQLx    |
-| 数据库     | SQLite (Production)      |
+| 数据库     | SQLite (开发) / PostgreSQL/Supabase (生产) |
 | 安全认证   | OAuth2.1, JWT            |
 | 代理       | Pingora                  |
 | 测试       | Jest 30, Playwright      |

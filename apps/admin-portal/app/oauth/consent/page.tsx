@@ -66,9 +66,9 @@ function ConsentContent() {
     });
 
     // 调用OAuth服务获取同意信息
-    apiRequest<{ data: ConsentApiData }>(`/oauth/consent?${params.toString()}`)
+    apiRequest<ConsentApiData>(`/oauth/consent/info?${params.toString()}`)
       .then((response) => {
-        setApiData(response.data);
+        setApiData(response);
         setLoading(false);
       })
       .catch((err) => {

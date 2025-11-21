@@ -104,8 +104,8 @@ export class SecurityMiddleware {
     }
 
     // 内容安全策略
-    const csp = this.generateCSP('', options.customCSP);
-    headers.set('Content-Security-Policy', csp);
+    // const csp = this.generateCSP('', options.customCSP);
+    // headers.set('Content-Security-Policy', csp);
 
     // 严格传输安全（生产环境）
     if (process.env.NODE_ENV === 'production') {
@@ -122,7 +122,7 @@ export class SecurityMiddleware {
     if (customCSP) return customCSP;
 
     const isApi = url.includes('/api/');
-    
+
     if (isApi) {
       return "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     }
@@ -183,7 +183,7 @@ export class SecurityMiddleware {
     reason?: string;
   }> {
     const accessToken = request.cookies.get('access_token')?.value;
-    
+
     if (!accessToken) {
       return { valid: false, reason: 'No access token' };
     }
@@ -214,7 +214,7 @@ export class SecurityMiddleware {
     try {
       const payload = token.split('.')[1];
       if (!payload) return null;
-      
+
       const decoded = Buffer.from(payload, 'base64').toString('utf-8');
       return JSON.parse(decoded);
     } catch {
@@ -241,13 +241,13 @@ export class SecurityMiddleware {
     const allowed = allowedOrigins || defaultOrigins;
     return allowed.some(allowedOrigin => {
       if (allowedOrigin === origin) return true;
-      
+
       // 支持通配符
       if (allowedOrigin.includes('*')) {
         const regex = new RegExp(allowedOrigin.replace(/\*/g, '.*'));
         return regex.test(origin);
       }
-      
+
       return false;
     });
   }
