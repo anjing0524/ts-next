@@ -2,6 +2,13 @@ services:
   - name: 'unified-gateway'
     bind_address: '0.0.0.0:6188'
     default_backend: 'admin-portal' # Default to admin-portal for all UI and non-API requests
+
+    # TLS 配置 (可选，取消注释启用 HTTPS)
+    # tls:
+    #   cert_path: '/etc/pingora/certs/server.crt'
+    #   key_path: '/etc/pingora/certs/server.key'
+    #   min_version: '1.3'  # 支持 TLS 1.2, 1.3
+
     backends:
       admin-portal:
         upstreams:

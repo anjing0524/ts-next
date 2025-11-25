@@ -1,3 +1,4 @@
+pub mod audit_logs;
 pub mod clients;
 pub mod consent;
 pub mod oauth;

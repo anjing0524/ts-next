@@ -66,6 +66,9 @@ pub enum ServiceError {
 
     #[error("Cache error: {0}")]
     CacheError(String),
+
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
 }
 
 impl From<crate::cache::CacheError> for ServiceError {
@@ -127,6 +130,7 @@ impl IntoResponse for AppError {
                         "An internal error occurred. Please try again later.".to_string(),
                     )
                 },
+                ServiceError::RateLimitExceeded(msg) => (StatusCode::TOO_MANY_REQUESTS, msg),
             },
             AppError::Auth(auth_error) => match auth_error {
                 AuthError::InvalidCredentials | AuthError::InvalidToken => {

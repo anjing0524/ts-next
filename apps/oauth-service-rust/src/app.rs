@@ -107,6 +107,15 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
             get(routes::roles::get_user_roles)
                 .post(routes::roles::assign_role_to_user)
                 .delete(routes::roles::remove_role_from_user),
+        )
+        // 审计日志端点 (Audit logs export endpoints)
+        .route(
+            "/api/v2/admin/audit-logs",
+            get(routes::audit_logs::list_audit_logs),
+        )
+        .route(
+            "/api/v2/admin/audit-logs/export",
+            get(routes::audit_logs::export_audit_logs),
         );
 
     // 构建应用，应用所有中间件层
@@ -117,7 +126,11 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
 
     api_router
         .with_state(app_state.clone())
-        // 6. 审计中间件 - 最后执行，最先处理所有请求
+        // 7. 安全头部 - 最先执行，为所有响应添加安全头部
+        .layer(axum::middleware::from_fn(
+            middleware::security_headers::security_headers_middleware,
+        ))
+        // 6. 审计中间件 - 在安全头部之后执行
         .layer(axum::middleware::from_fn(
             middleware::audit::audit_middleware,
         ))

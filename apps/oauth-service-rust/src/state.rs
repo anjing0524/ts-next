@@ -1,7 +1,9 @@
 use crate::config::Config;
 use crate::error::AppError;
 use crate::middleware::rate_limit::RateLimiter;
+use crate::middleware::login_rate_limit::LoginRateLimiter;
 use crate::services::{
+    audit_log_service::{AuditLogService, AuditLogServiceImpl},
     auth_code_service::{AuthCodeService, AuthCodeServiceImpl},
     client_service::{ClientService, ClientServiceImpl},
     permission_service::{PermissionService, PermissionServiceImpl},
@@ -23,8 +25,10 @@ pub struct AppState {
     pub rbac_service: Arc<dyn RBACService>,
     pub permission_service: Arc<dyn PermissionService>,
     pub role_service: Arc<dyn RoleService>,
+    pub audit_log_service: Arc<dyn AuditLogService>,
     pub permission_cache: Arc<dyn PermissionCache>,
     pub rate_limiter: Arc<RateLimiter>,
+    pub login_rate_limiter: Arc<LoginRateLimiter>,
 }
 
 impl AppState {
@@ -44,6 +48,9 @@ impl AppState {
         // Initialize rate limiter (100 req/min per IP)
         let rate_limiter = Arc::new(RateLimiter::new(100, 60));
 
+        // Initialize login rate limiter (5 attempts / 5 min per IP)
+        let login_rate_limiter = Arc::new(LoginRateLimiter::new());
+
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(db_pool.clone()));
         let client_service = Arc::new(ClientServiceImpl::new(db_pool.clone()));
@@ -61,6 +68,7 @@ impl AppState {
             db_pool.clone(),
             client_service.clone(),
         ));
+        let audit_log_service = Arc::new(AuditLogServiceImpl::new(db_pool.clone()));
 
         Ok(Self {
             user_service,
@@ -70,8 +78,10 @@ impl AppState {
             rbac_service,
             permission_service,
             role_service,
+            audit_log_service,
             permission_cache,
             rate_limiter,
+            login_rate_limiter,
         })
     }
 
@@ -85,6 +95,9 @@ impl AppState {
 
         // Initialize rate limiter (100 req/min per IP)
         let rate_limiter = Arc::new(RateLimiter::new(100, 60));
+
+        // Initialize login rate limiter (5 attempts / 5 min per IP)
+        let login_rate_limiter = Arc::new(LoginRateLimiter::new());
 
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
@@ -103,6 +116,7 @@ impl AppState {
             pool.clone(),
             client_service.clone(),
         ));
+        let audit_log_service = Arc::new(AuditLogServiceImpl::new(pool.clone()));
 
         Ok(Self {
             user_service,
@@ -112,8 +126,10 @@ impl AppState {
             rbac_service,
             permission_service,
             role_service,
+            audit_log_service,
             permission_cache,
             rate_limiter,
+            login_rate_limiter,
         })
     }
 }

@@ -3,10 +3,11 @@ use pingora::prelude::*;
 use pingora::http::ResponseHeader;
 use pingora::lb::selection::RoundRobin;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::info;
 
 use crate::config::RouteConfig;
+use crate::rate_limit::IpRateLimiter; // rate_limit module from src/rate_limit.rs
 
 pub struct Backend {
     pub name: String,
@@ -19,6 +20,7 @@ pub struct ProxyService {
     pub routes: Arc<Vec<RouteConfig>>,
     pub backends: Arc<HashMap<String, Backend>>,
     pub default_backend: Arc<str>,
+    pub rate_limiter: Arc<Mutex<IpRateLimiter>>,
 }
 
 impl ProxyService {
@@ -48,6 +50,31 @@ impl ProxyHttp for ProxyService {
     async fn upstream_peer(&self, session: &mut Session, _ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
         let uri = session.req_header().uri.to_string();
 
+        // 提取客户端 IP 并检查速率限制
+        let client_ip = if let Some(sockaddr) = session.client_addr() {
+            match sockaddr {
+                pingora::protocols::l4::socket::SocketAddr::Inet(addr) => addr.ip(),
+                pingora::protocols::l4::socket::SocketAddr::Unix(_) => {
+                    "127.0.0.1".parse().unwrap_or_else(|_| "0.0.0.0".parse().unwrap())
+                }
+            }
+        } else {
+            "0.0.0.0".parse().unwrap_or_else(|_| "127.0.0.1".parse().unwrap())
+        };
+
+        // 检查速率限制
+        {
+            let mut limiter = self.rate_limiter.lock().unwrap();
+            if !limiter.check(client_ip) {
+                info!(
+                    service = %self.service_name,
+                    client_ip = %client_ip,
+                    "Rate limit exceeded for client"
+                );
+                return Err(Error::new_str("Rate limit exceeded"));
+            }
+        }
+
         let backend = self.select_backend(&uri)
             .ok_or_else(|| Error::new_str("No backend found for request"))?;
 
@@ -55,19 +82,12 @@ impl ProxyHttp for ProxyService {
             .select(b"", 256) // hash doesn't matter for round robin
             .ok_or_else(|| Error::new_str("No healthy upstream peer"))?;
 
-        let client_ip = if let Some(sockaddr) = session.client_addr() {
-            match sockaddr {
-                pingora::protocols::l4::socket::SocketAddr::Inet(addr) => addr.ip().to_string(),
-                pingora::protocols::l4::socket::SocketAddr::Unix(_) => "unix_socket".to_string(),
-            }
-        } else {
-            "unknown".to_string()
-        };
+        let client_ip_str = client_ip.to_string();
         let peer_address = peer.addr.to_string();
 
         info!(
             service = %self.service_name,
-            client_ip = %client_ip,
+            client_ip = %client_ip_str,
             request_uri = %uri,
             backend = %backend.name,
             upstream_peer = %peer_address,

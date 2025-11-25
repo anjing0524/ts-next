@@ -44,6 +44,26 @@ impl AuthCodeService for AuthCodeServiceImpl {
         let client =
             client.ok_or_else(|| ServiceError::NotFound("Client not found".to_string()))?;
 
+        // === OAuth 2.1 合规性验证 ===
+
+        // 1. 验证 redirect_uri 是否在注册的列表中 (RFC 6749 Section 3.1.2)
+        validation::validate_redirect_uri(&params.redirect_uri, &client.redirect_uris)?;
+
+        // 2. 验证请求的作用域是否在允许范围内 (RFC 6749 Section 3.3)
+        validation::validate_scope(&params.scope, &client.allowed_scopes)?;
+
+        // 3. OAuth 2.1 要求：PUBLIC 客户端必须使用 PKCE
+        // (https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-09#section-7.2.1)
+        if client.client.client_type == crate::models::client::ClientType::PUBLIC {
+            if params.code_challenge.is_empty() {
+                return Err(ServiceError::ValidationError(
+                    "OAuth 2.1 requires PKCE (code_challenge) for public clients".to_string(),
+                ));
+            }
+            // 验证 code_challenge 格式
+            validation::validate_code_verifier(&params.code_challenge)?;
+        }
+
         let code = Uuid::new_v4().to_string();
         let expires_at = Utc::now() + Duration::minutes(10);
         let id = Uuid::new_v4().to_string();

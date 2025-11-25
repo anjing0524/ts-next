@@ -130,8 +130,37 @@ pub struct AuthenticateResponse {
 pub async fn login_endpoint(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
+    headers: axum::http::HeaderMap,
     JsonExtractor(request): JsonExtractor<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginResponse>), AppError> {
+    // 0. Rate limiting check - 5 attempts per 5 minutes per IP
+    // Extract client IP from headers (X-Forwarded-For or X-Real-IP) or connection
+    let client_ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .and_then(|ip| ip.trim().parse().ok())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|ip| ip.parse().ok())
+        })
+        .unwrap_or_else(|| "127.0.0.1".parse().unwrap());
+
+    // Check if login attempt is allowed
+    if !state.login_rate_limiter.check_login_attempt(client_ip).await {
+        let remaining = state.login_rate_limiter.get_remaining_attempts(client_ip).await;
+        tracing::warn!(
+            "Login rate limit exceeded for IP: {}, remaining attempts: {}",
+            client_ip,
+            remaining
+        );
+        return Err(ServiceError::RateLimitExceeded(
+            "Too many login attempts. Please try again in 5 minutes.".to_string(),
+        ).into());
+    }
+
     // 1. Authenticate the user
     let user = state
         .user_service

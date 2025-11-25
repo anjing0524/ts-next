@@ -18,6 +18,8 @@ pub struct ServiceConfig {
     pub default_backend: String,
     #[serde(default)]
     pub health_check: HealthCheckConfig,
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -41,12 +43,27 @@ pub struct HealthCheckConfig {
     pub frequency_secs: u64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct TlsConfig {
+    /// 证书文件路径 (PEM 格式)
+    pub cert_path: String,
+    /// 私钥文件路径 (PEM 格式)
+    pub key_path: String,
+    /// TLS 最小版本 (default: "1.3")
+    #[serde(default = "default_tls_min_version")]
+    pub min_version: String,
+}
+
 fn default_health_check_timeout_ms() -> u64 {
     500
 }
 
 fn default_health_check_frequency_secs() -> u64 {
     5
+}
+
+fn default_tls_min_version() -> String {
+    "1.3".to_string()
 }
 
 impl Default for HealthCheckConfig {
@@ -103,6 +120,22 @@ impl Settings {
                         route.path_prefix,
                         route.backend,
                         service.name
+                    ));
+                }
+            }
+
+            // 验证 TLS 配置
+            if let Some(tls_config) = &service.tls {
+                if !std::path::Path::new(&tls_config.cert_path).exists() {
+                    return Err(anyhow::anyhow!(
+                        "TLS certificate file not found: {}",
+                        tls_config.cert_path
+                    ));
+                }
+                if !std::path::Path::new(&tls_config.key_path).exists() {
+                    return Err(anyhow::anyhow!(
+                        "TLS key file not found: {}",
+                        tls_config.key_path
                     ));
                 }
             }

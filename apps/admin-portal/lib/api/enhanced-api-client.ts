@@ -29,8 +29,11 @@ export class EnhancedAPIClient {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 1000;
   private static readonly TIMEOUT = 30000;
+  private static readonly OAUTH_SERVICE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
+  private static readonly OAUTH_CLIENT_ID = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client';
 
   private static pendingRequests = new Map<string, PendingRequest>();
+  private static refreshTokenPromise: Promise<boolean> | null = null;
 
 
   /**
@@ -168,11 +171,38 @@ export class EnhancedAPIClient {
         }
       }
 
-      // Handle authentication errors
+      // Handle authentication errors - attempt automatic refresh
       if (response.status === 401 && !skipAuthRefresh) {
-        // Clear tokens and redirect to login
+        // Attempt to refresh the access token
+        const refreshed = await this.attemptTokenRefresh();
+        if (refreshed) {
+          // Token was successfully refreshed, retry the request
+          // Get the new access token and make the request again
+          const newAccessToken = TokenStorage.getAccessToken();
+          if (newAccessToken) {
+            headers.set('Authorization', `Bearer ${newAccessToken}`);
+            // Retry the request with the new token
+            const retryResponse = await fetch(url, {
+              credentials: 'same-origin',
+              mode: 'same-origin',
+              ...options,
+              headers,
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!retryResponse.ok) {
+              const errorData = await retryResponse.json().catch(() => ({}));
+              throw new Error(errorData.message || `HTTP ${retryResponse.status}`);
+            }
+            return await retryResponse.json();
+          }
+        }
+
+        // If refresh failed, clear tokens and fail the request
         TokenStorage.clearTokens();
-        throw new Error('Authentication failed');
+        triggerAuthError('Session expired. Please log in again.');
+        throw new Error('Token refresh failed');
       }
 
       // Handle other HTTP errors
@@ -190,6 +220,92 @@ export class EnhancedAPIClient {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Attempt to refresh the access token using the refresh token
+   * Handles deduplication - only one refresh request at a time
+   */
+  private static async attemptTokenRefresh(): Promise<boolean> {
+    try {
+      // If a refresh is already in progress, wait for it
+      if (this.refreshTokenPromise) {
+        return await this.refreshTokenPromise;
+      }
+
+      // Get the refresh token
+      const refreshToken = TokenStorage.getRefreshToken();
+      if (!refreshToken) {
+        console.warn('No refresh token available');
+        return false;
+      }
+
+      // Create the refresh promise
+      this.refreshTokenPromise = this.performTokenRefresh(refreshToken);
+
+      try {
+        return await this.refreshTokenPromise;
+      } finally {
+        // Clear the refresh promise
+        this.refreshTokenPromise = null;
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Perform the actual token refresh request
+   */
+  private static async performTokenRefresh(refreshToken: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.OAUTH_SERVICE_URL}/api/v2/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: this.OAUTH_CLIENT_ID,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Token refresh failed with status:', response.status);
+        return false;
+      }
+
+      const data = await response.json();
+
+      if (data.access_token) {
+        // SECURITY: Verify that refresh token was rotated (OAuth 2.1 requirement)
+        // A non-rotated refresh token could indicate a replay attack
+        if (!data.refresh_token || data.refresh_token === refreshToken) {
+          console.error('Security violation: Refresh token was not rotated by the server');
+          // Clear tokens to force re-authentication
+          TokenStorage.clearTokens();
+          triggerAuthError('Security check failed. Please log in again.');
+          return false;
+        }
+
+        // Store the new tokens
+        TokenStorage.setTokens({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresIn: data.expires_in || 3600,
+        });
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Token refresh request error:', error);
+      return false;
     }
   }
 

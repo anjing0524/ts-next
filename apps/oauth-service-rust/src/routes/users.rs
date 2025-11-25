@@ -139,9 +139,6 @@ pub async fn update_user(
     }))
 }
 
-    })))
-}
-
 pub async fn delete_user(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,

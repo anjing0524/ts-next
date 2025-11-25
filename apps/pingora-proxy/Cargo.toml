@@ -24,5 +24,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 
+# TLS/SSL 支持
+rustls = { version = "0.23", features = ["std"] }
+rustls-pemfile = "2.0"
+tokio-rustls = "0.26"
+
+# 监控 (Prometheus)
+prometheus = "0.13"
+lazy_static = "1.4"
+
+# 速率限制
+governor = "0.10"
+
+# 配置热重载
+notify = { version = "6.1", features = ["macos_fsevent"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
