@@ -1,0 +1,88 @@
+# Codecov 配置
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "70..100"
+
+ignore:
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/tests/**"
+  - "**/test/**"
+  - "node_modules"
+  - ".next"
+  - "dist"
+  - "build"
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+  require_base: false
+  show_carryforward_flags: false
+
+codecov:
+  require_ci_to_pass: false
+  branch: develop
+  bot: codecov-io
+
+# 显式映射以处理多语言覆盖率
+flag_management:
+  individual_flags:
+    - name: rust
+      paths:
+        - apps/pingora-proxy
+        - apps/oauth-service-rust
+    - name: typescript
+      paths:
+        - apps/admin-portal
+
+# 覆盖率阈值设置
+# 下降超过 5% 将失败
+threshold: 5
+
+# 设置单个文件的最小覆盖率要求
+components:
+  - component_id: admin_portal_api
+    component_name: Admin Portal API Client
+    paths:
+      - apps/admin-portal/lib/api/**
+    statuses:
+      - type: file
+        target: 90%
+
+  - component_id: admin_portal_auth
+    component_name: Admin Portal Auth
+    paths:
+      - apps/admin-portal/lib/auth/**
+    statuses:
+      - type: file
+        target: 90%
+
+  - component_id: admin_portal_hooks
+    component_name: Admin Portal Hooks
+    paths:
+      - apps/admin-portal/hooks/**
+    statuses:
+      - type: file
+        target: 85%
+
+  - component_id: oauth_service
+    component_name: OAuth Service
+    paths:
+      - apps/oauth-service-rust/src/**
+    statuses:
+      - type: file
+        target: 80%
+
+  - component_id: pingora_proxy
+    component_name: Pingora Proxy
+    paths:
+      - apps/pingora-proxy/src/**
+    statuses:
+      - type: file
+        target: 80%
