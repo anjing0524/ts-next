@@ -20,7 +20,7 @@ import { completeOAuthLogin } from './helpers/test-helpers';
  */
 
 test.describe('Role and Permission Management', () => {
-  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
+  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3002';
   const rolesRoute = '/admin/system/roles';
   const testUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
   const testPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';

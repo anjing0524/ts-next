@@ -255,7 +255,7 @@ export const API_ENDPOINTS = {
  */
 export const TEST_CONFIG = {
     // 基础 URL
-    baseUrl: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188',
+    baseUrl: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3002',
 
     // 超时配置
     timeouts: {

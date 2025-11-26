@@ -22,7 +22,7 @@ import { completeOAuthLogin, clearAuthState } from './helpers/test-helpers';
  */
 
 test.describe('OAuth 2.1 Authentication Flow', () => {
-  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
+  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3002';
   const protectedRoute = '/admin';
   const testUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
   const testPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
