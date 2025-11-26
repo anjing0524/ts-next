@@ -13,13 +13,13 @@ export default defineConfig({
   testMatch: '**/*.{test,spec}.{js,ts}',
 
   // 并行执行
-  fullyParallel: true,
+  fullyParallel: false,
 
   // 失败时不重试
   retries: 0,
 
-  // CI环境中的工作进程数
-  workers: process.env.CI ? 1 : undefined,
+  // 限制工作进程数以避免服务超载
+  workers: 1,
 
   // 测试报告配置
   reporter: [
@@ -54,6 +54,11 @@ export default defineConfig({
 
     // 跟踪设置
     trace: 'retain-on-failure',
+
+    // 代理配置：如果系统设置了 http_proxy 环境变量，
+    // 为了访问本地 localhost:6188，需要禁用代理
+    // 建议在运行测试前清除代理变量：
+    // env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY npm run test:e2e
   },
 
   // 项目配置
