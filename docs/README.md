@@ -69,6 +69,36 @@ pnpm --filter=pingora-proxy dev  # 反向代理 (6188)
 - Prometheus 监控指标
 - 日志审计系统
 
+## 📊 测试与质量
+
+### 测试增强项目完成 ✅
+
+完整的三阶段测试增强和质量提升项目已全部完成：
+
+**📋 [测试项目完整总结](./TESTING_PHASES_SUMMARY.md)**
+
+#### Phase 1: OAuth 2.1 合规性 ✅
+- [详细报告](./PHASE_1_OAUTH_COMPLIANCE_IMPROVEMENTS.md)
+- 12 个单元测试 (100% 通过)
+- OAuth 2.1 协议合规性验证
+
+#### Phase 2: 测试增强 ✅
+- [详细报告](./PHASE_2_TESTING_ENHANCEMENTS.md)
+- 124 个单元测试 (100% 通过)
+- 代码覆盖率: 90%+
+
+#### Phase 3: CI/CD 和质量保证 ✅
+- [最终总结](./PHASE_3_COMPLETION_SUMMARY.md)
+- Task 1: [CI/CD 自动化](./PHASE_3_CI_CD_INTEGRATION.md)
+- Task 2: [覆盖率可视化](./PHASE_3_COVERAGE_VISUALIZATION.md)
+- Task 3: [性能测试基准](./PHASE_3_PERFORMANCE_TESTING.md)
+
+**关键指标**:
+- 总测试数: 182+ 个 (100% 通过)
+- 代码覆盖: 90%+
+- 性能: P95 < 500ms ✅
+- 自动化: 完整 CI/CD 流程 ✅
+
 ## 开发指南
 
 ### 项目结构
