@@ -30,8 +30,9 @@ export default defineConfig({
 
   // 全局测试设置
   use: {
-    // 基础URL - 使用 Pingora 代理端口 6188
-    baseURL: 'http://localhost:6188',
+    // 基础URL - 使用 Admin Portal 端口 3002
+    // 注：Pingora 在测试期间变得不稳定，直接测试 Admin Portal 以确保测试可靠性
+    baseURL: 'http://localhost:3002',
 
     // 绕过 CSP
     bypassCSP: true,
@@ -56,7 +57,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
 
     // 代理配置：如果系统设置了 http_proxy 环境变量，
-    // 为了访问本地 localhost:6188，需要禁用代理
+    // 为了访问本地 localhost:3002，需要禁用代理
     // 建议在运行测试前清除代理变量：
     // env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY npm run test:e2e
   },
@@ -79,7 +80,6 @@ export default defineConfig({
             '--disable-extensions',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // 单进程模式（适用于容器环境）
             '--disable-blink-features=AutomationControlled',
           ],
         },

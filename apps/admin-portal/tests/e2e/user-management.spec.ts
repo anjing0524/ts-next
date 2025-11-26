@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { completeOAuthLogin } from './helpers/test-helpers';
 
 /**
  * User Management E2E Tests

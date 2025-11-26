@@ -11,7 +11,7 @@ import crypto from 'crypto';
  * - JWT 解析
  */
 
-const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
+const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3002';
 const defaultUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
 const defaultPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
 
@@ -109,8 +109,9 @@ export async function completeOAuthLogin(
 
     // 在 Playwright 执行上下文中直接执行登录提交
     // 在脚本中实现完整的表单提交逻辑，以避免竞态条件
+    let loginResult = null;
     try {
-        const result = await page.evaluate(async (username: string, password: string) => {
+        loginResult = await page.evaluate(async (args: { username: string; password: string }) => {
             const usernameInput = document.querySelector('input[data-testid="username-input"]') as HTMLInputElement;
             const passwordInput = document.querySelector('input[data-testid="password-input"]') as HTMLInputElement;
             const loginButton = document.querySelector('button[data-testid="login-button"]') as HTMLButtonElement;
@@ -131,13 +132,15 @@ export async function completeOAuthLogin(
                     actionUrl = `${protocol}//${host}${actionUrl}`;
                 }
 
+                console.log(`[Script] Attempting POST to ${actionUrl}`);
+
                 // 执行登录 POST 请求
                 const response = await fetch(actionUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        username,
-                        password,
+                        username: args.username,
+                        password: args.password,
                         redirect: new URLSearchParams(window.location.search).get('redirect') || '/admin'
                     }),
                     credentials: 'include'
@@ -147,11 +150,13 @@ export async function completeOAuthLogin(
 
                 if (!response.ok) {
                     const errorText = await response.text();
+                    console.log(`[Script] Error response: ${errorText.substring(0, 500)}`);
                     return { success: false, error: `POST failed with ${response.status}: ${errorText.substring(0, 200)}` };
                 }
 
                 const data = await response.json();
                 console.log(`[Script] Response data keys: ${Object.keys(data).join(', ')}`);
+                console.log(`[Script] Response data: ${JSON.stringify(data).substring(0, 500)}`);
 
                 if (data.redirect_url) {
                     console.log(`[Script] Got redirect_url: ${data.redirect_url}`);
@@ -166,16 +171,22 @@ export async function completeOAuthLogin(
                 }
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
+                console.log(`[Script] Exception: ${errorMsg}`);
                 return { success: false, error: `Script exception: ${errorMsg}` };
             }
-        }, username, password);
+        }, { username, password });
 
-        console.log('[Test] Login script result:', result);
+        console.log('[Test] Login script result:', loginResult);
     } catch (err) {
         // 这里可能会出现 "Execution context was destroyed" 错误，但这是预期的
         // 表示脚本成功触发了重定向
         const errorMsg = err instanceof Error ? err.message : String(err);
         console.log('[Test] Script execution status:', errorMsg);
+
+        // 如果是 "Execution context was destroyed", 这是正常的（脚本触发了重定向）
+        if (!errorMsg.includes('Execution context was destroyed')) {
+            console.warn('[Test] Unexpected error during script execution:', errorMsg);
+        }
     }
 
     // 等待导航完成
