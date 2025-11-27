@@ -19,6 +19,7 @@ const defaultPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
 /**
  * 完成OAuth登录 - 简化版本
  * 直接调用登录API而不是通过UI，以提高可靠性和速度
+ * 包含重试逻辑处理API速率限制
  *
  * @param page - Playwright Page 对象
  * @param username - 用户名 (默认: admin)
@@ -34,44 +35,74 @@ export async function completeOAuthLogin(
 ): Promise<string> {
     console.log(`[Auth] 开始OAuth登录流程，用户: ${username}`);
 
-    try {
-        // 步骤 1: 直接调用登录API
-        console.log(`[Auth] 调用登录API: ${apiBaseUrl}/api/v2/auth/login`);
-        const loginResponse = await fetch(`${apiBaseUrl}/api/v2/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                username,
-                password,
-                redirect: protectedResource
-            })
-        });
+    // 在登录前等待一个小的随机时间以避免率限制
+    const delay = Math.random() * 300 + 100; // 100-400ms 随机延迟
+    await new Promise(resolve => setTimeout(resolve, delay));
 
-        if (!loginResponse.ok) {
-            const errorText = await loginResponse.text();
-            throw new Error(`登录API失败 ${loginResponse.status}: ${errorText.substring(0, 200)}`);
+    try {
+        // 步骤 1: 直接调用登录API (包含重试逻辑)
+        console.log(`[Auth] 调用登录API: ${apiBaseUrl}/api/v2/auth/login`);
+
+        let loginResponse: Response;
+        let retries = 0;
+        const maxRetries = 3;
+
+        while (retries < maxRetries) {
+            loginResponse = await fetch(`${apiBaseUrl}/api/v2/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    password,
+                    redirect: protectedResource
+                })
+            });
+
+            // 如果是速率限制错误，等待后重试
+            if (loginResponse.status === 429) {
+                retries++;
+                if (retries < maxRetries) {
+                    const retryDelay = Math.pow(2, retries) * 2000; // 指数退避: 2s, 4s, 8s
+                    console.log(`[Auth] 遇到速率限制 (429)，${retryDelay}ms 后重试 (${retries}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
+                }
+            }
+
+            break;
         }
 
-        const loginData = await loginResponse.json();
+        if (!loginResponse!.ok) {
+            const errorText = await loginResponse!.text();
+            throw new Error(`登录API失败 ${loginResponse!.status}: ${errorText.substring(0, 200)}`);
+        }
+
+        const loginData = await loginResponse!.json();
         console.log('[Auth] 登录API响应成功', {
             hasAccessToken: !!loginData.access_token,
             hasRefreshToken: !!loginData.refresh_token,
             hasRedirectUrl: !!loginData.redirect_url
         });
 
-        // 步骤 2: 导航到基础URL以初始化页面
-        console.log('[Auth] 导航到应用程序...');
-        await page.goto(baseUrl, {
-            waitUntil: 'domcontentloaded',
-            timeout: 15000
-        }).catch(err => {
-            console.log('[Auth] 导航期间的预期错误:', err.message);
-        });
+        // 步骤 2: 导航到基础URL以初始化页面上下文
+        console.log('[Auth] 导航到应用程序以初始化上下文...');
+        try {
+            await page.goto(baseUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: 10000
+            });
+        } catch (err) {
+            console.log('[Auth] 导航错误(继续):', (err as Error).message);
+        }
+
+        // 短暂延迟确保页面上下文稳定
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         // 步骤 3: 在localStorage中设置tokens
         console.log('[Auth] 在localStorage中设置tokens...');
-        const setTokensResult = await page.evaluate((data: any) => {
-            try {
+        let setTokensResult;
+        try {
+            setTokensResult = await page.evaluate((data: any) => {
                 if (data.access_token) {
                     localStorage.setItem('access_token', data.access_token);
                 }
@@ -86,18 +117,16 @@ export async function completeOAuthLogin(
                     hasAccessToken: !!localStorage.getItem('access_token'),
                     hasRefreshToken: !!localStorage.getItem('refresh_token')
                 };
-            } catch (e) {
-                return {
-                    success: false,
-                    error: e instanceof Error ? e.message : String(e)
-                };
-            }
-        }, loginData);
+            }, loginData);
+        } catch (e) {
+            console.error('[Auth] localStorage设置异常:', e);
+            setTokensResult = { success: false, error: String(e) };
+        }
 
         console.log('[Auth] Token设置结果:', setTokensResult);
 
-        if (!setTokensResult.success) {
-            throw new Error('无法在localStorage中设置tokens');
+        if (!setTokensResult || !setTokensResult.success) {
+            throw new Error(`无法在localStorage中设置tokens: ${setTokensResult?.error || 'unknown error'}`);
         }
 
         // 步骤 4: 导航到受保护路由
