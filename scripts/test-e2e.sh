@@ -59,20 +59,16 @@ cd apps/oauth-service-rust
 # 确保测试数据库目录存在
 mkdir -p data
 
-# 如果测试数据库存在，先备份
+# 如果测试数据库存在，先备份并删除，让服务启动时重新创建
 if [ -f "test.db" ]; then
     echo "📋 备份现有测试数据库..."
     cp test.db "test.db.backup.$(date +%Y%m%d_%H%M%S)"
     rm test.db
 fi
 
-# 运行数据库迁移
-echo "🔄 运行数据库迁移..."
-DATABASE_URL="file:./test.db" pnpm db:migrate
-
-# 运行种子数据
-echo "🌱 插入种子数据..."
-DATABASE_URL="file:./test.db" pnpm db:seed
+# 注意: OAuth Service 会在启动时自动运行迁移和种子数据 (src/db.rs)
+# 只要不设置 SKIP_DB_INIT 环境变量即可
+echo "🔄 数据库将在服务启动时自动初始化..."
 
 cd ../..
 
@@ -85,13 +81,19 @@ export DATABASE_URL="file:$(pwd)/apps/oauth-service-rust/test.db"
 export JWT_SECRET="test-jwt-secret-key-for-e2e-testing"
 export ENCRYPTION_KEY="test-encryption-key-32-chars-long"
 export RUST_LOG=info
+export NODE_ENV=test
+export SKIP_RATE_LIMIT=true  # 禁用测试环境的速率限制
 
 # 使用 cargo run 启动 oauth-service
-(cd apps/oauth-service-rust && cargo run --bin oauth-service > ../../oauth-service.log 2>&1) &
+(cd apps/oauth-service-rust && cargo run --bin oauth-service-rust > ../../oauth-service.log 2>&1) &
 PIDS+=($!)
 
 # 4.2 启动 Admin Portal (Port 3002)
 echo "Starting Admin Portal..."
+# 设置 Admin Portal 所需的环境变量
+export OAUTH_SERVICE_URL="http://localhost:3001"
+export NEXT_PUBLIC_API_BASE_URL="/api/v2"
+
 # 使用 pnpm start 启动生产构建
 (cd apps/admin-portal && pnpm start -p 3002 > ../../admin-portal.log 2>&1) &
 PIDS+=($!)

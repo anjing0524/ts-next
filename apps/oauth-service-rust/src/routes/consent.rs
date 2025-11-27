@@ -159,7 +159,7 @@ pub async fn get_consent_info(
         .iter()
         .map(|scope| ScopeInfo {
             name: scope.to_string(),
-            description: format!("Access to {}", scope), // TODO: Get description from database
+            description: get_scope_description(scope),
         })
         .collect();
 
@@ -332,4 +332,23 @@ pub async fn submit_consent(
     Ok(Json(ConsentSubmitResponse {
         redirect_uri: redirect_url.to_string(),
     }))
+}
+
+/// Helper function to get scope description
+fn get_scope_description(scope: &str) -> String {
+    match scope {
+        "openid" => "Verify your identity (OpenID Connect)".to_string(),
+        "profile" => "Access your basic profile information (name, picture)".to_string(),
+        "email" => "Access your email address".to_string(),
+        "offline_access" => "Access your data when you are not logged in".to_string(),
+        "admin" => "Full administrative access".to_string(),
+        "read:users" => "View user information".to_string(),
+        "write:users" => "Create and modify users".to_string(),
+        "read:roles" => "View roles and permissions".to_string(),
+        "write:roles" => "Manage roles and permissions".to_string(),
+        "read:clients" => "View OAuth clients".to_string(),
+        "write:clients" => "Manage OAuth clients".to_string(),
+        "read:audit" => "View audit logs".to_string(),
+        _ => format!("Access to {}", scope),
+    }
 }

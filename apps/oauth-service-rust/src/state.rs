@@ -29,6 +29,7 @@ pub struct AppState {
     pub permission_cache: Arc<dyn PermissionCache>,
     pub rate_limiter: Arc<RateLimiter>,
     pub login_rate_limiter: Arc<LoginRateLimiter>,
+    pub token_rate_limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -50,6 +51,9 @@ impl AppState {
 
         // Initialize login rate limiter (5 attempts / 5 min per IP)
         let login_rate_limiter = Arc::new(LoginRateLimiter::new());
+
+        // Initialize token rate limiter (20 req/min per IP)
+        let token_rate_limiter = Arc::new(RateLimiter::new(20, 60));
 
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(db_pool.clone()));
@@ -82,6 +86,7 @@ impl AppState {
             permission_cache,
             rate_limiter,
             login_rate_limiter,
+            token_rate_limiter,
         })
     }
 
@@ -98,6 +103,9 @@ impl AppState {
 
         // Initialize login rate limiter (5 attempts / 5 min per IP)
         let login_rate_limiter = Arc::new(LoginRateLimiter::new());
+
+        // Initialize token rate limiter (20 req/min per IP)
+        let token_rate_limiter = Arc::new(RateLimiter::new(20, 60));
 
         // Initialize services
         let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
@@ -130,6 +138,7 @@ impl AppState {
             permission_cache,
             rate_limiter,
             login_rate_limiter,
+            token_rate_limiter,
         })
     }
 }

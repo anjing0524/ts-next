@@ -84,6 +84,11 @@ pub async fn rate_limit_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, String)> {
+    // 检查是否跳过速率限制（测试环境）
+    if std::env::var("SKIP_RATE_LIMIT").unwrap_or_else(|_| "false".to_string()) == "true" {
+        return Ok(next.run(request).await);
+    }
+
     // 从请求扩展中获取 ConnectInfo
     let addr = request
         .extensions()

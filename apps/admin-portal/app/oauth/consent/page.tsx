@@ -72,7 +72,16 @@ function ConsentContent() {
         setLoading(false);
       })
       .catch((err) => {
-        setError(typeof err === 'string' ? err : err.message || '加载同意信息失败');
+        const errorMessage = typeof err === 'string' ? err : err.message || '加载同意信息失败';
+
+        // Check for 401 Unauthorized (Session Expired)
+        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          const currentUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/login?redirect=${currentUrl}`;
+          return;
+        }
+
+        setError(errorMessage);
         setLoading(false);
       });
   }, [
@@ -156,8 +165,14 @@ function ConsentContent() {
       } else {
         throw new Error('无效的响应');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('授权确认错误:', error);
+      // Check for 401 Unauthorized (Session Expired)
+      if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+        const currentUrl = encodeURIComponent(window.location.href);
+        window.location.href = `/login?redirect=${currentUrl}`;
+        return;
+      }
       setError('处理授权请求失败，请重试');
     }
   };

@@ -62,11 +62,8 @@ export function UsernamePasswordForm({ className }: UsernamePasswordFormProps) {
     }
 
     try {
-      // 构建登录请求 URL (通过 Pingora)
-      const pingora_url = typeof window !== 'undefined'
-        ? `${window.location.protocol}//${window.location.hostname}:6188`
-        : 'http://localhost:6188';
-      const loginUrl = `${pingora_url}/api/v2/auth/login`;
+      // Use relative path to go through Next.js proxy
+      const loginUrl = '/api/v2/auth/login';
 
       console.log('Sending login request to:', loginUrl);
 

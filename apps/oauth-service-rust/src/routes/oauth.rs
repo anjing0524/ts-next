@@ -212,8 +212,30 @@ pub async fn login_endpoint(
 /// Handles `/api/v2/oauth/token`
 pub async fn token_endpoint(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     JsonExtractor(request): JsonExtractor<TokenRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
+    // 0. Rate limiting check - 20 attempts per minute per IP
+    let client_ip: std::net::IpAddr = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .and_then(|ip| ip.trim().parse().ok())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|ip| ip.parse().ok())
+        })
+        .unwrap_or_else(|| "127.0.0.1".parse().unwrap());
+
+    if !state.token_rate_limiter.check_rate_limit(&client_ip.to_string()).await {
+        tracing::warn!("Token endpoint rate limit exceeded for IP: {}", client_ip);
+        return Err(ServiceError::RateLimitExceeded(
+            "Too many token requests. Please try again later.".to_string(),
+        ).into());
+    }
+
     let client = state
         .client_service
         .authenticate_client(&request.client_id, request.client_secret.as_deref())

@@ -1,7 +1,8 @@
 import { User, OAuthClient } from '../types/auth';
 
 // API客户端配置
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
+// Use local proxy /api/v2 to avoid direct calls to OAuth Service
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v2';
 
 // 基础请求函数
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

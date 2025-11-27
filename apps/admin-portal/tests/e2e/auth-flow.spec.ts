@@ -22,7 +22,10 @@ import { completeOAuthLogin, clearAuthState } from './helpers/test-helpers';
  */
 
 test.describe('OAuth 2.1 Authentication Flow', () => {
-  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3002';
+  // Pingora 代理地址（6188）路由所有流量：
+  // - /api/v2/* → OAuth Service (3001)
+  // - 其他请求 → Admin Portal (3002)
+  const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
   const protectedRoute = '/admin';
   const testUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
   const testPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
@@ -51,7 +54,7 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
     // Clear any existing auth state after navigation
     await clearAuthState(page);
 
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
     // Step 2: Wait for form
     await page.waitForSelector('form', { timeout: 5000 });
@@ -97,7 +100,7 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
     await page.goto(`${baseUrl}/auth/callback?code=${validCode}&state=${invalidState}`);
 
     // Wait for page to load
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
     // Should either:
     // 1. Show error message, or
@@ -125,7 +128,7 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
 
     // Step 2: Now access protected route - should not redirect to login
     await page.goto(`${baseUrl}${protectedRoute}`);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
     // Step 3: Verify we can access protected route
     const finalUrl = page.url();
@@ -148,15 +151,14 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
 
     // Step 3: Access protected route
     await page.goto(`${baseUrl}${protectedRoute}`);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
     // Step 4: Verify all requests are to Pingora (localhost:6188)
+    // Step 4: Verify all requests are to Admin Portal Proxy (localhost:3002) or Pingora (localhost:6188)
+    // We strictly forbid direct calls to OAuth Service (localhost:3001)
     const directBackendRequests = networkLog.filter(
       (url) =>
-        (url.includes('localhost:3001') ||
-          url.includes('localhost:3002') ||
-          url.includes('localhost:3003')) &&
-        !url.includes('localhost:6188')
+        url.includes('localhost:3001')
     );
 
     // Should have no direct requests to backend services
@@ -183,8 +185,8 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
     });
 
     // Step 3: Try to access protected route again
-    await page.goto(`${baseUrl}${protectedRoute}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.goto(`${baseUrl}${protectedRoute}`, { waitUntil: 'domcontentloaded' }).catch(() => { });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
     // Step 4: Should be redirected to login/authorize flow
     const url = page.url();

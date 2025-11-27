@@ -9,8 +9,9 @@ const OAUTH_BASE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://loca
 export const OAuthConfig = {
   clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
   redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
-  authorizationEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/authorize`,
-  tokenEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/token`,
+  // Use relative paths to go through Next.js proxy
+  authorizationEndpoint: '/api/v2/oauth/authorize',
+  tokenEndpoint: '/api/v2/oauth/token',
   scope: 'openid profile offline_access admin:full_access',
 };
 
