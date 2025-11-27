@@ -71,16 +71,16 @@ function ConsentContent() {
         setApiData(response);
         setLoading(false);
       })
-      .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : err.message || '加载同意信息失败';
-
-        // Check for 401 Unauthorized (Session Expired)
-        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      .catch((err: any) => {
+        // 使用 ApiError 类判断错误类型
+        // Use ApiError class to determine error type
+        if (err.isSessionExpired?.()) {
           const currentUrl = encodeURIComponent(window.location.href);
           window.location.href = `/login?redirect=${currentUrl}`;
           return;
         }
 
+        const errorMessage = typeof err === 'string' ? err : err.getUserFriendlyMessage?.() || err.message || '加载同意信息失败';
         setError(errorMessage);
         setLoading(false);
       });
@@ -167,13 +167,15 @@ function ConsentContent() {
       }
     } catch (error: any) {
       console.error('授权确认错误:', error);
-      // Check for 401 Unauthorized (Session Expired)
-      if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+      // 使用 ApiError 类判断 Session 过期
+      // Use ApiError class to check session expiration
+      if (error.isSessionExpired?.()) {
         const currentUrl = encodeURIComponent(window.location.href);
         window.location.href = `/login?redirect=${currentUrl}`;
         return;
       }
-      setError('处理授权请求失败，请重试');
+      const errorMessage = error.getUserFriendlyMessage?.() || '处理授权请求失败，请重试';
+      setError(errorMessage);
     }
   };
 

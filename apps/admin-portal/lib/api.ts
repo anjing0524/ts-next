@@ -4,6 +4,45 @@ import { User, OAuthClient } from '../types/auth';
 // Use local proxy /api/v2 to avoid direct calls to OAuth Service
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v2';
 
+/**
+ * 自定义 API 错误类
+ * Custom API error class with status code and localized messages
+ */
+export class ApiError extends Error {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+
+  // 判断是否是 Session 过期错误
+  // Check if this is a session expiration error
+  isSessionExpired(): boolean {
+    return this.statusCode === 401;
+  }
+
+  // 获取用户友好的错误信息
+  // Get user-friendly error message
+  getUserFriendlyMessage(): string {
+    if (this.isSessionExpired()) {
+      return '您的登录已过期，请重新登录';
+    }
+    if (this.statusCode === 403) {
+      return '您没有权限访问此资源';
+    }
+    if (this.statusCode === 404) {
+      return '请求的资源不存在';
+    }
+    if (this.statusCode === 500) {
+      return '服务器出错，请稍后重试';
+    }
+    return this.message || '发生未知错误';
+  }
+}
+
 // 基础请求函数
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -17,7 +56,11 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP ${response.status}`);
+    const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`;
+
+    // 抛出自定义 ApiError，包含状态码
+    // Throw custom ApiError with status code
+    throw new ApiError(response.status, errorMessage, errorData);
   }
 
   return response.json();

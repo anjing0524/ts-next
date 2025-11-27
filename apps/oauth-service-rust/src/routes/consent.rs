@@ -334,21 +334,35 @@ pub async fn submit_consent(
     }))
 }
 
-/// Helper function to get scope description
+/// 获取权限范围的中文描述
+/// Helper function to get scope description with Chinese localization
 fn get_scope_description(scope: &str) -> String {
     match scope {
-        "openid" => "Verify your identity (OpenID Connect)".to_string(),
-        "profile" => "Access your basic profile information (name, picture)".to_string(),
-        "email" => "Access your email address".to_string(),
-        "offline_access" => "Access your data when you are not logged in".to_string(),
-        "admin" => "Full administrative access".to_string(),
-        "read:users" => "View user information".to_string(),
-        "write:users" => "Create and modify users".to_string(),
-        "read:roles" => "View roles and permissions".to_string(),
-        "write:roles" => "Manage roles and permissions".to_string(),
-        "read:clients" => "View OAuth clients".to_string(),
-        "write:clients" => "Manage OAuth clients".to_string(),
-        "read:audit" => "View audit logs".to_string(),
-        _ => format!("Access to {}", scope),
+        // OpenID Connect 标准权限
+        "openid" => "验证您的身份 | Verify your identity (OpenID Connect)".to_string(),
+        "profile" => "访问您的基本资料（姓名、头像等） | Access your basic profile information (name, picture)".to_string(),
+        "email" => "访问您的电子邮件地址 | Access your email address".to_string(),
+        "offline_access" => "在您未登录时访问您的数据 | Access your data when you are not logged in".to_string(),
+
+        // 管理员权限
+        "admin" => "完全管理员权限 | Full administrative access".to_string(),
+
+        // 用户管理权限
+        "read:users" => "查看用户信息 | View user information".to_string(),
+        "write:users" => "创建和修改用户 | Create and modify users".to_string(),
+
+        // 角色权限管理
+        "read:roles" => "查看角色和权限 | View roles and permissions".to_string(),
+        "write:roles" => "管理角色和权限 | Manage roles and permissions".to_string(),
+
+        // OAuth 客户端管理
+        "read:clients" => "查看 OAuth 客户端 | View OAuth clients".to_string(),
+        "write:clients" => "管理 OAuth 客户端 | Manage OAuth clients".to_string(),
+
+        // 审计日志
+        "read:audit" => "查看审计日志 | View audit logs".to_string(),
+
+        // 默认格式
+        _ => format!("访问 {} | Access to {}", scope, scope),
     }
 }
