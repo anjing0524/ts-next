@@ -46,20 +46,30 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
   /**
    * Scenario 2: Invalid Credentials
    * Tests error handling for wrong username/password
+   * 注意：必须先访问受保护资源(/admin)触发OAuth重定向，而不是直接访问/login
    */
   test('Scenario 2: Error handling for invalid credentials', async ({ page }) => {
-    // Step 1: Navigate to login page
-    await page.goto(`${baseUrl}/login`);
+    // Step 1: 访问受保护资源 - 触发OAuth重定向
+    // Access protected route - triggers OAuth redirect
+    console.log(`[Test] Step 1: Accessing protected resource ${baseUrl}${protectedRoute}`);
+    await page.goto(`${baseUrl}${protectedRoute}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000
+    });
+
+    // Step 2: 应该重定向到登录页面
+    console.log(`[Test] Step 2: Waiting for redirect to login page`);
+    await page.waitForURL(/\/login/, { timeout: 8000 });
 
     // Clear any existing auth state after navigation
     await clearAuthState(page);
 
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
-    // Step 2: Wait for form
+    // Step 3: Wait for form
     await page.waitForSelector('form', { timeout: 5000 });
 
-    // Step 3: Try invalid credentials
+    // Step 4: Try invalid credentials
     const usernameInput = page.getByTestId('username-input');
     await usernameInput.waitFor({ state: 'visible', timeout: 5000 });
     await usernameInput.fill('invalid-user');
@@ -68,14 +78,14 @@ test.describe('OAuth 2.1 Authentication Flow', () => {
     await passwordInput.waitFor({ state: 'visible', timeout: 5000 });
     await passwordInput.fill('invalid-password');
 
-    // Step 4: Submit login
+    // Step 5: Submit login
     const loginButton = page.getByTestId('login-button');
     await loginButton.click();
 
-    // Step 5: Wait for error response
+    // Step 6: Wait for error response
     await page.waitForTimeout(2000);
 
-    // Step 6: Verify error message is displayed (check multiple possible locations)
+    // Step 7: Verify error message is displayed (check multiple possible locations)
     try {
       await expect(page.getByText(/用户名或密码错误|invalid|incorrect|error/i)).toBeVisible({ timeout: 5000 });
     } catch {

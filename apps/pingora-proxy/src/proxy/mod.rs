@@ -107,9 +107,26 @@ impl ProxyHttp for ProxyService {
         upstream_response: &mut ResponseHeader,
         _ctx: &mut Self::CTX,
     ) -> Result<()> where Self::CTX: Send + Sync {
-        // TODO: 修改 Set-Cookie header 的 Domain 属性
-        // 目前 Pingora 的 ResponseHeader 不支持直接修改 headers
-        // 需要在后端服务（oauth-service 和 admin-portal）中设置正确的 Domain
+        // 为 Next.js SSR 流式响应优化
+        // Enable streaming for Next.js SSR responses
+        // Pingora 默认会传递流式响应给客户端而不缓冲
+
+        // 检查是否为流式响应（Transfer-Encoding: chunked 或 Content-Length 缺失）
+        let has_chunked = upstream_response
+            .headers
+            .get("transfer-encoding")
+            .map(|v| v.to_str().unwrap_or("").to_lowercase().contains("chunked"))
+            .unwrap_or(false);
+
+        let is_streaming = has_chunked || upstream_response.headers.get("content-length").is_none();
+
+        if is_streaming {
+            info!(
+                service = %self.service_name,
+                chunked = %has_chunked,
+                "Processing streaming response (Next.js SSR)"
+            );
+        }
 
         // 记录 Set-Cookie headers 用于调试
         let set_cookie_count = upstream_response

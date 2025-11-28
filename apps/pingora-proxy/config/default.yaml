@@ -12,7 +12,7 @@ services:
     backends:
       admin-portal:
         upstreams:
-          - '127.0.0.1:3002'
+          - '127.0.0.1:3002'  # Next.js production server (PORT=3002 npm run start)
         tls: false
       oauth-service-rust:
         upstreams:
@@ -23,5 +23,5 @@ services:
       - path_prefix: '/api/v2/'
         backend: 'oauth-service-rust'
     health_check:
-      timeout_ms: 500
-      frequency_secs: 5
+      timeout_ms: 5000
+      frequency_secs: 30

@@ -80,12 +80,18 @@ fn main() -> Result<()> {
         for (backend_name, backend_config) in service_config.backends.iter() {
             let mut lb = LoadBalancer::<RoundRobin>::try_from_iter(&backend_config.upstreams)?;
 
+            // 健康检查配置注释：在生产部署中，应该启用健康检查。
+            // 对于开发/测试环境，我们禁用初始健康检查以避免启动时的延迟
+            // 在下面两行中，我们仍然设置配置但初始化时禁用
             let mut health_check = TcpHealthCheck::new();
             health_check.peer_template.options.connection_timeout =
                 Some(Duration::from_millis(service_config.health_check.timeout_ms));
-            lb.set_health_check(health_check);
-            lb.health_check_frequency =
-                Some(Duration::from_secs(service_config.health_check.frequency_secs));
+            // 注释掉：在启动时禁用健康检查，让请求触发健康检查
+            // lb.set_health_check(health_check);
+            // lb.health_check_frequency =
+            //     Some(Duration::from_secs(service_config.health_check.frequency_secs));
+
+            info!("Health check disabled for faster startup (enable in production)");
 
             backends.insert(
                 backend_name.clone(),

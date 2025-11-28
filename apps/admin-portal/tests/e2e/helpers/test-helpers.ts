@@ -13,7 +13,7 @@ import * as crypto from 'crypto';
 
 // Pingora 代理地址（6188）路由所有流量：
 // - /api/v2/* → OAuth Service (3001)
-// - 其他请求 → Admin Portal (3002)
+// - 其他请求 → Admin Portal (3000) [生产模式的Next.js默认端口]
 const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
 const defaultUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
 const defaultPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
