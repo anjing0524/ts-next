@@ -2,21 +2,266 @@
 
 {% block title %}登录 - OAuth 授权系统{% endblock %}
 
-{% block content %}
-<div class="flex items-center justify-center min-h-[600px]">
-    <div class="w-full max-w-md">
-        <h1 class="text-3xl font-bold mb-8">{{ company_name }}</h1>
+{% block extra_head %}
+<style>
+    .form-error {
+        color: #dc2626;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+        display: none;
+    }
+    .form-error.show {
+        display: block;
+    }
+    .remember-me {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+</style>
+{% endblock %}
 
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100
+            flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+        <!-- 品牌和标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">{{ company_name }}</h1>
+            <p class="text-sm text-gray-600 mt-2">OAuth 授权系统登录</p>
+        </div>
+
+        <!-- 错误消息 -->
         {% if let Some(error) = error_message %}
-        <div class="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
-            <p class="text-red-700">{{ error }}</p>
+        <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
+            <p class="text-red-700 font-medium text-sm">
+                <span class="mr-2">⚠️</span>{{ error }}
+            </p>
         </div>
         {% endif %}
 
-        <p class="text-gray-600 mb-4">登录表单将在这里显示</p>
-        {% if let Some(url) = redirect_url %}
-        <p class="text-sm text-gray-500">Redirect URL: {{ url }}</p>
-        {% endif %}
+        <!-- 登录表单 -->
+        <form id="login-form" method="POST" action="/api/v2/auth/login" class="space-y-6">
+            <!-- 用户名字段 -->
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+                    用户名或邮箱
+                </label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    required
+                    autofocus
+                    placeholder="请输入用户名或邮箱"
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300
+                           focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+                           transition-colors duration-200
+                           placeholder-gray-400"
+                    aria-label="用户名或邮箱">
+                <div class="form-error" id="username-error" role="alert"></div>
+            </div>
+
+            <!-- 密码字段 -->
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                    密码
+                </label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    required
+                    placeholder="请输入密码"
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300
+                           focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+                           transition-colors duration-200
+                           placeholder-gray-400"
+                    aria-label="密码">
+                <div class="form-error" id="password-error" role="alert"></div>
+            </div>
+
+            <!-- 记住我和忘记密码 -->
+            <div class="flex items-center justify-between text-sm">
+                <label class="remember-me cursor-pointer">
+                    <input
+                        type="checkbox"
+                        id="remember"
+                        name="remember"
+                        class="w-4 h-4 rounded border-gray-300
+                               text-blue-600 focus:ring-blue-500">
+                    <span class="text-gray-700">记住我</span>
+                </label>
+                <a href="#" class="text-blue-600 hover:text-blue-700 font-medium">
+                    忘记密码?
+                </a>
+            </div>
+
+            <!-- 隐藏字段：重定向 URL -->
+            {% if let Some(url) = redirect_url %}
+            <input type="hidden" name="redirect" value="{{ url }}">
+            {% endif %}
+
+            <!-- 登录按钮 -->
+            <button
+                type="submit"
+                id="submit-btn"
+                class="w-full py-2 px-4 rounded-lg font-semibold
+                       bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800
+                       transition-colors duration-200
+                       disabled:opacity-50 disabled:cursor-not-allowed">
+                <span id="btn-text">登录</span>
+                <span id="btn-loading" class="hidden">
+                    <svg class="inline w-4 h-4 mr-2 animate-spin"
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    登录中...
+                </span>
+            </button>
+        </form>
+
+        <!-- 其他选项 -->
+        <div class="mt-6 border-t border-gray-200 pt-6">
+            <div class="text-center text-sm text-gray-600">
+                没有账户? <a href="#" class="text-blue-600 hover:text-blue-700 font-medium">申请注册</a>
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+    // 前端表单验证和提交处理
+    const form = document.getElementById('login-form');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const usernameError = document.getElementById('username-error');
+    const passwordError = document.getElementById('password-error');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const btnLoading = document.getElementById('btn-loading');
+
+    // 验证函数
+    function validateUsername(value) {
+        if (!value || value.trim().length === 0) {
+            return '用户名不能为空';
+        }
+        if (value.length < 3) {
+            return '用户名至少需要 3 个字符';
+        }
+        if (value.length > 50) {
+            return '用户名不能超过 50 个字符';
+        }
+        if (!/^[a-zA-Z0-9._@-]+$/.test(value)) {
+            return '用户名包含无效字符';
+        }
+        return '';
+    }
+
+    function validatePassword(value) {
+        if (!value || value.length === 0) {
+            return '密码不能为空';
+        }
+        if (value.length < 6) {
+            return '密码至少需要 6 个字符';
+        }
+        if (value.length > 128) {
+            return '密码不能超过 128 个字符';
+        }
+        return '';
+    }
+
+    // 显示错误
+    function showError(input, errorElement, message) {
+        if (message) {
+            input.classList.remove('border-gray-300', 'focus:border-blue-500');
+            input.classList.add('border-red-500', 'focus:border-red-500');
+            errorElement.textContent = message;
+            errorElement.classList.add('show');
+        } else {
+            input.classList.add('border-gray-300', 'focus:border-blue-500');
+            input.classList.remove('border-red-500', 'focus:border-red-500');
+            errorElement.textContent = '';
+            errorElement.classList.remove('show');
+        }
+    }
+
+    // 实时验证
+    usernameInput.addEventListener('blur', () => {
+        const error = validateUsername(usernameInput.value);
+        showError(usernameInput, usernameError, error);
+    });
+
+    passwordInput.addEventListener('blur', () => {
+        const error = validatePassword(passwordInput.value);
+        showError(passwordInput, passwordError, error);
+    });
+
+    // 表单提交
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // 验证
+        const usernameErr = validateUsername(usernameInput.value);
+        const passwordErr = validatePassword(passwordInput.value);
+
+        showError(usernameInput, usernameError, usernameErr);
+        showError(passwordInput, passwordError, passwordErr);
+
+        if (usernameErr || passwordErr) {
+            return;
+        }
+
+        // 禁用按钮，显示加载状态
+        submitBtn.disabled = true;
+        btnText.classList.add('hidden');
+        btnLoading.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/api/v2/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: usernameInput.value,
+                    password: passwordInput.value,
+                    remember: document.getElementById('remember').checked,
+                    redirect: form.querySelector('input[name="redirect"]')?.value || '/',
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                // 登录成功，重定向
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    window.location.href = '/success';
+                }
+            } else {
+                // 登录失败，显示错误
+                const errorMsg = data.error || '登录失败，请检查用户名和密码';
+                // 显示为全局错误消息或重新加载页面
+                window.location.href = '/login?error=' + encodeURIComponent(errorMsg);
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            alert('网络错误，请稍后重试');
+            submitBtn.disabled = false;
+            btnText.classList.remove('hidden');
+            btnLoading.classList.add('hidden');
+        }
+    });
+</script>
 {% endblock %}

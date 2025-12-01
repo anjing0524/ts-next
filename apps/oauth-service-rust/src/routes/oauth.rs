@@ -179,25 +179,100 @@ pub async fn login_endpoint(
     let is_production = std::env::var("NODE_ENV")
         .unwrap_or_else(|_| "development".to_string()) == "production";
 
-    // 注意：不设置 domain 属性，让浏览器使用当前的 host
-    // 这样可以确保 cookie 在通过 Pingora 代理时正确工作
-    // domain 默认会被设置为当前请求的 host，这是最安全的做法
+    // 从环境变量读取 Cookie domain
+    // 本地开发使用 .localhost，生产环境使用实际域名
+    let cookie_domain = std::env::var("COOKIE_DOMAIN")
+        .unwrap_or_else(|_| {
+            if is_production {
+                tracing::warn!("COOKIE_DOMAIN not set in production! Using default .localhost. This may fail!");
+                ".localhost".to_string()
+            } else {
+                ".localhost".to_string()
+            }
+        });
+
+    // 显式设置 domain 属性，确保 cookie 跨子域正确工作
     let session_cookie = Cookie::build(("session_token", token_pair.access_token))
+        .domain(cookie_domain)     // ✅ 显式设置 domain，避免浏览器推断失败
         .path("/")
-        // 移除 .domain("localhost") - 让浏览器自动使用当前的 host
-        .http_only(true)      // ✅ Prevent XSS attacks - JavaScript cannot access this cookie
-        .secure(is_production) // ✅ Enforce HTTPS in production
-        .same_site(SameSite::Lax) // ✅ CSRF protection with Lax mode (allow same-site navigation)
+        .http_only(true)           // ✅ Prevent XSS attacks - JavaScript cannot access this cookie
+        .secure(is_production)     // ✅ Enforce HTTPS in production
+        .same_site(SameSite::Strict) // ✅ CSRF protection - Strict is more secure than Lax
         .max_age(time::Duration::hours(1)); // Session expires in 1 hour
 
     let updated_jar = jar.add(session_cookie);
 
     // 4. Return JSON response with redirect URL instead of 302 redirect
     // This ensures the Set-Cookie header is properly received by the browser
-    let redirect_url = request.redirect.unwrap_or_else(|| "/".to_string());
+
+    // 解析原始的 /authorize URL 来提取 OAuth 参数
+    // Parse the original /authorize URL to extract OAuth parameters
+    let redirect_url = if let Some(auth_url) = &request.redirect {
+        // 使用 url 库来解析 URL 和查询参数
+        // Parse the authorize URL to extract query parameters
+        if let Ok(parsed_url) = url::Url::parse(auth_url) {
+            let params: std::collections::HashMap<String, String> = parsed_url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+
+            // 获取 Admin Portal URL，默认使用 localhost:6188（通过 Pingora 代理）
+            // Get Admin Portal URL from environment or use default via Pingora proxy
+            let admin_portal_url = std::env::var("ADMIN_PORTAL_URL")
+                .unwrap_or_else(|_| "http://localhost:6188".to_string());
+
+            // 构建指向 Admin Portal 同意页面的 URL
+            // Construct URL to Admin Portal's consent page with OAuth parameters
+            let mut query_parts = Vec::new();
+
+            if let Some(client_id) = params.get("client_id") {
+                query_parts.push(format!("client_id={}", urlencoding::encode(client_id)));
+            }
+            if let Some(redirect_uri) = params.get("redirect_uri") {
+                query_parts.push(format!("redirect_uri={}", urlencoding::encode(redirect_uri)));
+            }
+            if let Some(response_type) = params.get("response_type") {
+                query_parts.push(format!("response_type={}", urlencoding::encode(response_type)));
+            } else {
+                query_parts.push("response_type=code".to_string());
+            }
+            if let Some(scope) = params.get("scope") {
+                query_parts.push(format!("scope={}", urlencoding::encode(scope)));
+            }
+            if let Some(state) = params.get("state") {
+                query_parts.push(format!("state={}", urlencoding::encode(state)));
+            }
+            if let Some(code_challenge) = params.get("code_challenge") {
+                query_parts.push(format!("code_challenge={}", urlencoding::encode(code_challenge)));
+            }
+            if let Some(code_challenge_method) = params.get("code_challenge_method") {
+                query_parts.push(format!("code_challenge_method={}", urlencoding::encode(code_challenge_method)));
+            } else {
+                query_parts.push("code_challenge_method=S256".to_string());
+            }
+            if let Some(nonce) = params.get("nonce") {
+                query_parts.push(format!("nonce={}", urlencoding::encode(nonce)));
+            }
+
+            let query_string = query_parts.join("&");
+            format!("{}/oauth/consent?{}", admin_portal_url, query_string)
+        } else {
+            // 如果无法解析 URL，使用默认回退 (使用 Admin Portal URL)
+            // If URL parsing fails, fall back to default
+            let admin_portal_url = std::env::var("ADMIN_PORTAL_URL")
+                .unwrap_or_else(|_| "http://localhost:6188".to_string());
+            format!("{}/oauth/consent", admin_portal_url)
+        }
+    } else {
+        // 如果没有提供 redirect URL，默认指向同意页面 (使用 Admin Portal URL)
+        // If no redirect URL provided, default to consent page
+        let admin_portal_url = std::env::var("ADMIN_PORTAL_URL")
+            .unwrap_or_else(|_| "http://localhost:6188".to_string());
+        format!("{}/oauth/consent", admin_portal_url)
+    };
 
     tracing::info!(
-        "Login successful for user: {}, redirecting to: {}",
+        "Login successful for user: {}, redirecting to consent page: {}",
         request.username,
         redirect_url
     );

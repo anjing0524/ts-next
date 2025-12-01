@@ -27,6 +27,104 @@ pub struct LoginQuery {
     pub error: Option<String>,
 }
 
+/// 登录表单提交请求
+#[derive(Deserialize)]
+pub struct LoginFormRequest {
+    /// 用户名或邮箱
+    pub username: String,
+    /// 密码
+    pub password: String,
+    /// 是否记住我
+    pub remember: Option<bool>,
+    /// 重定向地址
+    pub redirect: Option<String>,
+}
+
+impl LoginFormRequest {
+    /// 验证用户名格式
+    pub fn validate_username(&self) -> Result<(), String> {
+        let username = self.username.trim();
+
+        if username.is_empty() {
+            return Err("用户名不能为空".to_string());
+        }
+
+        if username.len() < 3 {
+            return Err("用户名至少需要 3 个字符".to_string());
+        }
+
+        if username.len() > 50 {
+            return Err("用户名不能超过 50 个字符".to_string());
+        }
+
+        // 允许字母、数字、下划线、点号、连字符和@（邮箱）
+        if !username.chars().all(|c| c.is_alphanumeric() || "._@-".contains(c)) {
+            return Err("用户名包含无效字符".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// 验证密码格式
+    pub fn validate_password(&self) -> Result<(), String> {
+        let password = &self.password;
+
+        if password.is_empty() {
+            return Err("密码不能为空".to_string());
+        }
+
+        if password.len() < 6 {
+            return Err("密码至少需要 6 个字符".to_string());
+        }
+
+        if password.len() > 128 {
+            return Err("密码不能超过 128 个字符".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// 验证重定向 URL（防止开放重定向）
+    pub fn validate_redirect(&self) -> Result<Option<String>, String> {
+        if let Some(ref redirect) = self.redirect {
+            let url = redirect.trim();
+
+            if url.is_empty() {
+                return Ok(None);
+            }
+
+            // 允许的重定向源
+            let allowed_origins = [
+                "http://localhost:3002",
+                "http://localhost:3001",
+                "http://127.0.0.1:3002",
+                "http://127.0.0.1:3001",
+                "/",  // 相对 URL
+            ];
+
+            let is_valid = allowed_origins.iter().any(|origin| {
+                url.starts_with(origin)
+            }) || url.starts_with("/");
+
+            if !is_valid {
+                return Err("无效的重定向 URL".to_string());
+            }
+
+            Ok(Some(url.to_string()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// 验证整个登录请求
+    pub fn validate_all(&self) -> Result<(), String> {
+        self.validate_username()?;
+        self.validate_password()?;
+        self.validate_redirect()?;
+        Ok(())
+    }
+}
+
 /// 处理登录页面请求
 /// GET /login
 pub async fn login_handler(
