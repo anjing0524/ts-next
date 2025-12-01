@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
 use crate::{config::Config, middleware, routes, state::AppState};
 
@@ -116,7 +116,18 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
         .route(
             "/api/v2/admin/audit-logs/export",
             get(routes::audit_logs::export_audit_logs),
-        );
+        )
+        // ===== Web UI 路由 =====
+        // 登录页面
+        .route("/login", get(routes::templates::login_handler))
+        // 权限同意页面
+        .route("/oauth/consent", get(routes::templates::consent_handler))
+        // 错误页面
+        .route("/error", get(routes::templates::error_handler))
+        // 成功页面
+        .route("/success", get(routes::templates::success_handler))
+        // 静态文件服务 (CSS, JavaScript, 图片等)
+        .nest_service("/static", ServeDir::new("static"));
 
     // 构建应用，应用所有中间件层
     // 采用简化的架构：直接在 Router 上应用层，避免 ServiceBuilder 的复杂类型

@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义组件 */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-medium
+           bg-blue-600 text-white
+           hover:bg-blue-700 active:bg-blue-800
+           transition-colors duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-medium
+           bg-gray-200 text-gray-900
+           hover:bg-gray-300 active:bg-gray-400
+           transition-colors duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2 rounded-lg
+           border border-gray-300
+           focus:border-blue-500 focus:ring-2 focus:ring-blue-200
+           transition-colors duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md
+           border border-gray-200
+           p-6 space-y-4;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .card {
+    @apply bg-slate-800 border-slate-700;
+  }
+
+  .input-field {
+    @apply bg-slate-700 border-slate-600 text-white;
+  }
+}

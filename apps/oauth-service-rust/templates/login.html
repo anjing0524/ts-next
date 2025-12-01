@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+
+{% block title %}登录 - OAuth 授权系统{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[600px]">
+    <div class="w-full max-w-md">
+        <h1 class="text-3xl font-bold mb-8">{{ company_name }}</h1>
+
+        {% if let Some(error) = error_message %}
+        <div class="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
+            <p class="text-red-700">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <p class="text-gray-600 mb-4">登录表单将在这里显示</p>
+        {% if let Some(url) = redirect_url %}
+        <p class="text-sm text-gray-500">Redirect URL: {{ url }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

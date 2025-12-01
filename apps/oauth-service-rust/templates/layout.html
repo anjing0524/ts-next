@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OAuth 授权系统{% endblock %}</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="/static/styles/tailwind.css">
+
+    <style>
+        :root {
+            --color-primary: #3B82F6;
+            --color-secondary: #EF4444;
+            --color-accent: #8B5CF6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color-scheme: dark;
+            }
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-white dark:bg-slate-900 text-gray-900 dark:text-white">
+
+    <nav class="bg-white dark:bg-slate-800 shadow">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold text-blue-600">OAuth 授权系统</h1>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="mt-12 py-6 border-t border-gray-200 dark:border-gray-700 text-center text-gray-600 dark:text-gray-400">
+        <p>&copy; 2025 OAuth 授权系统. All rights reserved.</p>
+    </footer>
+
+    {% block extra_script %}{% endblock %}
+</body>
+</html>
