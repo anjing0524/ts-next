@@ -4,45 +4,107 @@
 
 {% block extra_head %}
 <style>
+    /* 表单字段错误提示 */
     .form-error {
         color: #dc2626;
         font-size: 0.875rem;
         margin-top: 0.25rem;
         display: none;
+        animation: slideDown 0.2s ease-out;
     }
     .form-error.show {
         display: block;
     }
-    .remember-me {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+
+    /* 全局错误消息 */
+    .global-error {
+        animation: slideDown 0.3s ease-out;
     }
+
+    /* 动画效果 */
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
     .animate-spin {
         animation: spin 1s linear infinite;
     }
+
+    /* 表单布局和响应式设计 */
+    .remember-me {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* 输入框焦点状态 */
+    input:focus {
+        outline: none;
+    }
+
+    /* 响应式文字大小 */
+    @media (max-width: 640px) {
+        .login-container h1 {
+            font-size: 1.875rem;
+        }
+        .login-card {
+            padding: 1.5rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .login-container h1 {
+            font-size: 1.5rem;
+        }
+        .login-card {
+            padding: 1.25rem;
+        }
+        .form-error {
+            font-size: 0.8125rem;
+        }
+    }
+
+    /* 加载状态下的按钮 */
+    button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100
+<div class="login-container min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100
             flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+    <div class="login-card w-full max-w-md bg-white rounded-xl shadow-lg p-8">
         <!-- 品牌和标题 -->
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-900">{{ company_name }}</h1>
             <p class="text-sm text-gray-600 mt-2">OAuth 授权系统登录</p>
         </div>
 
-        <!-- 错误消息 -->
+        <!-- 全局错误消息容器 -->
+        <div id="global-error-container"></div>
+
+        <!-- 页面级错误消息 -->
         {% if let Some(error) = error_message %}
-        <div class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
-            <p class="text-red-700 font-medium text-sm">
-                <span class="mr-2">⚠️</span>{{ error }}
-            </p>
+        <div id="page-error" class="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 global-error">
+            <div class="flex items-start">
+                <span class="mr-3 text-lg">⚠️</span>
+                <div class="flex-1">
+                    <p class="text-red-700 font-medium text-sm">{{ error }}</p>
+                    <p class="text-red-600 text-xs mt-1">请检查您的输入，或稍后重试</p>
+                </div>
+            </div>
         </div>
         {% endif %}
 
@@ -195,6 +257,72 @@
         }
     }
 
+    // 安全显示全局错误消息
+    function showGlobalError(message, isDuration = 0) {
+        const container = document.getElementById('global-error-container');
+
+        // 创建错误容器
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'mb-6 p-4 rounded-lg bg-red-50 border border-red-200 global-error';
+        errorDiv.setAttribute('role', 'alert');
+
+        // 创建内容结构
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'flex items-start';
+
+        // 创建图标
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'mr-3 text-lg';
+        iconSpan.textContent = '❌';
+
+        // 创建文字内容容器
+        const textDiv = document.createElement('div');
+        textDiv.className = 'flex-1';
+
+        // 创建主错误消息
+        const errorMsg = document.createElement('p');
+        errorMsg.className = 'text-red-700 font-medium text-sm';
+        errorMsg.textContent = message;
+
+        // 创建提示文字
+        const tipsMsg = document.createElement('p');
+        tipsMsg.className = 'text-red-600 text-xs mt-1';
+        tipsMsg.textContent = '请稍后重试或联系管理员';
+
+        textDiv.appendChild(errorMsg);
+        textDiv.appendChild(tipsMsg);
+
+        // 创建关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'text-red-500 hover:text-red-700 ml-2 flex-shrink-0';
+        closeBtn.setAttribute('aria-label', '关闭错误消息');
+
+        // 安全创建SVG
+        closeBtn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>';
+
+        // 关闭按钮事件
+        closeBtn.addEventListener('click', () => {
+            errorDiv.remove();
+        });
+
+        // 组装所有元素
+        contentDiv.appendChild(iconSpan);
+        contentDiv.appendChild(textDiv);
+        contentDiv.appendChild(closeBtn);
+        errorDiv.appendChild(contentDiv);
+        container.appendChild(errorDiv);
+
+        // 设置自动消失（如果指定时长）
+        if (isDuration > 0) {
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, isDuration);
+        }
+    }
+
     // 实时验证
     usernameInput.addEventListener('blur', () => {
         const error = validateUsername(usernameInput.value);
@@ -250,14 +378,42 @@
                     window.location.href = '/success';
                 }
             } else {
-                // 登录失败，显示错误
-                const errorMsg = data.error || '登录失败，请检查用户名和密码';
-                // 显示为全局错误消息或重新加载页面
-                window.location.href = '/login?error=' + encodeURIComponent(errorMsg);
+                // 登录失败，显示错误消息
+                let errorMsg = '登录失败';
+
+                // 根据响应状态码提供更详细的错误消息
+                if (response.status === 429) {
+                    errorMsg = '登录尝试次数过多，请在 5 分钟后重试';
+                } else if (response.status === 401) {
+                    errorMsg = '用户名或密码错误';
+                } else if (response.status === 400) {
+                    errorMsg = data.error || data.message || '请求错误，请检查输入';
+                } else if (response.status === 500) {
+                    errorMsg = '服务器错误，请稍后重试';
+                } else {
+                    errorMsg = data.error || data.message || '登录失败，请检查用户名和密码';
+                }
+
+                showGlobalError(errorMsg, 0);
+
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
             }
         } catch (error) {
             console.error('Login error:', error);
-            alert('网络错误，请稍后重试');
+
+            let errorMsg = '网络错误';
+            if (error instanceof TypeError) {
+                errorMsg = '无法连接到服务器，请检查网络连接';
+            } else if (error instanceof SyntaxError) {
+                errorMsg = '服务器响应格式错误';
+            }
+
+            showGlobalError(errorMsg, 0);
+
+            // 恢复按钮状态
             submitBtn.disabled = false;
             btnText.classList.remove('hidden');
             btnLoading.classList.add('hidden');
