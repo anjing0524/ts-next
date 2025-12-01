@@ -42,7 +42,7 @@ export interface RequestOptions extends RequestInit {
 }
 
 export class APIClient {
-  private static readonly BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v2';
+  private static readonly BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
   private static cache = APICacheLayer.getInstance();
 
   /**

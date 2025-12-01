@@ -9,7 +9,7 @@
  * - Request deduplication
  */
 
-import { TokenStorage } from '../auth/token-storage-consolidated';
+import { TokenStorage } from '../auth/token-storage';
 import { triggerAuthError, triggerNetworkError, triggerApiError } from '@/components/error/global-error-handler';
 
 export interface RequestOptions extends RequestInit {
@@ -25,11 +25,11 @@ interface PendingRequest {
 }
 
 export class EnhancedAPIClient {
-  private static readonly BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v2';
+  private static readonly BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:6188/api/v2';
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 1000;
   private static readonly TIMEOUT = 30000;
-  private static readonly OAUTH_SERVICE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:3001';
+  private static readonly OAUTH_SERVICE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://localhost:6188';
   private static readonly OAUTH_CLIENT_ID = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client';
 
   private static pendingRequests = new Map<string, PendingRequest>();

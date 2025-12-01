@@ -13,8 +13,8 @@ export { APIClient as EnhancedAPIClient } from './api-client-consolidated';
 export type { RequestOptions } from './api-client-consolidated';
 
 // Token Storage (consolidated)
-export { TokenStorage } from '../auth/token-storage-consolidated';
-export type { TokenStorageOptions } from '../auth/token-storage-consolidated';
+export { TokenStorage } from '../auth/token-storage';
+export type { TokenStorageOptions } from '../auth/token-storage';
 
 // Supporting modules
 export { APICacheLayer } from './cache-layer';
@@ -42,26 +42,12 @@ export const apiRequest = <T = any>(
 ): Promise<T> => APIClient.request<T>(endpoint, options);
 
 /**
- * Admin Portal 特定功能的 API 助手函数集合
+ * Admin Portal 统一的 API 助手函数集合
  *
- * 这些函数提供针对特定场景的便捷 API 调用，例如 OAuth 同意页面
+ * 这些函数提供所有admin portal功能的便捷 API 调用
  */
 export const adminApi = {
-  /**
-   * 提交用户的授权同意决定
-   *
-   * @param action - 用户的决定：'allow' 允许 或 'deny' 拒绝
-   * @param params - OAuth 参数（包括 client_id, redirect_uri, scope 等）
-   * @returns 包含重定向 URI 的响应
-   *
-   * 工作流程：
-   * 1. 用户在同意页面选择"允许"或"拒绝"
-   * 2. 调用此函数提交决定到 OAuth Service
-   * 3. OAuth Service 验证用户和权限
-   * 4. 如果允许，生成授权码并返回重定向 URI
-   * 5. 如果拒绝，返回带 error=access_denied 的重定向 URI
-   * 6. 前端重定向到返回的 URI
-   */
+  // OAuth & 同意页面
   async submitConsent(
     action: 'allow' | 'deny',
     params: URLSearchParams
@@ -78,12 +64,415 @@ export const adminApi = {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        skipCache: true, // 不缓存同意决定
+        skipCache: true,
       }
     );
     return response;
   },
+
+  // 用户管理
+  async getUsers(params?: any) {
+    return apiRequest('/users', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async getUserById(id: string) {
+    return apiRequest(`/users/${id}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async createUser(data: any) {
+    return apiRequest('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async updateUser(id: string, data: any) {
+    return apiRequest(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async deleteUser(id: string) {
+    return apiRequest(`/users/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  },
+
+  async updateUserProfile(data: any) {
+    return apiRequest('/users/me/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async updatePassword(data: any) {
+    return apiRequest('/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  // 角色管理
+  async updateRole(id: string, data: any) {
+    return apiRequest(`/roles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async deleteRole(id: string) {
+    return apiRequest(`/roles/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  },
+
+  async updateRolePermissions(id: string, permissions: string[]) {
+    return apiRequest(`/roles/${id}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  // 系统配置
+  async getSystemConfig() {
+    return apiRequest('/system/config', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async updateSystemConfig(data: any) {
+    return apiRequest('/system/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  // 审计日志
+  async getAuditLogs(params?: any) {
+    return apiRequest('/audit-logs', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  // 统计数据
+  async getStatsSummary() {
+    return apiRequest('/stats/summary', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  // OAuth 客户端管理
+  async getClients(params?: any) {
+    return apiRequest('/clients', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async getClientById(clientId: string) {
+    return apiRequest(`/clients/${clientId}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async createClient(clientData: any) {
+    return apiRequest('/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async updateClient(clientId: string, clientData: any) {
+    return apiRequest(`/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async deleteClient(clientId: string) {
+    return apiRequest(`/clients/${clientId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  },
+
+  async rotateClientSecret(clientId: string) {
+    return apiRequest(`/clients/${clientId}/secret`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  // 权限管理
+  async registerClient(data: any) {
+    return apiRequest('/clients/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async getPermissions(params?: any) {
+    return apiRequest('/permissions', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  // 角色相关（补充）
+  async getRoles(params?: any) {
+    return apiRequest('/roles', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async getRoleById(roleId: string) {
+    return apiRequest(`/roles/${roleId}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async createRole(roleData: any) {
+    return apiRequest('/roles', {
+      method: 'POST',
+      body: JSON.stringify(roleData),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
 };
 
-// Utility exports (removed to fix compilation issues)
-// Note: Use direct imports instead: import { APIClient } from '@/lib/api'
+/**
+ * 身份认证 API 助手函数集合
+ *
+ * 处理OAuth和令牌相关的认证操作
+ */
+export const authApi = {
+  /**
+   * 使用授权码交换访问令牌
+   */
+  async exchangeCodeForToken(code: string, codeVerifier: string) {
+    return apiRequest('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({ code, code_verifier: codeVerifier }),
+      headers: { 'Content-Type': 'application/json' },
+      skipCache: true,
+    });
+  },
+
+  /**
+   * 登出并清除令牌
+   */
+  async logout() {
+    return apiRequest('/oauth/revoke', {
+      method: 'POST',
+      credentials: 'include',
+      skipCache: true,
+    });
+  },
+
+  /**
+   * 获取当前用户信息
+   */
+  async getUserById(userId: string) {
+    return apiRequest(`/users/${userId}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  /**
+   * 登录
+   */
+  async login(credentials: any) {
+    return apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+      headers: { 'Content-Type': 'application/json' },
+      skipCache: true,
+    });
+  },
+
+  /**
+   * 获取用户个人资料
+   */
+  async fetchUserProfile() {
+    return apiRequest('/users/me/profile', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+};
+
+/**
+ * 用户管理 API 助手函数集合
+ */
+export const usersApi = {
+  async getUsers(page = 1, limit = 20) {
+    return apiRequest('/users', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async getUserById(id: string) {
+    return apiRequest(`/users/${id}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async createUser(data: any) {
+    return apiRequest('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async updateUser(id: string, data: any) {
+    return apiRequest(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async deleteUser(id: string) {
+    return apiRequest(`/users/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  },
+
+  async updateUserProfile(data: any) {
+    return apiRequest('/users/me/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async updatePassword(data: any) {
+    return apiRequest('/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+};
+
+/**
+ * 角色管理 API 助手函数集合
+ */
+export const rolesApi = {
+  async updateRole(id: string, data: any) {
+    return apiRequest(`/roles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  async deleteRole(id: string) {
+    return apiRequest(`/roles/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  },
+
+  async updateRolePermissions(id: string, permissions: string[]) {
+    return apiRequest(`/roles/${id}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+};
+
+/**
+ * 系统配置 API 助手函数集合
+ */
+export const systemApi = {
+  async getSystemConfig() {
+    return apiRequest('/system/config', {
+      method: 'GET',
+      credentials: 'include',
+    });
+  },
+
+  async updateSystemConfig(data: any) {
+    return apiRequest('/system/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+};
+
+/**
+ * Paginated response type for list endpoints
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Audit log response type
+ */
+export interface AuditLogsResponse extends PaginatedResponse<any> {}

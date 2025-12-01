@@ -1,7 +1,8 @@
 /**
- * Token Storage - Consolidated Implementation
- * 
- * This file provides backward compatibility by re-exporting from the consolidated token storage
+ * Token Storage - Unified Implementation
+ *
+ * Direct export from the enhanced token storage implementation
  */
 
-export { TokenStorage } from './token-storage-consolidated';
+export { EnhancedTokenStorage as TokenStorage } from './enhanced-token-storage';
+export type { TokenStorageOptions } from './enhanced-token-storage';
