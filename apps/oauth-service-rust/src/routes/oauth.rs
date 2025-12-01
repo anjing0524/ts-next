@@ -131,9 +131,69 @@ pub async fn login_endpoint(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
     headers: axum::http::HeaderMap,
-    JsonExtractor(request): JsonExtractor<LoginRequest>,
+    JsonExtractor(mut request): JsonExtractor<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginResponse>), AppError> {
-    // 0. Rate limiting check - 5 attempts per 5 minutes per IP
+    // 0. 前端验证: 验证用户名和密码格式
+    // Validate username format (3-50 chars, alphanumeric + ._@-)
+    let username = request.username.trim().to_string();
+    if username.is_empty() || username.len() < 3 || username.len() > 50 {
+        return Err(ServiceError::ValidationError(
+            "用户名长度必须在 3-50 个字符之间".to_string(),
+        ).into());
+    }
+
+    if !username.chars().all(|c| c.is_alphanumeric() || "._@-".contains(c)) {
+        return Err(ServiceError::ValidationError(
+            "用户名包含无效字符".to_string(),
+        ).into());
+    }
+
+    // Validate password format (6-128 chars)
+    if request.password.is_empty() || request.password.len() < 6 || request.password.len() > 128 {
+        return Err(ServiceError::ValidationError(
+            "密码长度必须在 6-128 个字符之间".to_string(),
+        ).into());
+    }
+
+    // 更新 request 使用验证后的用户名
+    request.username = username;
+
+    // 0.5 解析重定向 URL（防止开放重定向）
+    // Validate and parse redirect URL if provided
+    let validated_redirect = if let Some(ref redirect) = request.redirect {
+        let url = redirect.trim();
+        if !url.is_empty() {
+            // 允许的重定向源
+            let allowed_origins = [
+                "http://localhost:3002",
+                "http://localhost:3001",
+                "http://127.0.0.1:3002",
+                "http://127.0.0.1:3001",
+                "/",
+            ];
+
+            let is_valid = allowed_origins.iter().any(|origin| {
+                url.starts_with(origin)
+            }) || url.starts_with("/");
+
+            if !is_valid {
+                return Err(ServiceError::ValidationError(
+                    "无效的重定向 URL".to_string(),
+                ).into());
+            }
+            Some(url.to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // 用验证后的重定向替换原来的
+    request.redirect = validated_redirect;
+
+    // 1. 速率限制检查 - 5 次尝试每 5 分钟每 IP
+    // Rate limiting check - 5 attempts per 5 minutes per IP
     // Extract client IP from headers (X-Forwarded-For or X-Real-IP) or connection
     let client_ip = headers
         .get("x-forwarded-for")
