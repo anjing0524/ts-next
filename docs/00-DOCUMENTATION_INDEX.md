@@ -1,8 +1,8 @@
 # 📚 项目文档索引
 
-**最后更新**: 2025-11-28
+**最后更新**: 2025-12-01
 **文档维护者**: 架构团队
-**状态**: 📋 整理中
+**状态**: ✅ Phase 1 完成，Phase 2 准备中
 
 ---
 
@@ -24,6 +24,8 @@
 
 | 文档 | 用途 | 关键内容 | 状态 |
 |------|------|---------|------|
+| **01-ARCHITECTURE_COMPATIBILITY_ANALYSIS.md** | 深度架构兼容性分析 (新) | HTTP API, Cookie管理, 流式响应处理, 性能优化 | ✅ 当前 |
+| **00-ARCHITECTURE_DECISION.md** | 架构决策文档 | 设计权衡, 标准合规性分析 | ✅ 基础 |
 | **2-SYSTEM_DESIGN.md** | 完整的系统设计文档 | OAuth 2.1, Pingora代理, 8层架构 | ✅ 基础 |
 | **00-PINGORA_PROXY_ARCHITECTURE_FIX.md** | Pingora代理架构修复 | 统一网关, 路由配置 | ✅ 实现 |
 | **OAUTH_2.1_STANDARD_VS_IMPLEMENTATION.md** | OAuth标准对比 | 标准合规性分析 | 📋 参考 |
@@ -67,9 +69,23 @@
 | **CONSISTENCY_ANALYSIS_ISSUES_RECOMMENDATIONS.md** | 一致性分析 | 问题与建议 | 📋 参考 |
 | **PHASE_1_OAUTH_COMPLIANCE_IMPROVEMENTS.md** | OAuth合规改进 | Phase 1 实现 | 📋 历史 |
 
+### 8. 🎨 Phase 1: Web UI 基础设施
+
+| 文档 | 用途 | 关键内容 | 状态 |
+|------|------|---------|------|
+| **../PHASE_1_COMPLETION_REPORT.md** | Phase 1 完成报告 | 完整实现总结、验证清单、生产就绪性评估 | ✅ 当前 |
+| **../QUICKSTART_PHASE1.md** | Phase 1 快速启动指南 | 两种启动方式、开发工作流、常见问题 | ✅ 当前 |
+| **PHASE_1_DETAILED_BREAKDOWN_2025-12-01.md** | Phase 1 详细任务分解 | 8个具体任务、时间估算、验证步骤 | ✅ 当前 |
+| **../SOLUTION_A_DETAILED_IMPLEMENTATION_PLAN_2025-12-01.md** | 完整实现计划 | 6个Phase、25-35天计划、技术方案 | ✅ 当前 |
+| **../EXECUTIVE_SUMMARY_AND_ACTION_PLAN.md** | 执行摘要与行动计划 | 问题诊断、解决方案概览、周度分解 | ✅ 当前 |
+| **../BUSINESS_LOGIC_QUALITY_AUDIT_2025-12-01.md** | 业务逻辑质量审计 | 8个核心问题分析、影响评估、优先级矩阵 | ✅ 当前 |
+
 ---
 
 ## 🎯 快速查找指南
+
+### 我需要深入理解架构兼容性问题
+👉 **开始于**: `01-ARCHITECTURE_COMPATIBILITY_ANALYSIS.md` (深度分析、HTTP API、Cookie管理、性能优化)
 
 ### 我需要了解系统整体情况
 👉 **开始于**: `2-SYSTEM_DESIGN.md` → `00-IMPLEMENTATION_VERIFICATION_2025-11-28.md`
@@ -83,11 +99,20 @@
 ### 我需要理解OAuth实现
 👉 **开始于**: `2-SYSTEM_DESIGN.md` (FR-001 部分) → `OAUTH_2.1_STANDARD_VS_IMPLEMENTATION.md`
 
-### 我需要了解Pingora代理配置
-👉 **开始于**: `00-PINGORA_PROXY_ARCHITECTURE_FIX.md`
+### 我需要了解Pingora代理配置和优化
+👉 **开始于**: `01-ARCHITECTURE_COMPATIBILITY_ANALYSIS.md` (第6-7章节) 或 `00-PINGORA_PROXY_ARCHITECTURE_FIX.md`
 
 ### 我需要检查安全性
-👉 **开始于**: `00-IMPLEMENTATION_VERIFICATION_2025-11-28.md` (安全性部分)
+👉 **开始于**: `01-ARCHITECTURE_COMPATIBILITY_ANALYSIS.md` (第5章) 或 `00-IMPLEMENTATION_VERIFICATION_2025-11-28.md`
+
+### 我需要快速启动 Phase 1 Web UI
+👉 **开始于**: `../QUICKSTART_PHASE1.md` → `../setup-phase1.sh` (10分钟快速配置)
+
+### 我需要理解 Phase 1 完整实现
+👉 **开始于**: `../PHASE_1_COMPLETION_REPORT.md` → `PHASE_1_DETAILED_BREAKDOWN_2025-12-01.md`
+
+### 我需要了解整个6 Phase 的计划
+👉 **开始于**: `../SOLUTION_A_DETAILED_IMPLEMENTATION_PLAN_2025-12-01.md` → `../EXECUTIVE_SUMMARY_AND_ACTION_PLAN.md`
 
 ---
 
