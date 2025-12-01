@@ -1747,6 +1747,7 @@ dependencies = [
  "governor 0.5.1",
  "html-escape",
  "jsonwebtoken",
+ "lazy_static",
  "rand 0.8.5",
  "reqwest",
  "serde",
