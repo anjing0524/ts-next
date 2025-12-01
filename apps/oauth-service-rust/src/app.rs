@@ -122,6 +122,7 @@ pub async fn create_app(pool: Arc<sqlx::SqlitePool>, config: Arc<Config>) -> Rou
         .route("/login", get(routes::templates::login_handler))
         // 权限同意页面
         .route("/oauth/consent", get(routes::templates::consent_handler))
+        .route("/oauth/consent/submit", post(routes::templates::consent_submit_handler))
         // 错误页面
         .route("/error", get(routes::templates::error_handler))
         // 成功页面

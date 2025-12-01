@@ -2,7 +2,11 @@
 // 提供登录、权限同意等页面的HTML模板渲染
 
 use askama_axum::IntoResponse;
-use axum::extract::{Query, State};
+use axum::{
+    extract::{Form, Query, State},
+    response::Redirect,
+};
+use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -162,34 +166,197 @@ pub struct ConsentQuery {
     pub client_id: Option<String>,
     /// 请求的权限范围
     pub scope: Option<String>,
-    /// 状态参数
+    /// 状态参数（CSRF 保护）
     pub state: Option<String>,
+    /// 重定向URI
+    pub redirect_uri: Option<String>,
+    /// 响应类型
+    pub response_type: Option<String>,
+    /// PKCE code_challenge
+    pub code_challenge: Option<String>,
+    /// PKCE code_challenge_method
+    pub code_challenge_method: Option<String>,
+    /// OpenID Connect nonce
+    pub nonce: Option<String>,
 }
 
 /// 处理权限同意页面请求
 /// GET /oauth/consent
 pub async fn consent_handler(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<ConsentQuery>,
+    jar: CookieJar,
 ) -> Result<impl IntoResponse, AppError> {
-    // TODO: 获取客户端信息和当前用户
-    // 这里应该调用业务逻辑获取真实数据
-    // 暂时使用硬编码的演示数据
-
-    let template = ConsentTemplate {
-        client_name: query.client_id.unwrap_or_else(|| "Unknown Client".to_string()),
-        user_email: "user@example.com".to_string(), // 从session获取
-        scope_list: query
-            .scope
-            .map(|s| {
-                s.split_whitespace()
-                    .map(|scope| scope.to_string())
-                    .collect()
-            })
-            .unwrap_or_default(),
+    // 1. 验证用户已认证（从session_token cookie）
+    let user_id = if let Some(cookie) = jar.get("session_token") {
+        match state.token_service.introspect_token(cookie.value()).await {
+            Ok(claims) => claims.sub.ok_or_else(|| {
+                AppError::Service(ServiceError::Unauthorized("Token does not represent a user".to_string()))
+            })?,
+            Err(_) => return Err(AppError::Service(ServiceError::Unauthorized(
+                "Invalid or expired session token".to_string()
+            ))),
+        }
+    } else {
+        return Err(AppError::Service(ServiceError::Unauthorized(
+            "No session token found. Please login first.".to_string()
+        )));
     };
 
+    // 2. 获取用户信息
+    let user = state
+        .user_service
+        .find_by_id(&user_id)
+        .await?
+        .ok_or_else(|| ServiceError::NotFound("User not found".to_string()))?;
+
+    // 3. 验证用户账户状态
+    if !user.is_active {
+        tracing::warn!("Inactive user {} attempted to access consent page", user_id);
+        return Err(AppError::Service(ServiceError::Unauthorized("User account is inactive".to_string())));
+    }
+
+    // 4. 获取客户端信息
+    let client_id = query.client_id
+        .as_ref()
+        .ok_or_else(|| AppError::Service(ServiceError::ValidationError("Missing client_id parameter".to_string())))?;
+
+    let client_details = state
+        .client_service
+        .find_by_client_id(client_id)
+        .await?
+        .ok_or_else(|| AppError::Service(ServiceError::NotFound(format!("Client {} not found", client_id))))?;
+
+    // 5. 解析scope列表
+    let scope_list = query
+        .scope
+        .as_ref()
+        .map(|s| {
+            s.split_whitespace()
+                .map(|scope| scope.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // 6. 构建模板数据
+    let user_display = user.display_name
+        .clone()
+        .or_else(|| {
+            match (user.first_name.clone(), user.last_name.clone()) {
+                (Some(first), Some(last)) => Some(format!("{} {}", first, last)),
+                (Some(first), None) => Some(first),
+                (None, Some(last)) => Some(last),
+                _ => None,
+            }
+        })
+        .unwrap_or_else(|| format!("{}@example.com", user.username));
+
+    let template = ConsentTemplate {
+        client_name: client_details.client.name.clone(),
+        user_email: user_display,
+        scope_list,
+    };
+
+    tracing::info!(
+        "Consent page rendered for user: {}, client: {}",
+        user_id,
+        client_id
+    );
+
     Ok(template)
+}
+
+/// 权限同意表单提交请求
+#[derive(Deserialize)]
+pub struct ConsentSubmitRequest {
+    /// 用户决定: "approve" 或 "deny"
+    pub decision: String,
+    /// OAuth 客户端ID
+    pub client_id: String,
+    /// 重定向URI
+    pub redirect_uri: String,
+    /// 响应类型
+    pub response_type: String,
+    /// 请求的权限范围
+    pub scope: String,
+    /// 状态参数
+    #[serde(default)]
+    pub state: Option<String>,
+    /// PKCE code_challenge
+    #[serde(default)]
+    pub code_challenge: Option<String>,
+    /// PKCE code_challenge_method
+    #[serde(default)]
+    pub code_challenge_method: Option<String>,
+    /// OpenID Connect nonce
+    #[serde(default)]
+    pub nonce: Option<String>,
+    /// 记住选择
+    #[serde(default)]
+    pub remember: Option<String>,
+}
+
+/// 处理权限同意表单提交
+/// POST /oauth/consent/submit
+pub async fn consent_submit_handler(
+    State(state): State<Arc<AppState>>,
+    jar: CookieJar,
+    Form(request): Form<ConsentSubmitRequest>,
+) -> Result<Redirect, AppError> {
+    // 1. 验证用户已认证（从session_token cookie）
+    let user_id = if let Some(cookie) = jar.get("session_token") {
+        match state.token_service.introspect_token(cookie.value()).await {
+            Ok(claims) => claims.sub.ok_or_else(|| {
+                AppError::Service(ServiceError::Unauthorized("Token does not represent a user".to_string()))
+            })?,
+            Err(_) => return Err(AppError::Service(ServiceError::Unauthorized(
+                "Invalid or expired session token".to_string()
+            ))),
+        }
+    } else {
+        return Err(AppError::Service(ServiceError::Unauthorized(
+            "No session token found. Please login first.".to_string()
+        )));
+    };
+
+    // 2. 验证decision字段
+    if request.decision.to_lowercase() != "approve" && request.decision.to_lowercase() != "deny" {
+        return Err(AppError::Service(ServiceError::ValidationError(
+            "Invalid decision value. Must be 'approve' or 'deny'".to_string()
+        )));
+    }
+
+    // 3. 使用API consent模块处理实际的OAuth逻辑
+    let consent_request = crate::routes::consent::ConsentSubmitRequest {
+        decision: request.decision.clone(),
+        client_id: request.client_id.clone(),
+        redirect_uri: request.redirect_uri.clone(),
+        response_type: request.response_type.clone(),
+        scope: request.scope.clone(),
+        state: request.state.clone(),
+        code_challenge: request.code_challenge.clone(),
+        code_challenge_method: request.code_challenge_method.clone(),
+        nonce: request.nonce.clone(),
+    };
+
+    // 调用consent submit API处理业务逻辑
+    let response = crate::routes::consent::submit_consent(
+        State(state),
+        jar,
+        axum::http::HeaderMap::new(),
+        axum::extract::Json(consent_request),
+    ).await?;
+
+    // 4. 获取重定向URI并返回
+    let redirect_uri = response.0.redirect_uri;
+
+    tracing::info!(
+        "Consent decision processed for user: {}, decision: {}",
+        user_id,
+        request.decision
+    );
+
+    Ok(Redirect::to(&redirect_uri))
 }
 
 /// 错误页面处理
@@ -256,9 +423,34 @@ mod tests {
             client_id: Some("test-client".to_string()),
             scope: Some("openid profile email".to_string()),
             state: Some("state456".to_string()),
+            redirect_uri: Some("http://localhost:3001/callback".to_string()),
+            response_type: Some("code".to_string()),
+            code_challenge: Some("challenge123".to_string()),
+            code_challenge_method: Some("S256".to_string()),
+            nonce: Some("nonce789".to_string()),
         };
 
         assert_eq!(query.client_id, Some("test-client".to_string()));
         assert!(query.scope.is_some());
+        assert!(query.redirect_uri.is_some());
+    }
+
+    #[test]
+    fn test_consent_submit_request_deserialization() {
+        let request = ConsentSubmitRequest {
+            decision: "approve".to_string(),
+            client_id: "test-client".to_string(),
+            redirect_uri: "http://localhost:3001/callback".to_string(),
+            response_type: "code".to_string(),
+            scope: "openid profile".to_string(),
+            state: Some("state123".to_string()),
+            code_challenge: None,
+            code_challenge_method: None,
+            nonce: None,
+            remember: Some("true".to_string()),
+        };
+
+        assert_eq!(request.decision, "approve");
+        assert_eq!(request.client_id, "test-client");
     }
 }
