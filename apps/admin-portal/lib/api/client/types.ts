@@ -13,6 +13,8 @@ export interface HttpRequestOptions extends RequestInit {
   skipAuthRefresh?: boolean;
   /** 请求去重键 */
   dedupeKey?: string;
+  /** 是否跳过请求去重 */
+  skipDedup?: boolean;
   /** 缓存键 */
   cacheKey?: string;
   /** 缓存TTL（毫秒） */

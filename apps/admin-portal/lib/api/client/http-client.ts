@@ -9,6 +9,7 @@ import { CacheDecorator } from '../decorators/cache-decorator';
 import { RetryDecorator } from '../decorators/retry-decorator';
 import { CircuitBreakerDecorator } from '../decorators/circuit-breaker-decorator';
 import { AuthDecorator } from '../decorators/auth-decorator';
+import { RequestDeduplicationDecorator, type DeduplicationConfig } from '../decorators/request-deduplication-decorator';
 
 /**
  * 抽象装饰器基类
@@ -109,6 +110,14 @@ export class HttpClientBuilder {
   }
 
   /**
+   * 添加请求去重装饰器
+   */
+  withRequestDeduplication(config?: DeduplicationConfig): HttpClientBuilder {
+    this.client = new RequestDeduplicationDecorator(this.client, config);
+    return this;
+  }
+
+  /**
    * 构建最终的HTTP客户端
    */
   build(): HttpClient {
@@ -134,10 +143,12 @@ export class HttpClientFactory {
 
   /**
    * 创建带所有装饰器的HTTP客户端
+   * 装饰器链顺序：BaseClient → Auth → RequestDedup → Retry → CircuitBreaker → Cache
    */
   static createFullFeaturedClient(baseUrl?: string): HttpClient {
     return new HttpClientBuilder(baseUrl)
       .withAuth()
+      .withRequestDeduplication()
       .withRetry()
       .withCircuitBreaker()
       .withCache()
