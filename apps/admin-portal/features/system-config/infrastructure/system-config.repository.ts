@@ -8,6 +8,9 @@ export class SystemConfigRepository implements ISystemConfigRepository {
   }
 
   async updateSystemConfig(configData: Partial<SystemConfig>[]): Promise<SystemConfig[]> {
-    return adminApi.updateSystemConfig(configData);
+    // 更新配置（返回 void）
+    await adminApi.updateSystemConfig(configData);
+    // 重新获取更新后的配置
+    return adminApi.getSystemConfig();
   }
 }

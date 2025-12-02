@@ -117,7 +117,7 @@ function AuditLogsPage() {
       <h1 className="text-2xl font-bold">Audit Logs</h1>
       <div className="flex flex-wrap gap-2 items-end">{/* Filter inputs */}</div>
       <DataTable
-        columns={columns as ColumnDef<any>[]}
+        columns={columns as ColumnDef<AuditLog>[]}
         data={logs}
         isLoading={isFetching}
         pageCount={meta?.totalPages ?? 0}

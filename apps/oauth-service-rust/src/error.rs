@@ -29,6 +29,12 @@ pub enum AppError {
 
     #[error("Internal error: {0}")]
     Anyhow(#[from] anyhow::Error),
+
+    #[error("Template error: {0}")]
+    Template(#[from] askama::Error),
+
+    #[error("URL parsing error: {0}")]
+    UrlParse(#[from] url::ParseError),
 }
 
 /// Errors that can occur within the service layer.
@@ -169,6 +175,22 @@ impl IntoResponse for AppError {
             // SECURITY FIX: Don't expose internal error details
             AppError::Anyhow(e) => {
                 tracing::error!("Internal error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            },
+            // SECURITY FIX: Don't expose template rendering details
+            AppError::Template(e) => {
+                tracing::error!("Template rendering error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            },
+            // SECURITY FIX: Don't expose URL parsing details
+            AppError::UrlParse(e) => {
+                tracing::error!("URL parsing error: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "An internal error occurred. Please try again later.".to_string(),

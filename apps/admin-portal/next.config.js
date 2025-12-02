@@ -20,13 +20,13 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              // 脚本源 | Script sources (严格CSP - 无unsafe)
-              "script-src 'self' https://cdn.jsdelivr.net",
-              // 样式源 | Style sources (仅允许self和CDN)
-              "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+              // 脚本源 | Script sources (严格CSP - 仅允许同源)
+              "script-src 'self'",
+              // 样式源 | Style sources (允许self和内联样式)
+              "style-src 'self' 'unsafe-inline'",
               // 图片源 | Image sources
               "img-src 'self' data: https:",
-              // 字体源 | Font sources
+              // 字体源 | Font sources (允许Google Fonts)
               "font-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
               // 连接源 | Connect sources
               "connect-src 'self' http://localhost:* https://localhost:* wss://localhost:* ws://localhost:*",
