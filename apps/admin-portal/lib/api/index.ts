@@ -14,6 +14,15 @@ import type {
   Permission,
   OAuthClient,
   SystemConfiguration,
+  ClientCreateRequest,
+  ClientUpdateRequest,
+  ClientFilter,
+  RoleCreateRequest,
+  RoleUpdateRequest,
+  RoleFilter,
+  UserCreateRequest,
+  UserUpdateRequest,
+  UserFilter,
 } from '@/types/auth';
 
 export type {
@@ -26,6 +35,15 @@ export type {
   Permission,
   OAuthClient,
   SystemConfiguration,
+  ClientCreateRequest,
+  ClientUpdateRequest,
+  ClientFilter,
+  RoleCreateRequest,
+  RoleUpdateRequest,
+  RoleFilter,
+  UserCreateRequest,
+  UserUpdateRequest,
+  UserFilter,
 };
 
 // --- HTTP客户端核心模块 ---
