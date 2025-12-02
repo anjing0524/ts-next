@@ -11,6 +11,8 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time;
+// 使用编译期常量替代lazy_static，避免panic风险
+const DEFAULT_IP: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
 
 // --- Login Endpoint Structs ---
 
@@ -195,18 +197,7 @@ pub async fn login_endpoint(
     // 1. 速率限制检查 - 5 次尝试每 5 分钟每 IP
     // Rate limiting check - 5 attempts per 5 minutes per IP
     // Extract client IP from headers (X-Forwarded-For or X-Real-IP) or connection
-    let client_ip = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(',').next())
-        .and_then(|ip| ip.trim().parse().ok())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|ip| ip.parse().ok())
-        })
-        .unwrap_or_else(|| "127.0.0.1".parse().unwrap());
+    let client_ip = extract_client_ip(&headers)?;
 
     // Check if login attempt is allowed
     if !state.login_rate_limiter.check_login_attempt(client_ip).await {
@@ -351,18 +342,7 @@ pub async fn token_endpoint(
     JsonExtractor(request): JsonExtractor<TokenRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
     // 0. Rate limiting check - 20 attempts per minute per IP
-    let client_ip: std::net::IpAddr = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(',').next())
-        .and_then(|ip| ip.trim().parse().ok())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|ip| ip.parse().ok())
-        })
-        .unwrap_or_else(|| "127.0.0.1".parse().unwrap());
+    let client_ip = extract_client_ip(&headers)?;
 
     if !state.token_rate_limiter.check_rate_limit(&client_ip.to_string()).await {
         tracing::warn!("Token endpoint rate limit exceeded for IP: {}", client_ip);
@@ -438,27 +418,23 @@ pub async fn authorize_endpoint(
 
             // Build the return URL that will redirect back to authorize after login
             // This preserves all OAuth parameters including PKCE code_challenge
-            let mut authorize_url = url::Url::parse(&format!(
-                "{}/api/v2/oauth/authorize",
-                std::env::var("NEXT_PUBLIC_OAUTH_SERVICE_URL")
-                    .unwrap_or_else(|_| "http://localhost:3001".to_string())
-            )).expect("Failed to parse authorize URL");
-
-            authorize_url.query_pairs_mut()
-                .append_pair("client_id", &request.client_id)
-                .append_pair("redirect_uri", &request.redirect_uri)
-                .append_pair("response_type", &request.response_type)
-                .append_pair("scope", &request.scope)
-                .append_pair("code_challenge", &request.code_challenge)
-                .append_pair("code_challenge_method", &request.code_challenge_method);
+            let authorize_base = std::env::var("NEXT_PUBLIC_OAUTH_SERVICE_URL")
+                .unwrap_or_else(|_| "http://localhost:3001".to_string());
+            let mut authorize_params = vec![
+                ("client_id", request.client_id.as_str()),
+                ("redirect_uri", request.redirect_uri.as_str()),
+                ("response_type", request.response_type.as_str()),
+                ("scope", request.scope.as_str()),
+                ("code_challenge", request.code_challenge.as_str()),
+                ("code_challenge_method", request.code_challenge_method.as_str()),
+            ];
             if let Some(nonce) = &request.nonce {
-                authorize_url.query_pairs_mut().append_pair("nonce", nonce);
+                authorize_params.push(("nonce", nonce.as_str()));
             }
+            let authorize_url = build_url(&authorize_base, "/api/v2/oauth/authorize", &authorize_params)?;
 
             // Redirect to Admin Portal's /login with the authorize URL as the return destination
-            let mut login_url = url::Url::parse(&format!("{}/login", admin_portal_url))
-                .expect("Failed to parse login URL");
-            login_url.query_pairs_mut().append_pair("redirect", authorize_url.as_str());
+            let login_url = build_url(&admin_portal_url, "/login", &[("redirect", authorize_url.as_str())])?;
 
             return Ok(Redirect::to(login_url.as_str()).into_response());
         }
@@ -493,19 +469,18 @@ pub async fn authorize_endpoint(
             .unwrap_or_else(|_| "http://localhost:3002".to_string());
 
         // 构建同意页面 URL，携带所有 OAuth 参数
-        let mut consent_url = url::Url::parse(&format!("{}/oauth/consent", admin_portal_url))
-            .expect("Failed to parse consent URL");
-
-        consent_url.query_pairs_mut()
-            .append_pair("client_id", &request.client_id)
-            .append_pair("redirect_uri", &request.redirect_uri)
-            .append_pair("response_type", &request.response_type)
-            .append_pair("scope", &request.scope)
-            .append_pair("code_challenge", &request.code_challenge)
-            .append_pair("code_challenge_method", &request.code_challenge_method);
+        let mut consent_params = vec![
+            ("client_id", request.client_id.as_str()),
+            ("redirect_uri", request.redirect_uri.as_str()),
+            ("response_type", request.response_type.as_str()),
+            ("scope", request.scope.as_str()),
+            ("code_challenge", request.code_challenge.as_str()),
+            ("code_challenge_method", request.code_challenge_method.as_str()),
+        ];
         if let Some(nonce) = &request.nonce {
-            consent_url.query_pairs_mut().append_pair("nonce", nonce);
+            consent_params.push(("nonce", nonce.as_str()));
         }
+        let consent_url = build_url(&admin_portal_url, "/oauth/consent", &consent_params)?;
 
         return Ok(Redirect::to(consent_url.as_str()).into_response());
     }
@@ -808,4 +783,46 @@ pub async fn extract_user_id_from_request(
     claims.sub.ok_or_else(|| {
         ServiceError::Unauthorized("Token does not represent a user".to_string()).into()
     })
+}
+
+// --- IP Extraction Helper ---
+
+/// Safely extracts client IP from headers, falling back to default IP if extraction fails.
+/// Returns an AppError if IP parsing fails and no default can be used.
+fn extract_client_ip(headers: &axum::http::HeaderMap) -> Result<std::net::IpAddr, AppError> {
+    // Try to extract from X-Forwarded-For header
+    if let Some(forwarded_for) = headers.get("x-forwarded-for") {
+        if let Ok(header_value) = forwarded_for.to_str() {
+            if let Some(first_ip) = header_value.split(',').next() {
+                if let Ok(ip) = first_ip.trim().parse::<std::net::IpAddr>() {
+                    tracing::debug!("Extracted IP from X-Forwarded-For: {}", ip);
+                    return Ok(ip);
+                }
+            }
+        }
+    }
+
+    // Try to extract from X-Real-IP header
+    if let Some(real_ip) = headers.get("x-real-ip") {
+        if let Ok(header_value) = real_ip.to_str() {
+            if let Ok(ip) = header_value.parse::<std::net::IpAddr>() {
+                tracing::debug!("Extracted IP from X-Real-IP: {}", ip);
+                return Ok(ip);
+            }
+        }
+    }
+
+    // Fall back to default IP with logging
+    tracing::warn!("Failed to extract client IP from headers, using default IP");
+    Ok(DEFAULT_IP)
+}
+
+// --- URL Builder Helper ---
+
+/// Builds a URL and appends query parameters, returning an AppError on failure.
+fn build_url(base: &str, path: &str, params: &[(&str, &str)]) -> Result<url::Url, AppError> {
+    let mut url = url::Url::parse(base)?;
+    url.set_path(path);
+    url.query_pairs_mut().extend_pairs(params);
+    Ok(url)
 }
