@@ -1,0 +1,98 @@
+---
+# OAuth Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ts-next-template.fullname" . }}-oauth
+  labels:
+    {{- include "ts-next-template.labels" . | nindent 4 }}
+    app: oauth-service
+spec:
+  replicas: {{ .Values.oauthService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ts-next-template.selectorLabels" . | nindent 6 }}
+      app: oauth-service
+  template:
+    metadata:
+      labels:
+        {{- include "ts-next-template.selectorLabels" . | nindent 8 }}
+        app: oauth-service
+    spec:
+      containers:
+      - name: oauth-service
+        image: "{{ .Values.oauthService.image.repository }}:{{ .Values.oauthService.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.oauthService.port }}
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "ts-next-template.fullname" . }}-secret
+              key: database-url
+        - name: REDIS_URL
+          value: "redis://{{ .Values.redis.host }}:{{ .Values.redis.port }}"
+        - name: RUST_LOG
+          value: "info"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.oauthService.resources | nindent 10 }}
+
+---
+# Admin Portal Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ts-next-template.fullname" . }}-admin
+  labels:
+    {{- include "ts-next-template.labels" . | nindent 4 }}
+    app: admin-portal
+spec:
+  replicas: {{ .Values.adminPortal.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ts-next-template.selectorLabels" . | nindent 6 }}
+      app: admin-portal
+  template:
+    metadata:
+      labels:
+        {{- include "ts-next-template.selectorLabels" . | nindent 8 }}
+        app: admin-portal
+    spec:
+      containers:
+      - name: admin-portal
+        image: "{{ .Values.adminPortal.image.repository }}:{{ .Values.adminPortal.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.adminPortal.port }}
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://{{ include "ts-next-template.fullname" . }}-oauth:{{ .Values.oauthService.port }}"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.adminPortal.resources | nindent 10 }}
