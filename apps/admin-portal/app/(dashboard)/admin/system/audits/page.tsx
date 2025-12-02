@@ -36,7 +36,7 @@ type ColumnDef<T> = {
 type AuditLogFilters = {
   search: string;
   action: string;
-  status: '' | 'SUCCESS' | 'FAILURE';
+  status: '' | 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ACCESS_DENIED';
   startDate: string;
   endDate: string;
 };
@@ -115,7 +115,72 @@ function AuditLogsPage() {
   return (
     <div className="container mx-auto py-10 space-y-4">
       <h1 className="text-2xl font-bold">Audit Logs</h1>
-      <div className="flex flex-wrap gap-2 items-end">{/* Filter inputs */}</div>
+      <div className="flex flex-wrap gap-2 items-end">
+        <Input
+          placeholder="Search logs..."
+          value={filters.search || ''}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="min-w-[200px]"
+        />
+
+        <Select
+          value={filters.action || ''}
+          onValueChange={(value) => setFilters({ ...filters, action: value || '' })}
+        >
+          <SelectItem value="">All Actions</SelectItem>
+          <SelectItem value="CREATE">Create</SelectItem>
+          <SelectItem value="UPDATE">Update</SelectItem>
+          <SelectItem value="DELETE">Delete</SelectItem>
+          <SelectItem value="READ">Read</SelectItem>
+          <SelectItem value="EXPORT">Export</SelectItem>
+        </Select>
+
+        <Select
+          value={filters.status || ''}
+          onValueChange={(value) => setFilters({ ...filters, status: (value || '') as typeof filters.status })}
+        >
+          <SelectItem value="">All Status</SelectItem>
+          <SelectItem value="SUCCESS">Success</SelectItem>
+          <SelectItem value="FAILURE">Failure</SelectItem>
+          <SelectItem value="PENDING">Pending</SelectItem>
+          <SelectItem value="ACCESS_DENIED">Access Denied</SelectItem>
+        </Select>
+
+        <div className="flex gap-2">
+          <Input
+            type="date"
+            value={filters.startDate ? new Date(filters.startDate).toISOString().split('T')[0] : ''}
+            onChange={(e) => setFilters({
+              ...filters,
+              startDate: e.target.value ? new Date(e.target.value).toISOString() : ''
+            })}
+            placeholder="From"
+          />
+          <Input
+            type="date"
+            value={filters.endDate ? new Date(filters.endDate).toISOString().split('T')[0] : ''}
+            onChange={(e) => setFilters({
+              ...filters,
+              endDate: e.target.value ? new Date(e.target.value).toISOString() : ''
+            })}
+            placeholder="To"
+          />
+        </div>
+
+        <Button
+          onClick={() => {
+            const emptyFilters = { search: '', action: '', status: '' as typeof filters.status, startDate: '', endDate: '' };
+            setPage(1);
+            setFilters(emptyFilters);
+            setAppliedFilters(emptyFilters);
+          }}
+          variant="outline"
+        >
+          Reset
+        </Button>
+
+        <Button onClick={() => setAppliedFilters(filters)}>Apply Filters</Button>
+      </div>
       <DataTable
         columns={columns as ColumnDef<AuditLog>[]}
         data={logs}
