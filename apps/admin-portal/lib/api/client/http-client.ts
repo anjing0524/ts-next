@@ -10,6 +10,7 @@ import { RetryDecorator } from '../decorators/retry-decorator';
 import { CircuitBreakerDecorator } from '../decorators/circuit-breaker-decorator';
 import { AuthDecorator } from '../decorators/auth-decorator';
 import { RequestDeduplicationDecorator, type DeduplicationConfig } from '../decorators/request-deduplication-decorator';
+import { InstrumentationDecorator, type InstrumentationConfig } from '../decorators/instrumentation-decorator';
 
 /**
  * 抽象装饰器基类
@@ -118,6 +119,14 @@ export class HttpClientBuilder {
   }
 
   /**
+   * 添加仪表化装饰器（日志和指标收集）
+   */
+  withInstrumentation(config?: InstrumentationConfig): HttpClientBuilder {
+    this.client = new InstrumentationDecorator(this.client, config);
+    return this;
+  }
+
+  /**
    * 构建最终的HTTP客户端
    */
   build(): HttpClient {
@@ -143,7 +152,9 @@ export class HttpClientFactory {
 
   /**
    * 创建带所有装饰器的HTTP客户端
-   * 装饰器链顺序：BaseClient → Auth → RequestDedup → Retry → CircuitBreaker → Cache
+   * 装饰器链顺序（从内到外）：
+   * BaseClient → Auth → RequestDedup → Retry → CircuitBreaker → Cache → Instrumentation
+   * 仪表化在最外层以捕获所有操作的总时间
    */
   static createFullFeaturedClient(baseUrl?: string): HttpClient {
     return new HttpClientBuilder(baseUrl)
@@ -152,6 +163,7 @@ export class HttpClientFactory {
       .withRetry()
       .withCircuitBreaker()
       .withCache()
+      .withInstrumentation()
       .build();
   }
 
