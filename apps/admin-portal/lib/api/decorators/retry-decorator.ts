@@ -4,6 +4,7 @@
  */
 
 import type { HttpClient, HttpRequestOptions, HttpResponse, HttpClientDecorator, RetryConfig } from '../client/types';
+import type { HttpErrorLike } from '../types/request-response';
 import { HttpClientDecoratorBase } from '../client/http-client';
 
 /**
@@ -23,12 +24,12 @@ export class RetryDecorator extends HttpClientDecoratorBase {
   /**
    * 发送HTTP请求（带重试）
    */
-  async request<T = any>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async request<T = unknown>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     const retryConfig = this.getRetryConfig(options);
     const maxAttempts = retryConfig.maxAttempts;
     const retryCondition = retryConfig.retryCondition;
 
-    let lastError: any = null;
+    let lastError: HttpErrorLike = null;
     let lastResponse: HttpResponse<T> | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -102,29 +103,35 @@ export class RetryDecorator extends HttpClientDecoratorBase {
   /**
    * 默认重试条件
    */
-  private defaultRetryCondition(error: any, attempt: number): boolean {
+  private defaultRetryCondition(error: HttpErrorLike, attempt: number): boolean {
+    if (!error) {
+      return true;
+    }
+
+    const errorObj = error as any;
+
     // 不重试认证错误
-    if (error?.status === 401 || error?.message?.includes('401')) {
+    if (errorObj.status === 401 || errorObj.message?.includes('401')) {
       return false;
     }
 
     // 不重试验证错误
-    if (error?.status === 400 || error?.message?.includes('400')) {
+    if (errorObj.status === 400 || errorObj.message?.includes('400')) {
       return false;
     }
 
     // 不重试未找到错误
-    if (error?.status === 404 || error?.message?.includes('404')) {
+    if (errorObj.status === 404 || errorObj.message?.includes('404')) {
       return false;
     }
 
     // 不重试客户端错误（4xx），除了速率限制
-    if (error?.status && error.status >= 400 && error.status < 500 && error.status !== 429) {
+    if (errorObj.status && errorObj.status >= 400 && errorObj.status < 500 && errorObj.status !== 429) {
       return false;
     }
 
     // 重试网络错误和服务器错误
-    if (error instanceof TypeError || error?.status >= 500 || error?.status === 429) {
+    if (error instanceof Error || errorObj.status >= 500 || errorObj.status === 429) {
       return true;
     }
 

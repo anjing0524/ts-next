@@ -3,6 +3,8 @@
  * 用于装饰器模式的HTTP客户端
  */
 
+import type { HttpErrorLike } from '../types/request-response';
+
 /**
  * HTTP请求选项
  */
@@ -187,7 +189,7 @@ export interface RetryConfig {
   /** 是否添加抖动 */
   jitter?: boolean;
   /** 重试条件函数 */
-  retryCondition?: (error: any, attempt: number) => boolean;
+  retryCondition?: (error: HttpErrorLike, attempt: number) => boolean;
 }
 
 /**
@@ -201,7 +203,7 @@ export interface CircuitBreakerConfig {
   /** 监控周期（毫秒） */
   monitoringPeriod?: number;
   /** 预期异常断言函数 */
-  expectedExceptionPredicate?: (error: any) => boolean;
+  expectedExceptionPredicate?: (error: HttpErrorLike) => boolean;
 }
 
 /**
