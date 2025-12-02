@@ -5,6 +5,7 @@
 
 import type { PaginatedResponse, SystemConfiguration, AuditLog } from '../index';
 import { HttpClientFactory } from '../client/http-client';
+import { cacheClient } from '../../cache/cache-client';
 
 /**
  * 审计日志过滤器接口
@@ -90,7 +91,7 @@ export class SystemResource {
   }
 
   /**
-   * 获取审计日志列表
+   * 获取审计日志列表（带缓存）
    */
   async getAuditLogs(params?: AuditLogFilter): Promise<PaginatedResponse<AuditLog>> {
     const queryParams = new URLSearchParams();
@@ -103,8 +104,25 @@ export class SystemResource {
       });
     }
 
+    // 生成缓存key
+    const cacheKey = `audit:logs:${queryParams.toString()}`;
+
+    // 尝试从缓存获取
+    const cached = await cacheClient.get<PaginatedResponse<AuditLog>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // 缓存未命中，从API获取
     const url = `/api/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.client.get<PaginatedResponse<AuditLog>>(url);
+
+    // 缓存结果（5分钟TTL，标签为'audit'方便批量清除）
+    await cacheClient.set(cacheKey, response.data, {
+      ttl: 300,
+      tags: ['audit'],
+    });
+
     return response.data;
   }
 
