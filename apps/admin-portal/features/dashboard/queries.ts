@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { adminApi } from '../../lib/api';
+import { api } from '../../lib/api';
 import type { SystemStatsSummary } from '../../lib/api/resources/system';
 
 // 定义统计数据的类型，后续可以根据后端返回的实际结构进行完善
@@ -41,7 +41,7 @@ export const useDashboardStatsQuery = () => {
   return useQuery<DashboardStats, Error>({
     queryKey: dashboardKeys.stats(),
     queryFn: async () => {
-      const stats = await adminApi.getStatsSummary();
+      const stats = await api.getStatsSummary();
       return transformStatsSummary(stats);
     },
     // 可以设置数据刷新间隔，例如每分钟刷新一次

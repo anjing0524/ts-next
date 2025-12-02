@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi, authApi } from '../../lib/api';
+import { api, authApi } from '../../lib/api';
 
 // 使用 types/auth.ts 中的 User 类型，确保与 API 返回的类型一致
 import { User } from '@/types/auth';
@@ -30,7 +30,7 @@ export const useUpdateProfileMutation = () => {
   return useMutation<User, Error, { displayName: string }>({
     mutationFn: async (profileData) => {
       // 只传递 displayName，且保证为 string
-      await adminApi.updateUserProfile({ displayName: profileData.displayName });
+      await api.updateUserProfile({ displayName: profileData.displayName });
       // 更新后重新获取最新用户信息，保证类型为 User
       const data = await authApi.fetchUserProfile();
       return data as unknown as User;
@@ -50,7 +50,7 @@ export const useUpdateProfileMutation = () => {
 export const useUpdatePasswordMutation = () => {
   return useMutation<void, Error, { currentPassword: string; newPassword: string }>({
     mutationFn: async (passwordData) => {
-      await adminApi.updatePassword(passwordData);
+      await api.updatePassword(passwordData);
     },
     // 成功后可以添加一些逻辑，例如提示用户密码修改成功
   });

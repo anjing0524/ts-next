@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { adminApi } from '../../../../../lib/api';
+import { api } from '../../../../../lib/api';
 import { useAuth } from '@repo/ui/hooks';
 import { PermissionGuard } from '@repo/ui';
 import {
@@ -63,7 +63,7 @@ function AuditLogsPage() {
   const { data, isLoading, error, isFetching } = useQuery<AuditLogsResponse>({
     queryKey: ['auditLogs', queryParams],
     queryFn: () =>
-      adminApi.getAuditLogs({
+      api.getAuditLogs({
         ...queryParams,
         startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
         endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,

@@ -5,7 +5,7 @@ import { User } from '@/types/auth';
 import { CreateUserInput, UpdateUserInput, PaginatedResponse } from './domain/user';
 import { UserService } from './application/user.service';
 import { UserRepository } from './infrastructure/user.repository';
-import { adminApi } from '../../lib/api'; // Still needed for stats summary if not moved to UserService
+import { api } from '../../lib/api'; // Still needed for stats summary if not moved to UserService
 
 // 实例化 UserRepository 和 UserService
 const userRepository = new UserRepository();
@@ -70,7 +70,7 @@ export const useUserStatsQuery = () => {
     queryKey: userQueryKeys.stats(),
     queryFn: async () => {
       // 使用现有的API获取统计数据
-      const statsSummary = await adminApi.getStatsSummary();
+      const statsSummary = await api.getStatsSummary();
       return statsSummary;
     },
     staleTime: 5 * 60 * 1000, // 统计数据5分钟内保持新鲜

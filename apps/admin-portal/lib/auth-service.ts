@@ -1,5 +1,5 @@
 import { AuthProviderInterface, AuthUser, AuthTokens } from '@repo/ui';
-import { adminApi, authApi } from './api';
+import { api, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
 import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@/lib/utils/browser';
 
@@ -28,7 +28,7 @@ export const authService: AuthProviderInterface = {
     if (!accessToken) {
       return null;
     }
-    return adminApi.getUserById('me') as Promise<AuthUser | null>;
+    return api.getUserById('me') as Promise<AuthUser | null>;
   },
 
   async login(): Promise<void> {

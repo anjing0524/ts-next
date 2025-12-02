@@ -13,7 +13,7 @@ import {
   Switch,
   toast,
 } from '@repo/ui';
-import { adminApi } from '../../../lib/api';
+import { api } from '../../../lib/api';
 import type { User } from '@/types/auth';
 
 interface UserFormDialogProps {
@@ -88,7 +88,7 @@ export function UserFormDialog({
     try {
       if (currentUser) {
         // Update user
-        await adminApi.updateUser(currentUser.id, {
+        await api.updateUser(currentUser.id, {
           displayName: formData.displayName,
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -101,7 +101,7 @@ export function UserFormDialog({
         toast({ title: 'Success', description: 'User updated successfully.' });
       } else {
         // Create user
-        await adminApi.createUser({
+        await api.createUser({
           username: formData.username,
           password: formData.password,
           displayName: formData.displayName,

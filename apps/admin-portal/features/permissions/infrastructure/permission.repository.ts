@@ -1,4 +1,4 @@
-import { adminApi, PaginatedResponse } from '../../../lib/api';
+import { api, PaginatedResponse } from '../../../lib/api';
 import { IPermissionRepository } from '../domain/permission.repository';
 import { Permission } from '../domain/permission';
 
@@ -9,7 +9,7 @@ export class PermissionRepository implements IPermissionRepository {
     search?: string;
   }): Promise<PaginatedResponse<Permission>> {
     // 类型断言，确保返回值符合 PaginatedResponse<Permission>
-    return adminApi.getPermissions(params) as Promise<PaginatedResponse<Permission>>;
+    return api.getPermissions(params) as Promise<PaginatedResponse<Permission>>;
   }
 
   async getPermissionById(permissionId: string): Promise<Permission> {

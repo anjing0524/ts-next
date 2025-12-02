@@ -1,4 +1,4 @@
-import { adminApi, PaginatedResponse } from '../../../lib/api';
+import { api, PaginatedResponse } from '../../../lib/api';
 import { IClientRepository } from '../domain/client.repository';
 import { OAuthClient, ClientFormInput } from '../domain/client';
 
@@ -8,26 +8,26 @@ export class ClientRepository implements IClientRepository {
     limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<OAuthClient>> {
-    return adminApi.getClients(params);
+    return api.getClients(params);
   }
 
   async getClientById(clientId: string): Promise<OAuthClient> {
-    return adminApi.getClientById(clientId);
+    return api.getClientById(clientId);
   }
 
   async createClient(clientData: ClientFormInput): Promise<OAuthClient> {
-    return adminApi.createClient(clientData);
+    return api.createClient(clientData);
   }
 
   async updateClient(clientId: string, clientData: Partial<ClientFormInput>): Promise<OAuthClient> {
-    return adminApi.updateClient(clientId, clientData);
+    return api.updateClient(clientId, clientData);
   }
 
   async deleteClient(clientId: string): Promise<void> {
-    return adminApi.deleteClient(clientId);
+    return api.deleteClient(clientId);
   }
 
   async rotateClientSecret(clientId: string): Promise<{ clientSecret: string }> {
-    return adminApi.rotateClientSecret(clientId);
+    return api.rotateClientSecret(clientId);
   }
 }

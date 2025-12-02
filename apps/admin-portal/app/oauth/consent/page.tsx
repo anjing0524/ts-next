@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@repo/ui';
-import { apiRequest, adminApi } from '@/lib/api';
+import { apiRequest, api } from '@/lib/api';
 
 interface ConsentApiData {
   client: { id: string; name: string; logoUri?: string | null };
@@ -146,7 +146,7 @@ function ConsentContent() {
   // 处理授权确认
   const handleConsent = async (action: 'allow' | 'deny') => {
     try {
-      // 优先调用adminApi.submitConsent，统一后端接口
+      // 优先调用api.submitConsent，统一后端接口
       const consentParams = new URLSearchParams({
         decision: action,
         client_id: clientId!,
@@ -159,7 +159,7 @@ function ConsentContent() {
         nonce: nonce || '',
       });
       // 调用统一的submitConsent工具函数
-      const response = await adminApi.submitConsent(action, consentParams);
+      const response = await api.submitConsent(action, consentParams);
       if (response.redirect_uri) {
         window.location.href = response.redirect_uri;
       } else {

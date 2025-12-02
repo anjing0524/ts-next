@@ -107,10 +107,6 @@ export const api = {
   ...systemApi,
 };
 
-/**
- * @deprecated 请使用 `api` 对象
- */
-export const adminApi = api;
 
 // --- 类型定义 ---
 
