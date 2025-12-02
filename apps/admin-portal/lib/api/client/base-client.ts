@@ -17,7 +17,7 @@ export class BaseHttpClient implements HttpClient {
   /**
    * 发送HTTP请求
    */
-  async request<T = any>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async request<T = unknown>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     const fullUrl = this.buildUrl(url, options.params);
     const requestOptions = this.prepareRequestOptions(options);
     const startTime = Date.now();
@@ -49,14 +49,14 @@ export class BaseHttpClient implements HttpClient {
   /**
    * GET请求
    */
-  async get<T = any>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async get<T = unknown>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'GET' });
   }
 
   /**
    * POST请求
    */
-  async post<T = any>(url: string, data?: any, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async post<T = unknown>(url: string, data?: Record<string, unknown>, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'POST',
@@ -67,7 +67,7 @@ export class BaseHttpClient implements HttpClient {
   /**
    * PUT请求
    */
-  async put<T = any>(url: string, data?: any, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async put<T = unknown>(url: string, data?: Record<string, unknown>, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'PUT',
@@ -78,14 +78,14 @@ export class BaseHttpClient implements HttpClient {
   /**
    * DELETE请求
    */
-  async delete<T = any>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async delete<T = unknown>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'DELETE' });
   }
 
   /**
    * PATCH请求
    */
-  async patch<T = any>(url: string, data?: any, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async patch<T = unknown>(url: string, data?: Record<string, unknown>, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'PATCH',
@@ -96,7 +96,7 @@ export class BaseHttpClient implements HttpClient {
   /**
    * 文件上传
    */
-  async upload<T = any>(url: string, file: File, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+  async upload<T = unknown>(url: string, file: File, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -114,7 +114,7 @@ export class BaseHttpClient implements HttpClient {
   /**
    * 构建完整URL
    */
-  protected buildUrl(url: string, params?: Record<string, any>): string {
+  protected buildUrl(url: string, params?: Record<string, unknown>): string {
     const baseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
     const path = url.startsWith('/') ? url : `/${url}`;
     const fullUrl = `${baseUrl}${path}`;

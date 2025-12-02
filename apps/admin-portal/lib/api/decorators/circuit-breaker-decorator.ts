@@ -4,6 +4,7 @@
  */
 
 import type { HttpClient, HttpRequestOptions, HttpResponse, HttpClientDecorator, CircuitBreakerConfig } from '../client/types';
+import type { HttpErrorLike } from '../types/request-response';
 import { HttpClientDecoratorBase } from '../client/http-client';
 
 /**
@@ -159,21 +160,23 @@ export class CircuitBreakerDecorator extends HttpClientDecoratorBase {
   /**
    * 默认异常断言
    */
-  private defaultExceptionPredicate(error: any): boolean {
+  private defaultExceptionPredicate(error: HttpErrorLike): boolean {
+    if (!error) return false;
+    const err = error as any;
     // 将网络错误和服务器错误视为预期异常
     return (
       error instanceof TypeError ||
-      error?.status >= 500 ||
-      error?.status === 429 ||
-      error?.message?.includes('timeout') ||
-      error?.message?.includes('network')
+      (err.status || 0) >= 500 ||
+      err.status === 429 ||
+      err?.message?.includes('timeout') ||
+      err?.message?.includes('network')
     );
   }
 
   /**
    * 检查是否是预期异常
    */
-  private isExpectedException(error: any): boolean {
+  private isExpectedException(error: HttpErrorLike): boolean {
     return this.config.expectedExceptionPredicate(error);
   }
 

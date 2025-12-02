@@ -176,10 +176,15 @@ export interface ConsentParams {
  * ClientCreateRequest - 客户端创建请求
  */
 export interface ClientCreateRequest {
-  clientName: string;
+  name: string;
   redirectUris: string[];
-  scopes: string[];
+  grantTypes: string[];
   clientType: 'CONFIDENTIAL' | 'PUBLIC';
+  allowedScopes: string[];
+  accessTokenTtl: number;
+  refreshTokenTtl: number;
+  requirePkce: boolean;
+  requireConsent: boolean;
   description?: string;
 }
 
@@ -187,10 +192,15 @@ export interface ClientCreateRequest {
  * ClientUpdateRequest - 客户端更新请求
  */
 export interface ClientUpdateRequest {
-  clientName?: string;
+  name?: string;
   redirectUris?: string[];
-  scopes?: string[];
+  grantTypes?: string[];
   clientType?: 'CONFIDENTIAL' | 'PUBLIC';
+  allowedScopes?: string[];
+  accessTokenTtl?: number;
+  refreshTokenTtl?: number;
+  requirePkce?: boolean;
+  requireConsent?: boolean;
   description?: string;
   isActive?: boolean;
 }
@@ -211,8 +221,9 @@ export interface ClientFilter {
  */
 export interface RoleCreateRequest {
   name: string;
+  displayName?: string;
   description?: string;
-  permissions: string[];
+  permissionIds: string[];
 }
 
 /**
@@ -245,7 +256,9 @@ export interface UserCreateRequest {
   lastName?: string;
   organization?: string;
   department?: string;
-  roles?: string[];
+  roleIds?: string[];
+  isActive?: boolean;
+  mustChangePassword?: boolean;
 }
 
 /**

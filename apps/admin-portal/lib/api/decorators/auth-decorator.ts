@@ -4,6 +4,7 @@
  */
 
 import type { HttpClient, HttpRequestOptions, HttpResponse, HttpClientDecorator, AuthConfig } from '../client/types';
+import type { HttpErrorLike, TokenData } from '../types/request-response';
 import { HttpClientDecoratorBase } from '../client/http-client';
 import { TokenStorage } from '../../auth/token-storage';
 
@@ -156,13 +157,15 @@ export class AuthDecorator extends HttpClientDecoratorBase {
   /**
    * 检查是否是认证错误
    */
-  private isAuthError(error: any): boolean {
+  private isAuthError(error: HttpErrorLike): boolean {
+    if (!error) return false;
+    const err = error as any;
     return (
-      error?.status === 401 ||
-      error?.message?.includes('401') ||
-      error?.message?.includes('Unauthorized') ||
-      error?.message?.includes('invalid_token') ||
-      error?.message?.includes('expired_token')
+      err.status === 401 ||
+      err?.message?.includes('401') ||
+      err?.message?.includes('Unauthorized') ||
+      err?.message?.includes('invalid_token') ||
+      err?.message?.includes('expired_token')
     );
   }
 
@@ -250,13 +253,14 @@ export class AuthDecorator extends HttpClientDecoratorBase {
   /**
    * 保存令牌
    */
-  private async saveTokens(tokenData: any): Promise<void> {
+  private async saveTokens(tokenData: TokenData): Promise<void> {
     try {
       if (typeof window === 'undefined') {
         return;
       }
 
-      const { access_token, refresh_token, expires_in, csrf_token } = tokenData;
+      const { access_token, refresh_token, expires_in } = tokenData;
+      const csrf_token = (tokenData as any).csrf_token;
 
       if (access_token) {
         localStorage.setItem('access_token', access_token);

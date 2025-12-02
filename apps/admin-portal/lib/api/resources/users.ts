@@ -4,6 +4,7 @@
  */
 
 import type { PaginatedResponse, User, UserCreateRequest, UserUpdateRequest, UserFilter } from '../index';
+import type { ProfileUpdateRequest, PasswordUpdateRequest } from '../types/request-response';
 import { HttpClientFactory } from '../client/http-client';
 
 /**
@@ -178,7 +179,7 @@ export class UsersResource {
   /**
    * 更新用户个人资料
    */
-  async updateProfile(data: any): Promise<User> {
+  async updateProfile(data: ProfileUpdateRequest): Promise<User> {
     const response = await this.client.put<User>('/api/users/me/profile', data);
     return response.data;
   }
@@ -186,7 +187,7 @@ export class UsersResource {
   /**
    * 更新密码
    */
-  async updatePassword(data: any): Promise<void> {
+  async updatePassword(data: PasswordUpdateRequest): Promise<void> {
     await this.client.put('/api/users/me/password', data);
   }
 
@@ -208,12 +209,12 @@ export const usersResource = new UsersResource();
  * 向后兼容的API助手函数
  */
 export const usersApi = {
-  getUsers: (params?: any) => usersResource.list(params),
+  getUsers: (params?: UserFilter) => usersResource.list(params),
   getUserById: (id: string) => usersResource.get(id),
-  createUser: (data: any) => usersResource.create(data),
-  updateUser: (id: string, data: any) => usersResource.update(id, data),
+  createUser: (data: UserCreateRequest) => usersResource.create(data),
+  updateUser: (id: string, data: UserUpdateRequest) => usersResource.update(id, data),
   deleteUser: (id: string) => usersResource.delete(id),
-  updateUserProfile: (data: any) => usersResource.updateProfile(data),
-  updatePassword: (data: any) => usersResource.updatePassword(data),
+  updateUserProfile: (data: ProfileUpdateRequest) => usersResource.updateProfile(data),
+  updatePassword: (data: PasswordUpdateRequest) => usersResource.updatePassword(data),
   fetchUserProfile: () => usersResource.getProfile(),
 };

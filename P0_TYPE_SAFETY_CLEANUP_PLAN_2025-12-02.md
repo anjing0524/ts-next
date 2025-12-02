@@ -2,18 +2,22 @@
 
 ## 📊 进度概览
 
-**总体进度**: Phase 1 完成 ✅ | Phase 2 进行中 🟡
+**总体进度**: Phase 1 完成 ✅ | Phase 2 完成 ✅ | Phase 3 待进行 🟡
 
 ### 统计信息
 - **总计 any 使用**: 67 处
-- **高风险 (12 处)**: 18% - 立即修复
+- **高风险 (12 处)**: 18% - ✅ 已完成
 - **中风险 (29 处)**: 43% - 逐步修复
 - **低风险 (22 处)**: 33% - 文档改进
 
 ### 已完成
-- ✅ 创建 lib/api/types/request-response.ts (完整的类型定义文件)
-- ✅ 修复 client/types.ts 回调函数参数类型
-- ✅ 修复 retry-decorator.ts 错误类型
+- ✅ Phase 1: 创建 lib/api/types/request-response.ts (完整的类型定义文件)
+- ✅ Phase 1: 修复 client/types.ts 回调函数参数类型
+- ✅ Phase 1: 修复 retry-decorator.ts 错误类型
+- ✅ Phase 2: 修复 auth-decorator.ts isAuthError 和 saveTokens 函数
+- ✅ Phase 2: 修复 circuit-breaker-decorator.ts defaultExceptionPredicate 函数
+- ✅ Phase 2: 修复 resources/auth.ts 所有 API 返回类型
+- ✅ Phase 2: 更新 ConsentResponse、LoginRequest、UserInfo 接口以匹配实际使用
 - ✅ Build 通过，零回归
 
 ---
@@ -30,91 +34,22 @@
 | H4 | retry-decorator.ts | 106 | defaultRetryCondition 参数类型 any | ✅ 改为 HttpErrorLike |
 | H5 | retry-decorator.ts | 26 | request 方法泛型默认 any | ✅ 改为 unknown |
 
-### Phase 2 需处理 (7/12) - 优先级排序
+### Phase 2 已完成 (7/12) ✅
 
-#### 最高优先级 (第一天)
+| ID | 文件 | 行号 | 问题 | 状态 |
+|----|----|------|------|------|
+| H6 | auth-decorator.ts | 159 | isAuthError 参数类型 any | ✅ 改为 HttpErrorLike |
+| H7 | auth-decorator.ts | 253 | saveTokens 参数类型 any | ✅ 改为 TokenData |
+| H8 | circuit-breaker-decorator.ts | 162 | defaultExceptionPredicate 参数类型 any | ✅ 改为 HttpErrorLike |
+| H9 | resources/auth.ts | 22 | submitConsent 返回 Promise<any> | ✅ 改为 Promise<ConsentResponse> |
+| H10 | resources/auth.ts | 81 | getUserInfo 返回 Promise<any> | ✅ 改为 Promise<UserInfo> |
+| H11 | resources/auth.ts | 89 | introspectToken 返回 Promise<any> | ✅ 改为 Promise<TokenIntrospectResponse> |
+| H12 | resources/auth.ts | 122 | login helper credentials: any | ✅ 改为 LoginRequest |
 
-**H6: auth-decorator.ts - isAuthError 函数**
-```typescript
-// 当前 (第159行)
-private isAuthError(error: any): boolean {
-
-// 应改为
-private isAuthError(error: HttpErrorLike): boolean {
-  if (!error) return false;
-  const err = error as any;
-  return err.status === 401 || err.message?.includes('401');
-}
-```
-- **风险**: 错误检查函数，认证路径关键
-- **文件**: lib/api/decorators/auth-decorator.ts:159
-- **工作量**: 15分钟
-
-**H7: auth-decorator.ts - saveTokens 函数**
-```typescript
-// 当前 (第253行)
-private async saveTokens(tokenData: any): Promise<void> {
-
-// 应改为 (导入 TokenData 类型)
-import type { TokenData } from '../types/request-response';
-
-private async saveTokens(tokenData: TokenData): Promise<void> {
-```
-- **风险**: 令牌存储，安全关键
-- **文件**: lib/api/decorators/auth-decorator.ts:253
-- **工作量**: 15分钟
-- **注意**: 需检查 saveTokens 的调用位置，确保传入类型匹配
-
-**H8: circuit-breaker-decorator.ts - defaultExceptionPredicate**
-```typescript
-// 当前 (第162行)
-private defaultExceptionPredicate(error: any): boolean {
-
-// 应改为
-private defaultExceptionPredicate(error: HttpErrorLike): boolean {
-  if (!error) return false;
-  const err = error as any;
-  return (err.status || 0) >= 500;
-}
-```
-- **风险**: 断路器异常判断，故障转移关键
-- **文件**: lib/api/decorators/circuit-breaker-decorator.ts:162
-- **工作量**: 15分钟
-
-#### 第二优先级 (第二天)
-
-**H9-H12: resources/auth.ts - API 返回类型**
-
-| 行号 | 函数 | 当前返回 | 应改为 | 工作量 |
-|------|------|---------|--------|--------|
-| 22 | submitConsent | Promise<any> | Promise<ConsentResponse> | 10分 |
-| 81 | getUserInfo | Promise<any> | Promise<UserInfo> | 10分 |
-| 89 | introspectToken | Promise<any> | Promise<TokenIntrospectResponse> | 10分 |
-| 122 | login helper | credentials: any | LoginRequest | 10分 |
-
-**步骤**:
-```typescript
-// 在文件顶部导入
-import type {
-  ConsentResponse,
-  UserInfo,
-  TokenIntrospectResponse,
-  LoginRequest,
-} from '../types/request-response';
-
-// 更新函数签名
-async submitConsent(action: string, params?: Record<string, unknown>): Promise<ConsentResponse>
-
-async getUserInfo(): Promise<UserInfo>
-
-async introspectToken(token: string): Promise<TokenIntrospectResponse>
-
-// 在 authApi 对象中
-login: (credentials: LoginRequest) => { ... }
-```
-
-**风险**: OAuth 流程核心，类型错误可导致运行时问题
-**工作量**: 40分钟
+**额外修复**:
+- ✅ 更新 ConsentResponse 接口，使用 snake_case 字段名匹配实际 API 响应
+- ✅ 更新 LoginRequest 接口，添加 grant_type 可选字段
+- ✅ 更新 UserInfo 接口，添加所有必需字段以匹配 User 类型
 
 ---
 
@@ -259,14 +194,14 @@ request-response.ts (已完成) ✅
 
 ## 📋 修复检查清单
 
-### Phase 2 (高风险后7项)
+### Phase 2 (高风险后7项) ✅
 
-- [ ] H6: auth-decorator.ts:159 isAuthError
-- [ ] H7: auth-decorator.ts:253 saveTokens (含调用位置检查)
-- [ ] H8: circuit-breaker-decorator.ts:162 defaultExceptionPredicate
-- [ ] H9-H12: resources/auth.ts (4个函数返回类型)
-- [ ] 验证 build 成功
-- [ ] 运行现有测试 (确保无回归)
+- [x] H6: auth-decorator.ts:159 isAuthError
+- [x] H7: auth-decorator.ts:253 saveTokens (含调用位置检查)
+- [x] H8: circuit-breaker-decorator.ts:162 defaultExceptionPredicate
+- [x] H9-H12: resources/auth.ts (4个函数返回类型)
+- [x] 验证 build 成功
+- [x] 运行现有测试 (确保无回归)
 
 ### Phase 3 关键项
 

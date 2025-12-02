@@ -27,6 +27,14 @@ export interface TokenData {
 export interface UserInfo {
   id: string;
   username: string;
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  organization: string | null;
+  department: string | null;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  userRoles: { roleId: string }[];
   email?: string;
   name?: string;
   avatar?: string;
@@ -54,8 +62,8 @@ export interface TokenIntrospectResponse {
  * 同意授权响应接口
  */
 export interface ConsentResponse {
-  redirectUri: string;
-  authorizationCode?: string;
+  redirect_uri: string;
+  authorization_code?: string;
   state?: string;
 }
 
@@ -65,6 +73,7 @@ export interface ConsentResponse {
 export interface LoginRequest {
   username: string;
   password: string;
+  grant_type?: string;
   rememberMe?: boolean;
 }
 
@@ -82,7 +91,7 @@ export interface ProfileUpdateRequest {
  * 密码更新请求
  */
 export interface PasswordUpdateRequest {
-  oldPassword: string;
+  currentPassword: string;
   newPassword: string;
   confirmPassword?: string;
 }
@@ -103,11 +112,12 @@ export interface SystemConfigUpdateRequest {
  * OAuth 客户端注册请求
  */
 export interface ClientRegisterRequest {
-  clientName: string;
-  redirectUris: string[];
+  name: string;
+  redirectUris: string;
   responseTypes?: string[];
   grantTypes?: string[];
   scope?: string;
+  jwksUri?: string;
   [key: string]: unknown;
 }
 
@@ -139,4 +149,37 @@ export interface ApiResponse<T = unknown> {
     details?: Record<string, unknown>;
   };
   timestamp?: string;
+}
+
+/**
+ * 角色更新请求
+ */
+export interface RoleUpdateRequest {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+/**
+ * 权限创建请求
+ */
+export interface PermissionCreateRequest {
+  name: string;
+  displayName?: string;
+  description?: string;
+  type: 'API' | 'MENU' | 'DATA';
+  resource?: string;
+  action?: string;
+}
+
+/**
+ * 权限更新请求
+ */
+export interface PermissionUpdateRequest {
+  name?: string;
+  displayName?: string;
+  description?: string;
+  type?: 'API' | 'MENU' | 'DATA';
+  resource?: string;
+  action?: string;
 }

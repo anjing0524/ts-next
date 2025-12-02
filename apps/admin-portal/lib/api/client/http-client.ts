@@ -18,13 +18,13 @@ import { InstrumentationDecorator, type InstrumentationConfig } from '../decorat
 export abstract class HttpClientDecoratorBase implements HttpClientDecorator {
   constructor(public readonly wrappedClient: HttpClient) {}
 
-  abstract request<T = any>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
+  abstract request<T = unknown>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
 
-  async get<T = any>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async get<T = unknown>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'GET' });
   }
 
-  async post<T = any>(url: string, data?: any, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async post<T = unknown>(url: string, data?: Record<string, unknown>, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'POST',
@@ -32,7 +32,7 @@ export abstract class HttpClientDecoratorBase implements HttpClientDecorator {
     });
   }
 
-  async put<T = any>(url: string, data?: any, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async put<T = unknown>(url: string, data?: Record<string, unknown>, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'PUT',
@@ -40,11 +40,11 @@ export abstract class HttpClientDecoratorBase implements HttpClientDecorator {
     });
   }
 
-  async delete<T = any>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async delete<T = unknown>(url: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'DELETE' });
   }
 
-  async patch<T = any>(url: string, data?: any, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async patch<T = unknown>(url: string, data?: Record<string, unknown>, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'PATCH',
@@ -52,7 +52,7 @@ export abstract class HttpClientDecoratorBase implements HttpClientDecorator {
     });
   }
 
-  async upload<T = any>(url: string, file: File, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
+  async upload<T = unknown>(url: string, file: File, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     const formData = new FormData();
     formData.append('file', file);
 

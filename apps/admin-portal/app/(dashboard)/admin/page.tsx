@@ -7,13 +7,13 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Skeleton,
   Alert,
   AlertDescription,
   AlertTitle,
   PermissionGuard,
 } from '@repo/ui';
 import { AlertTriangle, Users, AppWindow, ShieldCheck, KeyRound } from 'lucide-react';
+import { DashboardLoading } from '@/components/common/LoadingStates';
 import {
   ResponsiveContainer,
   BarChart,
@@ -41,10 +41,10 @@ function StatCard({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          <Skeleton className="h-4 w-4" />
+          <div className="h-4 w-4 bg-muted/50 rounded animate-pulse" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-8 w-1/2" />
+          <div className="h-8 w-1/2 bg-muted/50 rounded animate-pulse" />
         </CardContent>
       </Card>
     );
@@ -76,6 +76,10 @@ function DashboardPageContent() {
     );
   }
 
+  if (isLoading) {
+    return <DashboardLoading />;
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">管理员仪表盘</h1>
@@ -84,25 +88,25 @@ function DashboardPageContent() {
           title="用户总数"
           value={data?.userCount ?? '...'}
           icon={Users}
-          isLoading={isLoading}
+          isLoading={false}
         />
         <StatCard
           title="客户端总数"
           value={data?.clientCount ?? '...'}
           icon={AppWindow}
-          isLoading={isLoading}
+          isLoading={false}
         />
         <StatCard
           title="角色总数"
           value={data?.roleCount ?? '...'}
           icon={ShieldCheck}
-          isLoading={isLoading}
+          isLoading={false}
         />
         <StatCard
           title="今日颁发令牌"
           value={data?.tokensIssuedToday ?? '...'}
           icon={KeyRound}
-          isLoading={isLoading}
+          isLoading={false}
         />
       </div>
       <Card>
@@ -110,20 +114,16 @@ function DashboardPageContent() {
           <CardTitle>用户增长趋势</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-[350px] w-full" />
-          ) : (
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={data?.userGrowth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#8884d8" name="新增用户数" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={data?.userGrowth}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="count" fill="#8884d8" name="新增用户数" />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>

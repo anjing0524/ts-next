@@ -14,6 +14,8 @@
 
 | 文档 | 用途 | 最新版本 | 状态 |
 |------|------|--------|------|
+| **../P0_TYPE_SAFETY_PHASE2_SUMMARY_2025-12-02.md** | P0 Type Safety Phase 2 完成总结 - 7项高风险any类型修复 | 2025-12-02 | ✅ 最新 |
+| **../P0_TYPE_SAFETY_CLEANUP_PLAN_2025-12-02.md** | P0 API层类型安全清理计划 (Phase 1-2完成) | 2025-12-02 | ✅ 最新 |
 | **../MULTI_EXPERT_CODE_REVIEW_SUMMARY_2025-12-02.md** | 多角色专家并行代码审查综合报告 (Next.js+Rust) | 2025-12-02 | ✅ 最新 |
 | **../MULTI_ROLE_REVIEW_EXECUTION_SUMMARY.md** | 多角色审查执行总结与流程评价 | 2025-12-02 | ✅ 最新 |
 | **../QUICK_FIX_GUIDE.md** | 快速修复指南 - 5大高优先问题详细步骤 | 2025-12-02 | ✅ 最新 |
@@ -50,6 +52,7 @@
 
 | 文档 | 用途 | 关键内容 | 状态 |
 |------|------|---------|------|
+| **../RUST_UNIT_TESTING_FRAMEWORK_SETUP_2025-12-02.md** | Rust单元测试框架设置计划 | 测试覆盖分析、框架设计、实施路线图 | ✅ 最新 |
 | **7-TESTING.md** | 测试策略完整文档 | 单元/集成/E2E测试 | ✅ 基础 |
 | **TESTING_PHASES_SUMMARY.md** | 测试阶段总结 | 测试执行计划 | 📋 参考 |
 | **E2E_TEST_EXECUTION_REPORT.md** | E2E测试执行报告 | 详细的测试结果 | 📋 历史 |

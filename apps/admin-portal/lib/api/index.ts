@@ -18,12 +18,18 @@ import type {
   ClientUpdateRequest,
   ClientFilter,
   RoleCreateRequest,
-  RoleUpdateRequest,
   RoleFilter,
   UserCreateRequest,
   UserUpdateRequest,
   UserFilter,
 } from '@/types/auth';
+
+import type {
+  RoleUpdateRequest,
+  PermissionCreateRequest,
+  PermissionUpdateRequest,
+  SystemConfigUpdateRequest,
+} from './types/request-response';
 
 export type {
   AuditLog,
@@ -44,6 +50,9 @@ export type {
   UserCreateRequest,
   UserUpdateRequest,
   UserFilter,
+  PermissionCreateRequest,
+  PermissionUpdateRequest,
+  SystemConfigUpdateRequest,
 };
 
 // --- HTTP客户端核心模块 ---

@@ -4,6 +4,7 @@
  */
 
 import type { PaginatedResponse, SystemConfiguration, AuditLog } from '../index';
+import type { ConfigValue, SystemLog } from '../types/request-response';
 import { HttpClientFactory } from '../client/http-client';
 import { cacheClient } from '../../cache/cache-client';
 
@@ -29,7 +30,7 @@ export interface AuditLogFilter {
  * 系统配置更新请求
  */
 export interface SystemConfigUpdateRequest {
-  [key: string]: any;
+  [key: string]: ConfigValue;
 }
 
 /**
@@ -86,7 +87,7 @@ export class SystemResource {
   /**
    * 更新单个系统配置项
    */
-  async updateSystemConfigItem(key: string, value: any, type?: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'): Promise<void> {
+  async updateSystemConfigItem(key: string, value: ConfigValue, type?: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'): Promise<void> {
     await this.client.put(`/api/system/config/${key}`, { value, type });
   }
 
@@ -321,13 +322,7 @@ export class SystemResource {
     search?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResponse<{
-    timestamp: Date;
-    level: string;
-    service: string;
-    message: string;
-    details?: any;
-  }>> {
+  }): Promise<PaginatedResponse<SystemLog>> {
     const queryParams = new URLSearchParams();
 
     if (params) {
@@ -339,7 +334,7 @@ export class SystemResource {
     }
 
     const url = `/api/system/logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await this.client.get<PaginatedResponse<any>>(url);
+    const response = await this.client.get<PaginatedResponse<SystemLog>>(url);
     return response.data;
   }
 }
@@ -354,7 +349,7 @@ export const systemResource = new SystemResource();
  */
 export const systemApi = {
   getSystemConfig: () => systemResource.getSystemConfig(),
-  updateSystemConfig: (data: any) => systemResource.updateSystemConfig(data),
-  getAuditLogs: (params?: any) => systemResource.getAuditLogs(params),
+  updateSystemConfig: (data: SystemConfigUpdateRequest) => systemResource.updateSystemConfig(data),
+  getAuditLogs: (params?: AuditLogFilter) => systemResource.getAuditLogs(params),
   getStatsSummary: () => systemResource.getStatsSummary(),
 };

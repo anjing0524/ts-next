@@ -65,8 +65,8 @@ function AuditLogsPage() {
     queryFn: () =>
       api.getAuditLogs({
         ...queryParams,
-        startDate: queryParams.startDate ? new Date(queryParams.startDate) : undefined,
-        endDate: queryParams.endDate ? new Date(queryParams.endDate) : undefined,
+        startDate: queryParams.startDate ? new Date(queryParams.startDate).toISOString() : undefined,
+        endDate: queryParams.endDate ? new Date(queryParams.endDate).toISOString() : undefined,
       }),
     placeholderData: (prev) => prev,
   });

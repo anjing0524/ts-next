@@ -4,6 +4,7 @@
  */
 
 import type { PaginatedResponse, Permission } from '../index';
+import type { PermissionCreateRequest, PermissionUpdateRequest } from '../types/request-response';
 import { HttpClientFactory } from '../client/http-client';
 
 /**
@@ -17,30 +18,6 @@ export interface PermissionFilter {
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-}
-
-/**
- * 权限创建请求
- */
-export interface PermissionCreateRequest {
-  name: string;
-  displayName?: string;
-  description?: string;
-  type: 'API' | 'MENU' | 'DATA';
-  resource?: string;
-  action?: string;
-}
-
-/**
- * 权限更新请求
- */
-export interface PermissionUpdateRequest {
-  name?: string;
-  displayName?: string;
-  description?: string;
-  type?: 'API' | 'MENU' | 'DATA';
-  resource?: string;
-  action?: string;
 }
 
 /**
@@ -217,9 +194,9 @@ export const permissionsResource = new PermissionsResource();
  * 向后兼容的API助手函数
  */
 export const permissionsApi = {
-  getPermissions: (params?: any) => permissionsResource.list(params),
+  getPermissions: (params?: PermissionFilter) => permissionsResource.list(params),
   getPermissionById: (permissionId: string) => permissionsResource.get(permissionId),
-  createPermission: (data: any) => permissionsResource.create(data),
-  updatePermission: (id: string, data: any) => permissionsResource.update(id, data),
+  createPermission: (data: PermissionCreateRequest) => permissionsResource.create(data),
+  updatePermission: (id: string, data: PermissionUpdateRequest) => permissionsResource.update(id, data),
   deletePermission: (id: string) => permissionsResource.delete(id),
 };

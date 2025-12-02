@@ -3,7 +3,7 @@
  * 提供角色相关的CRUD操作
  */
 
-import type { PaginatedResponse, Role, RoleCreateRequest, RoleUpdateRequest, RoleFilter } from '../index';
+import type { PaginatedResponse, Role, RoleCreateRequest, RoleUpdateRequest, RoleFilter, User } from '../index';
 import { HttpClientFactory } from '../client/http-client';
 
 /**
@@ -105,7 +105,7 @@ export class RolesResource {
   /**
    * 获取角色用户列表
    */
-  async getUsers(roleId: string, params?: any): Promise<PaginatedResponse<any>> {
+  async getUsers(roleId: string, params?: Record<string, unknown>): Promise<PaginatedResponse<User>> {
     const queryParams = new URLSearchParams();
 
     if (params) {
@@ -117,7 +117,7 @@ export class RolesResource {
     }
 
     const url = `/api/roles/${roleId}/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await this.client.get<PaginatedResponse<any>>(url);
+    const response = await this.client.get<PaginatedResponse<User>>(url);
     return response.data;
   }
 
@@ -184,10 +184,10 @@ export const rolesResource = new RolesResource();
  * 向后兼容的API助手函数
  */
 export const rolesApi = {
-  getRoles: (params?: any) => rolesResource.list(params),
+  getRoles: (params?: RoleFilter) => rolesResource.list(params),
   getRoleById: (roleId: string) => rolesResource.get(roleId),
-  createRole: (roleData: any) => rolesResource.create(roleData),
-  updateRole: (id: string, data: any) => rolesResource.update(id, data),
+  createRole: (roleData: RoleCreateRequest) => rolesResource.create(roleData),
+  updateRole: (id: string, data: RoleUpdateRequest) => rolesResource.update(id, data),
   deleteRole: (id: string) => rolesResource.delete(id),
   updateRolePermissions: (id: string, permissions: string[]) => rolesResource.updatePermissions(id, permissions),
 };

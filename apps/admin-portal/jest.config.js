@@ -16,6 +16,7 @@ const config = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^lucide-react/dynamicIconImports$': '<rootDir>/__mocks__/lucide-dynamicIconImports.js',
   },
   testMatch: [
     '<rootDir>/test/**/*.{test,spec}.{js,jsx,ts,tsx}',

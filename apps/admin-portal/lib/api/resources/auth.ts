@@ -4,6 +4,12 @@
  */
 
 import type { LoginCredentials, TokenResponse, ConsentParams } from '../index';
+import type {
+  ConsentResponse,
+  UserInfo,
+  TokenIntrospectResponse,
+  LoginRequest,
+} from '../types/request-response';
 import { HttpClientFactory } from '../client/http-client';
 
 /**
@@ -19,8 +25,8 @@ export class AuthResource {
   /**
    * 提交同意授权
    */
-  async submitConsent(action: 'allow' | 'deny', params: ConsentParams): Promise<any> {
-    const response = await this.client.post(`/api/oauth/consent/${action}`, params, {
+  async submitConsent(action: 'allow' | 'deny', params: ConsentParams): Promise<ConsentResponse> {
+    const response = await this.client.post<ConsentResponse>(`/api/oauth/consent/${action}`, params, {
       skipCache: true,
       skipAuthRefresh: true, // 同意页面不需要认证
     });
@@ -78,16 +84,16 @@ export class AuthResource {
   /**
    * 获取用户信息
    */
-  async getUserInfo(): Promise<any> {
-    const response = await this.client.get('/api/oauth/userinfo');
+  async getUserInfo(): Promise<UserInfo> {
+    const response = await this.client.get<UserInfo>('/api/oauth/userinfo');
     return response.data;
   }
 
   /**
    * 验证令牌
    */
-  async introspectToken(token: string): Promise<any> {
-    const response = await this.client.post('/api/oauth/introspect', { token });
+  async introspectToken(token: string): Promise<TokenIntrospectResponse> {
+    const response = await this.client.post<TokenIntrospectResponse>('/api/oauth/introspect', { token });
     return response.data;
   }
 
@@ -103,7 +109,7 @@ export class AuthResource {
     code_challenge?: string;
     code_challenge_method?: string;
   }): Promise<string> {
-    const queryParams = new URLSearchParams(params as any);
+    const queryParams = new URLSearchParams(params as Record<string, string>);
     return `/api/oauth/authorize?${queryParams.toString()}`;
   }
 }
@@ -119,7 +125,7 @@ export const authResource = new AuthResource();
 export const authApi = {
   submitConsent: (action: 'allow' | 'deny', params: URLSearchParams) =>
     authResource.submitConsent(action, Object.fromEntries(params)),
-  login: (credentials: any) => authResource.login(credentials),
+  login: (credentials: LoginRequest) => authResource.login(credentials),
   exchangeCodeForToken: (code: string, codeVerifier: string) =>
     authResource.exchangeCodeForToken(code, codeVerifier),
   logout: () => authResource.logout(),

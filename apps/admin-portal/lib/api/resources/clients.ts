@@ -4,6 +4,7 @@
  */
 
 import type { PaginatedResponse, OAuthClient, ClientCreateRequest, ClientUpdateRequest, ClientFilter } from '../index';
+import type { ClientRegisterRequest } from '../types/request-response';
 import { HttpClientFactory } from '../client/http-client';
 
 /**
@@ -85,7 +86,7 @@ export class ClientsResource {
   /**
    * 注册客户端
    */
-  async register(data: any): Promise<OAuthClient> {
+  async register(data: ClientRegisterRequest): Promise<OAuthClient> {
     const response = await this.client.post<OAuthClient>('/api/clients/register', data);
     return response.data;
   }
@@ -164,11 +165,11 @@ export const clientsResource = new ClientsResource();
  * 向后兼容的API助手函数
  */
 export const clientsApi = {
-  getClients: (params?: any) => clientsResource.list(params),
+  getClients: (params?: ClientFilter) => clientsResource.list(params),
   getClientById: (clientId: string) => clientsResource.get(clientId),
-  createClient: (clientData: any) => clientsResource.create(clientData),
-  updateClient: (clientId: string, clientData: any) => clientsResource.update(clientId, clientData),
+  createClient: (clientData: ClientCreateRequest) => clientsResource.create(clientData),
+  updateClient: (clientId: string, clientData: ClientUpdateRequest) => clientsResource.update(clientId, clientData),
   deleteClient: (clientId: string) => clientsResource.delete(clientId),
   rotateClientSecret: (clientId: string) => clientsResource.rotateSecret(clientId),
-  registerClient: (data: any) => clientsResource.register(data),
+  registerClient: (data: ClientRegisterRequest) => clientsResource.register(data),
 };
