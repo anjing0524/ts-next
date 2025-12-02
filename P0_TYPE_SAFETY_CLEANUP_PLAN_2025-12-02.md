@@ -2,7 +2,7 @@
 
 ## 📊 进度概览
 
-**总体进度**: Phase 1 完成 ✅ | Phase 2 完成 ✅ | Phase 3 待进行 🟡
+**总体进度**: Phase 1 完成 ✅ | Phase 2 完成 ✅ | Phase 3 完成 ✅
 
 ### 统计信息
 - **总计 any 使用**: 67 处
@@ -55,7 +55,7 @@
 
 ## 🟠 中风险项快速指南 (29 处)
 
-### POST/PUT/PATCH 数据参数统一化 (10 处)
+### POST/PUT/PATCH 数据参数统一化 (10 处) ✅ 已完成
 
 **所有文件**: base-client.ts, decorators, resources/*
 
@@ -81,7 +81,7 @@ patch<T = unknown>(url: string, data?: Record<string, unknown>, options?: HttpRe
 
 **工作量**: 1-2 小时
 
-### 资源返回类型明确化 (8 处)
+### 资源返回类型明确化 (8 处) ✅ 已完成
 
 **问题位置**:
 - roles.ts:120 `getUsers` 返回 `PaginatedResponse<any>` → `PaginatedResponse<User>`
@@ -90,7 +90,7 @@ patch<T = unknown>(url: string, data?: Record<string, unknown>, options?: HttpRe
 
 **工作量**: 1-2 小时
 
-### 系统配置值类型约束 (4 处)
+### 系统配置值类型约束 (4 处) ✅ 已完成
 
 **使用 ConfigValue 类型**:
 ```typescript
@@ -112,7 +112,7 @@ updateSystemConfigItem(key: string, value: ConfigValue, type?: string)
 
 **工作量**: 30分钟
 
-### 请求体接口定义 (7 处)
+### 请求体接口定义 (7 处) ✅ 已完成
 
 **需要定义新接口** (在 request-response.ts 中):
 - `ClientRegisterRequest` (已有骨架)
@@ -165,7 +165,7 @@ updateSystemConfigItem(key: string, value: ConfigValue, type?: string)
 |------|------|--------|--------|
 | Phase 1 ✅ | 类型定义 + 高风险前5项 | 2小时 | 🔴 |
 | Phase 2 | 高风险后7项 | 2小时 | 🔴 |
-| Phase 3 | 中风险29项 | 5-6小时 | 🟠 |
+| Phase 3 ✅ | 中风险29项 | 5-6小时 | 🟠 |
 | Phase 4 | 低风险22项 | 1-2小时 | 🟡 |
 | **总计** | **完全清理** | **10-11小时** | - |
 
@@ -205,10 +205,10 @@ request-response.ts (已完成) ✅
 
 ### Phase 3 关键项
 
-- [ ] base-client.ts POST/PUT/PATCH 数据类型
-- [ ] 所有 resources 的返回类型
-- [ ] 系统配置值类型约束
-- [ ] 请求体接口定义
+- [x] base-client.ts POST/PUT/PATCH 数据类型
+- [x] 所有 resources 的返回类型
+- [x] 系统配置值类型约束
+- [x] 请求体接口定义
 
 ### Phase 4
 
