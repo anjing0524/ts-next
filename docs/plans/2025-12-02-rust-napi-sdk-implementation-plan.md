@@ -22,7 +22,15 @@
 
 ## Phase 1: napi 基础设施搭建
 
-### Task 1: 更新 oauth-service-rust Cargo.toml 添加 napi 依赖
+### ✅ Task 1: 更新 oauth-service-rust Cargo.toml 添加 napi 依赖 (COMPLETED)
+
+**Completion Summary:**
+- ✅ 成功添加 napi 依赖到 Cargo.toml 的 [dependencies] 和 [dev-dependencies]
+- ✅ 添加 [package.metadata.napi] 配置
+- ✅ 创建 src/napi/mod.rs 模块入口文件
+- ✅ 创建 npm/package.json 配置文件
+- ✅ cargo check 验证通过，无编译错误
+- ✅ 提交: dadd0eff "feat(oauth-sdk): Initialize napi SDK structure with dependencies"
 
 **Files:**
 - Modify: `apps/oauth-service-rust/Cargo.toml`
