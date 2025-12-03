@@ -140,7 +140,16 @@ git commit -m "feat(oauth-sdk): Initialize napi SDK structure with dependencies"
 
 ---
 
-### Task 2: 实现 napi SDK 核心结构（配置和 HTTP 客户端）
+### ✅ Task 2: 实现 napi SDK 核心结构（配置和 HTTP 客户端）(COMPLETED)
+
+**Completion Summary:**
+- ✅ 成功创建 SDKConfig 结构体，实现 builder pattern 配置管理
+- ✅ 实现 SDKError 错误类型，支持状态码和结构化错误处理
+- ✅ 完成 HttpClient 实现，集成 reqwest + 指数退避重试逻辑
+- ✅ 更新 lib.rs 导出 napi 模块
+- ✅ 添加 reqwest 依赖到 Cargo.toml
+- ✅ 所有测试通过：2/2 tests ok
+- ✅ 提交: 8bec8d02 "feat(oauth-sdk): Implement HTTP client with config and error handling"
 
 **Files:**
 - Create: `apps/oauth-service-rust/src/napi/config.rs`
