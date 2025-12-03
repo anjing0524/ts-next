@@ -48,6 +48,7 @@ futures = "0.3"
 napi = { version = "2.16", features = ["async", "serde-json"] }
 napi-derive = "2.16"
 napi-build = "2.1"
+reqwest = { version = "0.11", features = ["json"] }
 
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json", "cookies"] }
