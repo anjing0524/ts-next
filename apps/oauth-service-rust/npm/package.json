@@ -1,9 +1,36 @@
 {
   "name": "oauth-service-napi",
   "version": "0.1.0",
-  "description": "OAuth Service Rust napi SDK for Node.js",
+  "description": "OAuth Service Rust napi SDK for Node.js - High-performance native addon for OAuth 2.0/2.1 authentication",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ts-next-template.git",
+    "directory": "apps/oauth-service-rust"
+  },
+  "homepage": "https://github.com/your-org/ts-next-template/tree/main/apps/oauth-service-rust#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/ts-next-template/issues"
+  },
+  "keywords": [
+    "oauth",
+    "oauth2",
+    "oauth2.1",
+    "authentication",
+    "authorization",
+    "rust",
+    "napi",
+    "napi-rs",
+    "native-addon",
+    "sdk",
+    "typescript",
+    "rbac",
+    "jwt",
+    "token"
+  ],
+  "author": "Admin Portal Team",
+  "license": "MIT",
   "napi": {
     "name": "oauth-service-napi",
     "triples": [
