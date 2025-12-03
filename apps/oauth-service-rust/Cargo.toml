@@ -3,6 +3,10 @@ name = "oauth-service-rust"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.napi]
+name = "oauth-service-napi"
+version = "0.1.0"
+
 [dependencies]
 anyhow = "1.0"
 argon2 = "0.5"
@@ -40,7 +44,14 @@ url = "2.5.7"
 urlencoding = "2.1"
 futures = "0.3"
 
+# ===== napi SDK 依赖 =====
+napi = { version = "2.16", features = ["async", "serde-json"] }
+napi-derive = "2.16"
+napi-build = "2.1"
+
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json", "cookies"] }
 serial_test = "3.0"
 tokio-test = "0.4"
+napi = { version = "2.16", features = ["async", "serde-json"] }
+napi-derive = "2.16"
