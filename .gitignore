@@ -84,6 +84,9 @@ apps/oauth-service-rust/*.db-wal
 .DS_Store
 Thumbs.db
 
+# git worktrees
+.worktrees/
+
 # task files
 tasks.json
 tasks/
