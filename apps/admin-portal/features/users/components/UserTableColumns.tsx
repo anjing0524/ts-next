@@ -1,7 +1,7 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { Button, Badge, DataTableColumnHeader } from '@repo/ui';
+import { Button, AnimatedBadge, DataTableColumnHeader } from '@repo/ui';
 import { User } from '@/types/auth';
 import { UserStatus } from '../domain/user';
 import { format } from 'date-fns';
@@ -34,7 +34,7 @@ export const getUserColumns = ({ onEdit, onDelete }: UserActions): ColumnDef<Use
             : 'destructive';
       const text =
         status === UserStatus.ACTIVE ? '活动' : status === UserStatus.INACTIVE ? '禁用' : '封禁';
-      return <Badge variant={variant}>{text}</Badge>;
+      return <AnimatedBadge variant={variant} shimmer pulse>{text}</AnimatedBadge>;
     },
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));

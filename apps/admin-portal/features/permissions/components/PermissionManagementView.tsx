@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { DataTable, type ColumnDef, Input, Button, Badge } from '@repo/ui';
-import { usePermissionManagement } from '../hooks/use-permission-management';
+import { DataTable, type ColumnDef, Input, Button, AnimatedBadge, LoadingSpinner } from '@repo/ui';
+import { useRoleManagementServerActions } from '../hooks/use-role-management-server-actions';
 import type { Permission } from '../domain/permission';
 
 export function PermissionManagementView() {
@@ -19,13 +19,13 @@ export function PermissionManagementView() {
     searchTerm,
     setSearchTerm,
     handleSearchSubmit,
-  } = usePermissionManagement();
+  } = useRoleManagementServerActions();
 
   const columns: ColumnDef<Permission>[] = [
     {
       accessorKey: 'name',
       header: '权限名称',
-      cell: ({ row }) => <Badge variant="secondary">{row.original.name}</Badge>,
+      cell: ({ row }) => <AnimatedBadge variant="secondary" shimmer pulse>{row.original.name}</AnimatedBadge>,
     },
     { 
       accessorKey: 'description', 
@@ -48,10 +48,7 @@ export function PermissionManagementView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p>正在加载权限数据...</p>
-        </div>
+        <LoadingSpinner size="lg" shimmer pulse label="正在加载权限数据..." />
       </div>
     );
   }

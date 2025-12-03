@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { DataTable, Button, ColumnDef, Skeleton } from '@repo/ui';
 import { PlusCircle } from 'lucide-react';
 import { useAuth } from '@repo/ui';
-import { useClientManagement } from '../hooks/use-client-management';
+import { useClientManagementServerActions as useClientManagement } from '../hooks/use-client-management-server-actions';
 import { ClientFormDialog } from '@/components/admin/clients/ClientFormDialog';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';

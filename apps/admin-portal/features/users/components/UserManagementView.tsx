@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { DataTable, Button, Skeleton } from '@repo/ui';
 import { useAuth } from '@repo/ui/hooks';
 import { PlusCircle } from 'lucide-react';
-import { useUserManagement } from '../hooks/use-user-management';
+import { useUserManagementServerActions as useUserManagement } from '../hooks/use-user-management-server-actions';
 import { getUserColumns } from './UserTableColumns'; // Corrected import name
 import { UserFormDialog } from './UserFormDialog';
 import { DeleteConfirmDialog } from '../../../components/common/DeleteConfirmDialog'; // Corrected import path

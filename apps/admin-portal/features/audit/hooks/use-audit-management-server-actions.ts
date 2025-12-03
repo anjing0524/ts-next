@@ -1,166 +1,137 @@
 /**
  * 审计日志管理 Hook - Server Actions 版本 (Audit Log Management Hook - Server Actions Version)
  *
- * 使用 Next.js Server Actions 替代 TanStack Query
- * Uses Next.js Server Actions instead of TanStack Query
+ * 使用 Next.js Server Actions 替代 TanStack Query，保持与旧 Hook 接口兼容
+ * Uses Next.js Server Actions instead of TanStack Query while maintaining compatibility
  */
 
 'use client';
 
-import { useState, useCallback, useTransition } from 'react';
-import { PaginationState, SortingState } from '@tanstack/react-table';
+import { useState, useCallback, useEffect, useTransition } from 'react';
 import { listAuditLogsAction, listUserAuditLogsAction } from '@/app/actions';
-import { AuditLog } from '@/app/actions/types';
+import type { AuditLog as ActionAuditLog } from '@/app/actions/types';
+import type { AuditLog } from '../domain/audit';
 
 /**
- * 审计日志管理 Hook 返回值 (Hook Return Value)
+ * 审计日志过滤器类型 (Audit Log Filters Type)
+ */
+export interface AuditLogFilters {
+  search?: string;
+  action?: string;
+  status?: 'SUCCESS' | 'FAILURE';
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * 审计日志管理 Hook 返回值 - 与旧 Hook 兼容 (Hook Return Value - Compatible with old hook)
  */
 export interface UseAuditManagementReturn {
   // 数据 (Data)
-  auditLogs: AuditLog[];
-  auditLogsMeta: {
-    total: number;
-    totalPages: number;
-  } | null;
-  areLogsLoading: boolean;
-  logsError: Error | null;
-
-  // 表格状态 (Table State)
-  pagination: PaginationState;
-  setPagination: (state: PaginationState) => void;
-  sorting: SortingState;
-  setSorting: (state: SortingState) => void;
+  logs: AuditLog[];
+  meta: { total: number; totalPages: number; currentPage: number } | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
 
   // 过滤状态 (Filter State)
-  selectedUserId: string | null;
-  setSelectedUserId: (userId: string | null) => void;
+  filters: AuditLogFilters;
+  setFilters: (filters: AuditLogFilters) => void;
+  handleApplyFilters: () => void;
 
-  // 方法 (Methods)
-  refreshLogs: () => Promise<void>;
-  refreshUserLogs: (userId: string) => Promise<void>;
+  // 分页状态 (Pagination State)
+  page: number;
+  setPage: (page: number) => void;
+  limit: number;
+  setLimit: (limit: number) => void;
 }
 
 /**
  * 审计日志管理 Hook (Audit Log Management Hook)
  *
- * 使用 Server Actions 加载审计日志
- * Uses Server Actions to load audit logs
+ * 使用 Server Actions 加载审计日志，保持与旧 Hook 相同的接口
+ * Uses Server Actions to load audit logs with old hook interface
  */
 export const useAuditManagementServerActions = (): UseAuditManagementReturn => {
   // 数据状态 (Data State)
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [auditLogsMeta, setAuditLogsMeta] = useState<{
-    total: number;
-    totalPages: number;
-  } | null>(null);
-  const [logsError, setLogsError] = useState<Error | null>(null);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [meta, setMeta] = useState<{ total: number; totalPages: number; currentPage: number } | undefined>();
+  const [error, setError] = useState<Error | null>(null);
 
-  // 加载状态 (Loading State)
+  // 过渡状态 (Transition State)
   const [isLoading, startTransition] = useTransition();
+  const [isFetching, setIsFetching] = useState(false);
 
-  // 表格状态 (Table State)
-  const [{ pageIndex, pageSize }, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 10,
-  });
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // 分页状态 (Pagination State)
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
 
   // 过滤状态 (Filter State)
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AuditLogFilters>({
+    search: '',
+    action: '',
+    status: undefined,
+    startDate: undefined,
+    endDate: undefined,
+  });
+  const [appliedFilters, setAppliedFilters] = useState(filters);
 
   /**
-   * 刷新所有审计日志 (Refresh All Audit Logs)
+   * 加载审计日志 (Load Audit Logs)
    */
-  const refreshLogs = useCallback(async () => {
+  const loadLogs = useCallback(async () => {
+    setIsFetching(true);
     startTransition(async () => {
       try {
         const result = await listAuditLogsAction({
-          page: pageIndex + 1,
-          page_size: pageSize,
+          page,
+          page_size: limit,
         });
 
         if (result.success && result.data) {
-          setAuditLogs(result.data.items);
-          setAuditLogsMeta({
+          setLogs(result.data.items as unknown as AuditLog[]);
+          setMeta({
             total: result.data.total,
-            totalPages: Math.ceil(result.data.total / pageSize),
+            totalPages: Math.ceil((result.data.total || 0) / limit),
+            currentPage: page,
           });
-          setLogsError(null);
+          setError(null);
         } else {
-          setLogsError(new Error(result.error || '加载审计日志失败'));
+          setError(new Error(result.error || '加载审计日志失败'));
         }
-      } catch (error) {
-        setLogsError(error instanceof Error ? error : new Error('未知错误'));
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('加载审计日志失败'));
+      } finally {
+        setIsFetching(false);
       }
     });
-  }, [pageIndex, pageSize]);
+  }, [page, limit]);
 
   /**
-   * 刷新用户的审计日志 (Refresh User Audit Logs)
+   * 应用过滤器 (Apply Filters)
    */
-  const refreshUserLogs = useCallback(
-    async (userId: string) => {
-      startTransition(async () => {
-        try {
-          const result = await listUserAuditLogsAction(userId, {
-            page: pageIndex + 1,
-            page_size: pageSize,
-          });
+  const handleApplyFilters = useCallback(() => {
+    setPage(1);
+    setAppliedFilters(filters);
+  }, [filters]);
 
-          if (result.success && result.data) {
-            setAuditLogs(result.data.items);
-            setAuditLogsMeta({
-              total: result.data.total,
-              totalPages: Math.ceil(result.data.total / pageSize),
-            });
-            setLogsError(null);
-          } else {
-            setLogsError(new Error(result.error || '加载用户审计日志失败'));
-          }
-        } catch (error) {
-          setLogsError(error instanceof Error ? error : new Error('未知错误'));
-        }
-      });
-    },
-    [pageIndex, pageSize],
-  );
-
-  /**
-   * 处理用户过滤 (Handle User Filter)
-   */
-  const handleUserFilterChange = useCallback(
-    (userId: string | null) => {
-      setSelectedUserId(userId);
-      setPagination({ pageIndex: 0, pageSize });
-
-      if (userId) {
-        refreshUserLogs(userId);
-      } else {
-        refreshLogs();
-      }
-    },
-    [pageSize, refreshLogs, refreshUserLogs, setPagination],
-  );
+  // 在分页或过滤器变化时重新加载 (Reload when pagination or filters change)
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   return {
-    // 数据 (Data)
-    auditLogs,
-    auditLogsMeta,
-    areLogsLoading: isLoading,
-    logsError,
-
-    // 表格状态 (Table State)
-    pagination: { pageIndex, pageSize },
-    setPagination,
-    sorting,
-    setSorting,
-
-    // 过滤状态 (Filter State)
-    selectedUserId,
-    setSelectedUserId: handleUserFilterChange,
-
-    // 方法 (Methods)
-    refreshLogs,
-    refreshUserLogs,
+    logs,
+    meta,
+    isLoading,
+    isFetching,
+    error,
+    filters,
+    setFilters,
+    handleApplyFilters,
+    page,
+    setPage,
+    limit,
+    setLimit,
   };
 };

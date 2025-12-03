@@ -1,200 +1,133 @@
 /**
- * 角色权限管理 Hook - Server Actions 版本 (Role Management Hook - Server Actions Version)
+ * 权限管理 Hook - Server Actions 版本 (Permission Management Hook - Server Actions Version)
  *
- * 使用 Next.js Server Actions 替代 TanStack Query
- * Uses Next.js Server Actions instead of TanStack Query
+ * 使用 Next.js Server Actions 替代 TanStack Query，保持与旧 Hook 接口兼容
+ * Uses Next.js Server Actions instead of TanStack Query while maintaining compatibility
  */
 
 'use client';
 
-import { useState, useCallback, useTransition } from 'react';
-import { PaginationState, SortingState } from '@tanstack/react-table';
-import {
-  listPermissionsAction,
-  listRolesAction,
-  assignRoleToUserAction,
-  revokeRoleFromUserAction,
-} from '@/app/actions';
-import { Permission, Role } from '@/app/actions/types';
+import { useState, useCallback, useEffect, useTransition } from 'react';
+import { listPermissionsAction } from '@/app/actions';
+import type { Permission as ActionPermission } from '@/app/actions/types';
+import type { Permission } from '../domain/permission';
 
 /**
- * 角色管理 Hook 返回值 (Hook Return Value)
+ * 权限管理 Hook 返回值 - 与旧 Hook 兼容 (Hook Return Value - Compatible with old hook)
  */
 export interface UseRoleManagementReturn {
   // 权限数据 (Permission Data)
   permissions: Permission[];
-  permissionsMeta: { total: number } | null;
-  arePermissionsLoading: boolean;
-
-  // 角色数据 (Role Data)
-  roles: Role[];
-  rolesMeta: { total: number } | null;
-  areRolesLoading: boolean;
-
-  // 错误状态 (Error State)
+  meta: { total: number; totalPages: number; currentPage: number } | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
   error: Error | null;
 
-  // 表格状态 (Table State)
-  pagination: PaginationState;
-  setPagination: (state: PaginationState) => void;
-  sorting: SortingState;
-  setSorting: (state: SortingState) => void;
+  // 分页状态 (Pagination State)
+  page: number;
+  setPage: (page: number) => void;
+  limit: number;
+  setLimit: (limit: number) => void;
 
-  // 加载/处理状态 (Processing State)
-  isProcessing: boolean;
-
-  // 方法 (Methods)
-  refreshPermissions: () => Promise<void>;
-  refreshRoles: () => Promise<void>;
-  assignRoleToUser: (userId: string, roleId: string) => Promise<void>;
-  revokeRoleFromUser: (userId: string, roleId: string) => Promise<void>;
+  // 搜索状态 (Search State)
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  handleSearchSubmit: () => void;
 }
 
 /**
- * 角色管理 Hook (Role Management Hook)
+ * 权限管理 Hook (Permission Management Hook)
  *
- * 使用 Server Actions 管理角色和权限
- * Uses Server Actions to manage roles and permissions
+ * 使用 Server Actions 加载权限数据，保持与旧 Hook 相同的接口
+ * Uses Server Actions to load permission data with old hook interface
  */
 export const useRoleManagementServerActions = (): UseRoleManagementReturn => {
-  // 权限数据 (Permission Data)
+  // 数据状态 (Data State)
   const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [permissionsMeta, setPermissionsMeta] = useState<{ total: number } | null>(null);
-
-  // 角色数据 (Role Data)
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [rolesMeta, setRolesMeta] = useState<{ total: number } | null>(null);
-
-  // 错误状态 (Error State)
+  const [meta, setMeta] = useState<{ total: number; totalPages: number; currentPage: number } | undefined>();
   const [error, setError] = useState<Error | null>(null);
 
-  // 加载状态 (Loading State)
+  // 过渡状态 (Transition State)
   const [isLoading, startTransition] = useTransition();
+  const [isFetching, setIsFetching] = useState(false);
 
-  // 表格状态 (Table State)
-  const [{ pageIndex, pageSize }, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 10,
-  });
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // 分页状态 (Pagination State)
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
+  // 搜索状态 (Search State)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
 
   /**
-   * 刷新权限列表 (Refresh Permissions)
+   * 加载权限列表 (Load Permissions List)
    */
-  const refreshPermissions = useCallback(async () => {
+  const loadPermissions = useCallback(async () => {
+    setIsFetching(true);
     startTransition(async () => {
       try {
         const result = await listPermissionsAction({
-          page: pageIndex + 1,
-          page_size: pageSize,
+          page,
+          page_size: limit,
         });
 
         if (result.success && result.data) {
-          setPermissions(result.data.items);
-          setPermissionsMeta({ total: result.data.total });
+          // 转换 ActionPermission 到 Permission 格式
+          // Convert ActionPermission to Permission format
+          const convertedPermissions: Permission[] = result.data.items.map((item: any) => ({
+            id: item.id || item.permission_id,
+            name: item.name,
+            description: item.description || '',
+            resource: item.resource,
+            action: item.action,
+            type: item.type || 'custom',
+            createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+            updatedAt: item.updated_at ? new Date(item.updated_at) : new Date(),
+          } as any));
+
+          setPermissions(convertedPermissions);
+          setMeta({
+            total: result.data.total,
+            totalPages: Math.ceil((result.data.total || 0) / limit),
+            currentPage: page,
+          });
           setError(null);
         } else {
-          setError(new Error(result.error || '加载权限列表失败'));
+          setError(new Error(result.error || '加载权限失败'));
         }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('未知错误'));
+        setError(err instanceof Error ? err : new Error('加载权限失败'));
+      } finally {
+        setIsFetching(false);
       }
     });
-  }, [pageIndex, pageSize]);
+  }, [page, limit]);
 
   /**
-   * 刷新角色列表 (Refresh Roles)
+   * 处理搜索 (Handle Search)
    */
-  const refreshRoles = useCallback(async () => {
-    startTransition(async () => {
-      try {
-        const result = await listRolesAction({
-          page: pageIndex + 1,
-          page_size: pageSize,
-        });
+  const handleSearchSubmit = useCallback(() => {
+    setPage(1);
+    setAppliedSearchTerm(searchTerm);
+  }, [searchTerm]);
 
-        if (result.success && result.data) {
-          setRoles(result.data.items);
-          setRolesMeta({ total: result.data.total });
-          setError(null);
-        } else {
-          setError(new Error(result.error || '加载角色列表失败'));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('未知错误'));
-      }
-    });
-  }, [pageIndex, pageSize]);
-
-  /**
-   * 为用户分配角色 (Assign Role to User)
-   */
-  const assignRole = useCallback(async (userId: string, roleId: string) => {
-    startTransition(async () => {
-      try {
-        const result = await assignRoleToUserAction(userId, roleId);
-        if (result.success) {
-          setError(null);
-          // 分配成功后可以刷新角色列表
-          // Can refresh roles after successful assignment
-          await refreshRoles();
-        } else {
-          setError(new Error(result.error || '分配角色失败'));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('分配角色失败'));
-      }
-    });
-  }, [refreshRoles]);
-
-  /**
-   * 撤销用户角色 (Revoke Role from User)
-   */
-  const revokeRole = useCallback(async (userId: string, roleId: string) => {
-    startTransition(async () => {
-      try {
-        const result = await revokeRoleFromUserAction(userId, roleId);
-        if (result.success) {
-          setError(null);
-          // 撤销成功后可以刷新角色列表
-          // Can refresh roles after successful revocation
-          await refreshRoles();
-        } else {
-          setError(new Error(result.error || '撤销角色失败'));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('撤销角色失败'));
-      }
-    });
-  }, [refreshRoles]);
+  // 在分页或搜索变化时重新加载 (Reload when pagination or search changes)
+  useEffect(() => {
+    loadPermissions();
+  }, [loadPermissions]);
 
   return {
-    // 权限数据 (Permission Data)
     permissions,
-    permissionsMeta,
-    arePermissionsLoading: isLoading,
-
-    // 角色数据 (Role Data)
-    roles,
-    rolesMeta,
-    areRolesLoading: isLoading,
-
-    // 错误状态 (Error State)
+    meta,
+    isLoading,
+    isFetching,
     error,
-
-    // 表格状态 (Table State)
-    pagination: { pageIndex, pageSize },
-    setPagination,
-    sorting,
-    setSorting,
-
-    // 加载状态 (Processing State)
-    isProcessing: isLoading,
-
-    // 方法 (Methods)
-    refreshPermissions,
-    refreshRoles,
-    assignRoleToUser: assignRole,
-    revokeRoleFromUser: revokeRole,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    searchTerm,
+    setSearchTerm,
+    handleSearchSubmit,
   };
 };

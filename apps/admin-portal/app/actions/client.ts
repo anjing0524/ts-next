@@ -41,6 +41,16 @@ export async function listClientsAction(params?: PaginationParams): Promise<Clie
 export async function getClientAction(clientId: string): Promise<ClientResult> {
   return withErrorHandling(async () => {
     const sdk = getOAuthSDK();
-    return await sdk.clientGet(clientId);
+    const client = await sdk.clientGet(clientId);
+    // 转换为 ClientInfoPublic (不包含 client_secret)
+    // Convert to ClientInfoPublic (excluding client_secret)
+    return {
+      client_id: (client as any).client_id || (client as any).id,
+      client_name: (client as any).client_name || (client as any).name,
+      redirect_uris: (client as any).redirect_uris || [],
+      grant_types: (client as any).grant_types || [],
+      created_at: (client as any).created_at,
+      updated_at: (client as any).updated_at,
+    };
   }, '获取客户端详情失败 (Failed to get client details)');
 }
