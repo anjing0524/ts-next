@@ -1,6 +1,7 @@
 use crate::napi::error::SDKResult;
 use crate::napi::http_client::HttpClient;
 use crate::napi::modules::rbac::PaginatedResponse;
+use napi_derive::napi;
 use serde::{Deserialize, Serialize};
 
 /// 客户端信息 ClientInfo 结构（包含敏感字段，仅内部使用）
@@ -17,6 +18,7 @@ pub struct ClientInfo {
 
 /// 客户端信息（公开版本，去除敏感字段）- 用于 NAPI/前端
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[napi(object)]
 pub struct ClientInfoPublic {
     pub client_id: String,
     pub client_name: String,
