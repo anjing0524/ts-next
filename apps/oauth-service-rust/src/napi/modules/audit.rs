@@ -105,3 +105,123 @@ impl Default for AuditLogFilter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audit_log_with_optional_fields() {
+        // 验证 AuditLog 可选字段 - Verifies AuditLog optional fields
+        let log = AuditLog {
+            id: "audit123".to_string(),
+            actor_id: "user123".to_string(),
+            action: "user.login".to_string(),
+            resource_type: "user".to_string(),
+            resource_id: "user123".to_string(),
+            status: "success".to_string(),
+            details: serde_json::json!({"method": "password", "ip": "192.168.1.1"}),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+            ip_address: Some("192.168.1.1".to_string()),
+            user_agent: Some("Mozilla/5.0".to_string()),
+        };
+
+        let json = serde_json::to_value(&log).unwrap();
+
+        // 必需字段 - Required fields
+        assert!(json.get("id").is_some());
+        assert!(json.get("actor_id").is_some());
+        assert!(json.get("action").is_some());
+        assert!(json.get("status").is_some());
+
+        // 可选字段 - Optional fields
+        assert!(json.get("ip_address").is_some());
+        assert!(json.get("user_agent").is_some());
+
+        // details 应该是对象 - details should be object
+        assert!(json["details"].is_object());
+    }
+
+    #[test]
+    fn test_audit_log_without_optional_fields() {
+        // 验证 AuditLog 无可选字段 - Verifies AuditLog without optional fields
+        let log = AuditLog {
+            id: "audit456".to_string(),
+            actor_id: "user456".to_string(),
+            action: "user.logout".to_string(),
+            resource_type: "session".to_string(),
+            resource_id: "session456".to_string(),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+            ip_address: None,
+            user_agent: None,
+        };
+
+        let json = serde_json::to_value(&log).unwrap();
+
+        // 可选字段应该为 null - Optional fields should be null
+        assert!(json["ip_address"].is_null());
+        assert!(json["user_agent"].is_null());
+    }
+
+    #[test]
+    fn test_audit_log_filter_default() {
+        // 验证 AuditLogFilter 默认值 - Verifies AuditLogFilter default
+        let filter = AuditLogFilter::default();
+        let json = serde_json::to_value(&filter).unwrap();
+
+        // 所有字段应该为 null - All fields should be null
+        assert!(json["actor_id"].is_null());
+        assert!(json["resource_type"].is_null());
+        assert!(json["action"].is_null());
+        assert!(json["status"].is_null());
+        assert!(json["start_time"].is_null());
+        assert!(json["end_time"].is_null());
+    }
+
+    #[test]
+    fn test_audit_log_filter_partial_fields() {
+        // 验证 AuditLogFilter 部分字段 - Verifies AuditLogFilter with partial fields
+        let filter = AuditLogFilter {
+            actor_id: Some("user789".to_string()),
+            status: Some("failure".to_string()),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_value(&filter).unwrap();
+
+        // 有值的字段 - Fields with values
+        assert!(!json["actor_id"].is_null());
+        assert_eq!(json["actor_id"], "user789");
+        assert!(!json["status"].is_null());
+        assert_eq!(json["status"], "failure");
+
+        // None 的字段 - Fields that are None
+        assert!(json["resource_type"].is_null());
+        assert!(json["action"].is_null());
+    }
+
+    #[test]
+    fn test_audit_log_filter_all_fields() {
+        // 验证 AuditLogFilter 所有字段 - Verifies AuditLogFilter with all fields
+        let filter = AuditLogFilter {
+            actor_id: Some("user123".to_string()),
+            resource_type: Some("user".to_string()),
+            action: Some("user.login".to_string()),
+            status: Some("success".to_string()),
+            start_time: Some("2025-01-01T00:00:00Z".to_string()),
+            end_time: Some("2025-12-31T23:59:59Z".to_string()),
+        };
+
+        let json = serde_json::to_value(&filter).unwrap();
+
+        // 所有字段都应该有值 - All fields should have values
+        assert_eq!(json["actor_id"], "user123");
+        assert_eq!(json["resource_type"], "user");
+        assert_eq!(json["action"], "user.login");
+        assert_eq!(json["status"], "success");
+        assert!(json.get("start_time").is_some());
+        assert!(json.get("end_time").is_some());
+    }
+}
