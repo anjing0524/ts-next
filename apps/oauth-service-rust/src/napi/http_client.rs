@@ -4,6 +4,7 @@ use reqwest::{Client, Method};
 use serde_json::Value;
 use std::time::Duration;
 
+#[derive(Clone)]
 pub struct HttpClient {
     client: Client,
     config: SDKConfig,

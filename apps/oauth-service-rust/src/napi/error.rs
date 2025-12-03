@@ -38,4 +38,10 @@ impl fmt::Display for SDKError {
 
 impl std::error::Error for SDKError {}
 
+impl From<serde_json::Error> for SDKError {
+    fn from(err: serde_json::Error) -> Self {
+        SDKError::new("SERDE_ERROR", err.to_string())
+    }
+}
+
 pub type SDKResult<T> = Result<T, SDKError>;
