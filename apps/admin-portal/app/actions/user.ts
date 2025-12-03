@@ -8,23 +8,8 @@
 'use server';
 
 import { getOAuthSDK } from '@/lib/oauth-sdk';
-
-/**
- * 用户信息结果 (User Information Result)
- */
-export interface UserResult {
-  success: boolean;
-  data?: {
-    user_id: string;
-    username: string;
-    email: string;
-    display_name: string;
-    avatar_url?: string;
-    created_at: string;
-    updated_at: string;
-  };
-  error?: string;
-}
+import { UserResult, UpdateUserProfileRequest } from './types';
+import { withErrorHandling } from './utils';
 
 /**
  * 获取用户信息操作 (Get User Info Action)
@@ -35,18 +20,23 @@ export interface UserResult {
  * @returns 用户信息结果 (User information result)
  */
 export async function getUserInfoAction(): Promise<UserResult> {
-  try {
+  return withErrorHandling(async () => {
     const sdk = getOAuthSDK();
-    const result = await sdk.userGetInfo();
+    return await sdk.userGetInfo();
+  }, '获取用户信息失败 (Failed to get user info)');
+}
 
-    return {
-      success: true,
-      data: result as any,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get user info',
-    };
-  }
+/**
+ * 更新用户信息操作 (Update User Profile Action)
+ *
+ * @param profile - 用户信息更新请求 (User profile update request)
+ * @returns 更新后的用户信息结果 (Updated user info result)
+ */
+export async function updateUserProfileAction(
+  profile: UpdateUserProfileRequest,
+): Promise<UserResult> {
+  return withErrorHandling(async () => {
+    const sdk = getOAuthSDK();
+    return await sdk.userUpdateProfile(profile as any);
+  }, '更新用户信息失败 (Failed to update user profile)');
 }
