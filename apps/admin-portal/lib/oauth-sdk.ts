@@ -5,25 +5,48 @@
  * This module is responsible for initializing and providing access to the OAuth Service Rust napi SDK
  */
 
-import type { OAuthSDK, SDKConfig } from 'oauth-service-napi';
-import { createSDK } from 'oauth-service-napi';
+// Lazy load the NAPI module to avoid breaking builds when the native module is not available
+let napiModule: any = null;
+let napiLoadError: Error | null = null;
+
+function loadNapiModule() {
+  if (napiModule !== null) {
+    return napiModule;
+  }
+
+  if (napiLoadError !== null) {
+    throw napiLoadError;
+  }
+
+  try {
+    // Dynamic require to avoid immediate load failure
+    napiModule = require('oauth-service-napi');
+    return napiModule;
+  } catch (error) {
+    napiLoadError = error as Error;
+    throw error;
+  }
+}
+
+type NapiOAuthSDK = any;
+type NapiSdkConfig = any;
 
 /**
  * SDK 配置 (SDK Configuration)
  * 从环境变量中读取配置
  * Configuration is read from environment variables
  */
-const sdkConfig: SDKConfig = {
-  base_url: process.env.OAUTH_SERVICE_URL || 'http://localhost:8080',
+const sdkConfig: NapiSdkConfig = {
+  baseUrl: process.env.OAUTH_SERVICE_URL || 'http://localhost:8080',
   timeout: parseInt(process.env.OAUTH_SDK_TIMEOUT || '5000'),
-  retry_count: parseInt(process.env.OAUTH_SDK_RETRY_COUNT || '3'),
+  retryCount: parseInt(process.env.OAUTH_SDK_RETRY_COUNT || '3'),
   debug: process.env.NODE_ENV === 'development',
 };
 
 /**
  * SDK 单例实例 (SDK Singleton Instance)
  */
-let sdkInstance: OAuthSDK | null = null;
+let sdkInstance: NapiOAuthSDK | null = null;
 
 /**
  * 初始化 OAuth SDK (Initialize OAuth SDK)
@@ -32,7 +55,13 @@ let sdkInstance: OAuthSDK | null = null;
  */
 export function initializeOAuthSDK(): void {
   if (typeof window === 'undefined') {
-    sdkInstance = createSDK(sdkConfig);
+    try {
+      const napi = loadNapiModule();
+      sdkInstance = napi.createSdk(sdkConfig);
+    } catch (error) {
+      console.error('Failed to initialize OAuth SDK:', error);
+      throw error;
+    }
   }
 }
 
@@ -43,9 +72,9 @@ export function initializeOAuthSDK(): void {
  *
  * @throws {Error} 如果在客户端调用 (If called from client side)
  * @throws {Error} 如果 SDK 初始化失败 (If SDK initialization fails)
- * @returns {OAuthSDK} SDK 实例 (SDK instance)
+ * @returns {NapiOAuthSDK} SDK 实例 (SDK instance)
  */
-export function getOAuthSDK(): OAuthSDK {
+export function getOAuthSDK(): NapiOAuthSDK {
   if (typeof window !== 'undefined') {
     throw new Error('OAuth SDK can only be used on the server side');
   }
@@ -58,4 +87,7 @@ export function getOAuthSDK(): OAuthSDK {
   return sdkInstance;
 }
 
-export type { OAuthSDK, SDKConfig };
+export type { NapiOAuthSDK, NapiSdkConfig };
+// Export type aliases for backward compatibility
+export type OAuthSDK = NapiOAuthSDK;
+export type SDKConfig = NapiSdkConfig;

@@ -9,19 +9,24 @@
 let nativeModule;
 
 try {
-  // Try loading from the parent directory (where index.node is built)
-  nativeModule = require('../index.node');
+  // Try loading from the current directory (oauth-service-napi.node)
+  nativeModule = require('./oauth-service-napi.node');
 } catch (err) {
-  // Fallback: Try the dist directory if it exists
+  // Fallback: Try loading with different naming patterns
   try {
-    nativeModule = require('./dist/index.node');
-  } catch (fallbackErr) {
-    console.error('Failed to load oauth-service-napi native module:', err.message);
-    console.error('Fallback also failed:', fallbackErr.message);
-    throw new Error(
-      'oauth-service-napi: Failed to load native module. ' +
-      'The module may need to be compiled. Run: npm run build in apps/oauth-service-rust'
-    );
+    nativeModule = require('../index.node');
+  } catch (fallbackErr1) {
+    try {
+      nativeModule = require('./dist/index.node');
+    } catch (fallbackErr2) {
+      console.error('Failed to load oauth-service-napi native module:', err.message);
+      console.error('Fallback 1 failed:', fallbackErr1.message);
+      console.error('Fallback 2 failed:', fallbackErr2.message);
+      throw new Error(
+        'oauth-service-napi: Failed to load native module. ' +
+        'The module may need to be compiled. Run: npm run build in apps/oauth-service-rust'
+      );
+    }
   }
 }
 

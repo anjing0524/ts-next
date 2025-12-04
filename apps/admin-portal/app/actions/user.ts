@@ -12,6 +12,23 @@ import { UserResult, UpdateUserProfileRequest, UserListResult, PaginatedResult, 
 import { withErrorHandling } from './utils';
 
 /**
+ * 将 NAPI UserInfo 转换为本地 UserInfo (Transform NAPI UserInfo to local UserInfo)
+ * NAPI SDK 返回的 UserInfo 使用驼峰命名，需要转换为蛇形命名
+ * NAPI SDK returns UserInfo with camelCase properties, need to convert to snake_case
+ */
+function transformNapiUserInfo(napiUser: any): UserInfo {
+  return {
+    user_id: napiUser.userId,
+    username: napiUser.username,
+    email: napiUser.email,
+    display_name: napiUser.displayName,
+    avatar_url: napiUser.avatarUrl,
+    created_at: napiUser.createdAt,
+    updated_at: napiUser.updatedAt,
+  };
+}
+
+/**
  * 获取用户信息操作 (Get User Info Action)
  *
  * 通过 OAuth SDK 调用 OAuth Service 的用户信息接口
@@ -22,7 +39,8 @@ import { withErrorHandling } from './utils';
 export async function getUserInfoAction(): Promise<UserResult> {
   return withErrorHandling(async () => {
     const sdk = getOAuthSDK();
-    return await sdk.userGetInfo();
+    const napiUser = await sdk.userGetInfo();
+    return transformNapiUserInfo(napiUser);
   }, '获取用户信息失败 (Failed to get user info)');
 }
 
@@ -37,7 +55,15 @@ export async function updateUserProfileAction(
 ): Promise<UserResult> {
   return withErrorHandling(async () => {
     const sdk = getOAuthSDK();
-    return await sdk.userUpdateProfile(profile as any);
+    // 将驼峰命名转换为蛇形命名以匹配 NAPI SDK 的期望
+    // Convert camelCase to snake_case to match NAPI SDK expectations
+    const napiProfile = {
+      display_name: profile.display_name,
+      avatar_url: profile.avatar_url,
+      email: profile.email,
+    };
+    const napiUser = await sdk.userUpdateProfile(napiProfile as any);
+    return transformNapiUserInfo(napiUser);
   }, '更新用户信息失败 (Failed to update user profile)');
 }
 
