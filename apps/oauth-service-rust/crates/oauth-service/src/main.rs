@@ -1,6 +1,7 @@
-use oauth_service_rust::{config, create_app, initialize_database};
+use oauth_service::{config, create_app, initialize_database};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
+use sqlx::SqlitePool;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -15,7 +16,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // 初始化数据库（包括迁移和种子数据）
     tracing::info!("Initializing database...");
-    let pool = Arc::new(initialize_database(&config.database_url).await?);
+    let pool: Arc<SqlitePool> = Arc::new(initialize_database(&config.database_url).await?);
     tracing::info!("✅ Database initialized successfully (migrations + seed data)");
 
     // 创建应用
