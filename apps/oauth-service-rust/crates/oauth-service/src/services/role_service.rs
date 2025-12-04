@@ -1,3 +1,4 @@
+#![allow(clippy::uninlined_format_args)]
 use crate::{error::ServiceError, models::role::Role};
 use crate::cache::permission_cache::PermissionCache;
 use async_trait::async_trait;
@@ -479,7 +480,6 @@ impl RoleService for RoleServiceImpl {
 mod tests {
     use super::*;
     use crate::cache::permission_cache::InMemoryPermissionCache;
-    use crate::models::permission::PermissionType;
     use sqlx::SqlitePool;
 
     async fn setup_test_db() -> SqlitePool {

@@ -30,6 +30,7 @@ pub type SDKResult<T> = Result<T, SDKError>;
 /// OAuth SDK 主类 (Main Class)
 /// 整合所有功能模块，提供统一的 SDK 入口 (Integrates all functional modules, provides unified SDK entry point)
 pub struct OAuthSDK {
+    #[allow(dead_code)]
     http_client: HttpClient,
     pub auth: napi::modules::AuthModule,
     pub token: napi::modules::TokenModule,

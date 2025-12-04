@@ -5,8 +5,6 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod middleware;
-pub mod napi;
-pub mod napi_binding;
 pub mod routes;
 pub mod services;
 pub mod state;
@@ -27,5 +25,3 @@ pub use db::initialize_database;
 pub use error::{AppError, ServiceError};
 pub use state::AppState;
 
-// 导出 napi SDK 的公共 API
-pub use napi::{OAuthSDK, SDKConfig, SDKError, SDKResult};

@@ -6,7 +6,9 @@ use serde_json::Value;
 
 #[derive(Clone, Debug)]
 pub struct HttpClient {
+    #[allow(dead_code)]
     base_url: String,
+    #[allow(dead_code)]
     timeout: Option<u64>,
 }
 

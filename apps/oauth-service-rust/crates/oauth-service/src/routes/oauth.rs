@@ -1,3 +1,4 @@
+#![allow(clippy::uninlined_format_args)]
 use crate::error::{AppError, ServiceError};
 use crate::models::client::OAuthClientDetails;
 use crate::state::AppState;

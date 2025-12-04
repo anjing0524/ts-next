@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 // Database initialization and seeding for OAuth Service
 use sqlx::{sqlite::SqlitePool, migrate::MigrateDatabase, Sqlite};
 use crate::error::ServiceError;
@@ -10,13 +12,13 @@ pub async fn initialize_database(database_url: &str) -> Result<SqlitePool, Servi
         tracing::info!("Creating database: {}", database_url);
         Sqlite::create_database(database_url)
             .await
-            .map_err(|e| ServiceError::Internal(format!("Failed to create database: {}", e)))?;
+            .map_err(|e| ServiceError::Internal(format!("Failed to create database: {e}")))?;
     }
 
     // 2. Create connection pool
     let pool = SqlitePool::connect(database_url)
         .await
-        .map_err(|e| ServiceError::Internal(format!("Failed to connect to database: {}", e)))?;
+        .map_err(|e| ServiceError::Internal(format!("Failed to connect to database: {e}")))?;
 
     // 3. Run migrations and seed data (conditionally)
     let skip_db_init = std::env::var("SKIP_DB_INIT").unwrap_or_else(|_| "false".to_string());
@@ -45,7 +47,7 @@ async fn run_migrations(pool: &SqlitePool, migrations_dir: &str) -> Result<(), S
 
     // Get all migration files (*.sql) sorted by name
     let mut entries = std::fs::read_dir(migration_path)
-        .map_err(|e| ServiceError::Internal(format!("Failed to read migrations directory: {}", e)))?
+        .map_err(|e| ServiceError::Internal(format!("Failed to read migrations directory: {e}")))?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.path()
@@ -63,8 +65,7 @@ async fn run_migrations(pool: &SqlitePool, migrations_dir: &str) -> Result<(), S
         if let Some(filename) = path.file_name() {
             let sql = std::fs::read_to_string(&path)
                 .map_err(|e| ServiceError::Internal(format!(
-                    "Failed to read migration file {:?}: {}",
-                    filename, e
+                    "Failed to read migration file {filename:?}: {e}"
                 )))?;
 
             tracing::info!("Executing migration: {:?}", filename);
@@ -77,8 +78,7 @@ async fn run_migrations(pool: &SqlitePool, migrations_dir: &str) -> Result<(), S
                         .execute(pool)
                         .await
                         .map_err(|e| ServiceError::Internal(format!(
-                            "Failed to execute migration statement in {:?}: {}",
-                            filename, e
+                            "Failed to execute migration statement in {filename:?}: {e}"
                         )))?;
                 }
             }
@@ -123,7 +123,7 @@ async fn seed_admin_user(pool: &SqlitePool) -> Result<(), ServiceError> {
     )
     .fetch_optional(pool)
     .await
-    .map_err(|e| ServiceError::Internal(format!("Failed to check admin user: {}", e)))?;
+    .map_err(|e| ServiceError::Internal(format!("Failed to check admin user: {e}")))?;
 
     if existing.is_some() {
         tracing::debug!("Admin user already exists");
@@ -147,7 +147,7 @@ async fn seed_admin_user(pool: &SqlitePool) -> Result<(), ServiceError> {
     .bind(true)  // Must change password on first login
     .execute(pool)
     .await
-    .map_err(|e| ServiceError::Internal(format!("Failed to create admin user: {}", e)))?;
+    .map_err(|e| ServiceError::Internal(format!("Failed to create admin user: {e}")))?;
 
     tracing::info!("Admin user created successfully");
     Ok(())
@@ -169,7 +169,7 @@ async fn seed_default_roles(pool: &SqlitePool) -> Result<(), ServiceError> {
         .bind(name)
         .fetch_optional(pool)
         .await
-        .map_err(|e| ServiceError::Internal(format!("Failed to check role: {}", e)))?;
+        .map_err(|e| ServiceError::Internal(format!("Failed to check role: {e}")))?;
 
         if existing.is_some() {
             tracing::debug!("Role '{}' already exists", name);

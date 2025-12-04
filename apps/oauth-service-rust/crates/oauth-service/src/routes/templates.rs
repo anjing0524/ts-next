@@ -1,3 +1,4 @@
+#![allow(clippy::uninlined_format_args)]
 // Web UI 模板路由处理器
 // 提供登录、权限同意等页面的HTML模板渲染
 

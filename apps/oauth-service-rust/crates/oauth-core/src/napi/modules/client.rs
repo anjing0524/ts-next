@@ -66,7 +66,7 @@ impl ClientModule {
     ) -> SDKResult<PaginatedResponse<ClientInfo>> {
         let p = page.unwrap_or(1);
         let ps = page_size.unwrap_or(10);
-        let path = format!("/api/v2/client/clients?page={}&page_size={}", p, ps);
+        let path = format!("/api/v2/client/clients?page={p}&page_size={ps}");
         let response = self.http_client.get(&path).await?;
         serde_json::from_value::<PaginatedResponse<ClientInfo>>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -75,7 +75,7 @@ impl ClientModule {
     /// 获取单个客户端 get_client
     /// GET /api/v2/client/clients/{client_id}
     pub async fn get_client(&self, client_id: String) -> SDKResult<ClientInfo> {
-        let path = format!("/api/v2/client/clients/{}", client_id);
+        let path = format!("/api/v2/client/clients/{client_id}");
         let response = self.http_client.get(&path).await?;
         serde_json::from_value::<ClientInfo>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -101,7 +101,7 @@ impl ClientModule {
         client: CreateClientRequest,
     ) -> SDKResult<ClientInfo> {
         let body = serde_json::to_value(&client)?;
-        let path = format!("/api/v2/client/clients/{}", client_id);
+        let path = format!("/api/v2/client/clients/{client_id}");
         let response = self.http_client.put(&path, body).await?;
         serde_json::from_value::<ClientInfo>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -110,7 +110,7 @@ impl ClientModule {
     /// 删除客户端 delete_client
     /// DELETE /api/v2/client/clients/{client_id}
     pub async fn delete_client(&self, client_id: String) -> SDKResult<bool> {
-        let path = format!("/api/v2/client/clients/{}", client_id);
+        let path = format!("/api/v2/client/clients/{client_id}");
         let response = self.http_client.delete(&path).await?;
         response
             .get("success")

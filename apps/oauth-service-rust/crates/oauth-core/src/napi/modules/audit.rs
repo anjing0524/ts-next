@@ -58,26 +58,26 @@ impl AuditModule {
 
         if let Some(f) = filter {
             if let Some(actor_id) = f.actor_id {
-                query_params.push_str(&format!("&actor_id={}", actor_id));
+                query_params.push_str(&format!("&actor_id={actor_id}"));
             }
             if let Some(resource_type) = f.resource_type {
-                query_params.push_str(&format!("&resource_type={}", resource_type));
+                query_params.push_str(&format!("&resource_type={resource_type}"));
             }
             if let Some(action) = f.action {
-                query_params.push_str(&format!("&action={}", action));
+                query_params.push_str(&format!("&action={action}"));
             }
             if let Some(status) = f.status {
-                query_params.push_str(&format!("&status={}", status));
+                query_params.push_str(&format!("&status={status}"));
             }
             if let Some(start_time) = f.start_time {
-                query_params.push_str(&format!("&start_time={}", start_time));
+                query_params.push_str(&format!("&start_time={start_time}"));
             }
             if let Some(end_time) = f.end_time {
-                query_params.push_str(&format!("&end_time={}", end_time));
+                query_params.push_str(&format!("&end_time={end_time}"));
             }
         }
 
-        let path = format!("/api/v2/audit/logs{}", query_params);
+        let path = format!("/api/v2/audit/logs{query_params}");
         let response = self.http_client.get(&path).await?;
         serde_json::from_value::<PaginatedResponse<AuditLog>>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))

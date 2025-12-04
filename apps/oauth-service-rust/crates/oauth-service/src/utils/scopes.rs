@@ -1,3 +1,4 @@
+#![allow(clippy::uninlined_format_args)]
 // OAuth 2.1 / OpenID Connect 权限范围定义
 // 定义所有支持的权限及其元数据（描述、风险等级、分类）
 

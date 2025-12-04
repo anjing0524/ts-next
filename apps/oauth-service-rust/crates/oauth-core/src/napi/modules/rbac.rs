@@ -63,7 +63,7 @@ impl RbacModule {
     ) -> SDKResult<PaginatedResponse<Permission>> {
         let p = page.unwrap_or(1);
         let ps = page_size.unwrap_or(10);
-        let path = format!("/api/v2/rbac/permissions?page={}&page_size={}", p, ps);
+        let path = format!("/api/v2/rbac/permissions?page={p}&page_size={ps}");
         let response = self.http_client.get(&path).await?;
         serde_json::from_value::<PaginatedResponse<Permission>>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -78,7 +78,7 @@ impl RbacModule {
     ) -> SDKResult<PaginatedResponse<Role>> {
         let p = page.unwrap_or(1);
         let ps = page_size.unwrap_or(10);
-        let path = format!("/api/v2/rbac/roles?page={}&page_size={}", p, ps);
+        let path = format!("/api/v2/rbac/roles?page={p}&page_size={ps}");
         let response = self.http_client.get(&path).await?;
         serde_json::from_value::<PaginatedResponse<Role>>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -92,7 +92,7 @@ impl RbacModule {
         role_id: String,
     ) -> SDKResult<UserRole> {
         let body = json!({ "role_id": role_id });
-        let path = format!("/api/v2/rbac/users/{}/roles", user_id);
+        let path = format!("/api/v2/rbac/users/{user_id}/roles");
         let response = self.http_client.post(&path, body).await?;
         serde_json::from_value::<UserRole>(response)
             .map_err(|e| crate::napi::error::SDKError::new("PARSE_ERROR", e.to_string()))
@@ -101,7 +101,7 @@ impl RbacModule {
     /// 撤销用户角色 revoke_role_from_user
     /// DELETE /api/v2/rbac/users/{user_id}/roles/{role_id}
     pub async fn revoke_role_from_user(&self, user_id: String, role_id: String) -> SDKResult<bool> {
-        let path = format!("/api/v2/rbac/users/{}/roles/{}", user_id, role_id);
+        let path = format!("/api/v2/rbac/users/{user_id}/roles/{role_id}");
         let response = self.http_client.delete(&path).await?;
         response
             .get("success")

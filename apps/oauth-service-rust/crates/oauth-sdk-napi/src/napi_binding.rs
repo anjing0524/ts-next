@@ -70,8 +70,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 用户登出 (User Logout)
@@ -103,8 +103,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 获取用户信息 (Get User Info)
@@ -139,8 +139,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 撤销令牌 (Revoke Token)
@@ -203,8 +203,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 获取角色列表 (Get Roles List)
@@ -228,8 +228,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 为用户分配角色 (Assign Role to User)
@@ -253,8 +253,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 撤销用户角色 (Revoke Role from User)
@@ -317,8 +317,8 @@ impl NapiOAuthSDK {
             has_more: result.has_more,
         };
 
-        Ok(serde_json::to_value(paginated)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(paginated)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 获取客户端详情 (Get Client Details)
@@ -369,8 +369,8 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 
     /// 获取用户审计日志 (Get User Audit Logs)
@@ -396,7 +396,7 @@ impl NapiOAuthSDK {
             .await
             .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
 
-        Ok(serde_json::to_value(result)
-            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?)
+        serde_json::to_value(result)
+            .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))
     }
 }
