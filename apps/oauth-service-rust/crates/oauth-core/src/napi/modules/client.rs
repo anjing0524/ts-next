@@ -47,6 +47,7 @@ pub struct CreateClientRequest {
 }
 
 /// 客户端模块 ClientModule
+#[derive(Debug)]
 pub struct ClientModule {
     http_client: HttpClient,
 }

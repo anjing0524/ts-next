@@ -22,6 +22,7 @@ pub struct UpdateProfileRequest {
     pub email: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct UserModule {
     http_client: HttpClient,
 }

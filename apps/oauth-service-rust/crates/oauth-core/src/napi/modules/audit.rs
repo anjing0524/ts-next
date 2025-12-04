@@ -32,6 +32,7 @@ pub struct AuditLogFilter {
 }
 
 /// 审计模块 AuditModule
+#[derive(Debug)]
 pub struct AuditModule {
     http_client: HttpClient,
 }

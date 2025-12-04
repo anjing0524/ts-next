@@ -44,6 +44,7 @@ pub struct PaginatedResponse<T> {
 }
 
 /// RBAC 模块 RbacModule
+#[derive(Debug)]
 pub struct RbacModule {
     http_client: HttpClient,
 }

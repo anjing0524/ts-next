@@ -1,9 +1,7 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use oauth_core::napi::{
-    modules::{client::ClientInfoPublic, rbac::PaginatedResponse, user::UserInfo},
-    OAuthSDK, SDKConfig,
-};
+use oauth_core::{OAuthSDK, SDKConfig};
+use oauth_core::napi::modules::{client::ClientInfoPublic, rbac::PaginatedResponse, user::UserInfo};
 
 /// N-API SDK 配置 (N-API SDK Configuration)
 #[napi(object)]

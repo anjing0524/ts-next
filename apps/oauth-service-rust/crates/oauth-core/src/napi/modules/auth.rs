@@ -30,6 +30,7 @@ pub struct ConsentResponse {
     pub expires_in: i32,
 }
 
+#[derive(Debug)]
 pub struct AuthModule {
     http_client: HttpClient,
 }

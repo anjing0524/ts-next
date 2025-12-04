@@ -20,6 +20,7 @@ pub struct TokenIntrospectResponse {
     pub exp: i64,
 }
 
+#[derive(Debug)]
 pub struct TokenModule {
     http_client: HttpClient,
 }

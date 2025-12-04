@@ -1,9 +1,10 @@
 //! HTTP Client for SDK operations
 
-use crate::SDKError;
+use crate::{SDKConfig, SDKError};
+use crate::napi::error::SDKResult;
 use serde_json::Value;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HttpClient {
     base_url: String,
     timeout: Option<u64>,
@@ -12,8 +13,11 @@ pub struct HttpClient {
 pub type HttpResult<T> = Result<T, SDKError>;
 
 impl HttpClient {
-    pub fn new(base_url: String, timeout: Option<u64>) -> Self {
-        HttpClient { base_url, timeout }
+    pub fn new(config: SDKConfig) -> SDKResult<Self> {
+        Ok(HttpClient {
+            base_url: config.base_url,
+            timeout: config.timeout,
+        })
     }
 
     pub async fn post(&self, _path: &str, _body: Value) -> HttpResult<Value> {
