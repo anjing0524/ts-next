@@ -2,8 +2,8 @@
   "name": "oauth-service-napi",
   "version": "0.1.0",
   "description": "OAuth Service Rust napi SDK for Node.js - High-performance native addon for OAuth 2.0/2.1 authentication",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.js",
+  "types": "./index.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/your-org/ts-next-template.git",

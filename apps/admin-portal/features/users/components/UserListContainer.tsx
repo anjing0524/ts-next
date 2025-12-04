@@ -35,7 +35,24 @@ export async function UserListContainer({ page, limit }: UserListContainerProps)
   try {
     const result = await getCachedUsers(page, limit);
 
-    return <UserTable users={result.users || []} total={result.total || 0} page={page} limit={limit} />;
+    if (!result || !result.items) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-red-800">
+            加载用户列表时出错。请稍后重试。
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <UserTable
+        users={(result.items || []) as any}
+        total={result.total || 0}
+        page={page}
+        limit={limit}
+      />
+    );
   } catch (error) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-4">

@@ -8,7 +8,7 @@
 'use server';
 
 import { getOAuthSDK } from '@/lib/oauth-sdk';
-import { UserResult, UpdateUserProfileRequest } from './types';
+import { UserResult, UpdateUserProfileRequest, UserListResult, PaginatedResult, UserInfo } from './types';
 import { withErrorHandling } from './utils';
 
 /**
@@ -39,4 +39,46 @@ export async function updateUserProfileAction(
     const sdk = getOAuthSDK();
     return await sdk.userUpdateProfile(profile as any);
   }, '更新用户信息失败 (Failed to update user profile)');
+}
+
+/**
+ * 获取用户列表操作 (List Users Action)
+ *
+ * 从 OAuth SDK 获取用户列表
+ * Gets user list from OAuth SDK
+ *
+ * Note: OAuth SDK 目前不提供用户列表 API，此方法返回空列表
+ * (Note: OAuth SDK currently doesn't provide user list API, this method returns empty list)
+ *
+ * @param page - 页码 (Page number, 1-indexed)
+ * @param limit - 每页数量 (Items per page)
+ * @returns 用户列表结果 (User list result with pagination)
+ */
+export async function listUsersAction(
+  page: number = 1,
+  limit: number = 10,
+): Promise<{ items: UserInfo[]; total: number; page: number; page_size: number; has_more: boolean }> {
+  try {
+    // OAuth SDK 目前不提供用户列表的 API
+    // 返回空列表作为占位符
+    // OAuth SDK currently doesn't have user list API
+    // Return empty list as placeholder
+
+    return {
+      items: [],
+      total: 0,
+      page,
+      page_size: limit,
+      has_more: false,
+    };
+  } catch (error) {
+    console.error('Failed to get user list:', error);
+    return {
+      items: [],
+      total: 0,
+      page,
+      page_size: limit,
+      has_more: false,
+    };
+  }
 }
