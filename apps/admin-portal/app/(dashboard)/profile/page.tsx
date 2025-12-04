@@ -17,7 +17,7 @@ import {
   toast,
 } from '@repo/ui';
 import { useAuth } from '@repo/ui/hooks';
-import { adminApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { PermissionGuard } from '@repo/ui';
 
 const profileSchema = z.object({
@@ -65,7 +65,7 @@ export default function ProfilePage() {
   const onProfileSubmit = async (data: z.infer<typeof profileSchema>) => {
     setIsSubmitting(true);
     try {
-      await adminApi.updateUserProfile(data);
+      await api.updateUserProfile(data);
       toast({ title: 'Success', description: 'Profile updated successfully.' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -77,7 +77,7 @@ export default function ProfilePage() {
   const onPasswordSubmit = async (data: z.infer<typeof passwordSchema>) => {
     setIsSubmitting(true);
     try {
-      await adminApi.updatePassword(data);
+      await api.updatePassword(data);
       toast({ title: 'Success', description: 'Password updated successfully.' });
       passwordForm.reset();
     } catch (error: any) {

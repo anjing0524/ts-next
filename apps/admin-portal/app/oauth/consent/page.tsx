@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@repo/ui';
-import { apiRequest, adminApi } from '@/lib/api';
+import { apiRequest, api } from '@/lib/api';
 
 interface ConsentApiData {
   client: { id: string; name: string; logoUri?: string | null };
@@ -71,8 +71,17 @@ function ConsentContent() {
         setApiData(response);
         setLoading(false);
       })
-      .catch((err) => {
-        setError(typeof err === 'string' ? err : err.message || '加载同意信息失败');
+      .catch((err: any) => {
+        // 使用 ApiError 类判断错误类型
+        // Use ApiError class to determine error type
+        if (err.isSessionExpired?.()) {
+          const currentUrl = encodeURIComponent(window.location.href);
+          window.location.href = `/login?redirect=${currentUrl}`;
+          return;
+        }
+
+        const errorMessage = typeof err === 'string' ? err : err.getUserFriendlyMessage?.() || err.message || '加载同意信息失败';
+        setError(errorMessage);
         setLoading(false);
       });
   }, [
@@ -137,7 +146,7 @@ function ConsentContent() {
   // 处理授权确认
   const handleConsent = async (action: 'allow' | 'deny') => {
     try {
-      // 优先调用adminApi.submitConsent，统一后端接口
+      // 优先调用api.submitConsent，统一后端接口
       const consentParams = new URLSearchParams({
         decision: action,
         client_id: clientId!,
@@ -150,15 +159,23 @@ function ConsentContent() {
         nonce: nonce || '',
       });
       // 调用统一的submitConsent工具函数
-      const response = await adminApi.submitConsent(action, consentParams);
+      const response = await api.submitConsent(action, consentParams);
       if (response.redirect_uri) {
         window.location.href = response.redirect_uri;
       } else {
         throw new Error('无效的响应');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('授权确认错误:', error);
-      setError('处理授权请求失败，请重试');
+      // 使用 ApiError 类判断 Session 过期
+      // Use ApiError class to check session expiration
+      if (error.isSessionExpired?.()) {
+        const currentUrl = encodeURIComponent(window.location.href);
+        window.location.href = `/login?redirect=${currentUrl}`;
+        return;
+      }
+      const errorMessage = error.getUserFriendlyMessage?.() || '处理授权请求失败，请重试';
+      setError(errorMessage);
     }
   };
 

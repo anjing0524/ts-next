@@ -1,75 +1,142 @@
 import { Page, expect } from '@playwright/test';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 /**
  * E2E 测试辅助函数
  *
  * 提供通用的测试辅助功能,包括:
- * - OAuth 认证流程
+ * - OAuth 认证流程 (直接API调用版本 - 更可靠)
  * - Token 管理
  * - PKCE 参数生成
  * - JWT 解析
  */
 
+// Pingora 代理地址（6188）路由所有流量：
+// - /api/v2/* → OAuth Service (3001)
+// - 其他请求 → Admin Portal (3000) [生产模式的Next.js默认端口]
 const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
 const defaultUsername = process.env.TEST_ADMIN_USERNAME || 'admin';
 const defaultPassword = process.env.TEST_ADMIN_PASSWORD || 'admin123';
 
 /**
- * 完成完整的 OAuth 登录流程
+ * 完成OAuth登录 - 真实OAuth流程版本
+ * 通过实际的OAuth 2.1授权码流程登录：
+ * 1. 访问受保护资源 → 触发重定向到登录
+ * 2. 在登录页面填写凭证 → 提交表单
+ * 3. OAuth授权流程 → 获取授权码 → 交换token
+ * 4. (可选)处理权限同意页面
+ * 5. 重定向回受保护资源
+ *
+ * 此方法确保：
+ * - 所有API调用都通过Admin Portal代理
+ * - 获得有效的session_token cookie
+ * - 测试真实的用户OAuth流程
  *
  * @param page - Playwright Page 对象
  * @param username - 用户名 (默认: admin)
  * @param password - 密码 (默认: admin123)
+ * @param protectedResource - 受保护的资源路径 (默认: /admin)
  * @returns Promise<string> - 返回 access_token
  */
 export async function completeOAuthLogin(
     page: Page,
     username: string = defaultUsername,
-    password: string = defaultPassword
+    password: string = defaultPassword,
+    protectedResource: string = '/admin'
 ): Promise<string> {
-    // 1. 访问受保护的路由,触发 OAuth 流程
-    await page.goto(`${baseUrl}/admin`);
-    await page.waitForURL(/.*/, { timeout: 5000 });
+    console.log(`[Auth] 开始真实OAuth登录流程，用户: ${username}，目标资源: ${protectedResource}`);
 
-    // 2. 如果重定向到登录页,完成登录
-    if (page.url().includes('/login')) {
-        await page.getByTestId('username-input').fill(username);
-        await page.getByTestId('password-input').fill(password);
+    try {
+        // 步骤 1: 访问受保护资源，触发OAuth重定向
+        console.log(`[Auth] 步骤1: 访问受保护资源 ${baseUrl}${protectedResource}`);
+        await page.goto(`${baseUrl}${protectedResource}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 10000
+        });
 
-        // 等待登录 API 响应
-        const loginResponsePromise = page.waitForResponse(
-            (response) => response.url().includes('/api/v2/auth/login') && response.request().method() === 'POST',
-            { timeout: 10000 }
+        // 步骤 2: 应该被重定向到登录页面
+        console.log('[Auth] 步骤2: 等待重定向到登录页面...');
+        await page.waitForURL(/\/login/, { timeout: 8000 });
+        const loginPageUrl = page.url();
+        console.log(`[Auth] 已重定向到登录页面: ${loginPageUrl}`);
+
+        // 步骤 3: 等待登录表单加载
+        console.log('[Auth] 步骤3: 等待登录表单加载...');
+        await page.waitForSelector('form', { timeout: 5000 });
+
+        // 步骤 4: 填写登录凭证
+        console.log(`[Auth] 步骤4: 填写登录凭证 (用户: ${username})`);
+
+        // 等待用户名输入框可见
+        const usernameInput = page.getByTestId('username-input');
+        await usernameInput.waitFor({ state: 'visible', timeout: 5000 });
+        await usernameInput.fill(username);
+
+        // 等待密码输入框可见
+        const passwordInput = page.getByTestId('password-input');
+        await passwordInput.waitFor({ state: 'visible', timeout: 5000 });
+        await passwordInput.fill(password);
+
+        // 步骤 5: 点击登录按钮
+        console.log('[Auth] 步骤5: 点击登录按钮');
+        const loginButton = page.getByTestId('login-button');
+        await loginButton.click();
+
+        // 步骤 6: 等待OAuth流程完成
+        // 可能的流程路径：
+        // - 直接重定向回受保护资源 (无权限同意)
+        // - 重定向到权限同意页面 (需要用户批准)
+        console.log('[Auth] 步骤6: 等待OAuth流程完成...');
+        await page.waitForURL((url) => {
+            const pathname = url.pathname;
+            return pathname === protectedResource || pathname === '/oauth/consent';
+        }, { timeout: 15000 });
+
+        const currentUrl = page.url();
+        console.log(`[Auth] 当前URL: ${currentUrl}`);
+
+        // 步骤 7: 如果重定向到权限同意页面，需要批准
+        if (page.url().includes('/oauth/consent')) {
+            console.log('[Auth] 步骤7: 处理权限同意页面...');
+
+            // 等待同意页面加载
+            await page.waitForSelector('button', { timeout: 5000 });
+
+            // 查找并点击"允许"或"Allow"按钮
+            const allowButton = page.getByRole('button', { name: /允许|Allow|同意|Agree/i });
+            const isVisible = await allowButton.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (isVisible) {
+                console.log('[Auth] 点击允许按钮');
+                await allowButton.click();
+
+                // 等待重定向回受保护资源
+                console.log('[Auth] 等待重定向回受保护资源...');
+                await page.waitForURL(new RegExp(protectedResource.replace(/\//g, '\\/')), {
+                    timeout: 10000
+                });
+            }
+        }
+
+        // 步骤 8: 验证登录成功
+        console.log('[Auth] 步骤8: 验证登录成功...');
+        const token = await page.evaluate(() =>
+            localStorage.getItem('access_token')
         );
 
-        await page.getByTestId('login-button').click();
-
-        // 等待登录响应
-        const loginResponse = await loginResponsePromise;
-        expect(loginResponse.status()).toBe(200);
-
-        // 等待 OAuth 回调完成
-        await page.waitForURL(/.*/, { timeout: 10000 });
-    }
-
-    // 3. 处理同意页面 (如果需要)
-    if (page.url().includes('/oauth/consent')) {
-        const approveButton =
-            page.getByTestId('consent-approve-button') ||
-            page.getByRole('button', { name: /allow|approve|授权|允许/i });
-
-        if (await approveButton.isVisible()) {
-            await approveButton.click();
-            await page.waitForURL(/.*/, { timeout: 5000 });
+        if (!token) {
+            throw new Error('登录成功但localStorage中未找到access_token');
         }
+
+        console.log('[Auth] OAuth登录流程完成，获得access_token');
+        return token;
+
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('[Auth] OAuth登录失败:', errorMsg);
+        console.error('[Auth] 当前页面URL:', page.url());
+        throw error;
     }
-
-    // 4. 等待重定向到受保护路由
-    await page.waitForURL(/.*\/admin.*/, { timeout: 10000 });
-
-    // 5. 从存储中获取 access_token
-    return await getAccessToken(page);
 }
 
 /**
@@ -109,7 +176,7 @@ export async function getRefreshToken(page: Page): Promise<string> {
 }
 
 /**
- * 撤销 token (调用 OAuth Service 的 revoke 端点)
+ * 撤销 token (通过Admin Portal代理调用)
  *
  * @param page - Playwright Page 对象
  * @param token - 要撤销的 token
@@ -118,49 +185,28 @@ export async function getRefreshToken(page: Page): Promise<string> {
 export async function revokeToken(
     page: Page,
     token: string,
-    tokenTypeHint: 'access_token' | 'refresh_token' = 'refresh_token'
+    tokenTypeHint: 'access_token' | 'refresh_token' = 'access_token'
 ): Promise<void> {
-    const response = await page.request.post(`${baseUrl}/api/v2/oauth/revoke`, {
-        form: {
-            token,
-            token_type_hint: tokenTypeHint,
-        },
-    });
+    await page.evaluate(async (params: any) => {
+        // 使用相对路径通过Admin Portal代理
+        const response = await fetch(params.baseUrl + '/api/v2/oauth/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: params.token,
+                token_type_hint: params.tokenTypeHint
+            }),
+            credentials: 'include'
+        });
 
-    // RFC 7009: revoke 端点即使失败也返回 200
-    expect(response.status()).toBe(200);
+        if (!response.ok) {
+            throw new Error(`Token revoke failed with status ${response.status}`);
+        }
+    }, { baseUrl, token, tokenTypeHint });
 }
 
 /**
- * 等待 token 刷新
- *
- * 监听 token 端点的请求,等待 refresh_token grant_type
- *
- * @param page - Playwright Page 对象
- * @returns Promise<void>
- */
-export async function waitForTokenRefresh(page: Page): Promise<void> {
-    await page.waitForResponse(
-        (response) => {
-            const isTokenEndpoint = response.url().includes('/api/v2/oauth/token');
-            const isPost = response.request().method() === 'POST';
-
-            if (isTokenEndpoint && isPost) {
-                // 检查请求体是否包含 refresh_token grant_type
-                const postData = response.request().postData();
-                return postData?.includes('grant_type=refresh_token') || false;
-            }
-
-            return false;
-        },
-        { timeout: 10000 }
-    );
-}
-
-/**
- * 清除所有认证状态
- *
- * 清除 localStorage, sessionStorage 和 cookies
+ * 清除认证状态
  *
  * @param page - Playwright Page 对象
  */
@@ -169,264 +215,363 @@ export async function clearAuthState(page: Page): Promise<void> {
     await page.evaluate(() => {
         localStorage.clear();
         sessionStorage.clear();
+    }).catch(() => {
+        // 如果页面已销毁，忽略错误
     });
-
-    // 清除 cookies
-    await page.context().clearCookies();
 }
 
 /**
- * 解析 JWT token 的 payload
+ * 生成PKCE参数 (Code Challenge and Code Verifier)
  *
- * @param token - JWT token 字符串
- * @returns any - Token claims
+ * @returns Object { codeChallenge, codeVerifier }
  */
-export function extractJWTClaims(token: string): any {
+export function generatePKCEPair(): { codeChallenge: string; codeVerifier: string } {
+    const codeVerifier = base64UrlEncode(
+        crypto.randomBytes(32)
+    );
+
+    const codeChallenge = base64UrlEncode(
+        crypto
+            .createHash('sha256')
+            .update(codeVerifier)
+            .digest()
+    );
+
+    return { codeChallenge, codeVerifier };
+}
+
+/**
+ * Base64 URL编码
+ *
+ * @param buffer - 要编码的缓冲区
+ * @returns string - Base64 URL编码字符串
+ */
+function base64UrlEncode(buffer: Buffer): string {
+    return buffer
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+}
+
+/**
+ * 解析JWT token的payload部分
+ *
+ * @param token - JWT token
+ * @returns Object - Decoded payload
+ */
+export function parseJWT(token: string): Record<string, any> {
     const parts = token.split('.');
     if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
+        throw new Error('Invalid JWT token');
     }
 
-    // Base64URL decode
-    const payload = parts[1];
-    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
-
-    return JSON.parse(decoded);
+    const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
+    return JSON.parse(payload);
 }
 
 /**
- * 生成 PKCE 参数对
+ * 验证JWT token的有效性
  *
- * @returns Promise<{ verifier: string, challenge: string }>
+ * @param token - JWT token
+ * @returns boolean - 是否有效
  */
-export async function generatePKCEPair(): Promise<{ verifier: string; challenge: string }> {
-    // 生成 code_verifier (43-128 字符的随机字符串)
-    const verifier = base64URLEncode(crypto.randomBytes(32));
-
-    // 计算 code_challenge (SHA256 hash of verifier)
-    const challenge = base64URLEncode(crypto.createHash('sha256').update(verifier).digest());
-
-    return { verifier, challenge };
+export function isValidJWT(token: string): boolean {
+    try {
+        const payload = parseJWT(token);
+        const now = Math.floor(Date.now() / 1000);
+        return payload.exp > now;
+    } catch {
+        return false;
+    }
 }
 
 /**
- * Base64URL 编码
- *
- * @param buffer - Buffer 对象
- * @returns string - Base64URL 编码的字符串
- */
-function base64URLEncode(buffer: Buffer): string {
-    return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-/**
- * 验证 PKCE challenge
- *
- * @param verifier - code_verifier
- * @param challenge - code_challenge
- * @returns boolean - 是否匹配
- */
-export async function verifyPKCEChallenge(verifier: string, challenge: string): Promise<boolean> {
-    const computedChallenge = base64URLEncode(crypto.createHash('sha256').update(verifier).digest());
-    return computedChallenge === challenge;
-}
-
-/**
- * 等待特定的网络请求
+ * 等待元素可见
  *
  * @param page - Playwright Page 对象
- * @param urlPattern - URL 匹配模式
- * @param method - HTTP 方法
- * @returns Promise<Response>
+ * @param selector - 元素选择器
+ * @param timeout - 超时时间(毫秒)
  */
-export async function waitForRequest(page: Page, urlPattern: string | RegExp, method: string = 'GET'): Promise<any> {
-    return await page.waitForResponse(
-        (response) => {
-            const url = response.url();
-            const matches = typeof urlPattern === 'string' ? url.includes(urlPattern) : urlPattern.test(url);
-            return matches && response.request().method() === method;
-        },
-        { timeout: 10000 }
-    );
+export async function waitForElement(
+    page: Page,
+    selector: string,
+    timeout: number = 5000
+): Promise<void> {
+    await page.waitForSelector(selector, { timeout });
 }
 
 /**
- * 模拟 token 过期
- *
- * 通过修改 localStorage 中的 token 过期时间
+ * 获取页面中的所有请求URL
  *
  * @param page - Playwright Page 对象
+ * @returns string[] - 请求URL列表
+ */
+export async function captureRequests(page: Page): Promise<string[]> {
+    const requests: string[] = [];
+
+    page.on('request', (request) => {
+        requests.push(request.url());
+    });
+
+    return requests;
+}
+
+/**
+ * 监听页面错误
+ *
+ * @param page - Playwright Page 对象
+ * @returns string[] - 错误消息列表
+ */
+export async function captureErrors(page: Page): Promise<string[]> {
+    const errors: string[] = [];
+
+    page.on('pageerror', (error) => {
+        errors.push(error.message);
+    });
+
+    return errors;
+}
+
+/**
+ * 从JWT Token中提取声明信息 Claims
+ * 解析JWT的payload部分并返回声明对象
+ *
+ * @param token - JWT token 字符串
+ * @returns Record<string, any> - Token的声明对象 (sub, client_id, scope, exp等)
+ * @throws Error - 如果Token无效或解析失败
+ */
+export async function extractJWTClaims(token: string): Promise<Record<string, any>> {
+    try {
+        return parseJWT(token);
+    } catch (error) {
+        throw new Error(`Failed to extract JWT claims: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+/**
+ * 等待并捕获Token刷新事件 Token Refresh
+ * 监听localStorage变化，当新的access_token被设置时返回
+ *
+ * @param page - Playwright Page 对象
+ * @param timeout - 最大等待时间(毫秒，默认15000)
+ * @returns Promise<string> - 新的access_token
+ * @throws Error - 如果超时或Token未被刷新
+ */
+export async function waitForTokenRefresh(page: Page, timeout: number = 15000): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+        const startTime = Date.now();
+        const checkInterval = 500; // 每500ms检查一次
+
+        // 初始token值
+        const initialToken = await page.evaluate(() => {
+            return localStorage.getItem('access_token') || '';
+        });
+
+        const checkToken = async () => {
+            try {
+                const currentToken = await page.evaluate(() => {
+                    return localStorage.getItem('access_token') || '';
+                });
+
+                // 如果token发生变化，说明刷新成功
+                if (currentToken && currentToken !== initialToken) {
+                    console.log('[TokenRefresh] New access token detected');
+                    resolve(currentToken);
+                    return;
+                }
+
+                // 检查是否超时
+                if (Date.now() - startTime > timeout) {
+                    reject(new Error(`Token refresh timeout after ${timeout}ms`));
+                    return;
+                }
+
+                // 继续监听
+                setTimeout(checkToken, checkInterval);
+            } catch (error) {
+                reject(error);
+            }
+        };
+
+        // 启动检查
+        checkToken();
+    });
+}
+
+/**
+ * 过期当前Access Token
+ * 通过调用OAuth Service的token endpoint获取新token，
+ * 然后修改localStorage中的过期时间来模拟Token过期
+ *
+ * @param page - Playwright Page 对象
+ * @throws Error - 如果操作失败
  */
 export async function expireAccessToken(page: Page): Promise<void> {
-    await page.evaluate(() => {
-        // 将 token 过期时间设置为过去
-        localStorage.setItem('token_expires_at', String(Date.now() / 1000 - 3600));
-    });
-}
-
-/**
- * 获取用户权限列表
- *
- * 从 access_token 的 claims 中提取权限
- *
- * @param page - Playwright Page 对象
- * @returns Promise<string[]> - 权限列表
- */
-export async function getUserPermissions(page: Page): Promise<string[]> {
-    const token = await getAccessToken(page);
-    const claims = await extractJWTClaims(token);
-    return claims.permissions || [];
-}
-
-/**
- * 检查用户是否有特定权限
- *
- * @param page - Playwright Page 对象
- * @param permission - 权限名称 (例如 'users:create')
- * @returns Promise<boolean>
- */
-export async function hasPermission(page: Page, permission: string): Promise<boolean> {
-    const permissions = await getUserPermissions(page);
-    return permissions.includes(permission) || permissions.includes('*');
-}
-
-/**
- * 等待页面完全加载
- *
- * @param page - Playwright Page 对象
- */
-export async function waitForPageReady(page: Page): Promise<void> {
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
-        // networkidle 超时是可接受的
-    });
-}
-
-/**
- * 获取 API 错误信息
- *
- * @param response - Response 对象
- * @returns Promise<string> - 错误信息
- */
-export async function getErrorMessage(response: any): Promise<string> {
     try {
-        const body = await response.json();
-        return body.error || body.message || 'Unknown error';
-    } catch {
-        return await response.text();
+        await page.evaluate(() => {
+            // 获取当前token
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                throw new Error('No access token found');
+            }
+
+            // 解析JWT payload
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Invalid JWT token format');
+            }
+
+            // 解码payload
+            const payload = JSON.parse(
+                Buffer.from(parts[1], 'base64').toString('utf-8')
+            );
+
+            // 将exp设置为过去的时间（当前时间减去1小时）
+            const expiredPayload = {
+                ...payload,
+                exp: Math.floor(Date.now() / 1000) - 3600 // 1小时前
+            };
+
+            // 重新编码payload（注：这在真实场景中会导致签名无效，但对测试来说足够了）
+            const encodedPayload = Buffer.from(JSON.stringify(expiredPayload)).toString('base64')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+
+            // 更新localStorage中的token（模拟过期）
+            const expiredToken = `${parts[0]}.${encodedPayload}.${parts[2]}`;
+            localStorage.setItem('access_token', expiredToken);
+
+            console.log('[ExpireToken] Token marked as expired');
+        });
+    } catch (error) {
+        throw new Error(`Failed to expire access token: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
 /**
- * 获取有效的授权码
- *
- * 完成完整的 OAuth 流程直到获得授权码,但不交换 token
- * 这用于测试 PKCE 验证和 token 交换逻辑
+ * 获取授权码 Authorization Code
+ * 通过模拟用户授权流程来获取一个有效的授权码
  *
  * @param page - Playwright Page 对象
- * @param pkce - PKCE 参数对
- * @param username - 用户名 (默认: admin)
- * @param password - 密码 (默认: admin123)
- * @param customNonce - 自定义 nonce (可选,用于 OIDC 测试)
+ * @param pkce - PKCE参数对象 { codeChallenge, codeVerifier }
+ * @param username - 用户名(可选)
+ * @param password - 密码(可选)
+ * @param nonce - OIDC nonce参数(可选)
  * @returns Promise<string> - 授权码
+ * @throws Error - 如果获取授权码失败
  */
 export async function getAuthorizationCode(
     page: Page,
-    pkce: { verifier: string; challenge: string },
-    username: string = defaultUsername,
-    password: string = defaultPassword,
-    customNonce?: string
+    pkce: { codeChallenge: string; codeVerifier: string },
+    username?: string,
+    password?: string,
+    nonce?: string
 ): Promise<string> {
-    // 1. 清除之前的状态
-    await clearAuthState(page);
+    try {
+        // Pingora 代理地址（6188）路由所有流量：
+        // - /api/v2/* → OAuth Service (3001)
+        // - 其他请求 → Admin Portal (3002)
+        const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
+        // ✅ 使用Pingora代理的基础URL替代直接调用OAuth Service
+        // 所有请求都通过Pingora正确路由
 
-    // 2. 存储 PKCE 参数 (模拟客户端行为)
-    await page.evaluate(
-        (params) => {
-            sessionStorage.setItem('pkce_code_verifier', params.verifier);
-            sessionStorage.setItem('pkce_code_challenge', params.challenge);
-        },
-        pkce
-    );
+        // 生成state参数(CSRF保护)
+        const state = base64UrlEncode(crypto.randomBytes(32));
 
-    // 3. 生成 state 和 nonce (如果没有自定义提供)
-    const state = generateRandomString(32);
-    const nonce = customNonce || generateRandomString(32);
+        // 步骤1: 构建授权请求URL (通过Admin Portal)
+        const authorizeUrl = new URL(`${baseUrl}/api/v2/oauth/authorize`);
+        authorizeUrl.searchParams.set('client_id', 'admin-portal-client');
+        authorizeUrl.searchParams.set('response_type', 'code');
+        authorizeUrl.searchParams.set('redirect_uri', `${baseUrl}/auth/callback`);
+        authorizeUrl.searchParams.set('code_challenge', pkce.codeChallenge);
+        authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+        authorizeUrl.searchParams.set('state', state);
+        authorizeUrl.searchParams.set('scope', 'openid profile email');
 
-    await page.evaluate(
-        (params) => {
-            sessionStorage.setItem('oauth_state', params.state);
-            sessionStorage.setItem('oauth_nonce', params.nonce);
-        },
-        { state, nonce }
-    );
-
-    // 4. 构建授权请求 URL
-    const authorizeUrl = new URL(`${baseUrl}/api/v2/oauth/authorize`);
-    authorizeUrl.searchParams.set('client_id', 'admin-portal-client');
-    authorizeUrl.searchParams.set('redirect_uri', `${baseUrl}/auth/callback`);
-    authorizeUrl.searchParams.set('response_type', 'code');
-    authorizeUrl.searchParams.set('scope', 'openid profile email');
-    authorizeUrl.searchParams.set('code_challenge', pkce.challenge);
-    authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-    authorizeUrl.searchParams.set('state', state);
-    authorizeUrl.searchParams.set('nonce', nonce);
-
-    // 5. 导航到授权端点
-    await page.goto(authorizeUrl.toString());
-    await page.waitForURL(/.*/, { timeout: 5000 });
-
-    // 6. 如果重定向到登录页,完成登录
-    if (page.url().includes('/login')) {
-        await page.getByTestId('username-input').fill(username);
-        await page.getByTestId('password-input').fill(password);
-
-        await page.getByTestId('login-button').click();
-
-        // 等待登录完成
-        await page.waitForResponse(
-            (response) => response.url().includes('/api/v2/auth/login') && response.request().method() === 'POST',
-            { timeout: 10000 }
-        );
-    }
-
-    // 7. 处理同意页面 (如果有)
-    if (page.url().includes('/oauth/consent')) {
-        const approveButton =
-            page.getByTestId('consent-approve-button') || page.getByRole('button', { name: /allow|approve|授权|允许/i });
-
-        if (await approveButton.isVisible()) {
-            await approveButton.click();
+        if (nonce) {
+            authorizeUrl.searchParams.set('nonce', nonce);
         }
+
+        // 步骤2: 导航到授权页面
+        console.log('[AuthCode] Navigating to authorization endpoint');
+        await page.goto(authorizeUrl.toString(), {
+            waitUntil: 'domcontentloaded',
+            timeout: 10000
+        });
+
+        // 步骤3: 如果需要登录，执行登录操作
+        const currentUrl = page.url();
+        if (currentUrl.includes('/login')) {
+            console.log('[AuthCode] Need to login, submitting credentials');
+
+            const user = username || process.env.TEST_ADMIN_USERNAME || 'admin';
+            const pass = password || process.env.TEST_ADMIN_PASSWORD || 'admin123';
+
+            // 等待登录表单
+            await page.waitForSelector('input[type="text"], input[name*="user"], [data-testid*="username"]', {
+                timeout: 5000
+            }).catch(() => { });
+
+            // 尝试填充用户名
+            try {
+                await page.fill('input[type="text"]', user);
+            } catch {
+                try {
+                    await page.fill('input[name*="user"]', user);
+                } catch {
+                    await page.fill('[data-testid*="username"]', user);
+                }
+            }
+
+            // 尝试填充密码
+            try {
+                await page.fill('input[type="password"]', pass);
+            } catch {
+                await page.fill('input[name*="pass"]', pass);
+            }
+
+            // 提交表单
+            const submitButton = page.locator('button[type="submit"]').first();
+            await submitButton.click();
+
+            // 等待登录完成
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
+        }
+
+        // 步骤4: 如果显示同意页面，点击允许
+        const consentUrlStr = page.url();
+        if (consentUrlStr.includes('/consent') || consentUrlStr.includes('authorize')) {
+            console.log('[AuthCode] Checking for consent page');
+
+            // 尝试找到并点击"允许"按钮
+            try {
+                const allowButton = page.locator('button')
+                    .filter({ hasText: /允许|Allow|Approve|同意/i })
+                    .first();
+                await allowButton.click({ timeout: 5000 });
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
+            } catch {
+                console.log('[AuthCode] No explicit consent button found, continuing...');
+            }
+        }
+
+        // 步骤5: 从重定向URL中提取授权码
+        await page.waitForURL((url: URL) => url.href.includes('/auth/callback') || url.href.includes('code='), {
+            timeout: 10000
+        }).catch(() => { });
+
+        const finalUrl = new URL(page.url());
+        const code = finalUrl.searchParams.get('code');
+
+        if (!code) {
+            throw new Error('No authorization code found in callback URL');
+        }
+
+        console.log('[AuthCode] Authorization code obtained successfully');
+        return code;
+    } catch (error) {
+        throw new Error(`Failed to get authorization code: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    // 8. 等待重定向到回调 URL (包含授权码)
-    await page.waitForURL(/.*\/auth\/callback\?code=.*/, { timeout: 10000 });
-
-    // 9. 提取授权码
-    const url = new URL(page.url());
-    const code = url.searchParams.get('code');
-
-    if (!code) {
-        throw new Error('No authorization code received in callback URL');
-    }
-
-    console.log('✓ Authorization code obtained:', code.substring(0, 20) + '...');
-
-    return code;
-}
-
-/**
- * 生成随机字符串 (用于 state 和 nonce)
- *
- * @param length - 字符串长度
- * @returns string - 随机字符串
- */
-export function generateRandomString(length: number): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
 }

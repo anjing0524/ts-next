@@ -1,0 +1,26 @@
+name: Tests
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+jobs:
+  admin-portal:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v2
+      with:
+        version: 8
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm --filter admin-portal run build
+  oauth-service:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cd apps/oauth-service-rust && cargo test
+    - run: cd apps/oauth-service-rust && cargo build --release

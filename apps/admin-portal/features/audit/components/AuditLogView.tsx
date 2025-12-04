@@ -13,7 +13,7 @@ import {
   Badge,
   ColumnDef,
 } from '@repo/ui';
-import { useAuditLogManagement } from '../hooks/use-audit-log-management';
+import { useAuditManagementServerActions as useAuditLogManagement } from '../hooks/use-audit-management-server-actions';
 import type { AuditLog } from '@/types/auth';
 import { format } from 'date-fns';
 

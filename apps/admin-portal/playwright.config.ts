@@ -13,13 +13,13 @@ export default defineConfig({
   testMatch: '**/*.{test,spec}.{js,ts}',
 
   // 并行执行
-  fullyParallel: true,
+  fullyParallel: false,
 
   // 失败时不重试
   retries: 0,
 
-  // CI环境中的工作进程数
-  workers: process.env.CI ? 1 : undefined,
+  // 限制工作进程数以避免服务超载
+  workers: 1,
 
   // 测试报告配置
   reporter: [
@@ -31,6 +31,9 @@ export default defineConfig({
   // 全局测试设置
   use: {
     // 基础URL - 使用 Pingora 代理端口 6188
+    // 所有流量通过 Pingora 路由：
+    // - /api/v2/* → OAuth Service (3001)
+    // - 其他请求 → Admin Portal (3002)
     baseURL: 'http://localhost:6188',
 
     // 绕过 CSP
@@ -46,14 +49,19 @@ export default defineConfig({
     screenshot: 'only-on-failure',
 
     // 超时设置
-    actionTimeout: 30000,
-    navigationTimeout: 30000,
+    actionTimeout: 10000,
+    navigationTimeout: 10000,
 
     // 忽略HTTPS错误
     ignoreHTTPSErrors: true,
 
     // 跟踪设置
     trace: 'retain-on-failure',
+
+    // 代理配置：如果系统设置了 http_proxy 环境变量，
+    // 为了访问本地 localhost:3002，需要禁用代理
+    // 建议在运行测试前清除代理变量：
+    // env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY npm run test:e2e
   },
 
   // 项目配置
@@ -74,7 +82,6 @@ export default defineConfig({
             '--disable-extensions',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // 单进程模式（适用于容器环境）
             '--disable-blink-features=AutomationControlled',
           ],
         },
@@ -86,17 +93,22 @@ export default defineConfig({
   // 注意：OAuth 客户端流程测试需要以下服务同时运行：
   // 1. oauth-service-rust (端口 3001)
   // 2. admin-portal (端口 3002)
-  // 3. pingora-proxy (端口 6188)
   //
-  // 推荐使用外部脚本启动所有服务，而不是在这里自动启动
-  // 运行测试前，请确保所有服务已经启动
+  // 推荐使用Docker Compose或外部脚本启动所有服务
+  // 如果未配置 webServer，请确保在运行测试前手动启动服务
 
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:3002',
+  //   reuseExistingServer: !process.env.CI,
+  //   timeout: 120000,
+  // },
 
   // 测试输出目录
   outputDir: 'test-results/',
 
   // 期望超时
   expect: {
-    timeout: 10000,
+    timeout: 5000,
   },
 });

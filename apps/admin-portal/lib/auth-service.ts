@@ -1,5 +1,5 @@
 import { AuthProviderInterface, AuthUser, AuthTokens } from '@repo/ui';
-import { adminApi, authApi } from './api';
+import { api, authApi } from './api';
 import { TokenStorage } from './auth/token-storage';
 import { generateCodeVerifier, generateCodeChallenge, safeUrlEncode } from '@/lib/utils/browser';
 
@@ -8,9 +8,13 @@ const OAUTH_BASE_URL = process.env.NEXT_PUBLIC_OAUTH_SERVICE_URL || 'http://loca
 
 export const OAuthConfig = {
   clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'auth-center-admin-client',
-  redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:3002/auth/callback',
-  authorizationEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/authorize`,
-  tokenEndpoint: `${OAUTH_BASE_URL}/api/v2/oauth/token`,
+  // 重定向URI必须通过 Pingora 代理（6188），而不是直接访问 Admin Portal（3002）
+  // Redirect URI must go through Pingora proxy, not directly to Admin Portal
+  redirectUri: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URI || 'http://localhost:6188/auth/callback',
+  // 授权和Token端点也通过相对路径（由浏览器通过Pingora代理）
+  // Authorization and Token endpoints use relative paths (proxied through Pingora)
+  authorizationEndpoint: '/api/v2/oauth/authorize',
+  tokenEndpoint: '/api/v2/oauth/token',
   scope: 'openid profile offline_access admin:full_access',
 };
 
@@ -24,7 +28,7 @@ export const authService: AuthProviderInterface = {
     if (!accessToken) {
       return null;
     }
-    return adminApi.getUserById('me') as Promise<AuthUser | null>;
+    return api.getUserById('me') as Promise<AuthUser | null>;
   },
 
   async login(): Promise<void> {

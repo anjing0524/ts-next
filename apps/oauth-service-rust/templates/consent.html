@@ -1,0 +1,352 @@
+{% extends "layout.html" %}
+
+{% block title %}权限同意 - OAuth 授权系统{% endblock %}
+
+{% block extra_head %}
+<style>
+  .consent-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .consent-card {
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .consent-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .consent-header h1 {
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: bold;
+  }
+
+  .consent-header p {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+
+  .consent-content {
+    padding: 2rem;
+  }
+
+  .client-info {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .client-info h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    color: #111827;
+  }
+
+  .user-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+  }
+
+  .scopes-card {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .scopes-card h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: #111827;
+  }
+
+  .scopes-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .scope-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .scope-item:last-child {
+    border-bottom: none;
+  }
+
+  .scope-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    margin-right: 0.5rem;
+  }
+
+  .remember-choice {
+    background: #f0f9ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .remember-choice label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #1f2937;
+  }
+
+  .remember-choice input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #667eea;
+  }
+
+  .consent-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .consent-actions form {
+    flex: 1;
+  }
+
+  .consent-actions button {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  }
+
+  .btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  .btn-secondary:hover {
+    background: #d1d5db;
+  }
+
+  .security-info {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  @media (max-width: 640px) {
+    .consent-header {
+      padding: 1.5rem;
+    }
+
+    .consent-header h1 {
+      font-size: 1.25rem;
+    }
+
+    .consent-content {
+      padding: 1.5rem;
+    }
+
+    .consent-actions {
+      flex-direction: column;
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .consent-card {
+      background: #1f2937;
+    }
+
+    .client-info,
+    .scopes-card {
+      background: #111827;
+      border-color: #374151;
+    }
+
+    .client-info h2,
+    .scopes-card h3 {
+      color: #f9fafb;
+    }
+
+    .user-info {
+      color: #d1d5db;
+    }
+
+    .scope-item {
+      border-color: #374151;
+    }
+
+    .remember-choice {
+      background: #111827;
+      border-color: #374151;
+    }
+
+    .remember-choice label {
+      color: #f9fafb;
+    }
+
+    .btn-secondary {
+      background: #374151;
+      color: #f3f4f6;
+    }
+
+    .security-info {
+      border-color: #374151;
+      color: #d1d5db;
+    }
+  }
+
+  button:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="consent-container">
+  <div class="consent-card">
+    <div class="consent-header">
+      <h1>权限批准请求</h1>
+      <p>{{ client_name }} 请求访问您的信息</p>
+    </div>
+
+    <div class="consent-content">
+      <div class="client-info">
+        <h2>{{ client_name }}</h2>
+        <p class="user-info">用户: {{ user_email }}</p>
+      </div>
+
+      <div class="scopes-card">
+        <h3>此应用请求以下权限:</h3>
+        <ul class="scopes-list">
+          {% for scope in scope_list %}
+          <li class="scope-item">
+            <span class="scope-badge">{{ scope }}</span>
+            {{ scope }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="remember-choice">
+        <label>
+          <input type="checkbox" id="remember" name="remember">
+          <span>记住此选择（30天内无需再次批准）</span>
+        </label>
+      </div>
+
+      <div class="consent-actions">
+        <form id="deny-form" method="POST" action="/oauth/consent/submit">
+          <input type="hidden" name="decision" value="deny">
+          <input type="hidden" name="client_id" value="">
+          <input type="hidden" name="redirect_uri" value="">
+          <input type="hidden" name="response_type" value="">
+          <input type="hidden" name="scope" value="">
+          <input type="hidden" name="state" value="">
+          <input type="hidden" name="code_challenge" value="">
+          <input type="hidden" name="code_challenge_method" value="">
+          <input type="hidden" name="nonce" value="">
+          <button type="submit" class="btn-secondary">拒绝</button>
+        </form>
+
+        <form id="consent-form" method="POST" action="/oauth/consent/submit">
+          <input type="hidden" name="decision" value="approve">
+          <input type="hidden" name="client_id" value="">
+          <input type="hidden" name="redirect_uri" value="">
+          <input type="hidden" name="response_type" value="">
+          <input type="hidden" name="scope" value="">
+          <input type="hidden" name="state" value="">
+          <input type="hidden" name="code_challenge" value="">
+          <input type="hidden" name="code_challenge_method" value="">
+          <input type="hidden" name="nonce" value="">
+          <input type="hidden" name="remember" value="">
+          <button type="submit" id="approve-btn" class="btn-primary">同意并继续</button>
+        </form>
+      </div>
+
+      <div class="security-info">
+        <p>
+          此应用通过 OAuth 2.1 授权框架访问您的数据。<br>
+          您可以随时撤销应用权限。
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  // 从URL查询参数获取OAuth参数并填充到隐藏字段中
+  function populateOAuthParams() {
+    const params = new URLSearchParams(window.location.search);
+    const fields = [
+      'client_id', 'redirect_uri', 'response_type', 'scope',
+      'state', 'code_challenge', 'code_challenge_method', 'nonce'
+    ];
+
+    fields.forEach(field => {
+      const value = params.get(field) || '';
+      // 同时填充approve和deny表单
+      const approveInput = document.querySelector('#consent-form input[name="' + field + '"]');
+      const denyInput = document.querySelector('#deny-form input[name="' + field + '"]');
+
+      if (approveInput) approveInput.value = value;
+      if (denyInput) denyInput.value = value;
+    });
+  }
+
+  // 页面加载时填充参数
+  document.addEventListener('DOMContentLoaded', populateOAuthParams);
+
+  // 处理同意表单提交
+  document.getElementById('consent-form').addEventListener('submit', (e) => {
+    const remember = document.getElementById('remember').checked;
+    document.querySelector('#consent-form input[name="remember"]').value = remember ? 'true' : 'false';
+  });
+</script>
+{% endblock %}

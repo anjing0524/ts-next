@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ts-next-template.fullname" . }}-config
+  labels:
+    {{- include "ts-next-template.labels" . | nindent 4 }}
+data:
+  database-host: "{{ .Values.database.host }}"
+  database-port: "{{ .Values.database.port }}"
+  database-name: "{{ .Values.database.name }}"
+  database-user: "{{ .Values.database.user }}"
+  redis-host: "{{ .Values.redis.host }}"
+  redis-port: "{{ .Values.redis.port }}"

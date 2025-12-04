@@ -128,22 +128,25 @@ async fn test_code_verifier_must_match_challenge() {
 
     assert!(!auth_code.is_empty(), "Auth code should be created");
 
-    // TODO: 实现令牌端点验证
-    // 5. 尝试用错误的 verifier 交换令牌应该失败
-    // let result = token_service.exchange_code(
-    //     &client_details.client.client_id,
-    //     &auth_code,
-    //     &wrong_verifier,  // 错误的verifier
-    // ).await;
-    // assert!(result.is_err(), "Should fail with incorrect code_verifier");
+    // 5. 验证令牌端点验证 - 使用错误的 verifier 应该失败
+    // 这将在 handle_authorization_code_grant 中通过 pkce::verify_pkce() 验证
+    let wrong_verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
 
-    // 6. 用正确的 verifier 交换应该成功
-    // let result = token_service.exchange_code(
-    //     &client_details.client.client_id,
-    //     &auth_code,
-    //     &correct_verifier,
-    // ).await;
-    // assert!(result.is_ok(), "Should succeed with correct code_verifier");
+    // 验证错误的 verifier 会导致 verify_pkce 失败
+    let verify_result = oauth_service_rust::utils::pkce::verify_pkce(&wrong_verifier, &correct_challenge);
+    assert!(
+        verify_result.is_err(),
+        "Should fail with incorrect code_verifier"
+    );
+    tracing::info!("✅ Verification failed as expected with incorrect verifier");
+
+    // 6. 验证正确的 verifier 会通过验证
+    let verify_result = oauth_service_rust::utils::pkce::verify_pkce(&correct_verifier, &correct_challenge);
+    assert!(
+        verify_result.is_ok(),
+        "Should succeed with correct code_verifier"
+    );
+    tracing::info!("✅ Verification succeeded with correct verifier");
 }
 
 /// 测试: 授权码只能被使用一次
@@ -198,58 +201,32 @@ async fn test_authorization_code_can_only_be_used_once() {
         nonce: None,
     };
 
-    let _auth_code = auth_code_service
+    let auth_code = auth_code_service
         .create_auth_code(&auth_request, "user_456")
         .await
         .expect("Failed to create auth code");
 
-    // 3. 首次使用授权码交换令牌应该成功
-    // Set JWT_SECRET for testing (required since hardcoded fallback was removed)
-    std::env::set_var("JWT_SECRET", "test_jwt_secret_key_for_testing_only_do_not_use_in_production");
+    // 3. 首次使用授权码 - 通过 find_and_consume_code 来消费授权码
+    let consume_result = auth_code_service.find_and_consume_code(&auth_code).await;
+    assert!(
+        consume_result.is_ok(),
+        "First use of authorization code should succeed"
+    );
+    tracing::info!("✅ Authorization code consumed successfully on first use");
 
-    let config = Arc::new(oauth_service_rust::config::Config {
-        database_url: "file::memory:".to_string(),
-        jwt_private_key_path: "".to_string(), // Empty - will use JWT_SECRET env var
-        jwt_public_key_path: "".to_string(),  // Empty - will use JWT_SECRET env var
-        issuer: "http://localhost:3001".to_string(),
-        jwt_algorithm: oauth_service_rust::config::JwtAlgorithm::HS256,
-    });
+    // 4. 验证授权码单次使用 - 尝试再次使用同个授权码应该失败
+    let reuse_result = auth_code_service.find_and_consume_code(&auth_code).await;
+    assert!(
+        reuse_result.is_err(),
+        "Should reject reused authorization code"
+    );
 
-    let token_service = Arc::new(TokenServiceImpl::new(
-        pool.clone(),
-        client_service.clone(),
-        rbac_service.clone(),
-        user_service,
-        config,
-    ));
-
-    let client = client_service
-        .authenticate_client(&client_details.client.client_id, Some(&client_secret))
-        .await
-        .expect("Failed to authenticate client");
-
-    let token_pair = token_service
-        .issue_tokens(
-            &client,
-            Some("user_456".to_string()),
-            "read".to_string(),
-            vec![],
-            None,
-        )
-        .await
-        .expect("Failed to issue tokens");
-
-    assert!(!token_pair.access_token.is_empty());
-
-    // TODO: 实现授权码重用检查
-    // 4. 尝试再次使用同个授权码应该失败
-    // let reuse_result = token_service.exchange_code(
-    //     &client_details.client.client_id,
-    //     &auth_code,
-    //     &verifier,
-    // ).await;
-    // assert!(reuse_result.is_err(), "Should reject reused authorization code");
-    // assert!(reuse_result.unwrap_err().to_string().contains("code"));
+    let error_msg = reuse_result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("used") || error_msg.to_lowercase().contains("code"),
+        "Error message should indicate the code has been used. Got: {}", error_msg
+    );
+    tracing::info!("✅ Authorization code reuse prevented: {}", error_msg);
 }
 
 // ============================================================================
@@ -298,7 +275,7 @@ async fn test_redirect_uri_must_be_registered() {
 
     // 2. 使用未注册的 redirect_uri 请求授权码
     let unregistered_redirect_uri = "https://attacker.com/callback";
-    let _bad_request = AuthorizeRequest {
+    let bad_request = AuthorizeRequest {
         client_id: client_details.client.client_id.clone(),
         redirect_uri: unregistered_redirect_uri.to_string(),
         response_type: "code".to_string(),
@@ -308,20 +285,23 @@ async fn test_redirect_uri_must_be_registered() {
         nonce: None,
     };
 
-    // TODO: 实现重定向URI验证
-    // 预期失败
-    // let result = auth_code_service
-    //     .create_auth_code(&bad_request, "user_789")
-    //     .await;
-    // assert!(
-    //     result.is_err(),
-    //     "Should reject unregistered redirect_uri"
-    // );
-    // assert!(
-    //     result.unwrap_err().to_string().contains("redirect_uri") ||
-    //     result.unwrap_err().to_string().contains("invalid"),
-    //     "Error should mention redirect_uri"
-    // );
+    // 验证未注册的 redirect_uri 会被拒绝
+    let result = auth_code_service
+        .create_auth_code(&bad_request, "user_789")
+        .await;
+    assert!(
+        result.is_err(),
+        "Should reject unregistered redirect_uri"
+    );
+
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("redirect_uri") ||
+        error_msg.to_lowercase().contains("invalid") ||
+        error_msg.to_lowercase().contains("not registered"),
+        "Error should mention redirect_uri. Got: {}", error_msg
+    );
+    tracing::info!("✅ Unregistered redirect_uri rejected: {}", error_msg);
 
     // 3. 使用正确注册的 redirect_uri 应该成功
     let correct_request = AuthorizeRequest {
@@ -342,6 +322,7 @@ async fn test_redirect_uri_must_be_registered() {
         result.is_ok(),
         "Should accept registered redirect_uri"
     );
+    tracing::info!("✅ Registered redirect_uri accepted");
 }
 
 /// 测试: redirect_uri 必须精确匹配 (包括协议、路径、参数)
@@ -374,25 +355,41 @@ async fn test_redirect_uri_must_match_exactly() {
         .await
         .expect("Failed to create client");
 
-    // 2. 尝试用带参数的 URI (应该失败)
-    let _with_params = "https://secure.example.com/auth/callback?state=xyz";
+    // 2. 验证 redirect_uri 必须精确匹配 - 带参数的 URI 应该失败
+    let with_params = "https://secure.example.com/auth/callback?state=xyz";
+    let result = oauth_service_rust::utils::validation::validate_redirect_uri(
+        with_params,
+        &_client_details.redirect_uris
+    );
+    assert!(
+        result.is_err(),
+        "Should reject URI with extra parameters (注册的URI是不带参数的)"
+    );
+    tracing::info!("✅ redirect_uri with extra query parameters rejected");
 
-    // TODO: 验证重定向URI参数
-    // let result = validate_redirect_uri(
-    //     _with_params,
-    //     &_client_details.redirect_uris
-    // );
-    // assert!(result.is_err(), "Should reject URI with extra parameters");
+    // 3. 验证协议必须一致 - 不同协议的 URI 应该失败
+    let http_version = "http://secure.example.com/auth/callback";
+    let result = oauth_service_rust::utils::validation::validate_redirect_uri(
+        http_version,
+        &_client_details.redirect_uris
+    );
+    assert!(
+        result.is_err(),
+        "Should reject different protocol (注册的是HTTPS，请求的是HTTP)"
+    );
+    tracing::info!("✅ redirect_uri with different protocol (HTTP vs HTTPS) rejected");
 
-    // 3. 尝试用不同协议 (应该失败)
-    let _http_version = "http://secure.example.com/auth/callback";
-
-    // TODO: 验证协议一致性
-    // let result = validate_redirect_uri(
-    //     http_version,
-    //     &client_details.client.redirect_uris
-    // );
-    // assert!(result.is_err(), "Should reject different protocol");
+    // 4. 验证精确匹配的 URI 应该成功
+    let exact_match = "https://secure.example.com/auth/callback";
+    let result = oauth_service_rust::utils::validation::validate_redirect_uri(
+        exact_match,
+        &_client_details.redirect_uris
+    );
+    assert!(
+        result.is_ok(),
+        "Should accept exactly matching redirect_uri"
+    );
+    tracing::info!("✅ Exact matching redirect_uri accepted");
 }
 
 // ============================================================================
@@ -436,26 +433,56 @@ async fn test_client_scope_enforcement() {
     assert!(allowed_scopes.contains(&"read".to_string()), "read scope should be allowed");
     assert!(allowed_scopes.contains(&"profile".to_string()), "profile scope should be allowed");
 
-    // TODO: 实现授权码中的作用域检查
-    // 3. 尝试请求未授权的作用域 (admin)
-    // let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
-    // let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
-    //
-    // let bad_scope_request = AuthorizeRequest {
-    //     client_id: client_details.client.client_id.clone(),
-    //     redirect_uri: "http://localhost:3000/callback".to_string(),
-    //     response_type: "code".to_string(),
-    //     scope: "admin".to_string(),  // 未授权的作用域
-    //     code_challenge: challenge.clone(),
-    //     code_challenge_method: "S256".to_string(),
-    //     nonce: None,
-    // };
-    //
-    // let result = auth_code_service
-    //     .create_auth_code(&bad_scope_request, "user_scope")
-    //     .await;
-    //
-    // assert!(result.is_err(), "Should reject unauthorized scope");
+    // 3. 验证未授权的作用域会被拒绝
+    let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
+        pool.clone(),
+        client_service.clone(),
+    ));
+
+    let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
+    let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
+
+    // 尝试请求未授权的作用域 (admin)
+    let bad_scope_request = AuthorizeRequest {
+        client_id: client_details.client.client_id.clone(),
+        redirect_uri: "http://localhost:3000/callback".to_string(),
+        response_type: "code".to_string(),
+        scope: "admin".to_string(),  // 未授权的作用域
+        code_challenge: challenge.clone(),
+        code_challenge_method: "S256".to_string(),
+        nonce: None,
+    };
+
+    let result = auth_code_service
+        .create_auth_code(&bad_scope_request, "user_scope")
+        .await;
+
+    assert!(result.is_err(), "Should reject unauthorized scope");
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("scope") ||
+        error_msg.to_lowercase().contains("not allowed"),
+        "Error should mention scope. Got: {}", error_msg
+    );
+    tracing::info!("✅ Unauthorized scope rejected: {}", error_msg);
+
+    // 4. 验证授权的作用域应该接受
+    let good_scope_request = AuthorizeRequest {
+        client_id: client_details.client.client_id.clone(),
+        redirect_uri: "http://localhost:3000/callback".to_string(),
+        response_type: "code".to_string(),
+        scope: "read profile".to_string(),  // 授权的作用域
+        code_challenge: challenge,
+        code_challenge_method: "S256".to_string(),
+        nonce: None,
+    };
+
+    let result = auth_code_service
+        .create_auth_code(&good_scope_request, "user_scope")
+        .await;
+
+    assert!(result.is_ok(), "Should accept authorized scope");
+    tracing::info!("✅ Authorized scope accepted");
 }
 
 // ============================================================================
@@ -497,8 +524,8 @@ async fn test_pkce_required_for_public_clients_oauth_2_1() {
         .await
         .expect("Failed to create public client");
 
-    // 2. 尝试在没有 PKCE 的情况下获取授权码
-    let _no_pkce_request = AuthorizeRequest {
+    // 2. 验证 PUBLIC 客户端在没有 PKCE 的情况下会被拒绝
+    let no_pkce_request = AuthorizeRequest {
         client_id: client_details.client.client_id.clone(),
         redirect_uri: "http://localhost:3000/callback".to_string(),
         response_type: "code".to_string(),
@@ -508,17 +535,25 @@ async fn test_pkce_required_for_public_clients_oauth_2_1() {
         nonce: None,
     };
 
-    // TODO: 实现 OAuth 2.1 PKCE 强制检查
-    // let result = auth_code_service
-    //     .create_auth_code(&no_pkce_request, "user_pkce")
-    //     .await;
-    //
-    // assert!(
-    //     result.is_err(),
-    //     "OAuth 2.1 requires PKCE for public clients"
-    // );
+    // OAuth 2.1 强制 PUBLIC 客户端使用 PKCE
+    let result = auth_code_service
+        .create_auth_code(&no_pkce_request, "user_pkce")
+        .await;
 
-    // 3. 使用 PKCE 应该成功
+    assert!(
+        result.is_err(),
+        "OAuth 2.1 requires PKCE for public clients"
+    );
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("pkce") ||
+        error_msg.to_lowercase().contains("code_challenge") ||
+        error_msg.to_lowercase().contains("public"),
+        "Error should mention PKCE or public clients. Got: {}", error_msg
+    );
+    tracing::info!("✅ PUBLIC client without PKCE rejected: {}", error_msg);
+
+    // 3. 验证 PUBLIC 客户端使用 PKCE 应该成功
     let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
     let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
 
@@ -537,6 +572,7 @@ async fn test_pkce_required_for_public_clients_oauth_2_1() {
         .await;
 
     assert!(result.is_ok(), "PUBLIC client with PKCE should succeed");
+    tracing::info!("✅ PUBLIC client with PKCE accepted");
 }
 
 // ============================================================================
@@ -570,11 +606,23 @@ async fn test_error_response_format_compliance() {
     assert!(result.is_err(), "Should fail with invalid client_id");
 
     let error = result.unwrap_err();
-    let _error_msg = error.to_string();
+    let error_msg = error.to_string();
 
-    // TODO: 验证错误格式
-    // 应该包含 "invalid_client" 或类似的标准OAuth错误代码
-    // 不应该包含数据库错误信息等内部信息
+    // 验证错误消息不包含内部实现细节（如数据库错误）
+    assert!(
+        !error_msg.to_lowercase().contains("sql") &&
+        !error_msg.to_lowercase().contains("database") &&
+        !error_msg.to_lowercase().contains("connection"),
+        "Error message should not leak internal database details. Got: {}", error_msg
+    );
+
+    // 错误消息应该是用户可读的 OAuth 错误描述
+    assert!(
+        error_msg.len() > 0 && error_msg.len() < 500,
+        "Error message should be a reasonable length"
+    );
+
+    tracing::info!("✅ Error response format compliant (no internal details leaked): {}", error_msg);
 }
 
 // ============================================================================
@@ -591,18 +639,256 @@ async fn test_error_response_format_compliance() {
 /// - 使用已撤销的令牌: ❌ 被拒绝
 #[tokio::test]
 async fn test_token_revocation_endpoint_basic() {
-    // TODO: 完整实现令牌撤销端点
-    // 此测试当前作为占位符，待 revoke_token 在 TokenService 中实现
+    // 令牌撤销端点测试 (RFC 7009)
+    let pool = Arc::new(setup_test_db().await);
+    create_test_user(&pool, "user_revoke", "testuser_revoke").await;
 
-    // 预期流程:
-    // 1. 创建客户端和用户
-    // 2. 发行令牌
-    // 3. 调用 POST /oauth/revoke (client_id, token)
-    // 4. 验证响应 (200 OK)
-    // 5. 尝试使用已撤销的令牌
-    // 6. 应该返回 invalid_token
+    let permission_cache = Arc::new(InMemoryPermissionCache::new());
+    let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
+    let user_service = Arc::new(UserServiceImpl::new(pool.clone()));
+    let rbac_service = Arc::new(RBACServiceImpl::new(pool.clone(), permission_cache));
 
-    // TODO: Token revocation tests will be implemented in Phase 2
+    // 1. 创建客户端
+    let request = CreateClientRequest {
+        name: "Token Revocation Test Client".to_string(),
+        client_type: "CONFIDENTIAL".to_string(),
+        redirect_uris: vec!["http://localhost:3000/callback".to_string()],
+        grant_types: vec!["authorization_code".to_string(), "client_credentials".to_string()],
+        response_types: vec!["code".to_string()],
+        allowed_scopes: vec!["read".to_string()],
+        client_permissions: None,
+    };
+
+    let (client_details, _) = client_service
+        .create_client(request)
+        .await
+        .expect("Failed to create client");
+
+    // 2. 配置并创建 TokenService
+    std::env::set_var("JWT_SECRET", "test_jwt_secret_key_for_testing_only_do_not_use_in_production");
+
+    let config = Arc::new(oauth_service_rust::config::Config {
+        database_url: "file::memory:".to_string(),
+        jwt_private_key_path: "".to_string(),
+        jwt_public_key_path: "".to_string(),
+        issuer: "http://localhost:3001".to_string(),
+        jwt_algorithm: oauth_service_rust::config::JwtAlgorithm::HS256,
+    });
+
+    let token_service = Arc::new(TokenServiceImpl::new(
+        pool.clone(),
+        client_service.clone(),
+        rbac_service,
+        user_service,
+        config,
+    ));
+
+    // 3. 发行令牌
+    let token_pair = token_service
+        .issue_tokens(
+            &client_details,
+            Some("user_revoke".to_string()),
+            "read".to_string(),
+            vec![],
+            None,
+        )
+        .await
+        .expect("Failed to issue tokens");
+
+    let access_token = token_pair.access_token.clone();
+    assert!(!access_token.is_empty(), "Access token should be issued");
+    tracing::info!("✅ Token issued successfully");
+
+    // 4. 验证令牌有效
+    let introspect_result = token_service.introspect_token(&access_token).await;
+    assert!(introspect_result.is_ok(), "Token should be valid before revocation");
+    tracing::info!("✅ Token is valid before revocation");
+
+    // 5. 撤销令牌
+    let revoke_result = token_service.revoke_token(&access_token, Some("access_token")).await;
+    assert!(revoke_result.is_ok(), "Token revocation should succeed");
+    tracing::info!("✅ Token revoked successfully");
+
+    // 6. 验证已撤销的令牌被拒绝
+    let introspect_result = token_service.introspect_token(&access_token).await;
+    assert!(
+        introspect_result.is_err(),
+        "Token should be invalid after revocation"
+    );
+    tracing::info!("✅ Revoked token is properly rejected on introspection");
+}
+
+// ============================================================================
+// 授权码生成失败处理测试
+// ============================================================================
+
+/// 测试: 授权码生成失败处理 - 无效的客户端
+///
+/// 场景 A: 客户端不存在时的授权码生成
+/// 预期: 应该返回"客户端未找到"错误
+#[tokio::test]
+async fn test_auth_code_generation_with_invalid_client() {
+    let pool = Arc::new(setup_test_db().await);
+
+    let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
+    let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
+        pool.clone(),
+        client_service.clone(),
+    ));
+
+    // 1. 创建授权请求，但使用不存在的 client_id
+    let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
+    let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
+
+    let bad_request = AuthorizeRequest {
+        client_id: "non-existent-client-id".to_string(),
+        redirect_uri: "https://example.com/callback".to_string(),
+        response_type: "code".to_string(),
+        scope: "read".to_string(),
+        code_challenge: challenge,
+        code_challenge_method: "S256".to_string(),
+        nonce: None,
+    };
+
+    // 2. 尝试为不存在的客户端生成授权码应该失败
+    let result = auth_code_service
+        .create_auth_code(&bad_request, "test_user")
+        .await;
+
+    assert!(result.is_err(), "Should fail with non-existent client");
+
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("client") || error_msg.to_lowercase().contains("not found"),
+        "Error should mention client not found. Got: {}", error_msg
+    );
+    tracing::info!("✅ Authorization code generation properly failed for invalid client: {}", error_msg);
+}
+
+/// 测试: 授权码生成失败处理 - 无效的重定向 URI
+///
+/// 场景 B: 客户端存在但提供的 redirect_uri 不在注册列表中
+/// 预期: 应该返回"重定向 URI 未注册"错误
+#[tokio::test]
+async fn test_auth_code_generation_with_unregistered_redirect_uri() {
+    let pool = Arc::new(setup_test_db().await);
+
+    let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
+    let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
+        pool.clone(),
+        client_service.clone(),
+    ));
+
+    // 1. 创建客户端（只注册特定的 redirect_uri）
+    let request = CreateClientRequest {
+        name: "Test Client for Redirect URI Validation".to_string(),
+        client_type: "CONFIDENTIAL".to_string(),
+        redirect_uris: vec!["https://myapp.example.com/callback".to_string()],
+        grant_types: vec!["authorization_code".to_string()],
+        response_types: vec!["code".to_string()],
+        allowed_scopes: vec!["read".to_string()],
+        client_permissions: None,
+    };
+
+    let (client_details, _) = client_service
+        .create_client(request)
+        .await
+        .expect("Failed to create client");
+
+    // 2. 生成授权请求但使用不同的 redirect_uri
+    let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
+    let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
+
+    let bad_request = AuthorizeRequest {
+        client_id: client_details.client.client_id.clone(),
+        redirect_uri: "https://different-domain.example.com/callback".to_string(),
+        response_type: "code".to_string(),
+        scope: "read".to_string(),
+        code_challenge: challenge,
+        code_challenge_method: "S256".to_string(),
+        nonce: None,
+    };
+
+    // 3. 尝试为提供了不匹配的 redirect_uri 的客户端生成授权码应该失败
+    let result = auth_code_service
+        .create_auth_code(&bad_request, "test_user")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Should fail with unregistered redirect_uri"
+    );
+
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("redirect_uri") ||
+        error_msg.to_lowercase().contains("not registered"),
+        "Error should mention redirect_uri not registered. Got: {}", error_msg
+    );
+    tracing::info!("✅ Authorization code generation properly failed for unregistered redirect_uri: {}", error_msg);
+}
+
+/// 测试: 授权码生成失败处理 - 无效的作用域
+///
+/// 场景 C: 客户端存在但请求的 scope 不在允许范围内
+/// 预期: 应该返回"作用域不允许"错误
+#[tokio::test]
+async fn test_auth_code_generation_with_invalid_scope() {
+    let pool = Arc::new(setup_test_db().await);
+
+    let client_service = Arc::new(ClientServiceImpl::new(pool.clone()));
+    let auth_code_service = Arc::new(AuthCodeServiceImpl::new(
+        pool.clone(),
+        client_service.clone(),
+    ));
+
+    // 1. 创建客户端（只允许特定的 scope）
+    let request = CreateClientRequest {
+        name: "Test Client for Scope Validation".to_string(),
+        client_type: "PUBLIC".to_string(),
+        redirect_uris: vec!["https://myapp.example.com/callback".to_string()],
+        grant_types: vec!["authorization_code".to_string()],
+        response_types: vec!["code".to_string()],
+        allowed_scopes: vec!["read".to_string(), "profile".to_string()],
+        client_permissions: None,
+    };
+
+    let (client_details, _) = client_service
+        .create_client(request)
+        .await
+        .expect("Failed to create client");
+
+    // 2. 生成授权请求但使用不允许的 scope
+    let verifier = oauth_service_rust::utils::pkce::generate_code_verifier();
+    let challenge = oauth_service_rust::utils::pkce::generate_code_challenge(&verifier);
+
+    let bad_request = AuthorizeRequest {
+        client_id: client_details.client.client_id.clone(),
+        redirect_uri: "https://myapp.example.com/callback".to_string(),
+        response_type: "code".to_string(),
+        scope: "admin write".to_string(), // 不允许的 scope
+        code_challenge: challenge,
+        code_challenge_method: "S256".to_string(),
+        nonce: None,
+    };
+
+    // 3. 尝试为请求了不允许的 scope 的客户端生成授权码应该失败
+    let result = auth_code_service
+        .create_auth_code(&bad_request, "test_user")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Should fail with unauthorized scope"
+    );
+
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("scope") ||
+        error_msg.to_lowercase().contains("not allowed"),
+        "Error should mention invalid scope. Got: {}", error_msg
+    );
+    tracing::info!("✅ Authorization code generation properly failed for invalid scope: {}", error_msg);
 }
 
 // ============================================================================

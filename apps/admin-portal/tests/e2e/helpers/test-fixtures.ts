@@ -107,8 +107,7 @@ export const TEST_CLIENTS = {
         client_type: 'confidential',
         grant_types: ['authorization_code', 'refresh_token'],
         redirect_uris: [
-            'http://localhost:6188/auth/callback',
-            'http://localhost:3002/auth/callback',
+            'http://localhost:6188/auth/callback', // Pingora 代理
         ],
         allowed_scopes: ['openid', 'profile', 'email'],
         description: 'Admin Portal Web 应用',
@@ -254,7 +253,7 @@ export const API_ENDPOINTS = {
  * 测试配置
  */
 export const TEST_CONFIG = {
-    // 基础 URL
+    // 基础 URL - 使用 Pingora 代理（6188）路由所有流量
     baseUrl: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188',
 
     // 超时配置

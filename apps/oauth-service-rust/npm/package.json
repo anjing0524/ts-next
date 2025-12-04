@@ -1,0 +1,57 @@
+{
+  "name": "oauth-service-napi",
+  "version": "0.1.0",
+  "description": "OAuth Service Rust napi SDK for Node.js - High-performance native addon for OAuth 2.0/2.1 authentication",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ts-next-template.git",
+    "directory": "apps/oauth-service-rust"
+  },
+  "homepage": "https://github.com/your-org/ts-next-template/tree/main/apps/oauth-service-rust#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/ts-next-template/issues"
+  },
+  "keywords": [
+    "oauth",
+    "oauth2",
+    "oauth2.1",
+    "authentication",
+    "authorization",
+    "rust",
+    "napi",
+    "napi-rs",
+    "native-addon",
+    "sdk",
+    "typescript",
+    "rbac",
+    "jwt",
+    "token"
+  ],
+  "author": "Admin Portal Team",
+  "license": "MIT",
+  "napi": {
+    "name": "oauth-service-napi",
+    "triples": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --release",
+    "build:debug": "napi build",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.16.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "@types/jest": "^29.5.0",
+    "typescript": "^5.0.0"
+  }
+}

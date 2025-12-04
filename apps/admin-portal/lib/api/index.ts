@@ -1,31 +1,87 @@
 /**
- * Consolidated API and Auth Library - Unified entry point
+ * API 客户端库 - 统一入口点
  *
- * This file serves as the single entry point for all API and auth functionality
- * after the consolidation of legacy files.
+ * 使用装饰器模式实现的现代化HTTP客户端，提供缓存、重试、熔断器、认证等功能
  */
 
-import { APIClient, type RequestOptions } from './api-client-consolidated';
+import type {
+  AuditLog,
+  LoginCredentials,
+  TokenResponse,
+  ConsentParams,
+  User,
+  Role,
+  Permission,
+  OAuthClient,
+  SystemConfiguration,
+  ClientCreateRequest,
+  ClientUpdateRequest,
+  ClientFilter,
+  RoleCreateRequest,
+  RoleFilter,
+  UserCreateRequest,
+  UserUpdateRequest,
+  UserFilter,
+} from '@/types/auth';
 
-// API Client (consolidated)
-export { APIClient } from './api-client-consolidated';
-export { APIClient as EnhancedAPIClient } from './api-client-consolidated';
-export type { RequestOptions } from './api-client-consolidated';
+import type {
+  RoleUpdateRequest,
+  PermissionCreateRequest,
+  PermissionUpdateRequest,
+  SystemConfigUpdateRequest,
+} from './types/request-response';
 
-// Token Storage (consolidated)
-export { TokenStorage } from '../auth/token-storage-consolidated';
-export type { TokenStorageOptions } from '../auth/token-storage-consolidated';
+export type {
+  AuditLog,
+  LoginCredentials,
+  TokenResponse,
+  ConsentParams,
+  User,
+  Role,
+  Permission,
+  OAuthClient,
+  SystemConfiguration,
+  ClientCreateRequest,
+  ClientUpdateRequest,
+  ClientFilter,
+  RoleCreateRequest,
+  RoleUpdateRequest,
+  RoleFilter,
+  UserCreateRequest,
+  UserUpdateRequest,
+  UserFilter,
+  PermissionCreateRequest,
+  PermissionUpdateRequest,
+  SystemConfigUpdateRequest,
+};
 
-// Supporting modules
-export { APICacheLayer } from './cache-layer';
-export { RetryWithCircuitBreaker } from './retry-with-circuit-breaker';
+// --- HTTP客户端核心模块 ---
+import { HttpClientFactory, defaultHttpClient } from './client/http-client';
+export { HttpClientFactory, defaultHttpClient };
+export type { HttpClient, HttpRequestOptions, HttpResponse } from './client/types';
 
-// Auth-related exports
-export { EnhancedTokenStorage as AuthTokenStorage } from '../auth/enhanced-token-storage';
+// --- 装饰器模块 ---
+export { CacheDecorator } from './decorators/cache-decorator';
+export { RetryDecorator } from './decorators/retry-decorator';
+export { CircuitBreakerDecorator } from './decorators/circuit-breaker-decorator';
+export { AuthDecorator } from './decorators/auth-decorator';
 
-// --- Convenient API Request Functions ---
+// --- 资源API模块 ---
+import { authResource, authApi } from './resources/auth';
+import { usersResource, usersApi } from './resources/users';
+import { rolesResource, rolesApi } from './resources/roles';
+import { clientsResource, clientsApi } from './resources/clients';
+import { permissionsResource, permissionsApi } from './resources/permissions';
+import { systemResource, systemApi } from './resources/system';
+
+export { authResource, usersResource, rolesResource, clientsResource, permissionsResource, systemResource };
+export { authApi, usersApi, rolesApi, clientsApi, permissionsApi, systemApi };
+
+// --- 向后兼容的API请求函数 ---
 
 /**
+ * @deprecated 请使用新的资源API类，例如：usersResource.list() 或 usersApi.getUsers()
+ *
  * 发送 API 请求的通用函数
  *
  * 使用示例：
@@ -38,52 +94,53 @@ export { EnhancedTokenStorage as AuthTokenStorage } from '../auth/enhanced-token
  */
 export const apiRequest = <T = any>(
   endpoint: string,
-  options?: RequestOptions
-): Promise<T> => APIClient.request<T>(endpoint, options);
-
-/**
- * Admin Portal 特定功能的 API 助手函数集合
- *
- * 这些函数提供针对特定场景的便捷 API 调用，例如 OAuth 同意页面
- */
-export const adminApi = {
-  /**
-   * 提交用户的授权同意决定
-   *
-   * @param action - 用户的决定：'allow' 允许 或 'deny' 拒绝
-   * @param params - OAuth 参数（包括 client_id, redirect_uri, scope 等）
-   * @returns 包含重定向 URI 的响应
-   *
-   * 工作流程：
-   * 1. 用户在同意页面选择"允许"或"拒绝"
-   * 2. 调用此函数提交决定到 OAuth Service
-   * 3. OAuth Service 验证用户和权限
-   * 4. 如果允许，生成授权码并返回重定向 URI
-   * 5. 如果拒绝，返回带 error=access_denied 的重定向 URI
-   * 6. 前端重定向到返回的 URI
-   */
-  async submitConsent(
-    action: 'allow' | 'deny',
-    params: URLSearchParams
-  ): Promise<{ redirect_uri: string }> {
-    const response = await apiRequest<{ redirect_uri: string }>(
-      '/oauth/consent/submit',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          decision: action,
-          ...Object.fromEntries(params),
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        skipCache: true, // 不缓存同意决定
-      }
-    );
-    return response;
-  },
+  options?: any
+): Promise<T> => {
+  console.warn('apiRequest is deprecated. Please use the new resource APIs instead.');
+  const client = HttpClientFactory.createFullFeaturedClient();
+  return client.request<T>(endpoint, options).then((response: any) => response.data);
 };
 
-// Utility exports (removed to fix compilation issues)
-// Note: Use direct imports instead: import { APIClient } from '@/lib/api'
+// --- 统一API对象 ---
+
+/**
+ * 统一API对象，组合所有资源特定的API
+ * 提供应用程序中所有API调用的单一入口点
+ */
+export const api = {
+  ...authApi,
+  ...usersApi,
+  ...rolesApi,
+  ...clientsApi,
+  ...permissionsApi,
+  ...systemApi,
+};
+
+
+// --- 类型定义 ---
+
+/**
+ * 分页响应类型
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    [key: string]: any;
+  };
+}
+
+/**
+ * 审计日志响应类型
+ */
+export interface AuditLogsResponse extends PaginatedResponse<AuditLog> {}
+
+// --- 默认导出 ---
+
+/**
+ * 默认导出：HTTP客户端工厂
+ */
+export default HttpClientFactory;

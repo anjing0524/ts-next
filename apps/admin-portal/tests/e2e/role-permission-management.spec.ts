@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { completeOAuthLogin } from './helpers/test-helpers';
 
 /**
  * Role and Permission Management E2E Tests
@@ -19,6 +20,9 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 test.describe('Role and Permission Management', () => {
+  // Pingora 代理地址（6188）路由所有流量：
+  // - /api/v2/* → OAuth Service (3001)
+  // - 其他请求 → Admin Portal (3002)
   const baseUrl = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:6188';
   const rolesRoute = '/admin/system/roles';
   const testUsername = process.env.TEST_ADMIN_USERNAME || 'admin';

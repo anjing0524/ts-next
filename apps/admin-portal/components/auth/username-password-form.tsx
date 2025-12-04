@@ -54,7 +54,8 @@ export function UsernamePasswordForm({ className }: UsernamePasswordFormProps) {
       return;
     }
 
-    // 验证必填字段
+    // 前端 UX 层验证 - 提供即时反馈
+    // OAuth Service 会进行完整的安全验证（bcrypt、权限等）
     if (!username || !password) {
       setError('请输入用户名和密码');
       setLoading(false);
@@ -62,11 +63,9 @@ export function UsernamePasswordForm({ className }: UsernamePasswordFormProps) {
     }
 
     try {
-      // 构建登录请求 URL (通过 Pingora)
-      const pingora_url = typeof window !== 'undefined'
-        ? `${window.location.protocol}//${window.location.hostname}:6188`
-        : 'http://localhost:6188';
-      const loginUrl = `${pingora_url}/api/v2/auth/login`;
+      // 直接通过 Pingora 代理访问 OAuth Service API
+      // Pingora 会根据 /api/v2/ 路由转发到 OAuth Service
+      const loginUrl = '/api/v2/auth/login';
 
       console.log('Sending login request to:', loginUrl);
 

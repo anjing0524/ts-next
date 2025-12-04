@@ -30,18 +30,28 @@ export interface TokenPayload {
 }
 
 /**
+ * AuditLogDetails - 审计日志详情，存储为 JSON 数据
+ */
+export interface AuditLogDetails {
+  [key: string]: unknown;
+  message?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * AuditLog - 审计日志（来自 API 响应）
  */
 export interface AuditLog {
   id: string;
-  timestamp: Date;
+  timestamp: string; // ISO 8601 格式: "2025-12-02T10:30:00Z"
   userId: string | null;
   actorType: string;
   actorId: string;
   action: string;
   resourceType: string | null;
   resourceId: string | null;
-  details: any;
+  details: AuditLogDetails | null;
   status: string;
   ipAddress: string | null;
   userAgent: string | null;
@@ -67,8 +77,8 @@ export interface OAuthClient {
   jwksUri?: string;
   logoUri?: string;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601 格式
+  updatedAt: string; // ISO 8601 格式
 }
 
 /**
@@ -96,8 +106,8 @@ export interface Role {
   displayName?: string;
   description?: string;
   isSystem: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601 格式
+  updatedAt: string; // ISO 8601 格式
 }
 
 /**
@@ -120,8 +130,8 @@ export interface Permission {
   type: 'API' | 'MENU' | 'DATA';
   resource?: string;
   action?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO 8601 格式
+  updatedAt: string; // ISO 8601 格式
 }
 
 /**
@@ -133,5 +143,148 @@ export interface SystemConfiguration {
   value: string;
   type: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON';
   description?: string;
-  updatedAt: Date;
+  updatedAt: string; // ISO 8601 格式
+}
+
+/**
+ * LoginCredentials - 登录凭证
+ */
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+/**
+ * TokenResponse - 令牌响应
+ */
+export interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  refreshExpiresIn: number;
+  tokenType?: string;
+}
+
+/**
+ * ConsentParams - 同意授权参数
+ */
+export interface ConsentParams {
+  [key: string]: string;
+}
+
+/**
+ * ClientCreateRequest - 客户端创建请求
+ */
+export interface ClientCreateRequest {
+  name: string;
+  redirectUris: string[];
+  grantTypes: string[];
+  clientType: 'CONFIDENTIAL' | 'PUBLIC';
+  allowedScopes: string[];
+  accessTokenTtl: number;
+  refreshTokenTtl: number;
+  requirePkce: boolean;
+  requireConsent: boolean;
+  description?: string;
+}
+
+/**
+ * ClientUpdateRequest - 客户端更新请求
+ */
+export interface ClientUpdateRequest {
+  name?: string;
+  redirectUris?: string[];
+  grantTypes?: string[];
+  clientType?: 'CONFIDENTIAL' | 'PUBLIC';
+  allowedScopes?: string[];
+  accessTokenTtl?: number;
+  refreshTokenTtl?: number;
+  requirePkce?: boolean;
+  requireConsent?: boolean;
+  description?: string;
+  isActive?: boolean;
+}
+
+/**
+ * ClientFilter - 客户端过滤器
+ */
+export interface ClientFilter {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  clientType?: string;
+  isActive?: boolean;
+}
+
+/**
+ * RoleCreateRequest - 角色创建请求
+ */
+export interface RoleCreateRequest {
+  name: string;
+  displayName?: string;
+  description?: string;
+  permissionIds: string[];
+}
+
+/**
+ * RoleUpdateRequest - 角色更新请求
+ */
+export interface RoleUpdateRequest {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+/**
+ * RoleFilter - 角色过滤器
+ */
+export interface RoleFilter {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  isSystem?: boolean;
+}
+
+/**
+ * UserCreateRequest - 用户创建请求
+ */
+export interface UserCreateRequest {
+  username: string;
+  password: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  organization?: string;
+  department?: string;
+  roleIds?: string[];
+  isActive?: boolean;
+  mustChangePassword?: boolean;
+}
+
+/**
+ * UserUpdateRequest - 用户更新请求
+ */
+export interface UserUpdateRequest {
+  username?: string;
+  password?: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  organization?: string;
+  department?: string;
+  isActive?: boolean;
+  mustChangePassword?: boolean;
+  roles?: string[];
+}
+
+/**
+ * UserFilter - 用户过滤器
+ */
+export interface UserFilter {
+  offset?: number;
+  limit?: number;
+  search?: string;
+  isActive?: boolean;
+  organization?: string;
+  department?: string;
 }

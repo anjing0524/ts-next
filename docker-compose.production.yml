@@ -105,6 +105,7 @@ services:
       - ENABLE_AUDIT_LOG=true
       - LOG_OUTPUT=file
       - LOG_FILE_PATH=/app/logs/oauth-service.log
+      - COOKIE_DOMAIN=.yourdomain.com  # ✅ 明确设置 Cookie domain - 必须与 Pingora 暴露的域名一致
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s

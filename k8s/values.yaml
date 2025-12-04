@@ -1,0 +1,72 @@
+replicaCount: 2
+
+image:
+  registry: docker.io
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+oauthService:
+  name: oauth-service
+  image:
+    repository: your-registry/oauth-service
+    tag: "1.0.0"
+  port: 3001
+  replicas: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+adminPortal:
+  name: admin-portal
+  image:
+    repository: your-registry/admin-portal
+    tag: "1.0.0"
+  port: 3000
+  replicas: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+database:
+  host: postgres
+  port: 5432
+  name: oauth_db
+  user: postgres
+
+redis:
+  host: redis
+  port: 6379
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: "api.example.com"
+      paths:
+        - path: /
+          pathType: Prefix
+          service: oauth-service
+    - host: "admin.example.com"
+      paths:
+        - path: /
+          pathType: Prefix
+          service: admin-portal
+  tls: []
+
+service:
+  type: ClusterIP
+  annotations: {}
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 10Gi

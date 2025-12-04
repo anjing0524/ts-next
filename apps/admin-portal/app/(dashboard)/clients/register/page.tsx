@@ -16,7 +16,7 @@ import {
   Input,
   Label,
 } from '@repo/ui';
-import { adminApi } from '../../../../lib/api';
+import { api } from '../../../../lib/api';
 import { PermissionGuard } from '@repo/ui';
 
 // Zod schema for client registration (matches backend)
@@ -83,11 +83,11 @@ function ClientRegisterPage() {
     }
 
     try {
-      const result = await adminApi.registerClient(validation.data);
+      const result = await api.registerClient(validation.data);
 
       setApiResponse({
         type: 'success',
-        message: result.message || 'Client registered successfully!',
+        message: 'Client registered successfully!',
         data: { clientId: result.clientId ?? '', clientSecret: result.clientSecret ?? '' },
       });
       // Optionally clear form: setName(''); setRedirectUris('');

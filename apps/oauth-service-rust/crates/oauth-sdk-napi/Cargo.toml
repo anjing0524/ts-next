@@ -1,0 +1,30 @@
+[package]
+name = "oauth-sdk-napi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[package.metadata.napi]
+name = "oauth-service-napi"
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Local crates
+oauth-models = { path = "../oauth-models" }
+oauth-core = { path = "../oauth-core" }
+
+# NAPI dependencies
+napi = { workspace = true }
+napi-derive = { workspace = true }
+
+# Async and serialization
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]

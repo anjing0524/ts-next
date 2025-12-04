@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ts-next-template
+description: A Helm chart for ts-next-template monorepo
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - oauth
+  - nextjs
+  - rust
+maintainers:
+  - name: Your Team
+    email: team@example.com
